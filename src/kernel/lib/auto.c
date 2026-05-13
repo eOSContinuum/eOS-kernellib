@@ -280,7 +280,7 @@ static object compile_object(string path, string source...)
     uid = creator(path);
     if ((sizeof(source) != 0 && kernel) ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 ((lib || !uid) &&
 					  sizeof(source) == 0 && !kernel) ?
 					  READ_ACCESS : WRITE_ACCESS))) {
@@ -896,7 +896,7 @@ static string read_file(string path, varargs int offset, int size)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -924,7 +924,7 @@ static int write_file(string path, string str, varargs int offset)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
@@ -970,7 +970,7 @@ static int remove_file(string path)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
@@ -997,7 +997,7 @@ static int remove_file(string path)
 static int rename_file(string from, string to)
 {
     string oname, fcreator, tcreator;
-    object accessd, resource_daemon;
+    object access_daemon, resource_daemon;
     int size, result, *rsrc;
 
     CHECKARG(from, 1, "rename_file");
@@ -1009,14 +1009,14 @@ static int rename_file(string from, string to)
     oname = object_name(this_object());
     from = normalize_path(from, oname + "/..");
     to = normalize_path(to, oname + "/..");
-    accessd = ::find_object(ACCESSD);
+    access_daemon = ::find_object(ACCESS_DAEMON);
     if (sscanf(from + "/", "/kernel/%*s") != 0 ||
 	sscanf(to, "/kernel/%*s") != 0 ||
 	sscanf(from + "/", "/include/kernel/%*s") != 0 || from == "/include" ||
 	sscanf(to, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 (!accessd->access(oname, from, WRITE_ACCESS) ||
-	  !accessd->access(oname, to, WRITE_ACCESS)))) {
+	 (!access_daemon->access(oname, from, WRITE_ACCESS) ||
+	  !access_daemon->access(oname, to, WRITE_ACCESS)))) {
 	error("Access denied");
     }
 
@@ -1061,7 +1061,7 @@ static mixed **get_dir(string path)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -1112,7 +1112,7 @@ static mixed *file_info(string path)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -1148,7 +1148,7 @@ static int make_dir(string path)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
@@ -1191,7 +1191,7 @@ static int remove_dir(string path)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
@@ -1223,7 +1223,7 @@ static int restore_object(string path)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -1252,7 +1252,7 @@ static void save_object(string path)
 	 sscanf(oname, "/kernel/%*s") == 0) ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(oname, path, WRITE_ACCESS))) {
+	 !::find_object(ACCESS_DAEMON)->access(oname, path, WRITE_ACCESS))) {
 	error("Access denied");
     }
 

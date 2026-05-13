@@ -10,7 +10,7 @@
 
 
 object resource_daemon;		/* resource manager object */
-object accessd;		/* access manager object */
+object access_daemon;		/* access manager object */
 object userd;		/* user manager object */
 object initd;		/* init manager object */
 object objectd;		/* object manager object */
@@ -361,7 +361,7 @@ private void _initialize(mapping tls)
 		     file_size("/doc", TRUE) + file_size("/include", TRUE));
 
     /* load remainder of manager objects */
-    call_other(accessd = _compile(ACCESSD), "???");
+    call_other(access_daemon = _compile(ACCESS_DAEMON), "???");
     call_other(userd = _compile(USERD), "???");
     call_other(_compile(DEFAULT_WIZTOOL), "???");
 
@@ -369,7 +369,7 @@ private void _initialize(mapping tls)
     resource_daemon->rsrc_incr("System", "objects", 7);
 
     /* initialize other users as resource owners */
-    users = (accessd->query_users() - ({ "System" })) | ({ "admin" });
+    users = (access_daemon->query_users() - ({ "System" })) | ({ "admin" });
     for (i = sizeof(users); --i >= 0; ) {
 	resource_daemon->add_owner(users[i]);
 	resource_daemon->rsrc_incr(users[i], "fileblocks",
@@ -461,7 +461,7 @@ static string path_read(string path)
 	creator = creator(oname = object_name(previous_object()));
 	path = normalize_path(path, oname + "/..", creator);
 	return ((creator == "System" ||
-		 accessd->access(oname, path, READ_ACCESS)) ? path : nil);
+		 access_daemon->access(oname, path, READ_ACCESS)) ? path : nil);
     }
     return nil;
 }
@@ -485,7 +485,7 @@ static string path_write(string path)
 	if (sscanf(path, "/kernel/%*s") == 0 &&
 	    sscanf(path, "/include/kernel/%*s") == 0 &&
 	    (creator == "System" ||
-	     (accessd->access(oname, path, WRITE_ACCESS) &&
+	     (access_daemon->access(oname, path, WRITE_ACCESS) &&
 	      (rsrc[RSRC_USAGE] < rsrc[RSRC_MAX] || rsrc[RSRC_MAX] < 0)))) {
 	    TLSVAR(TLS(), TLS_ARGUMENT) = ({ path, file_size(path) });
 	    return path;
@@ -571,7 +571,7 @@ static object inherit_program(string from, string path, int priv)
     path = normalize_path(path, from + "/..", creator = creator(from));
     if (sscanf(path, "%*s/lib/") == 0 ||
 	(sscanf(path, "/kernel/%*s") != 0 && creator != "System") ||
-	!accessd->access(from, path, READ_ACCESS)) {
+	!access_daemon->access(from, path, READ_ACCESS)) {
 	return nil;
     }
 
@@ -659,7 +659,7 @@ static mixed include_file(string from, string path)
 	}
     } else {
 	path = normalize_path(path, from + "/..", creator(from));
-	if (!accessd->access(from, path, READ_ACCESS)) {
+	if (!access_daemon->access(from, path, READ_ACCESS)) {
 	    return nil;
 	}
     }

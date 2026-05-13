@@ -199,7 +199,7 @@ private string *preregister_includes(string path)
 	    "/include/type.h"
 	});
 
-    case ACCESSD:
+    case ACCESS_DAEMON:
 	return ({
 	    "/include/config.h",
 	    "/include/kernel/access.h",
@@ -315,7 +315,7 @@ private string *preregister_inherits(string path)
 	return ({ });
 
     case RESOURCE_DAEMON:
-    case ACCESSD:
+    case ACCESS_DAEMON:
     case USERD:
     case API_ACCESS:
     case API_RSRC:
@@ -359,7 +359,7 @@ private void preregister_objects()
     /* register objects in order of compilation, including this object */
     list = ({
 	DRIVER, AUTO,
-	RESOURCE_DAEMON, ACCESSD, USERD,
+	RESOURCE_DAEMON, ACCESS_DAEMON, USERD,
 	API_RSRC, API_ACCESS, API_USER, 
 	LIB_CONN, LIB_USER, LIB_WIZTOOL,
 	RSRCOBJ, BINARY_CONN, TELNET_CONN, DATAGRAM_CONN, DEFAULT_USER,
