@@ -117,6 +117,9 @@ static void create()
 	    load("/usr/" + domain + "/initd");
 	}
     }
+
+    /* HTTP/1 server on the first binary port */
+    load("sys/http_server");
 }
 
 /*
