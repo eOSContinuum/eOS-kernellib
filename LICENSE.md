@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
+
 # License
 
 eOS-kernellib is dual-licensed. Each file is governed by one of two licenses, identified by an SPDX header at the top of the file:

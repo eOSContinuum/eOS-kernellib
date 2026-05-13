@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
+
 # eOS-kernellib
 
 eOS-kernellib is the kernel layer for orthogonally-persistent servers built on the [DGD] driver. It is the substrate above the driver and below an application -- providing capability tiers, daemons, and runtime primitives the application uses to express its own logic.
