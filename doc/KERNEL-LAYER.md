@@ -86,7 +86,7 @@ An application built on eOS-kernellib adds:
 
 The kernel daemons (driver, access_daemon, resource_daemon, userd) require no modification. The application registers its objects, hooks into events, and consumes the substrate primitives.
 
-For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. Application-level routing on top of it can be added in a separate user-layer domain (the conventional path is `/usr/WWW/`).
+For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` -- `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `doc/HTTP-APPLICATIONS.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
 
 [DGD]: https://github.com/dworkin/dgd
 [eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext
