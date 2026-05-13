@@ -227,7 +227,7 @@ private string *preregister_includes(string path)
     case LIB_CONN:
     case LIB_USER:
     case TELNET_CONN:
-    case DEFAULT_WIZTOOL:
+    case DEFAULT_ADMIN_CONSOLE:
 	return ({
 	    "/include/config.h",
 	    "/include/kernel/kernel.h",
@@ -243,7 +243,7 @@ private string *preregister_includes(string path)
 	    "/include/status.h"
 	});
 
-    case LIB_WIZTOOL:
+    case LIB_ADMIN_CONSOLE:
 	return ({
 	    "/include/config.h",
 	    "/include/kernel/access.h",
@@ -327,7 +327,7 @@ private string *preregister_inherits(string path)
     case OBJDBASE:
 	return ({ AUTO });
 
-    case LIB_WIZTOOL:
+    case LIB_ADMIN_CONSOLE:
 	return ({ API_ACCESS, API_RSRC, API_USER });
 
     case BINARY_CONN:
@@ -338,8 +338,8 @@ private string *preregister_inherits(string path)
     case DEFAULT_USER:
 	return ({ LIB_USER, API_USER, API_ACCESS });
 
-    case DEFAULT_WIZTOOL:
-	return ({ LIB_WIZTOOL });
+    case DEFAULT_ADMIN_CONSOLE:
+	return ({ LIB_ADMIN_CONSOLE });
 
     case INIT:
 	return ({ API_ACCESS, API_RSRC });
@@ -361,9 +361,9 @@ private void preregister_objects()
 	DRIVER, AUTO,
 	RESOURCE_DAEMON, ACCESS_DAEMON, USERD,
 	API_RSRC, API_ACCESS, API_USER, 
-	LIB_CONN, LIB_USER, LIB_WIZTOOL,
+	LIB_CONN, LIB_USER, LIB_ADMIN_CONSOLE,
 	RSRCOBJ, BINARY_CONN, TELNET_CONN, DATAGRAM_CONN, DEFAULT_USER,
-	DEFAULT_WIZTOOL,
+	DEFAULT_ADMIN_CONSOLE,
 	INIT, OBJECTSERVER, OBJDBASE
     });
 

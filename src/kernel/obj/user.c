@@ -18,7 +18,7 @@ static string Name;		/* capitalized user name */
 static mapping state;		/* state for a connection object */
 string password;		/* user password */
 static string newpasswd;	/* new password */
-static object wiztool;		/* command handler */
+static object admin_console;		/* command handler */
 static int nconn;		/* # of connections */
 
 /*
@@ -100,8 +100,8 @@ int login(string str)
 		state[previous_object()] = STATE_NORMAL;
 		return MODE_ECHO;
 	    }
-	    if (!wiztool) {
-		wiztool = clone_object(DEFAULT_WIZTOOL, str);
+	    if (!admin_console) {
+		admin_console = clone_object(DEFAULT_ADMIN_CONSOLE, str);
 	    }
 	    message("Pick a new password:");
 	    state[previous_object()] = STATE_NEWPASSWD1;
@@ -125,8 +125,8 @@ void logout(int quit)
 	    }
 	}
 	::logout(name);
-	if (wiztool) {
-	    destruct_object(wiztool);
+	if (admin_console) {
+	    destruct_object(admin_console);
 	}
 	destruct_object(this_object());
     }
@@ -159,7 +159,7 @@ int receive_message(string str)
 		cmd = cmd[1 ..];
 	    }
 
-	    if (!wiztool || !query_editor(wiztool) || cmd != str) {
+	    if (!admin_console || !query_editor(admin_console) || cmd != str) {
 		/* check standard commands */
 		if (strlen(cmd) != 0) {
 		    switch (cmd[0]) {
@@ -243,8 +243,8 @@ int receive_message(string str)
 	    }
 
 	    if (str) {
-		if (wiztool) {
-		    wiztool->input(str);
+		if (admin_console) {
+		    admin_console->input(str);
 		} else if (strlen(str) != 0) {
 		    message("No command: " + str + "\n");
 		}
@@ -259,9 +259,9 @@ int receive_message(string str)
 	    connection(previous_object());
 	    message("\n");
 	    tell_audience(Name + " logs in.\n");
-	    if (!wiztool &&
+	    if (!admin_console &&
 		(name == "admin" || sizeof(query_users() & ({ name })) != 0)) {
-		wiztool = clone_object(DEFAULT_WIZTOOL, name);
+		admin_console = clone_object(DEFAULT_ADMIN_CONSOLE, name);
 	    }
 	    break;
 
@@ -283,7 +283,7 @@ int receive_message(string str)
 	case STATE_NEWPASSWD2:
 	    if (newpasswd == str) {
 		password = hash_string("crypt", str);
-		if (wiztool) {
+		if (admin_console) {
 		    /* save wizards only */
 		    save_object(DEFAULT_USER_DIR + "/" + name + ".pwd");
 		}
@@ -295,7 +295,7 @@ int receive_message(string str)
 	    break;
 	}
 
-	str = (wiztool) ? query_editor(wiztool) : nil;
+	str = (admin_console) ? query_editor(admin_console) : nil;
 	if (str) {
 	    message((str == "insert") ? "*\b" : ":");
 	} else {

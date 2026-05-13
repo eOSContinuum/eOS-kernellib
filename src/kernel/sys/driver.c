@@ -363,7 +363,7 @@ private void _initialize(mapping tls)
     /* load remainder of manager objects */
     call_other(access_daemon = _compile(ACCESS_DAEMON), "???");
     call_other(userd = _compile(USERD), "???");
-    call_other(_compile(DEFAULT_WIZTOOL), "???");
+    call_other(_compile(DEFAULT_ADMIN_CONSOLE), "???");
 
     /* correct object count */
     resource_daemon->rsrc_incr("System", "objects", 7);

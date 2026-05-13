@@ -1,7 +1,7 @@
 # include <kernel/kernel.h>
 # include <kernel/user.h>
 
-inherit LIB_WIZTOOL;
+inherit LIB_ADMIN_CONSOLE;
 
 
 private object user;		/* associated user object */

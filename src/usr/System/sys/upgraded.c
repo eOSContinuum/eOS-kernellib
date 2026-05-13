@@ -8,7 +8,7 @@ inherit API_ACCESS;
 
 # define OBJECTSERVER	"/usr/System/sys/objectd"
 # define SYSTEMAUTO	"/usr/System/lib/auto"
-# define WIZTOOL	"/usr/System/obj/wiztool"
+# define ADMIN_CONSOLE	"/usr/System/obj/admin_console"
 
 
 object objectd;			/* object server */

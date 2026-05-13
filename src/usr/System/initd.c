@@ -9,7 +9,7 @@ inherit rsrc API_RSRC;
 
 # define BINARYSERVER	"/usr/WWW/sys/server"
 # define TELNETSERVER	"/usr/System/sys/userd"
-# define WIZTOOL	"/usr/System/obj/wiztool"
+# define ADMIN_CONSOLE	"/usr/System/obj/admin_console"
 
 
 mapping resources;	/* saved initial resources at cold boot */

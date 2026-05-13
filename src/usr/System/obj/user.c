@@ -7,7 +7,7 @@
 
 inherit auto	"~/lib/auto";
 inherit user	LIB_USER;
-inherit wiztool	LIB_WIZTOOL;
+inherit admin_console	LIB_ADMIN_CONSOLE;
 
 private inherit	"/lib/util/ascii";
 
@@ -38,7 +38,7 @@ static int nconn;		/* # of connections */
  */
 static create()
 {
-    wiztool::create(200);
+    admin_console::create(200);
     state = ([ ]);
 }
 
@@ -106,7 +106,7 @@ static object compile_object(string path, string source...)
 	message("Ambiguous object.\n");
 	return nil;
     }
-    obj = wiztool::compile_object(path, source...);
+    obj = admin_console::compile_object(path, source...);
     if (obj) {
 	if (sscanf(path, "%*s/obj/") != 0) {
 	    return nil;
@@ -360,7 +360,7 @@ static void cmd_grant(object user, string cmd, string str)
 	} else {
 	    ::add_user(who);
 	    ::add_owner(who);
-	    wiztool::make_dir("/usr/" + who);
+	    admin_console::make_dir("/usr/" + who);
 	}
     } else {
 	/*
