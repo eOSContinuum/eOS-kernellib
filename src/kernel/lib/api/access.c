@@ -1,7 +1,7 @@
 # include <kernel/kernel.h>
 # include <kernel/access.h>
 
-private object accessd;		/* access manager */
+private object access_daemon;		/* access manager */
 
 /*
  * NAME:	create()
@@ -9,7 +9,7 @@ private object accessd;		/* access manager */
  */
 static void create()
 {
-    accessd = find_object(ACCESSD);
+    access_daemon = find_object(ACCESS_DAEMON);
 }
 
 /*
@@ -21,7 +21,7 @@ static int access(string user, string file, int type)
     if (!user || !file || type < 0 || type > FULL_ACCESS) {
 	error("Bad arguments for access");
     }
-    return accessd->access(user, file, type);
+    return access_daemon->access(user, file, type);
 }
 
 /*
@@ -33,7 +33,7 @@ static void add_user(string user)
     if (!user || sscanf(user, "/%*s") != 0) {
 	error("Bad argument for add_user");
     }
-    accessd->add_user(user);
+    access_daemon->add_user(user);
 }
 
 /*
@@ -45,7 +45,7 @@ static void remove_user(string user)
     if (!user) {
 	error("Bad argument for remove_user");
     }
-    accessd->remove_user(user);
+    access_daemon->remove_user(user);
 }
 
 /*
@@ -54,7 +54,7 @@ static void remove_user(string user)
  */
 static string *query_users()
 {
-    return accessd->query_users();
+    return access_daemon->query_users();
 }
 
 /*
@@ -63,7 +63,7 @@ static string *query_users()
  */
 static void save_access()
 {
-    accessd->save();
+    access_daemon->save();
 }
 
 /*
@@ -75,7 +75,7 @@ static void set_access(string user, string file, int type)
     if (!user || !file || type < 0 || type > FULL_ACCESS) {
 	error("Bad arguments for set_access");
     }
-    accessd->set_access(user, file, type);
+    access_daemon->set_access(user, file, type);
 }
 
 /*
@@ -87,7 +87,7 @@ static mapping query_user_access(string user)
     if (!user) {
 	error("Bad argument for query_user_access");
     }
-    return accessd->query_user_access(user);
+    return access_daemon->query_user_access(user);
 }
 
 /*
@@ -99,7 +99,7 @@ static mapping query_file_access(string path)
     if (!path) {
 	error("Bad argument for query_file_access");
     }
-    return accessd->query_file_access(path);
+    return access_daemon->query_file_access(path);
 }
 
 /*
@@ -111,7 +111,7 @@ static void set_global_access(string dir, int flag)
     if (!dir || (flag & ~1) != 0) {
 	error("Bad arguments for set_global_access");
     }
-    accessd->set_global_access(dir, flag);
+    access_daemon->set_global_access(dir, flag);
 }
 
 /*
@@ -121,5 +121,5 @@ static void set_global_access(string dir, int flag)
  */
 static string *query_global_access()
 {
-    return accessd->query_global_access();
+    return access_daemon->query_global_access();
 }

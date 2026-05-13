@@ -2,7 +2,7 @@
 # include <kernel/rsrc.h>
 # include <type.h>
 
-private object rsrcd;		/* resource manager */
+private object resource_daemon;		/* resource manager */
 
 /*
  * NAME:	create()
@@ -10,7 +10,7 @@ private object rsrcd;		/* resource manager */
  */
 static void create()
 {
-    rsrcd = find_object(RSRCD);
+    resource_daemon = find_object(RESOURCE_DAEMON);
 }
 
 /*
@@ -19,7 +19,7 @@ static void create()
  */
 static void add_owner(string owner)
 {
-    rsrcd->add_owner(owner);
+    resource_daemon->add_owner(owner);
 }
 
 /*
@@ -28,7 +28,7 @@ static void add_owner(string owner)
  */
 static void remove_owner(string owner)
 {
-    rsrcd->remove_owner(owner);
+    resource_daemon->remove_owner(owner);
 }
 
 /*
@@ -37,7 +37,7 @@ static void remove_owner(string owner)
  */
 static string *query_owners()
 {
-    return rsrcd->query_owners();
+    return resource_daemon->query_owners();
 }
 
 
@@ -52,7 +52,7 @@ static void set_rsrc(string name, int max, int decay, int period)
 	!decay != !period) {
 	error("Bad arguments for set_rsrc");
     }
-    rsrcd->set_rsrc(name, max, decay, period);
+    resource_daemon->set_rsrc(name, max, decay, period);
 }
 
 /*
@@ -64,7 +64,7 @@ static void remove_rsrc(string name)
     if (!name) {
 	error("Bad argument for remove_rsrc");
     }
-    rsrcd->remove_rsrc(name);
+    resource_daemon->remove_rsrc(name);
 }
 
 /*
@@ -76,7 +76,7 @@ static mixed *query_rsrc(string name)
     if (!name) {
 	error("Bad argument for query_rsrc");
     }
-    return rsrcd->query_rsrc(name);
+    return resource_daemon->query_rsrc(name);
 }
 
 /*
@@ -85,7 +85,7 @@ static mixed *query_rsrc(string name)
  */
 static string *query_resources()
 {
-    return rsrcd->query_resources();
+    return resource_daemon->query_resources();
 }
 
 
@@ -98,7 +98,7 @@ static void rsrc_set_limit(string owner, string name, int max)
     if (!name || max < -1) {
 	error("Bad arguments for rsrc_set_limit");
     }
-    rsrcd->rsrc_set_limit(owner, name, max);
+    resource_daemon->rsrc_set_limit(owner, name, max);
 }
 
 /*
@@ -110,7 +110,7 @@ static void rsrc_set_maxtickusage(string owner, float tickusage)
     if (tickusage < -1.0) {
 	error("Bad argument for rsrc_set_maxtickusage");
     }
-    rsrcd->rsrc_set_maxtickusage(owner, tickusage);
+    resource_daemon->rsrc_set_maxtickusage(owner, tickusage);
 }
 
 /*
@@ -122,7 +122,7 @@ static mixed *rsrc_get(string owner, string name)
     if (!name) {
 	error("Bad arguments for rsrc_get");
     }
-    return rsrcd->rsrc_get(owner, name);
+    return resource_daemon->rsrc_get(owner, name);
 }
 
 /*
@@ -131,7 +131,7 @@ static mixed *rsrc_get(string owner, string name)
  */
 static float rsrc_get_maxtickusage(string owner)
 {
-    return rsrcd->rsrc_get_maxtickusage(owner);
+    return resource_daemon->rsrc_get_maxtickusage(owner);
 }
 
 /*
@@ -143,5 +143,5 @@ static void rsrc_incr(string owner, string name, int incr)
     if (!name) {
 	error("Bad arguments for rsrc_incr");
     }
-    rsrcd->rsrc_incr(owner, name, incr);
+    resource_daemon->rsrc_incr(owner, name, incr);
 }

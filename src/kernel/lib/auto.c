@@ -227,7 +227,7 @@ static int destruct_object(mixed obj)
 	    /*
 	     * non-clones are handled by driver->remove_program()
 	     */
-	    ::find_object(RSRCD)->rsrc_incr(oowner, "objects", -1);
+	    ::find_object(RESOURCE_DAEMON)->rsrc_incr(oowner, "objects", -1);
 	} else {
 	    ::find_object(DRIVER)->destruct(object_name(obj), oowner);
 	}
@@ -250,7 +250,7 @@ private atomic object _compile(object driver, string path, string uid,
     add = !::find_object(path);
     obj = ::compile_object(path, source...);
     if (add) {
-	::find_object(RSRCD)->rsrc_incr(uid, "objects", 1);
+	::find_object(RESOURCE_DAEMON)->rsrc_incr(uid, "objects", 1);
     }
     driver->compile(path, uid, source);
     return obj;
@@ -280,7 +280,7 @@ static object compile_object(string path, string source...)
     uid = creator(path);
     if ((sizeof(source) != 0 && kernel) ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 ((lib || !uid) &&
 					  sizeof(source) == 0 && !kernel) ?
 					  READ_ACCESS : WRITE_ACCESS))) {
@@ -310,7 +310,7 @@ static object compile_object(string path, string source...)
 private atomic object _clone(string path, string uid, object obj)
 {
     if (path != RSRCOBJ) {
-	::find_object(RSRCD)->rsrc_incr(uid, "objects", 1);
+	::find_object(RESOURCE_DAEMON)->rsrc_incr(uid, "objects", 1);
     }
     TLSVAR(TLS(), TLS_ARGUMENT) = uid;
     return ::clone_object(obj);
@@ -699,12 +699,12 @@ static int call_touch(object obj)
  */
 private mixed _F_call_limited(mixed arg1, string oowner, mixed *args)
 {
-    object rsrcd;
+    object resource_daemon;
     int stack, ticks;
     string func;
     mixed tls, *limits, result;
 
-    rsrcd = ::find_object(RSRCD);
+    resource_daemon = ::find_object(RESOURCE_DAEMON);
     func = arg1;
     stack = ::status()[ST_STACKDEPTH];
     ticks = ::status()[ST_TICKS];
@@ -714,7 +714,7 @@ private mixed _F_call_limited(mixed arg1, string oowner, mixed *args)
 	    tls = arg1 = ([ ]);
 	}
 	limits = TLSVAR(tls, TLS_LIMIT) =
-		 rsrcd->call_limits(TLSVAR(tls, TLS_LIMIT), oowner, stack,
+		 resource_daemon->call_limits(TLSVAR(tls, TLS_LIMIT), oowner, stack,
 				    ticks);
     }
 
@@ -724,7 +724,7 @@ private mixed _F_call_limited(mixed arg1, string oowner, mixed *args)
 	ticks = ::status()[ST_TICKS];
 	rlimits (-1; -1) {
 # ifdef RSRC_TICKS_MEASUREMENT
-	    rsrcd->update_ticks(limits, ticks);
+	    resource_daemon->update_ticks(limits, ticks);
 # endif
 	    TLSVAR(tls, TLS_LIMIT) = limits[LIM_NEXT];
 
@@ -896,7 +896,7 @@ static string read_file(string path, varargs int offset, int size)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -911,7 +911,7 @@ static string read_file(string path, varargs int offset, int size)
 static int write_file(string path, string str, varargs int offset)
 {
     string fcreator;
-    object rsrcd, driver;
+    object resource_daemon, driver;
     int size, result, *rsrc;
 
     CHECKARG(path, 1, "write_file");
@@ -924,14 +924,14 @@ static int write_file(string path, string str, varargs int offset)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
 
     fcreator = creator(path);
-    rsrcd = ::find_object(RSRCD);
-    rsrc = rsrcd->rsrc_get(fcreator, "fileblocks");
+    resource_daemon = ::find_object(RESOURCE_DAEMON);
+    rsrc = resource_daemon->rsrc_get(fcreator, "fileblocks");
     if (creator != "System" && rsrc[RSRC_USAGE] >= rsrc[RSRC_MAX] &&
 	rsrc[RSRC_MAX] >= 0) {
 	error("File quota exceeded");
@@ -943,7 +943,7 @@ static int write_file(string path, string str, varargs int offset)
 	rlimits (-1; -1) {
 	    result = ::write_file(path, str, offset);
 	    if (result != 0 && (size=driver->file_size(path) - size) != 0) {
-		rsrcd->rsrc_incr(fcreator, "fileblocks", size);
+		resource_daemon->rsrc_incr(fcreator, "fileblocks", size);
 	    }
 	}
     } catch (err) {
@@ -970,7 +970,7 @@ static int remove_file(string path)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
@@ -980,7 +980,7 @@ static int remove_file(string path)
 	rlimits (-1; -1) {
 	    result = ::remove_file(path);
 	    if (result != 0 && size != 0) {
-		::find_object(RSRCD)->rsrc_incr(creator(path), "fileblocks",
+		::find_object(RESOURCE_DAEMON)->rsrc_incr(creator(path), "fileblocks",
 						-size);
 	    }
 	}
@@ -997,7 +997,7 @@ static int remove_file(string path)
 static int rename_file(string from, string to)
 {
     string oname, fcreator, tcreator;
-    object accessd, rsrcd;
+    object access_daemon, resource_daemon;
     int size, result, *rsrc;
 
     CHECKARG(from, 1, "rename_file");
@@ -1009,22 +1009,22 @@ static int rename_file(string from, string to)
     oname = object_name(this_object());
     from = normalize_path(from, oname + "/..");
     to = normalize_path(to, oname + "/..");
-    accessd = ::find_object(ACCESSD);
+    access_daemon = ::find_object(ACCESS_DAEMON);
     if (sscanf(from + "/", "/kernel/%*s") != 0 ||
 	sscanf(to, "/kernel/%*s") != 0 ||
 	sscanf(from + "/", "/include/kernel/%*s") != 0 || from == "/include" ||
 	sscanf(to, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 (!accessd->access(oname, from, WRITE_ACCESS) ||
-	  !accessd->access(oname, to, WRITE_ACCESS)))) {
+	 (!access_daemon->access(oname, from, WRITE_ACCESS) ||
+	  !access_daemon->access(oname, to, WRITE_ACCESS)))) {
 	error("Access denied");
     }
 
     fcreator = creator(from);
     tcreator = creator(to);
     size = ::find_object(DRIVER)->file_size(from, TRUE);
-    rsrcd = ::find_object(RSRCD);
-    rsrc = rsrcd->rsrc_get(tcreator, "fileblocks");
+    resource_daemon = ::find_object(RESOURCE_DAEMON);
+    rsrc = resource_daemon->rsrc_get(tcreator, "fileblocks");
     if (size != 0 && fcreator != tcreator && creator != "System" &&
 	rsrc[RSRC_USAGE] >= rsrc[RSRC_MAX] && rsrc[RSRC_MAX] >= 0) {
 	error("File quota exceeded");
@@ -1034,8 +1034,8 @@ static int rename_file(string from, string to)
 	rlimits (-1; -1) {
 	    result = ::rename_file(from, to);
 	    if (result != 0 && fcreator != tcreator) {
-		rsrcd->rsrc_incr(tcreator, "fileblocks", size);
-		rsrcd->rsrc_incr(fcreator, "fileblocks", -size);
+		resource_daemon->rsrc_incr(tcreator, "fileblocks", size);
+		resource_daemon->rsrc_incr(fcreator, "fileblocks", -size);
 	    }
 	}
     } catch (err) {
@@ -1061,7 +1061,7 @@ static mixed **get_dir(string path)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -1112,7 +1112,7 @@ static mixed *file_info(string path)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -1136,7 +1136,7 @@ static mixed *file_info(string path)
 static int make_dir(string path)
 {
     string fcreator;
-    object rsrcd;
+    object resource_daemon;
     int result, *rsrc;
 
     CHECKARG(path, 1, "make_dir");
@@ -1148,14 +1148,14 @@ static int make_dir(string path)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
 
     fcreator = creator(path + "/");
-    rsrcd = ::find_object(RSRCD);
-    rsrc = rsrcd->rsrc_get(fcreator, "fileblocks");
+    resource_daemon = ::find_object(RESOURCE_DAEMON);
+    rsrc = resource_daemon->rsrc_get(fcreator, "fileblocks");
     if (creator != "System" && rsrc[RSRC_USAGE] >= rsrc[RSRC_MAX] &&
 	rsrc[RSRC_MAX] >= 0) {
 	error("File quota exceeded");
@@ -1165,7 +1165,7 @@ static int make_dir(string path)
 	rlimits (-1; -1) {
 	    result = ::make_dir(path);
 	    if (result != 0) {
-		rsrcd->rsrc_incr(fcreator, "fileblocks", 1);
+		resource_daemon->rsrc_incr(fcreator, "fileblocks", 1);
 	    }
 	}
     } catch (err) {
@@ -1191,7 +1191,7 @@ static int remove_dir(string path)
     if (sscanf(path, "/kernel/%*s") != 0 ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(object_name(this_object()), path,
+	 !::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					 WRITE_ACCESS))) {
 	error("Access denied");
     }
@@ -1200,7 +1200,7 @@ static int remove_dir(string path)
 	rlimits (-1; -1) {
 	    result = ::remove_dir(path);
 	    if (result != 0) {
-		::find_object(RSRCD)->rsrc_incr(creator(path + "/"),
+		::find_object(RESOURCE_DAEMON)->rsrc_incr(creator(path + "/"),
 						"fileblocks", -1);
 	    }
 	}
@@ -1223,7 +1223,7 @@ static int restore_object(string path)
 
     path = normalize_path(path);
     if (creator != "System" &&
-	!::find_object(ACCESSD)->access(object_name(this_object()), path,
+	!::find_object(ACCESS_DAEMON)->access(object_name(this_object()), path,
 					READ_ACCESS)) {
 	error("Access denied");
     }
@@ -1238,7 +1238,7 @@ static int restore_object(string path)
 static void save_object(string path)
 {
     string oname, fcreator;
-    object rsrcd, driver;
+    object resource_daemon, driver;
     int size, *rsrc;
 
     CHECKARG(path, 1, "save_object");
@@ -1252,13 +1252,13 @@ static void save_object(string path)
 	 sscanf(oname, "/kernel/%*s") == 0) ||
 	sscanf(path, "/include/kernel/%*s") != 0 ||
 	(creator != "System" &&
-	 !::find_object(ACCESSD)->access(oname, path, WRITE_ACCESS))) {
+	 !::find_object(ACCESS_DAEMON)->access(oname, path, WRITE_ACCESS))) {
 	error("Access denied");
     }
 
     fcreator = creator(path);
-    rsrcd = ::find_object(RSRCD);
-    rsrc = rsrcd->rsrc_get(fcreator, "fileblocks");
+    resource_daemon = ::find_object(RESOURCE_DAEMON);
+    rsrc = resource_daemon->rsrc_get(fcreator, "fileblocks");
     if (creator != "System" && rsrc[RSRC_USAGE] >= rsrc[RSRC_MAX] &&
 	rsrc[RSRC_MAX] >= 0) {
 	error("File quota exceeded");
@@ -1270,7 +1270,7 @@ static void save_object(string path)
 	rlimits (-1; -1) {
 	    ::save_object(path);
 	    if ((size=driver->file_size(path) - size) != 0) {
-		rsrcd->rsrc_incr(fcreator, "fileblocks", size);
+		resource_daemon->rsrc_incr(fcreator, "fileblocks", size);
 	    }
 	}
     } catch (err) {
@@ -1284,7 +1284,7 @@ static void save_object(string path)
  */
 static string editor(varargs string cmd)
 {
-    object rsrcd;
+    object resource_daemon;
     string result;
     mixed *info;
 
@@ -1295,7 +1295,7 @@ static string editor(varargs string cmd)
 
     try {
 	rlimits (-1; -1) {
-	    rsrcd = ::find_object(RSRCD);
+	    resource_daemon = ::find_object(RESOURCE_DAEMON);
 	    if (!query_editor(this_object())) {
 		::find_object(USERD)->add_editor(this_object());
 	    }
@@ -1308,7 +1308,7 @@ static string editor(varargs string cmd)
 		::find_object(USERD)->remove_editor(this_object());
 	    }
 	    if (info) {
-		rsrcd->rsrc_incr(creator(info[0]), "fileblocks",
+		resource_daemon->rsrc_incr(creator(info[0]), "fileblocks",
 				 ::find_object(DRIVER)->file_size(info[0]) -
 								  info[1]);
 	    }

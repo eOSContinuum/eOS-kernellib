@@ -7,10 +7,6 @@
 inherit access API_ACCESS;
 inherit rsrc API_RSRC;
 
-# define BINARYSERVER	"/usr/WWW/sys/server"
-# define TELNETSERVER	"/usr/System/sys/userd"
-# define WIZTOOL	"/usr/System/obj/wiztool"
-
 
 mapping resources;	/* saved initial resources at cold boot */
 
@@ -121,6 +117,9 @@ static void create()
 	    load("/usr/" + domain + "/initd");
 	}
     }
+
+    /* HTTP/1 server on the first binary port */
+    load("sys/http_server");
 }
 
 /*

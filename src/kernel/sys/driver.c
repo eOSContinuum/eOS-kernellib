@@ -9,8 +9,8 @@
 # define TLS()		call_trace()[1][TRACE_FIRSTARG]
 
 
-object rsrcd;		/* resource manager object */
-object accessd;		/* access manager object */
+object resource_daemon;		/* resource manager object */
+object access_daemon;		/* access manager object */
 object userd;		/* user manager object */
 object initd;		/* init manager object */
 object objectd;		/* object manager object */
@@ -229,7 +229,7 @@ void compiling(string path)
 		TLSVAR(tls, TLS_PUT_ATOMIC) = messages;
 		error(err);
 	    }
-	    rsrcd->rsrc_incr("System", "objects", 1);
+	    resource_daemon->rsrc_incr("System", "objects", 1);
 	    if (objectd) {
 		objectd->compile("System", AUTO, TLSVAR(tls, TLS_SOURCE),
 				 TLSVAR(tls, TLS_INHERIT)[1 ..]...);
@@ -344,41 +344,41 @@ private void _initialize(mapping tls)
 
     /* load initial objects */
     _compile(AUTO);
-    call_other(rsrcd = _compile(RSRCD), "???");
+    call_other(resource_daemon = _compile(RESOURCE_DAEMON), "???");
     _compile(RSRCOBJ);
 
     /* initialize some resources */
-    rsrcd->set_rsrc("stack",      100,  0,    0);
-    rsrcd->set_rsrc("ticks", 20000000, 10, 3600);
+    resource_daemon->set_rsrc("stack",      100,  0,    0);
+    resource_daemon->set_rsrc("ticks", 20000000, 10, 3600);
 
     /* create initial resource owners */
-    rsrcd->add_owner("System");
-    rsrcd->rsrc_incr("System", "fileblocks",
+    resource_daemon->add_owner("System");
+    resource_daemon->rsrc_incr("System", "fileblocks",
 		     dir_size("/kernel") +
 		     file_size("/usr/System", TRUE));
-    rsrcd->add_owner(nil);	/* Ecru */
-    rsrcd->rsrc_incr(nil, "fileblocks",
+    resource_daemon->add_owner(nil);	/* Ecru */
+    resource_daemon->rsrc_incr(nil, "fileblocks",
 		     file_size("/doc", TRUE) + file_size("/include", TRUE));
 
     /* load remainder of manager objects */
-    call_other(accessd = _compile(ACCESSD), "???");
+    call_other(access_daemon = _compile(ACCESS_DAEMON), "???");
     call_other(userd = _compile(USERD), "???");
-    call_other(_compile(DEFAULT_WIZTOOL), "???");
+    call_other(_compile(DEFAULT_ADMIN_CONSOLE), "???");
 
     /* correct object count */
-    rsrcd->rsrc_incr("System", "objects", 7);
+    resource_daemon->rsrc_incr("System", "objects", 7);
 
     /* initialize other users as resource owners */
-    users = (accessd->query_users() - ({ "System" })) | ({ "admin" });
+    users = (access_daemon->query_users() - ({ "System" })) | ({ "admin" });
     for (i = sizeof(users); --i >= 0; ) {
-	rsrcd->add_owner(users[i]);
-	rsrcd->rsrc_incr(users[i], "fileblocks",
+	resource_daemon->add_owner(users[i]);
+	resource_daemon->rsrc_incr(users[i], "fileblocks",
 			 file_size("/usr/" + users[i], TRUE));
     }
 
     /* system-specific initialization */
     if (file_size("/usr/System/initd.c") != 0) {
-	initd = rsrcd->initd();
+	initd = resource_daemon->initd();
 	call_other(initd, "???");
     }
 }
@@ -461,7 +461,7 @@ static string path_read(string path)
 	creator = creator(oname = object_name(previous_object()));
 	path = normalize_path(path, oname + "/..", creator);
 	return ((creator == "System" ||
-		 accessd->access(oname, path, READ_ACCESS)) ? path : nil);
+		 access_daemon->access(oname, path, READ_ACCESS)) ? path : nil);
     }
     return nil;
 }
@@ -481,11 +481,11 @@ static string path_write(string path)
     if (path) {
 	creator = creator(oname = object_name(previous_object()));
 	path = normalize_path(path, oname + "/..", creator);
-	rsrc = rsrcd->rsrc_get(creator, "fileblocks");
+	rsrc = resource_daemon->rsrc_get(creator, "fileblocks");
 	if (sscanf(path, "/kernel/%*s") == 0 &&
 	    sscanf(path, "/include/kernel/%*s") == 0 &&
 	    (creator == "System" ||
-	     (accessd->access(oname, path, WRITE_ACCESS) &&
+	     (access_daemon->access(oname, path, WRITE_ACCESS) &&
 	      (rsrc[RSRC_USAGE] < rsrc[RSRC_MAX] || rsrc[RSRC_MAX] < 0)))) {
 	    TLSVAR(TLS(), TLS_ARGUMENT) = ({ path, file_size(path) });
 	    return path;
@@ -571,7 +571,7 @@ static object inherit_program(string from, string path, int priv)
     path = normalize_path(path, from + "/..", creator = creator(from));
     if (sscanf(path, "%*s/lib/") == 0 ||
 	(sscanf(path, "/kernel/%*s") != 0 && creator != "System") ||
-	!accessd->access(from, path, READ_ACCESS)) {
+	!access_daemon->access(from, path, READ_ACCESS)) {
 	return nil;
     }
 
@@ -616,7 +616,7 @@ static object inherit_program(string from, string path, int priv)
 	    error(err);
 	}
 	creator = creator(path);
-	rsrcd->rsrc_incr(creator, "objects", 1);
+	resource_daemon->rsrc_incr(creator, "objects", 1);
 	if (objectd) {
 	    TLSVAR(tls, TLS_SOURCE)[path + ".c"] = (str) ? str : path + ".c";
 	    objectd->compile(creator, path, TLSVAR(tls, TLS_SOURCE),
@@ -659,7 +659,7 @@ static mixed include_file(string from, string path)
 	}
     } else {
 	path = normalize_path(path, from + "/..", creator(from));
-	if (!accessd->access(from, path, READ_ACCESS)) {
+	if (!access_daemon->access(from, path, READ_ACCESS)) {
 	    return nil;
 	}
     }
@@ -693,7 +693,7 @@ static void remove_program(string path, int timestamp, int index)
 
     creator = creator(path);
     if (path != RSRCOBJ) {
-	rsrcd->rsrc_incr(creator, "objects", -1);
+	resource_daemon->rsrc_incr(creator, "objects", -1);
     }
     if (objectd) {
 	objectd->remove_program(creator, path, timestamp, index);
@@ -785,7 +785,7 @@ private void _runtime_error(mapping tls, string str, int caught, int ticks,
 	while (--i >= caught) {
 	    if (trace[i][TRACE_FUNCTION] == "_F_call_limited" &&
 		trace[i][TRACE_PROGNAME] == AUTO) {
-		ticks = rsrcd->update_ticks(limits, ticks);
+		ticks = resource_daemon->update_ticks(limits, ticks);
 		if (ticks < 0) {
 		    break;
 		}

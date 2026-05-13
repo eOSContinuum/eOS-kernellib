@@ -13,7 +13,7 @@ dynamic_chunk	= 130048;		/* dynamic memory chunk */
 dump_file	= "../state/snapshot";	/* snapshot file */
 dump_interval	= 3600;			/* snapshot rebuild interval */
 hotboot		= ({ "../bin/dgd",	/* hotboot binary */
-		     "../cloud.dgd",	/* hotboot config file */
+		     "../example.dgd",	/* hotboot config file */
 		     "../state/snapshot",
 		     "../state/snapshot.old" });
 

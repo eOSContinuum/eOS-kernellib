@@ -1,4 +1,4 @@
-# define ACCESSD	"/kernel/sys/accessd"
+# define ACCESS_DAEMON	"/kernel/sys/access_daemon"
 # define API_ACCESS	"/kernel/lib/api/access"
 # define ACCESSDATA	"/kernel/data/access.data"
 

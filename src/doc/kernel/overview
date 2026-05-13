@@ -119,10 +119,10 @@ existing user is "admin", who has administrator access.  Using the
 "admin" account, other users can be granted programming access.
 
 
-7. Standard wiztool
+7. Standard admin_console
 
-The kernel library includes a "wiztool", an object which defines the basic
-developer commands for programmers.  The wiztool is inheritable, and can
+The kernel library includes a "admin_console", an object which defines the basic
+developer commands for programmers.  The admin_console is inheritable, and can
 thus be used as the basis for a more advanced development tool.
 
 
