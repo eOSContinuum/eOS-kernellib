@@ -1,4 +1,4 @@
-# define RSRCD		"/kernel/sys/rsrcd"
+# define RESOURCE_DAEMON		"/kernel/sys/resource_daemon"
 # define RSRCOBJ	"/kernel/obj/rsrc"
 # define API_RSRC	"/kernel/lib/api/rsrc"
 

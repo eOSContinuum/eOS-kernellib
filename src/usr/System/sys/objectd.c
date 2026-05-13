@@ -190,7 +190,7 @@ private string *preregister_includes(string path)
 	    "/include/type.h"
 	});
 
-    case RSRCD:
+    case RESOURCE_DAEMON:
 	return ({
 	    "/include/config.h",
 	    "/include/kernel/kernel.h",
@@ -314,7 +314,7 @@ private string *preregister_inherits(string path)
     case AUTO:
 	return ({ });
 
-    case RSRCD:
+    case RESOURCE_DAEMON:
     case ACCESSD:
     case USERD:
     case API_ACCESS:
@@ -359,7 +359,7 @@ private void preregister_objects()
     /* register objects in order of compilation, including this object */
     list = ({
 	DRIVER, AUTO,
-	RSRCD, ACCESSD, USERD,
+	RESOURCE_DAEMON, ACCESSD, USERD,
 	API_RSRC, API_ACCESS, API_USER, 
 	LIB_CONN, LIB_USER, LIB_WIZTOOL,
 	RSRCOBJ, BINARY_CONN, TELNET_CONN, DATAGRAM_CONN, DEFAULT_USER,

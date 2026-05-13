@@ -7,7 +7,7 @@
 # define TLS()		call_trace(1)[TRACE_FIRSTARG]
 
 
-object rsrcd;		/* resource manager */
+object resource_daemon;		/* resource manager */
 mapping resources;	/* registered resources */
 string owner;		/* owner of these resources */
 int maxticks;		/* maximum number of ticks currently allowed */
@@ -25,7 +25,7 @@ static void create()
     ]);
     maxticks = -1;
     maxusage = -1.0;
-    rsrcd = find_object(RSRCD);
+    resource_daemon = find_object(RESOURCE_DAEMON);
 }
 
 /*
@@ -34,7 +34,7 @@ static void create()
  */
 void init(string name, int time)
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	owner = name;
 	resources["ticks"][RSRC_DECAYTIME] = time;
     }
@@ -46,7 +46,7 @@ void init(string name, int time)
  */
 void remove_rsrc(string name)
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	resources[name] = nil;
     }
 }
@@ -86,7 +86,7 @@ private void set_rlimits(mixed *rsrc, int update)
     max = (maxusage > 0.0 && rsrc[RSRC_USAGE] >= maxusage) ? 1 : rsrc[RSRC_MAX];
     if (update || maxticks != max) {
 	maxticks = max;
-	rsrcd->set_rlimits(owner,
+	resource_daemon->set_rlimits(owner,
 			   ({
 			      resources["stack"][RSRC_MAX],
 			      max,
@@ -101,7 +101,7 @@ private void set_rlimits(mixed *rsrc, int update)
  */
 void rsrc_set_limit(string name, int max, int decay)
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	mixed *rsrc;
 
 	if ((rsrc=resources[name])) {
@@ -123,7 +123,7 @@ void rsrc_set_limit(string name, int max, int decay)
  */
 void rsrc_set_maxtickusage(float tickusage)
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	rlimits (-1; -1) {
 	    maxusage = tickusage;
 	    set_rlimits(resources["ticks"], FALSE);
@@ -137,7 +137,7 @@ void rsrc_set_maxtickusage(float tickusage)
  */
 mixed *rsrc_get(string name, int *grsrc)
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	mixed *rsrc;
 	int time;
 
@@ -173,7 +173,7 @@ mixed *rsrc_get(string name, int *grsrc)
  */
 float rsrc_get_maxtickusage()
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	return maxusage;
     }
 }
@@ -184,7 +184,7 @@ float rsrc_get_maxtickusage()
  */
 void rsrc_incr(string name, int incr, int *grsrc)
 {
-    if (previous_program() == RSRCD && incr != 0) {
+    if (previous_program() == RESOURCE_DAEMON && incr != 0) {
 	mapping tls, map, pending;
 	mixed *arr;
 
@@ -259,7 +259,7 @@ static void delayed_incr(mapping map)
  */
 void decay_ticks(int *limits, int time, mixed *grsrc)
 {
-    if (previous_object() == rsrcd) {
+    if (previous_object() == resource_daemon) {
 	mixed *rsrc;
 
 	rlimits (-1; -1) {
@@ -279,7 +279,7 @@ void decay_ticks(int *limits, int time, mixed *grsrc)
  */
 void update_ticks(int ticks, mixed *grsrc)
 {
-    if (previous_program() == RSRCD) {
+    if (previous_program() == RESOURCE_DAEMON) {
 	call_out_summand("incr_ticks", 0, (float) ticks, grsrc);
     }
 }
