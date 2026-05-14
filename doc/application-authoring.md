@@ -154,6 +154,9 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 - `doc/architecture.md` -- the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
 - `doc/substrate-primitives.md` -- the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
-- `doc/lpc-essentials.md` -- the LPC language model (master / clone / inherit, atomic-by-default semantics, kfun calls, `create()` lifecycle).
+- `doc/lpc-essentials.md` -- LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
+- `doc/kernel-libraries.md` -- inheritable libraries shipped under `src/lib/`: String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
 - `doc/http-applications.md` -- the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
 - `doc/operations.md` -- the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
+
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md

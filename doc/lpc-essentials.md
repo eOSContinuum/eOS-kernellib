@@ -2,42 +2,112 @@
 
 # LPC Essentials
 
-This document covers the minimum LPC a builder new to the language needs to read and write code in an eOS-kernellib application. The architecture document (`doc/architecture.md`) covers the substrate's tier model and daemon inventory; the application-authoring document (`doc/application-authoring.md`) covers tier-E application patterns. This document covers the language itself: how objects are identified, how inheritance composes them, how lifecycle hooks fire, and how atomicity and deferred work behave at the function-call level.
+LPC is the programming language used by the [DGD] driver and the layers built on it, including eOS-kernellib. This document is an orientation: enough to read LPC code without surprise, enough mental model to know what to look up next. The authoritative reference is [LPC.md] in [dworkin/lpc-doc] (DGD pins commit `403cd0b` as a submodule). LPC.md is a formal specification, dense and reference-shaped; this document is the bridge that makes the spec readable.
 
-LPC is a C-flavored object-oriented language with three properties that distinguish it from most other languages a builder is likely to have written before: every object lives in a single persistent in-memory database, every kfun call commits or rolls back as a unit, and source files are recompiled into the live runtime without restarting the host. The remainder of this document covers the constructs that follow from those properties.
+For depth on a specific construct, follow the section citations into LPC.md. For the kfun catalog, see [dworkin/lpc-doc/kfun/]. For how LPC fits into eOS-kernellib's substrate (tier model, daemons, the auto-inheritance chain that hands every object its identity), see `doc/architecture.md`. For the patterns an application author writes on top of the substrate, see `doc/application-authoring.md`.
 
-For language reference depth (full kfun signatures, complete grammar, edge cases) see the upstream DGD documentation at <https://github.com/dworkin/dgd>.
+## What is familiar
 
-## Path-naming encodes object type
+A reader from C, C++, Java, or Go will recognize most of LPC's surface. Curly braces, semicolons, `if` / `while` / `for` / `switch`, `int` / `float` / `string` declarations, function definitions with parameter lists, the C preprocessor (`#include`, `#define`, `#ifdef`). Source files compile to objects; functions take and return values; expressions and operators look the way you expect. LPC.md §3.1 covers lexical elements, §3.2 expressions, §3.5 statements, §3.7 preprocessing.
 
-Every LPC source file's path tells the host driver what kind of object the file produces. The driver enforces these conventions at compile time; a misplaced file fails to compile.
+## What is surprising
 
-| Subdirectory | Object type | Notes |
+Five properties make LPC behave differently from most other languages a builder is likely to have written before. None are subtle once seen; all are subtle if missed.
+
+**Objects live in a persistent in-memory database.** Every "object" in LPC is a value in the host driver's persistent store. When the substrate restarts, the object graph is reconstituted from a snapshot file and resumes where it left off. There is no separate "save to disk" step in normal operation; persistence is the default. This is called *orthogonal persistence* in the systems literature.
+
+**Every function call is its own atomic context by default.** If the function body errors, every dataspace mutation it performed is rolled back as if the call had never happened. A function declared with the `atomic` modifier extends that atomic context across nested calls within the same call stack. The application author writes no `BEGIN TRANSACTION` / `ROLLBACK`; the host runtime enforces it.
+
+**Source files are recompiled into the live runtime.** Calling `compile_object("/usr/MyApp/obj/widget", new_source)` replaces the master object's program with the new source. Existing references to the old master continue to function for the in-flight call; subsequent calls dispatch to the new version. There is no separate "deploy" step.
+
+**No manual memory management.** No `malloc` / `free`, no `delete`. Objects are reference-counted by the host driver and garbage-collected when references drop to zero. Programs do not own memory; the host owns it.
+
+**Cross-object calls and inherited calls have their own operators.** `obj->func(arg)` calls `func` on a different object (the call traverses the kfun layer and goes through access checks). `::func()` calls the inherited version of `func` from this object's parent class. `name::func()` calls the inherited version when the inherit was given a name. A bare `func()` call is local to the current object.
+
+## Types and values
+
+LPC.md §3.4.2 lists eight types:
+
+| Type | Holds | Notes |
 |---|---|---|
-| `/lib/` | Inheritable library, never instantiated | `inherit` targets must live here |
-| `/obj/` | Cloneable; clones share the master's program | `clone_object()` instantiates |
-| `/data/` | Lightweight object (LWO); stored in another object's dataspace | No identity outside its container |
-| `/sys/` | Singleton; one instance, fixed name | Daemons live here |
+| `nil` | The "no value" value | Default for uninitialized variables |
+| `int` | 32-bit signed integer | -2147483648 through 2147483647 |
+| `float` | Double-precision floating point | IEEE 754 |
+| `string` | Sequence of characters | Immutable; first-class value |
+| `object` | Reference to another object | Master or clone |
+| `mapping` | Key-value associative map | Literal: `([ key : value ])` |
+| `mixed` | Any of the above | Used for dynamic typing |
+| `void` | No value | Function return type only |
 
-The convention is structural rather than stylistic. A file at `/usr/MyApp/lib/Helper.c` cannot be cloned; a file at `/usr/MyApp/obj/widget.c` cannot be inherited. The compile-time check catches the mistake before the object reaches the runtime.
+Two composite shapes are not in the type list but are first-class:
 
-## Master and clone
+- **Arrays** -- written `({ a, b, c })`. Heterogeneous (an array can hold mixed types). `arr[0]` indexes; `arr[1..3]` slices.
+- **Lightweight objects (LWOs)** -- value-shaped objects that travel inside another object's dataspace rather than living independently. Cloned with `new` (different from `clone_object()`); the lifetime is tied to the containing object's reference.
 
-A cloneable program at `/usr/MyApp/obj/widget` has at most one master object: the program itself, with object name equal to its source path. Clones are separate objects with names like `/usr/MyApp/obj/widget#37`. The master and the clones share program code but each clone has its own dataspace.
+`int` and `float` arithmetic does not auto-coerce; `1 + 1.0` is a type error. Use `(float) 1` or `(int) 1.0` to convert explicitly.
 
+## Type modifiers
+
+LPC.md §3.4.3 defines four modifiers that prefix a function or variable declaration:
+
+| Modifier | Effect |
+|---|---|
+| `private` | Only callable from within the same object |
+| `static` | On a function: callable only from this object and its inheriting children. On a variable: not saved to the snapshot |
+| `nomask` | On a function: cannot be redefined by a subclass |
+| `atomic` | On a function: extends the per-call atomic context across nested calls; the function body either commits wholly or rolls back wholly |
+
+`varargs` is also a keyword (LPC.md §3.1.4) prefixing a function whose parameter list is variable-length.
+
+Two consequences of `static` for variable declarations are worth flagging because they connect LPC to the substrate's persistence semantics:
+
+1. A `static` global variable holds runtime state that does not survive a snapshot restore. Use it for caches, derived state, or anything whose contents can be reconstructed.
+2. A non-`static` global variable is *persistent* by default -- its value is captured in the next snapshot and restored on the next boot.
+
+The `atomic` modifier carries two trade-offs the spec calls out (LPC.md §3.4.3):
+
+- **File operations forbidden inside `atomic`.** Renaming, writing, or reading files inside an atomic function is rejected by the host runtime. The atomicity guarantee covers in-memory dataspace, not external state.
+- **Double-tick cost.** Atomic functions consume tick budget at twice the rate of non-atomic functions, because every dataspace mutation is buffered until commit.
+
+## Functions and how they are called
+
+A function defined inside an object is called four ways depending on where the call comes from:
+
+```c
+foo();              /* local: this_object()'s own foo */
+obj->foo();         /* cross-object: call foo on another object via kfun */
+::foo();            /* inherited: parent class's foo */
+parent::foo();      /* inherited (named): foo from inherit named "parent" */
 ```
-status("/usr/MyApp/obj/widget")     -> master object's status
-clone_object("/usr/MyApp/obj/widget")  -> returns a new clone
-object_name(clone)                  -> "/usr/MyApp/obj/widget#37"
-```
 
-The master can store class-wide data; clones store per-instance data. The master is also a useful place for class-wide registries or factory functions when those need to live with the program rather than in a separate daemon.
+Cross-object calls (`->`) go through the host runtime's kfun layer and are subject to per-tier access checks. The inherited call operators (`::` and `name::`) are language constructs and dispatch directly into the inherited program.
+
+Some functions are not defined in any LPC source -- they are *kfuns*, provided by the host driver. From the calling site, kfuns look identical to local functions: `compile_object("/usr/MyApp/obj/widget")` is a kfun call, but the syntax does not say so. The catalog lives in [dworkin/lpc-doc/kfun/]. Note that kfuns split into two surfaces: the small minimalist core the host driver ships, and the optional extension modules a deployment may load (covered in `doc/architecture.md` "Host-driver extensions" and `doc/operations.md` "Loading host-driver extensions").
 
 ## Inheritance
 
-LPC supports multiple inheritance via the `inherit` directive at the top of a source file. There are two forms.
+LPC.md §3.6 specifies the `inherit` directive in two forms:
 
-**Anonymous inherit** makes inherited functions callable directly (and chained up to via `::name()`):
+```c
+inherit "FILENAME";              /* anonymous */
+inherit Identifier "FILENAME";   /* named */
+```
+
+The anonymous form makes inherited functions callable as if they were local: `foo()` calls the inherited `foo` and `::foo()` chains into the inherited version explicitly. The named form prefixes the inherited interface so calls qualify with the name: `Identifier::foo()`.
+
+Multiple inheritance is supported. The kernel auto at `/kernel/lib/auto.c` is inherited automatically by every compiled object regardless of any explicit `inherit` directives; the host driver's `auto_object` configuration setting points at it. The System auto at `/usr/System/lib/auto.c` extends the kernel auto and is the canonical anonymous-inherit target for application code (the application initd in `examples/http-app/initd.c` shows the pattern).
+
+The `private` keyword may prefix `inherit` to restrict the inherited members to access by this object only.
+
+## Lifecycle: create()
+
+LPC.md does not have a dedicated lifecycle section; `create()` is shown as an example function. The host driver invokes a configured "create" hook on every object's first function call -- the hook name comes from the `.dgd` config's `create` field. eOS-kernellib's setting is:
+
+```
+create = "_F_create";
+```
+
+`_F_create` is implemented in the kernel auto. It sets up owner and creator identity, registers clones with the driver's clone manager, and then invokes the object's own `create()` function. An application author writes `create()`; the kernel auto wires the dispatch.
 
 ```c
 inherit "/usr/System/lib/auto";
@@ -49,43 +119,15 @@ static void create()
 }
 ```
 
-**Named inherit** prefixes the inherited interface so callers and chain-ups must qualify with the name:
+Calling `::create()` chains into the parent's create. The `static` keyword keeps `create` callable only from this object and its children -- a convention that prevents external callers from re-running the constructor.
 
-```c
-inherit access API_ACCESS;
-
-static void create()
-{
-    access::create();
-    /* subclass-specific initialization */
-}
-```
-
-The kernel auto at `/kernel/lib/auto.c` is inherited automatically by every compiled object regardless of tier (the host driver's `auto_object` setting points at it). It provides per-object owner and creator identity, kfun wrappers, and access checks. The System auto at `/usr/System/lib/auto.c` extends the kernel auto with substrate-level facilities and is the canonical anonymous-inherit target for application code (the application initd in `examples/http-app/initd.c` shows the pattern).
-
-A subclass's constructor is responsible for chaining up to whichever inherited constructors it depends on. The language does not impose a chain-up order; the subclass picks the order that matches its initialization needs.
-
-## Lifecycle: create()
-
-Every object's first function call is `create()`. The host driver dispatches into the object via the `_F_create` hook configured in the `.dgd` file:
-
-```
-create = "_F_create";
-```
-
-`_F_create` is implemented in the kernel auto. It sets up owner and creator identity, registers clones with the driver's clone manager, and then invokes the object's `create()` function. An object author writes `create()`; the driver wires the dispatch.
-
-A clone's `create()` runs in the clone's own dataspace. The master's `create()` runs once when the program is first compiled. A pattern common across substrates is to have `create()` examine `object_name(this_object())` and behave differently for the master versus clones, but in this substrate the kernel auto handles the master/clone distinction via its registration logic and most application authors write a single `create()` body that runs on both.
-
-For higher-level application lifecycle (initd's role at boot, domain initialization order, deferred startup via `call_out(0)`) see `doc/application-authoring.md`.
+For deeper substrate dispatch (how the kernel auto handles master vs clone, how owner identity is set, how the clone registry is maintained), see `doc/architecture.md` "Auto-inheritance pattern."
 
 ## Atomicity
 
-Every LPC function call is its own atomic context by default. The function either runs to completion (the dataspace mutations it performed survive) or errors (the dataspace mutations it performed are rolled back as if the call had never happened). The substrate provides this transparently; an application author does not write begin/commit/rollback.
+Every function call is its own atomic context by default. The function either runs to completion (its dataspace mutations survive) or errors (its dataspace mutations are rolled back as if the call had never happened).
 
-The closest familiar analogy is a database transaction: the function body is the transaction, errors trigger rollback, successful completion commits. substrate-primitives.md §1 covers the guarantee at the substrate level.
-
-The `atomic` function modifier deepens this. A function declared `atomic` extends its atomic context across nested function calls within the same call stack:
+The `atomic` modifier extends this across nested calls:
 
 ```c
 atomic void transfer(object src, object dst, int amount)
@@ -95,51 +137,31 @@ atomic void transfer(object src, object dst, int amount)
 }
 ```
 
-Without the modifier, each `->` call commits independently; with the modifier, the whole `transfer` body is one transactional unit. The substrate's eOS-kernellib LPC source uses the implicit per-call atomicity throughout and rarely declares functions `atomic` explicitly because the default already covers the common case.
+Without the modifier each `->` call commits independently; with the modifier the whole `transfer` body is one transactional unit. The substrate's eOS-kernellib LPC source uses the implicit per-call atomicity throughout and rarely declares functions `atomic` explicitly because the default already covers the common case.
 
-Atomic contexts have a runtime cost: dataspace mutations are buffered until commit, doubling effective tick consumption inside an atomic context (the "double-tick" cost). For reference depth on the buffering machinery see the upstream DGD documentation.
+For the substrate-level guarantee and its open empirical questions under host-driver extensions, see `doc/substrate-primitives.md` §1.
 
 ## Deferred work: call_out
 
-LPC has no threads; concurrency is single-threaded with cooperative scheduling. Long-running work or work that must occur after the current call returns is scheduled via `call_out`:
+LPC has no threads. Concurrency is single-threaded with cooperative scheduling. Long-running work or work that must occur after the current call returns is scheduled via the `call_out` kfun:
 
 ```c
 int call_out(string func, mixed delay, mixed... args);
 ```
 
-The kfun returns a handle (an integer) and schedules `func` to be called on `this_object()` after `delay` seconds (zero is permitted; the call fires on the next event loop pass after the current call returns). Each fired call_out runs in its own atomic context.
+Returns a handle. Schedules `func` to be called on `this_object()` after `delay` seconds (zero is permitted; the call fires on the next event-loop pass after the current call returns). Each fired call_out runs in its own atomic context.
 
-Common uses:
+Common shapes:
 
 - `call_out("retry", 5, params)` -- retry a failing operation after a delay
-- `call_out("flush", 0)` -- defer work to after the current call returns; lets the caller see a consistent state before the deferred work runs
+- `call_out("flush", 0)` -- defer work to after the current call returns; the caller commits a consistent state before the deferred work runs
 - `call_out("tick", 1)` -- schedule recurring work; the called function re-arms the call_out before returning
 
-A call_out fired from inside an atomic function does not extend the caller's atomic context: the deferred call is its own transaction and runs after the caller commits. This is the substrate's only mechanism for async work and the only way to escape a single atomic context's tick budget.
-
-## Common library types
-
-eOS-kernellib ships a small set of inheritable libraries in `/lib/`. The headers in `src/include/` define the canonical names; an application includes the relevant header and inherits or instantiates as needed.
-
-| Library | Header | Role |
-|---|---|---|
-| `String`, `StringBuffer` | `<String.h>` | Efficient string accumulation; `StringBuffer` is the right choice for piecewise output construction |
-| `KVstore`, `KVnode` | `<KVstore.h>` | Persistent key-value store with structural sharing |
-| `Iterable`, `Iterator`, `IntIterator` | `<Iterator.h>` | Iterator protocol for traversing collections |
-| `Time`, `GMTime` | `<Time.h>` | Time arithmetic and formatting |
-| `Continuation`, `IterativeContinuation`, `ChainedContinuation`, `DelayedContinuation`, `DistContinuation` | `<Continuation.h>` | Composable async-control primitives over `call_out` |
-
-LPC also provides built-in aggregate types that need no library: `mapping` (associative map, `([ key : value ])` literal), arrays (`({ a, b, c })` literal), and lightweight objects (LWOs) for values that should travel inside another object's dataspace. Strings are first-class values.
-
-## Kfuns: built-in and extension-loadable
-
-A kfun is a function provided by the host driver rather than written in LPC. The driver ships a small minimalist core (capped at 256 kfuns by the 1-byte kfun numbering) covering object lifecycle, compilation, atomicity, connections, and basic math / strings / arrays. Additional kfuns can be loaded as host-driver extensions via the `.dgd` configuration's `modules =` mapping; an LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension.
-
-Do not assume all kfuns are equally available across deployments. A program that depends on an extension-provided kfun will fail to run on a deployment that does not load that extension. For the architectural pattern see `doc/architecture.md` "Host-driver extensions"; for deployment-time guidance see `doc/operations.md`.
+A call_out fired from inside an `atomic` function does not extend the caller's atomic context -- the deferred call is its own transaction, runs after the caller commits. This is the substrate's only mechanism for async work and the only way to escape a single atomic context's tick budget.
 
 ## Error handling
 
-A function errors by calling `error("message")` or by triggering a runtime fault (type mismatch, divide-by-zero, missing object). The atomic-context rollback fires on either path. Callers can capture an error with `catch`:
+A function errors by calling `error("message")` (an LPC.md-listed kfun) or by triggering a runtime fault (type mismatch, divide-by-zero, missing object). The atomic-context rollback fires on either path. Callers can capture an error with `catch`:
 
 ```c
 mixed result;
@@ -149,12 +171,44 @@ if (result) {
 }
 ```
 
-`catch` lets the caller observe the failure without propagating it; the inner call's dataspace mutations still roll back. The substrate's own LPC code rarely uses `catch` (errors propagate to the caller of the kfun, which is what callers usually want); use it sparingly in application code, since silently absorbing an error in a deeply atomic context defeats the rollback's protective purpose.
+`catch` lets the caller observe the failure without propagating it. The inner call's dataspace mutations still roll back. The substrate's own LPC code rarely uses `catch` (errors propagate to the caller of the kfun, which is what callers usually want); use it sparingly in application code, since silently absorbing an error in a deeply atomic context defeats the rollback's protective purpose.
+
+## A short worked example
+
+A counter object with a deliberate-failure increment that demonstrates atomic rollback:
+
+```c
+inherit "/usr/System/lib/auto";
+
+private int counter;
+
+static void create()
+{
+    ::create();
+    counter = 0;
+}
+
+int query() { return counter; }
+
+void increment_with_failure()
+{
+    counter += 1;
+    error("deliberate failure");
+}
+```
+
+Calling `query()` returns the current counter. Calling `increment_with_failure()` enters the atomic context, mutates `counter` to the next value, then errors. The host runtime rolls back the mutation; the next `query()` returns the same value as before. No application code participates in the rollback; the substrate's per-call atomicity does the work.
 
 ## Where to next
 
-- **`doc/architecture.md`** -- substrate tier model, daemons, boot sequence, where applications plug in.
-- **`doc/application-authoring.md`** -- writing a tier-E application: domain layout, initd, owner / access conventions, the object-manager lifecycle, `call_touch` upgrade.
-- **`doc/http-applications.md`** -- the canonical HTTP/1 application pattern with a runnable reference at `examples/http-app/`.
-- **`doc/substrate-primitives.md`** -- the substrate's eight runtime primitives (atomicity, capability separation, persistent state, hot reload, sandboxed code load, async events, multi-agent coherence, state introspection) covered as substrate guarantees rather than language constructs.
-- **DGD upstream reference** at <https://github.com/dworkin/dgd> -- full grammar and kfun reference.
+- **[LPC.md]** -- the formal language spec, pinned by DGD at commit `403cd0b`. §3.1 lexical elements, §3.2 expressions, §3.4 declarations and types, §3.5 statements, §3.6 inheritance, §3.7 preprocessing.
+- **[dworkin/lpc-doc/kfun/]** -- the kfun catalog. Every host-provided function the language calls.
+- **`doc/architecture.md`** -- the substrate's tier model, daemons, the auto-inheritance chain, the host-driver extension surface.
+- **`doc/application-authoring.md`** -- what writing a tier-E application on top of this substrate looks like: domain layout, initd, owner / access, the object-manager lifecycle, `call_touch` upgrade.
+- **`doc/kernel-libraries.md`** -- the inheritable libraries shipped under `src/lib/` (String, StringBuffer, KVstore, Iterator, Continuation variants, Time).
+- **`doc/substrate-primitives.md`** -- per-primitive foundation-and-status statement (atomicity, persistent state, hot reload, capability separation, etc.).
+
+[DGD]: https://github.com/dworkin/dgd
+[dworkin/lpc-doc]: https://github.com/dworkin/lpc-doc
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
+[dworkin/lpc-doc/kfun/]: https://github.com/dworkin/lpc-doc/tree/master/kfun

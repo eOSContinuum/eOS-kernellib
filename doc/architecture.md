@@ -95,6 +95,26 @@ User-tier objects pick up the System auto transitively: their `auto_object` reso
 
 The kernel auto also defines the inheritance discipline: a class declared `inherit "/<path>"` must have `/lib/` in its path. The driver's `inherit_program` kfun (kernel/sys/driver.c) enforces this. The discipline implies that cloneable objects (`/obj/`) and singleton daemons (`/sys/`) cannot be inherited; only `/lib/` and `/kernel/lib/` objects can.
 
+### Lifecycle dispatch
+
+The host driver invokes a configured "create" hook on every object's first function call. The `.dgd` config's `create` line names the hook; eOS-kernellib uses `_F_create`. The hook is implemented in the kernel auto at `src/kernel/lib/auto.c`:
+
+```c
+nomask void _F_create()
+{
+    if (!creator) {
+        /* set creator and owner from object_name */
+        /* if this is a clone, register with the driver's clone manager */
+        /* call System-tier creator if defined, otherwise call create() */
+        create();
+    }
+}
+```
+
+The `if (!creator)` guard ensures the hook fires once per object: at first call after compile, owner and creator identity are set from the object's path, the object is registered with the appropriate manager (clone manager for clones; the upgraded daemon for masters when an upgrade is in progress), and finally the object's own `create()` function is invoked. Application code writes `create()`; the kernel auto wires the dispatch.
+
+A clone's `create()` runs in its own dataspace at clone time. The master's `create()` runs once when the program is first compiled. The kernel auto handles the master/clone distinction via its registration logic, so most application authors write a single `create()` body that runs on both master and clones.
+
 ## System global access
 
 The System tier (tier C) is the only user-tier domain authorized to reach across user-domain boundaries by default. The mechanism is two-part:
@@ -169,7 +189,9 @@ The kernel daemons (driver, access_daemon, resource_daemon, userd) require no mo
 
 For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` -- `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `doc/http-applications.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
 
-For non-HTTP applications, the patterns are covered in `doc/application-authoring.md`. The LPC language model that enables the substrate's persistence and atomicity guarantees is covered in `doc/lpc-essentials.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `doc/operations.md`.
+For non-HTTP applications, the patterns are covered in `doc/application-authoring.md`. The LPC language itself is covered in `doc/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` -- string buffers, persistent collections, iterators, async continuations, time -- are catalogued in `doc/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `doc/operations.md`.
+
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
 
 [DGD]: https://github.com/dworkin/dgd
 [eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext
