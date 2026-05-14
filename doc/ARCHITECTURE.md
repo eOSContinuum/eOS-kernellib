@@ -130,32 +130,17 @@ The host driver (tier A, C code) supports dlopen-loaded extension modules regist
 
 ```
 modules = ([
-    "/path/to/jit.1.5"    : ([ ... ]),
-    "/path/to/rgx.1.5"    : ([ ... ]),
-    "/path/to/tls.1.5"    : ([ ... ]),
+    "/path/to/some-extension.1.5" : ([ ... ]),
 ])
 ```
 
-The canonical extension set lives at [dworkin/lpc-ext]:
+The extension surface is intentionally separate from the host driver's own kfun set. The driver ships a small minimalist core (capped at 256 kfuns by the 1-byte kfun numbering) covering object lifecycle, compilation, atomicity, connections, and basic math / strings / arrays. Functionality that requires C-level access beyond that core -- hardware-accelerated crypto, AOT compilation, native regex, system-database integration -- is added at runtime via this mechanism rather than by growing the core.
 
-- **jit** -- AOT-compile LPC bytecode to native code. A separate `jitcomp` process decompiles bytecode to LLVM IR, invokes clang to produce a per-program shared object, disk-caches by 16-byte program hash, and dlopens the result.
-- **dbase** -- on-disk database support.
-- **kfun/lower_case** -- locale-aware string lowercasing.
-- **kfun/rgx** -- regular expressions.
-- **kfun/tls** -- TLS primitives consumed by `/usr/TLS/` (the LPC TLS stack).
-- **kfun/zlib** -- compression / decompression.
-- **kfun/crypto** -- cryptographic primitives (recently extended with SHA3, KECCAK-256, SECP256K1).
+The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance, a regex kfun, a TLS-primitive kfun, and others. eOS-kernellib's substrate requires no extension and loads none; deployments choose what to load based on their needs.
 
-A community fork at [maldorne/dgd-extensions] tracks upstream and adds `kfun/sprintf` (column-aware terminal output) and `kfun/hexagon_test` (test infrastructure for the Hexagon mudlib).
+An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `doc/OPERATIONS.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the substrate's atomicity and hot-reload guarantees.
 
-Extensions are not part of eOS-kernellib's source. They are tier-A refinements: extension kfuns sit alongside built-in kfuns at the host-driver level, with the same per-tier access checks. An LPC file calling `regex(...)` cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension; the deployment's `.dgd` config determines which kfuns are present.
-
-Two substrate properties have open questions under JIT that empirical verification will resolve:
-
-- **JIT and atomic-commit rollback.** Does JIT-compiled native code participate in DGD's atomic-commit rollback when an atomic function errors? `doc/JIT.md` does not address this; inferred-from-source analysis suggests JIT preserves rollback because it operates over the same dataspace primitives the bytecode interpreter uses, but empirical verification is pending.
-- **JIT cache invalidation on `compile_object`.** When `compile_object(path, source)` recompiles an existing path, the bytecode hash changes (the cache is keyed by program hash); the substrate should issue a fresh JIT compilation. If the cache is path-keyed or address-keyed instead, hot reload would not propagate through to JIT-compiled code. Empirical verification is pending.
-
-Until those questions resolve, JIT deployment guidance carries flags rather than recommendations. See `doc/OPERATIONS.md` for deployment-time guidance.
+Extension kfuns sit alongside built-in kfuns at the host-driver level, with the same per-tier access checks. An LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension; the deployment's `.dgd` config determines which kfuns are present.
 
 ## Substrate primitives
 
@@ -189,4 +174,3 @@ For non-HTTP applications, the patterns are covered in `doc/APPLICATION-AUTHORIN
 [DGD]: https://github.com/dworkin/dgd
 [eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext
-[maldorne/dgd-extensions]: https://github.com/maldorne/dgd-extensions
