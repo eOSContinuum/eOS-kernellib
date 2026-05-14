@@ -17,7 +17,7 @@ An orthogonally-persistent server treats in-memory state as the primary state of
 - **Multi-agent coherence** -- Multiple callers see a consistent view of state without user-land coordination.
 - **State introspection** -- The state graph is queryable directly through runtime calls.
 
-`doc/KERNEL-LAYER.md` covers each primitive: which are surfaced as library-shipped objects, which are instantiated at boot, and which are hooks for the application above. The architectural argument for treating these properties as substrate primitives -- rather than as application-layer patterns or external glue -- lives at [eOS-DeepContext].
+`doc/ARCHITECTURE.md` covers the architecture: capability tiers, daemons, boot sequence, auto-inheritance, System global-access, and host-driver extensions. `doc/SUBSTRATE-PRIMITIVES.md` covers each primitive's foundation, demonstration status, supporting extensions, and open work. The architectural argument for treating these properties as substrate primitives -- rather than as application-layer patterns or external glue -- lives at [eOS-DeepContext].
 
 ## Getting started
 

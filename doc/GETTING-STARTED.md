@@ -68,7 +68,7 @@ The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an appli
 
 ## Next steps
 
-- `doc/KERNEL-LAYER.md` covers the architecture and the primitives the kernel layer provides.
+- `doc/ARCHITECTURE.md` covers the architecture; `doc/SUBSTRATE-PRIMITIVES.md` covers the per-primitive foundation-and-proof statement.
 - `doc/BUILDING.md` covers DGD build details and platform-specific notes.
 - Build your own application on top by adding a user-layer domain under `src/usr/`.
 

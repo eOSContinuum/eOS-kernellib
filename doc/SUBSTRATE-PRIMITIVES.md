@@ -221,7 +221,7 @@ The following are not primitives; they are surfaces through which primitives man
 
 ## Appendix: Tier model
 
-This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary in `doc/KERNEL-LAYER.md` (Kernel / System / User). The five-tier splits the C-language host driver from the LPC kernel (A vs B) and the shipped substrate domains from the application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis below.
+This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary in `doc/ARCHITECTURE.md` (Kernel / System / User). The five-tier splits the C-language host driver from the LPC kernel (A vs B) and the shipped substrate domains from the application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis below.
 
 The substrate organizes code into five tiers. Tier identity is determined by the path under which the source compiles, and is enforced by the host driver's access checks at every kfun call.
 
