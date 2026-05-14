@@ -17,11 +17,11 @@ An orthogonally-persistent server treats in-memory state as the primary state of
 - **Multi-agent coherence** -- Multiple callers see a consistent view of state without user-land coordination.
 - **State introspection** -- The state graph is queryable directly through runtime calls.
 
-`doc/ARCHITECTURE.md` covers the architecture: capability tiers, daemons, boot sequence, auto-inheritance, System global-access, and host-driver extensions. `doc/SUBSTRATE-PRIMITIVES.md` covers each primitive's foundation, demonstration status, supporting extensions, and open work. The architectural argument for treating these properties as substrate primitives -- rather than as application-layer patterns or external glue -- lives at [eOS-DeepContext].
+`doc/architecture.md` covers the architecture: capability tiers, daemons, boot sequence, auto-inheritance, System global-access, and host-driver extensions. `doc/substrate-primitives.md` covers each primitive's foundation, demonstration status, supporting extensions, and open work. The architectural argument for treating these properties as substrate primitives -- rather than as application-layer patterns or external glue -- lives at [eOS-DeepContext].
 
 ## Getting started
 
-`doc/GETTING-STARTED.md` covers installing DGD, fetching this repository, building, and running a minimal configuration. `doc/BUILDING.md` is the deeper build reference.
+`doc/getting-started.md` covers installing DGD, fetching this repository, building, and running a minimal configuration. `doc/building.md` is the deeper build reference.
 
 ## How it composes
 

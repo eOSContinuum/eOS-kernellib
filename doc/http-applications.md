@@ -4,7 +4,7 @@
 
 This document walks through writing an HTTP/1 application that runs on top of eOS-kernellib. The kernel layer binds the HTTP/1 substrate to the binary port and hands incoming connections to an application-supplied server object; this guide shows what that server object looks like, what it must inherit, and how it routes requests.
 
-`doc/ARCHITECTURE.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/SUBSTRATE-PRIMITIVES.md` covers the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+`doc/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/substrate-primitives.md` covers the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 
 ## The mount point
 
@@ -221,9 +221,9 @@ The 0-second `call_out` runs after the System initd commits, which is after ever
 
 ## Next steps
 
-- `doc/GETTING-STARTED.md` -- install DGD, run the example configuration.
-- `doc/ARCHITECTURE.md` -- capability tiers, daemons, kernel-layer libraries.
-- `doc/SUBSTRATE-PRIMITIVES.md` -- the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+- `doc/getting-started.md` -- install DGD, run the example configuration.
+- `doc/architecture.md` -- capability tiers, daemons, kernel-layer libraries.
+- `doc/substrate-primitives.md` -- the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 - `examples/http-app/` -- runnable reference application.
 - `src/usr/System/sys/http_server.c` -- the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the substrate-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
 - `src/usr/HTTP/api/lib/Server1.c` and `src/usr/HTTP/lib/Connection1.c` -- the HTTP/1 library implementation that an application server inherits and overrides.

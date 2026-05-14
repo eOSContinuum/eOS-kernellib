@@ -2,9 +2,9 @@
 
 # Operations
 
-This document covers running an eOS-kernellib substrate: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`doc/ARCHITECTURE.md`) covers the substrate's structural model; this document covers the operator's surface for keeping it running.
+This document covers running an eOS-kernellib substrate: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`doc/architecture.md`) covers the substrate's structural model; this document covers the operator's surface for keeping it running.
 
-Audience: someone running the substrate -- responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/APPLICATION-AUTHORING.md` and `doc/HTTP-APPLICATIONS.md`.
+Audience: someone running the substrate -- responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/application-authoring.md` and `doc/http-applications.md`.
 
 ## The .dgd configuration file
 
@@ -24,7 +24,7 @@ The host driver reads its configuration from a `.dgd` file passed on the command
 | `static_chunk`, `dynamic_chunk` | Memory allocator chunk sizes |
 | `dump_file` | Path the substrate writes snapshots to |
 | `dump_interval` | Seconds between automatic snapshots; 3600 (one hour) is a reasonable default |
-| `hotboot` | Tuple of `({ binary, config, snapshot, snapshot.old })` enabling hot boot via `execv` (see `doc/ARCHITECTURE.md` boot sequence) |
+| `hotboot` | Tuple of `({ binary, config, snapshot, snapshot.old })` enabling hot boot via `execv` (see `doc/architecture.md` boot sequence) |
 | `typechecking` | Strictness of compile-time type checks; production deployments should set `2` (full) |
 | `users`, `editors`, `objects`, `call_outs`, `array_size` | Hard caps on substrate-wide resource counts |
 | `modules` | Optional mapping of host-driver extensions to load at boot (see Loading host-driver extensions below) |
@@ -33,7 +33,7 @@ A minimal example is included at `example.dgd` in the repository root.
 
 ## Booting
 
-The substrate has three boot modes; `doc/ARCHITECTURE.md` covers the dispatch in detail. Briefly:
+The substrate has three boot modes; `doc/architecture.md` covers the dispatch in detail. Briefly:
 
 - **Cold boot**: started with no snapshot present. The driver compiles `/kernel/sys/driver`, runs the kernel auto's initd cascade through every `/usr/[A-Z]*/initd.c`, and reaches the running state. This is the path for first-time bring-up and after intentional state wipe.
 - **Snapshot restore**: started with a snapshot file present at `dump_file`. The driver reloads the snapshotted object graph and dataspaces, then calls the registered `restored(int hotboot)` driver hook. Initd cascades do not run; the substrate resumes the state captured at the snapshot.
@@ -117,7 +117,7 @@ The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext]
 
 Two substrate guarantees have unverified behavior under extension-loaded codepaths. Until empirically verified, an operator enabling such an extension in production should treat these as known unknowns:
 
-- **Atomicity under extension-loaded JIT.** Does the platform's atomic-commit rollback fire when an extension-compiled native function errors mid-call? The atomicity primitive (`doc/SUBSTRATE-PRIMITIVES.md` §1) hinges on the runtime restoring in-memory state on error; if extension-compiled code skips the rollback path (for example by writing directly to dataspace memory without going through the atomic-transaction layer), the guarantee holds only without the extension loaded.
+- **Atomicity under extension-loaded JIT.** Does the platform's atomic-commit rollback fire when an extension-compiled native function errors mid-call? The atomicity primitive (`doc/substrate-primitives.md` §1) hinges on the runtime restoring in-memory state on error; if extension-compiled code skips the rollback path (for example by writing directly to dataspace memory without going through the atomic-transaction layer), the guarantee holds only without the extension loaded.
 - **Hot reload under extension-loaded compiled-code caches.** Does `compile_object(path, source)` interact correctly with an extension's per-program code cache? The hot-reload primitive (§4) requires that the next call after recompilation runs the new logic; if the extension's cache is keyed on something stale, recompiled code can be shadowed by previously-compiled native code.
 
 Both questions are scoped to the eos-harness MVA workstream's #AO-4 probe; once results land, this section will resolve to either "verified preserves" or "verified breaks" with a citation to the Empirical Observation node carrying the evidence.
@@ -136,9 +136,9 @@ Both questions are scoped to the eos-harness MVA workstream's #AO-4 probe; once 
 
 ## Where to next
 
-- **`doc/ARCHITECTURE.md`** -- substrate tier model, daemons, boot sequence in detail.
-- **`doc/SUBSTRATE-PRIMITIVES.md`** -- the substrate's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
-- **`doc/APPLICATION-AUTHORING.md`** -- writing a tier-E application on top of this substrate.
+- **`doc/architecture.md`** -- substrate tier model, daemons, boot sequence in detail.
+- **`doc/substrate-primitives.md`** -- the substrate's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
+- **`doc/application-authoring.md`** -- writing a tier-E application on top of this substrate.
 - **DGD upstream reference** at <https://github.com/dworkin/dgd> -- full kfun reference, `.dgd` field reference, host-binary build instructions.
 
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext

@@ -224,7 +224,7 @@ The following are not primitives; they are surfaces through which primitives man
 
 ## Appendix: Tier model
 
-This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary in `doc/ARCHITECTURE.md` (Kernel / System / User). The five-tier splits the C-language host driver from the LPC kernel (A vs B) and the shipped substrate domains from the application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis below.
+This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary in `doc/architecture.md` (Kernel / System / User). The five-tier splits the C-language host driver from the LPC kernel (A vs B) and the shipped substrate domains from the application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis below.
 
 The substrate organizes code into five tiers. Tier identity is determined by the path under which the source compiles, and is enforced by the host driver's access checks at every kfun call.
 
@@ -249,7 +249,7 @@ The core driver ships a small minimalist kfun set (capped at 256 kfuns by the 1-
 
 eOS-kernellib's substrate requires no extension and loads none. Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity and §4 Hot reload concern what happens when a deployment chooses to load an extension whose codepaths interact with those primitives -- the substrate's contract is unverified there, not violated.
 
-The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance and others. The architectural pattern matters for this document; specific module choice is a deployment concern covered in `doc/OPERATIONS.md`.
+The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance and others. The architectural pattern matters for this document; specific module choice is a deployment concern covered in `doc/operations.md`.
 
 Loading an extension binds the substrate's statedump to the extension's presence: a snapshot taken with an extension active requires that same extension to restore. This makes extension loading a durable architectural commitment, not an opt-in convenience.
 

@@ -4,7 +4,7 @@
 
 eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the [DGD] driver. It sits between DGD and an application, providing the substrate primitives the application uses to express its own logic.
 
-This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The architectural argument behind these choices -- why these primitives belong in the substrate rather than the application layer -- lives at [eOS-DeepContext]. The per-primitive foundation-and-proof statement lives in `doc/SUBSTRATE-PRIMITIVES.md`.
+This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The architectural argument behind these choices -- why these primitives belong in the substrate rather than the application layer -- lives at [eOS-DeepContext]. The per-primitive foundation-and-proof statement lives in `doc/substrate-primitives.md`.
 
 ## Capability tiers
 
@@ -138,7 +138,7 @@ The extension surface is intentionally separate from the host driver's own kfun 
 
 The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance, a regex kfun, a TLS-primitive kfun, and others. eOS-kernellib's substrate requires no extension and loads none; deployments choose what to load based on their needs.
 
-An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `doc/OPERATIONS.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the substrate's atomicity and hot-reload guarantees.
+An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `doc/operations.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the substrate's atomicity and hot-reload guarantees.
 
 Extension kfuns sit alongside built-in kfuns at the host-driver level, with the same per-tier access checks. An LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension; the deployment's `.dgd` config determines which kfuns are present.
 
@@ -155,7 +155,7 @@ The kernel layer surfaces eight runtime primitives:
 - **Multi-agent coherence** -- multiple callers see a consistent view of state without user-land synchronization.
 - **State introspection** -- the state graph is queryable directly through host driver primitives.
 
-Each primitive's foundation, demonstration status, supporting extensions, and open work are documented in `doc/SUBSTRATE-PRIMITIVES.md`. The reference there is the authoritative per-primitive statement; this section is a quick index.
+Each primitive's foundation, demonstration status, supporting extensions, and open work are documented in `doc/substrate-primitives.md`. The reference there is the authoritative per-primitive statement; this section is a quick index.
 
 ## Where an application plugs in
 
@@ -167,9 +167,9 @@ An application built on the kernel layer adds:
 
 The kernel daemons (driver, access_daemon, resource_daemon, userd) require no modification. The application registers its objects, hooks into events, and consumes the substrate primitives.
 
-For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` -- `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `doc/HTTP-APPLICATIONS.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
+For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` -- `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `doc/http-applications.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
 
-For non-HTTP applications, the patterns are covered in `doc/APPLICATION-AUTHORING.md`. The LPC language model that enables the substrate's persistence and atomicity guarantees is covered in `doc/LPC-ESSENTIALS.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `doc/OPERATIONS.md`.
+For non-HTTP applications, the patterns are covered in `doc/application-authoring.md`. The LPC language model that enables the substrate's persistence and atomicity guarantees is covered in `doc/lpc-essentials.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `doc/operations.md`.
 
 [DGD]: https://github.com/dworkin/dgd
 [eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext

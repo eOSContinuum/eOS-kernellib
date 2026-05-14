@@ -2,9 +2,9 @@
 
 # Application Authoring
 
-This document walks through writing a tier-E application on top of eOS-kernellib. The architecture document (`doc/ARCHITECTURE.md`) covers the substrate's tier model, daemons, and inheritance chain; this document covers what an application built on top of that substrate looks like.
+This document walks through writing a tier-E application on top of eOS-kernellib. The architecture document (`doc/architecture.md`) covers the substrate's tier model, daemons, and inheritance chain; this document covers what an application built on top of that substrate looks like.
 
-The canonical HTTP/1 application pattern is covered separately in `doc/HTTP-APPLICATIONS.md` with a runnable reference at `examples/http-app/`. This document covers the patterns that apply to applications regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
+The canonical HTTP/1 application pattern is covered separately in `doc/http-applications.md` with a runnable reference at `examples/http-app/`. This document covers the patterns that apply to applications regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
 
 ## Domain layout
 
@@ -126,7 +126,7 @@ The connection-handling contract for non-HTTP applications is the binary-manager
 
 For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `logout`, `flow_*`, `timeout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
 
-For datagram-shaped applications (UDP), datagram support is a port candidate listed in `doc/SUBSTRATE-PRIMITIVES.md` Supporting surfaces; the substrate ships the transport scaffolding but no canonical datagram application yet.
+For datagram-shaped applications (UDP), datagram support is a port candidate listed in `doc/substrate-primitives.md` Supporting surfaces; the substrate ships the transport scaffolding but no canonical datagram application yet.
 
 ## Worked example sketch: an in-memory KV service
 
@@ -152,8 +152,8 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 ## Where to next
 
-- `doc/ARCHITECTURE.md` -- the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
-- `doc/SUBSTRATE-PRIMITIVES.md` -- the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
-- `doc/LPC-ESSENTIALS.md` -- the LPC language model (master / clone / inherit, atomic-by-default semantics, kfun calls, `create()` lifecycle).
-- `doc/HTTP-APPLICATIONS.md` -- the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
-- `doc/OPERATIONS.md` -- the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
+- `doc/architecture.md` -- the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
+- `doc/substrate-primitives.md` -- the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
+- `doc/lpc-essentials.md` -- the LPC language model (master / clone / inherit, atomic-by-default semantics, kfun calls, `create()` lifecycle).
+- `doc/http-applications.md` -- the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
+- `doc/operations.md` -- the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).

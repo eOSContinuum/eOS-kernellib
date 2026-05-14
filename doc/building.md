@@ -42,7 +42,7 @@ The DGD source compiles on Linux, FreeBSD, and other POSIX-compatible systems wi
 
 There is no build step. DGD compiles the LPC source under `src/` at runtime, on first load and on hot-reload requests.
 
-Verify the kernel layer compiles by running the driver against `example.dgd` per the steps in `doc/GETTING-STARTED.md`. Compile errors surface in the driver's standard output during boot.
+Verify the kernel layer compiles by running the driver against `example.dgd` per the steps in `doc/getting-started.md`. Compile errors surface in the driver's standard output during boot.
 
 ## State and snapshot files
 

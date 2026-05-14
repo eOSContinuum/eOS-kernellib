@@ -2,7 +2,7 @@
 
 # LPC Essentials
 
-This document covers the minimum LPC a builder new to the language needs to read and write code in an eOS-kernellib application. The architecture document (`doc/ARCHITECTURE.md`) covers the substrate's tier model and daemon inventory; the application-authoring document (`doc/APPLICATION-AUTHORING.md`) covers tier-E application patterns. This document covers the language itself: how objects are identified, how inheritance composes them, how lifecycle hooks fire, and how atomicity and deferred work behave at the function-call level.
+This document covers the minimum LPC a builder new to the language needs to read and write code in an eOS-kernellib application. The architecture document (`doc/architecture.md`) covers the substrate's tier model and daemon inventory; the application-authoring document (`doc/application-authoring.md`) covers tier-E application patterns. This document covers the language itself: how objects are identified, how inheritance composes them, how lifecycle hooks fire, and how atomicity and deferred work behave at the function-call level.
 
 LPC is a C-flavored object-oriented language with three properties that distinguish it from most other languages a builder is likely to have written before: every object lives in a single persistent in-memory database, every kfun call commits or rolls back as a unit, and source files are recompiled into the live runtime without restarting the host. The remainder of this document covers the constructs that follow from those properties.
 
@@ -77,13 +77,13 @@ create = "_F_create";
 
 A clone's `create()` runs in the clone's own dataspace. The master's `create()` runs once when the program is first compiled. A pattern common across substrates is to have `create()` examine `object_name(this_object())` and behave differently for the master versus clones, but in this substrate the kernel auto handles the master/clone distinction via its registration logic and most application authors write a single `create()` body that runs on both.
 
-For higher-level application lifecycle (initd's role at boot, domain initialization order, deferred startup via `call_out(0)`) see `doc/APPLICATION-AUTHORING.md`.
+For higher-level application lifecycle (initd's role at boot, domain initialization order, deferred startup via `call_out(0)`) see `doc/application-authoring.md`.
 
 ## Atomicity
 
 Every LPC function call is its own atomic context by default. The function either runs to completion (the dataspace mutations it performed survive) or errors (the dataspace mutations it performed are rolled back as if the call had never happened). The substrate provides this transparently; an application author does not write begin/commit/rollback.
 
-The closest familiar analogy is a database transaction: the function body is the transaction, errors trigger rollback, successful completion commits. SUBSTRATE-PRIMITIVES.md §1 covers the guarantee at the substrate level.
+The closest familiar analogy is a database transaction: the function body is the transaction, errors trigger rollback, successful completion commits. substrate-primitives.md §1 covers the guarantee at the substrate level.
 
 The `atomic` function modifier deepens this. A function declared `atomic` extends its atomic context across nested function calls within the same call stack:
 
@@ -135,7 +135,7 @@ LPC also provides built-in aggregate types that need no library: `mapping` (asso
 
 A kfun is a function provided by the host driver rather than written in LPC. The driver ships a small minimalist core (capped at 256 kfuns by the 1-byte kfun numbering) covering object lifecycle, compilation, atomicity, connections, and basic math / strings / arrays. Additional kfuns can be loaded as host-driver extensions via the `.dgd` configuration's `modules =` mapping; an LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension.
 
-Do not assume all kfuns are equally available across deployments. A program that depends on an extension-provided kfun will fail to run on a deployment that does not load that extension. For the architectural pattern see `doc/ARCHITECTURE.md` "Host-driver extensions"; for deployment-time guidance see `doc/OPERATIONS.md`.
+Do not assume all kfuns are equally available across deployments. A program that depends on an extension-provided kfun will fail to run on a deployment that does not load that extension. For the architectural pattern see `doc/architecture.md` "Host-driver extensions"; for deployment-time guidance see `doc/operations.md`.
 
 ## Error handling
 
@@ -153,8 +153,8 @@ if (result) {
 
 ## Where to next
 
-- **`doc/ARCHITECTURE.md`** -- substrate tier model, daemons, boot sequence, where applications plug in.
-- **`doc/APPLICATION-AUTHORING.md`** -- writing a tier-E application: domain layout, initd, owner / access conventions, the object-manager lifecycle, `call_touch` upgrade.
-- **`doc/HTTP-APPLICATIONS.md`** -- the canonical HTTP/1 application pattern with a runnable reference at `examples/http-app/`.
-- **`doc/SUBSTRATE-PRIMITIVES.md`** -- the substrate's eight runtime primitives (atomicity, capability separation, persistent state, hot reload, sandboxed code load, async events, multi-agent coherence, state introspection) covered as substrate guarantees rather than language constructs.
+- **`doc/architecture.md`** -- substrate tier model, daemons, boot sequence, where applications plug in.
+- **`doc/application-authoring.md`** -- writing a tier-E application: domain layout, initd, owner / access conventions, the object-manager lifecycle, `call_touch` upgrade.
+- **`doc/http-applications.md`** -- the canonical HTTP/1 application pattern with a runnable reference at `examples/http-app/`.
+- **`doc/substrate-primitives.md`** -- the substrate's eight runtime primitives (atomicity, capability separation, persistent state, hot reload, sandboxed code load, async events, multi-agent coherence, state introspection) covered as substrate guarantees rather than language constructs.
 - **DGD upstream reference** at <https://github.com/dworkin/dgd> -- full grammar and kfun reference.

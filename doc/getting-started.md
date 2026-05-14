@@ -18,7 +18,7 @@ cd dgd/src
 make install
 ```
 
-The driver binary lands at `dgd/bin/dgd`. See `doc/BUILDING.md` for platform-specific notes.
+The driver binary lands at `dgd/bin/dgd`. See `doc/building.md` for platform-specific notes.
 
 ## Fetch eOS-kernellib
 
@@ -68,8 +68,8 @@ The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an appli
 
 ## Next steps
 
-- `doc/ARCHITECTURE.md` covers the architecture; `doc/SUBSTRATE-PRIMITIVES.md` covers the per-primitive foundation-and-proof statement.
-- `doc/BUILDING.md` covers DGD build details and platform-specific notes.
+- `doc/architecture.md` covers the architecture; `doc/substrate-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `doc/building.md` covers DGD build details and platform-specific notes.
 - Build your own application on top by adding a user-layer domain under `src/usr/`.
 
 [DGD]: https://github.com/dworkin/dgd
