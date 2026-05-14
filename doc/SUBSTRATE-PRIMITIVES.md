@@ -30,7 +30,9 @@ Operations commit wholly or roll back wholly. Partial effects do not escape on f
 
 **Extensions**: None at substrate level. Atomicity is a host-runtime property; eOS-kernellib does not extend it beyond the host's contract.
 
-**Open**: Compound-operation atomic envelopes spanning multiple sub-calls. The host envelope is per-call; multi-call transactional semantics are an application concern.
+**Open**:
+- Compound-operation atomic envelopes spanning multiple sub-calls. The host envelope is per-call; multi-call transactional semantics are an application concern.
+- Behavior under host-driver extensions that compile LPC bytecode to native code (see Appendix §Tier A: extensions). The atomic-commit guarantee is enforced by the host runtime's bytecode interpreter; whether an extension-loaded codepath that bypasses the interpreter preserves the rollback path is empirically unverified. Operators loading such an extension should treat the guarantee as conditional until measured.
 
 ---
 
@@ -97,6 +99,7 @@ Code recompiles into the live runtime; existing objects update in place.
 **Open**:
 - Library-cascade behavior in the absence of progdb (does an existing clone of an old parent become stale, or does the host's late binding catch the new parent on next dispatch?).
 - Concurrent in-flight calls during recompile (what's the substrate's guarantee about a method executing in the old version while the new version compiles?).
+- Interaction with host-driver extensions that maintain a compiled-code cache (see Appendix §Tier A: extensions). When `compile_object` recompiles a path, an extension's per-program code cache must invalidate or re-key the corresponding entry, otherwise stale compiled code shadows the new bytecode and hot reload silently fails. Empirically unverified for any specific extension; operators loading such an extension should test the recompile path against their workload before relying on hot reload in production.
 
 ---
 
@@ -237,3 +240,17 @@ Two implications matter for builders authoring on top of eOS-kernellib:
 
 1. **What "is" eOS-kernellib** is tiers B + C + D. Tier A is the driver; tier E is the consumer's responsibility.
 2. **Tier D items are technically the same kind of thing as tier E items.** A user-tier domain is a user-tier domain. The boundary between D and E is packaging convention. A primitive that currently exists as a tier-E pattern in some consumer's distribution can be promoted to tier D in eOS-kernellib by adding the domain to the shipped substrate set.
+
+### Tier A: extensions
+
+Tier A has a sub-surface beyond the core driver: dlopen-loaded extension modules registered in the `.dgd` configuration's `modules =` mapping. Extension modules add kfuns to the runtime; from the LPC layer above, an extension kfun is indistinguishable from a host built-in.
+
+The core driver ships a small minimalist kfun set (capped at 256 kfuns by the 1-byte kfun numbering) covering object lifecycle, compilation, atomicity, connections, and basic math / strings / arrays. Functionality requiring C-level access beyond that core -- hardware-accelerated crypto, AOT compilation, native regex, system-database integration -- is added at runtime via this extension surface rather than by growing the core.
+
+eOS-kernellib's substrate requires no extension and loads none. Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity and §4 Hot reload concern what happens when a deployment chooses to load an extension whose codepaths interact with those primitives -- the substrate's contract is unverified there, not violated.
+
+The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance and others. The architectural pattern matters for this document; specific module choice is a deployment concern covered in `doc/OPERATIONS.md`.
+
+Loading an extension binds the substrate's statedump to the extension's presence: a snapshot taken with an extension active requires that same extension to restore. This makes extension loading a durable architectural commitment, not an opt-in convenience.
+
+[dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext
