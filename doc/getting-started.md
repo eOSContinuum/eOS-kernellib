@@ -4,7 +4,7 @@
 
 This guide installs the [DGD] driver, fetches this repository, and runs an eOS-kernellib server with the bundled example configuration.
 
-**Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the substrate.
+**Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the platform.
 
 ## Prerequisites
 
@@ -70,10 +70,10 @@ The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an appli
 
 ## Where to next
 
-- `examples/http-app/README.md` and `doc/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the substrate is running.
+- `examples/http-app/README.md` and `doc/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
 - `doc/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
-- `doc/architecture.md` covers the substrate's tier model, daemons, and boot sequence; `doc/substrate-primitives.md` covers the per-primitive foundation-and-proof statement.
-- `doc/application-authoring.md` covers writing a tier-E application on top of the substrate (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
+- `doc/architecture.md` covers the platform's tier model, daemons, and boot sequence; `doc/runtime-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `doc/application-authoring.md` covers writing a tier-E application on top of the platform (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
 - `doc/building.md` covers DGD build details and platform-specific notes.
 
 [DGD]: https://github.com/dworkin/dgd

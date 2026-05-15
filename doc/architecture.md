@@ -2,11 +2,11 @@
 
 # Architecture
 
-eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the [DGD] driver. It sits between DGD and an application, providing the substrate primitives the application uses to express its own logic.
+eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the [DGD] driver. It sits between DGD and an application, providing the runtime primitives the application uses to express its own logic.
 
-This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The per-primitive foundation-and-proof statement lives in `doc/substrate-primitives.md`, which also names the substrate's commitment behind each primitive.
+This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The per-primitive foundation-and-proof statement lives in `doc/runtime-primitives.md`, which also names the platform's commitment behind each primitive.
 
-**Audience**: a developer or architect orienting to the substrate's structural model; wants to know how the kernel layer is organized — what runs at which tier, which daemons mediate which surfaces, how the boot sequence reaches a steady state, where an application plugs in — before writing or operating code on the substrate.
+**Audience**: a developer or architect orienting to the platform's structural model; wants to know how the kernel layer is organized — what runs at which tier, which daemons mediate which surfaces, how the boot sequence reaches a steady state, where an application plugs in — before writing or operating code on the platform.
 
 ## Capability tiers
 
@@ -19,7 +19,7 @@ Five-tier vocabulary (canonical for cross-document precision):
 | **A** | C code (host driver) | Parses, executes, manages atomicity / persistence / swap / call_outs. Not LPC; not part of eOS-kernellib's source. |
 | **B** | `/kernel/` | Hard-trusted kernel-tier LPC. The driver hooks (`driver.c`, the user / access / resource daemons, the kernel auto, kernel API libraries). Hand-edited rarely. |
 | **C** | `/usr/System/` | Privileged user-tier code, owner `System`, with `set_global_access("System", TRUE)`. The System auto (`/usr/System/lib/auto.c`) is the inheritance root for every user-tier object. |
-| **D** | `/usr/HTTP/`, `/usr/TLS/`, `/usr/LPC/`, etc. | Shipped substrate domains. Each domain has its own owner and is isolated from other user-tier code unless explicit cross-domain access is granted. These domains are shipped together with eOS-kernellib as the substrate's distribution. |
+| **D** | `/usr/HTTP/`, `/usr/TLS/`, `/usr/LPC/`, etc. | Shipped platform domains. Each domain has its own owner and is isolated from other user-tier code unless explicit cross-domain access is granted. These domains are shipped together with eOS-kernellib as the platform's distribution. |
 | **E** | Application-supplied `/usr/<Domain>/` | Same user-tier mechanics as tier D — owner, access bits, inheritance chains — but distributed by the consuming application, not by eOS-kernellib. |
 
 Three-tier vocabulary (coarse synonym used elsewhere in the kernel source): **Kernel** = tier B; **System** = tier C; **User** = tiers D and E. The five-tier provides more resolution where boundary discrimination matters; the three-tier groups tiers that share enforcement semantics.
@@ -27,7 +27,7 @@ Three-tier vocabulary (coarse synonym used elsewhere in the kernel source): **Ke
 Two implications matter for builders authoring on top of the kernel layer:
 
 1. **What "is" the kernel layer** is tiers B + C + D. Tier A is the host driver; tier E is the consumer's responsibility.
-2. **Tier E inherits the substrate through tier C**. The System auto is the inheritance root for every user-tier object, regardless of whether that object lives in tier D or tier E. The substrate's enforcement reaches tier E via the C-to-E inheritance path.
+2. **Tier E inherits the platform through tier C**. The System auto is the inheritance root for every user-tier object, regardless of whether that object lives in tier D or tier E. The platform's enforcement reaches tier E via the C-to-E inheritance path.
 
 Adding a new tier-E domain means creating a subdirectory under `src/usr/` and an `initd.c` at its root. The System initd iterates `/usr/[A-Z]*/initd.c` at boot and compiles each domain under its tier.
 
@@ -78,9 +78,9 @@ The kernel layer recognizes three boot modes.
 
 The boot completes when the System initd's `create()` returns. The host driver then accepts external connections on the ports declared in the config.
 
-**Statedump-restore boot.** The host driver loads the snapshot file named by the config's `dump_file` and restores the in-memory object graph from it. No domain initds run; the objects, their owners, their access bits, and their internal state are present from the snapshot. The driver then resumes serving connections on the configured ports. Persistent state is the substrate's default mode; cold boot is the recovery path when no snapshot is available.
+**Statedump-restore boot.** The host driver loads the snapshot file named by the config's `dump_file` and restores the in-memory object graph from it. No domain initds run; the objects, their owners, their access bits, and their internal state are present from the snapshot. The driver then resumes serving connections on the configured ports. Persistent state is the platform's default mode; cold boot is the recovery path when no snapshot is available.
 
-**Hot boot.** The host driver writes a snapshot, replaces the running executable via `execv` (e.g., to pick up a new DGD binary or change a config value), reloads the snapshot, and continues serving the same persistent connections that were open before the replace. The connection file descriptors survive the `execv` via POSIX fd inheritance; the host runtime serializes per-connection state during hotboot and restores it on the receiving side. The kernel driver's `restored(int hotboot)` hook distinguishes hotboot-resume from statedump-resume so userd and initd can re-attach to the surviving connections. Hot boot enables substrate-level deployment without disconnecting active sessions; cold boot is the fallback when the snapshot is unrecoverable.
+**Hot boot.** The host driver writes a snapshot, replaces the running executable via `execv` (e.g., to pick up a new DGD binary or change a config value), reloads the snapshot, and continues serving the same persistent connections that were open before the replace. The connection file descriptors survive the `execv` via POSIX fd inheritance; the host runtime serializes per-connection state during hotboot and restores it on the receiving side. The kernel driver's `restored(int hotboot)` hook distinguishes hotboot-resume from statedump-resume so userd and initd can re-attach to the surviving connections. Hot boot enables platform-level deployment without disconnecting active sessions; cold boot is the fallback when the snapshot is unrecoverable.
 
 Statedump cadence is governed by the config's `dump_interval`. Statedumps occur between timeslices, never inside an atomic operation; the runtime guarantees that the snapshot represents a consistent state-graph commit boundary.
 
@@ -130,13 +130,13 @@ Once granted, System-tier objects can:
 - Look up objects in any domain via `find_object`.
 - Compile objects on behalf of any user-tier domain via `compile_object`.
 
-Other user-tier domains do not get global access by default. Cross-domain access from tier D or tier E is granted per-call via the access_daemon, not blanket-granted via `set_global_access`. The substrate's discipline: System mediates; user tiers consume.
+Other user-tier domains do not get global access by default. Cross-domain access from tier D or tier E is granted per-call via the access_daemon, not blanket-granted via `set_global_access`. The platform's discipline: System mediates; user tiers consume.
 
 The System auto inherits this reach automatically. Because every user-tier object inherits `/usr/System/lib/auto.c`, every user-tier object has structural access to the System-defined API surface — without each user domain having to be granted its own cross-domain access. The System auto is the cross-tier integration point.
 
 ## Modules under src/usr/
 
-The kernel layer ships substrate domains (tier D) under `src/usr/`:
+The kernel layer ships platform domains (tier D) under `src/usr/`:
 
 - **`src/usr/HTTP/`** — HTTP/1 client and server library objects (`api/obj/server1.c`, `api/obj/client1.c`) and their TLS variants. The kernel ships these as libraries; binding the HTTP/1 server on the binary port is handled by `src/usr/System/sys/http_server.c`.
 - **`src/usr/TLS/`** — TLS 1.3 record layer, handshake, and extension support. Gated on the host being built with `KF_SECURE_RANDOM`; otherwise compiled-but-inert.
@@ -158,13 +158,13 @@ modules = ([
 
 The extension surface is intentionally separate from the host driver's own kfun set. The driver ships a small minimalist core (capped at 256 kfuns by the 1-byte kfun numbering) covering object lifecycle, compilation, atomicity, connections, and basic math / strings / arrays. Functionality that requires C-level access beyond that core — hardware-accelerated crypto, AOT compilation, native regex, system-database integration — is added at runtime via this mechanism rather than by growing the core.
 
-The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance, a regex kfun, a TLS-primitive kfun, and others. eOS-kernellib's substrate requires no extension and loads none; deployments choose what to load based on their needs.
+The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance, a regex kfun, a TLS-primitive kfun, and others. eOS-kernellib's runtime platform requires no extension and loads none; deployments choose what to load based on their needs.
 
-An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `doc/operations.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the substrate's atomicity and hot-reload guarantees.
+An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `doc/operations.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the platform's atomicity and hot-reload guarantees.
 
 Extension kfuns sit alongside built-in kfuns at the host-driver level, with the same per-tier access checks. An LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension; the deployment's `.dgd` config determines which kfuns are present.
 
-## Substrate primitives
+## Runtime primitives
 
 The kernel layer surfaces eight runtime primitives:
 
@@ -177,7 +177,7 @@ The kernel layer surfaces eight runtime primitives:
 - **Multi-agent coherence** — multiple callers see a consistent view of state without user-land synchronization.
 - **State introspection** — the state graph is queryable directly through host driver primitives.
 
-Each primitive's foundation, demonstration status, supporting extensions, and open work are documented in `doc/substrate-primitives.md`. The reference there is the authoritative per-primitive statement; this section is a quick index.
+Each primitive's foundation, demonstration status, supporting extensions, and open work are documented in `doc/runtime-primitives.md`. The reference there is the authoritative per-primitive statement; this section is a quick index.
 
 ## Where an application plugs in
 
@@ -187,7 +187,7 @@ An application built on the kernel layer adds:
 2. An `auto.c` library (optional) inherited by the domain's objects to declare common API.
 3. Connection handlers (optional) bound to ports in the `.dgd` configuration that are not already bound by the kernel.
 
-The kernel daemons (driver, access_daemon, resource_daemon, userd) require no modification. The application registers its objects, hooks into events, and consumes the substrate primitives.
+The kernel daemons (driver, access_daemon, resource_daemon, userd) require no modification. The application registers its objects, hooks into events, and consumes the runtime primitives.
 
 For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` — `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `doc/http-applications.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
 
@@ -195,7 +195,7 @@ For non-HTTP applications, the patterns are covered in `doc/application-authorin
 
 ## Where to next
 
-- `doc/substrate-primitives.md` — per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
+- `doc/runtime-primitives.md` — per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
 - `doc/persistence.md` — the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
 - `doc/code-lifecycle.md` — compile, clone, destruct, recompile, and the object-manager event surface in detail.
 - `doc/operations.md` — the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).

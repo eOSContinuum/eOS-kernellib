@@ -2,11 +2,11 @@
 
 # Writing HTTP/1 applications
 
-An HTTP/1 application on eOS-kernellib supplies a clonable server object at `/usr/WWW/obj/server`; the kernel layer's HTTP/1 substrate binds the binary port and clones that object for every incoming connection. The sections below show what the server object looks like, what it must inherit, how it routes requests, and how an application supports multiple logical apps behind one HTTP/1 port.
+An HTTP/1 application on eOS-kernellib supplies a clonable server object at `/usr/WWW/obj/server`; the kernel layer's HTTP/1 transport binds the binary port and clones that object for every incoming connection. The sections below show what the server object looks like, what it must inherit, how it routes requests, and how an application supports multiple logical apps behind one HTTP/1 port.
 
-**Audience**: an application author building an HTTP/1 service on eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the substrate running locally per `doc/getting-started.md`.
+**Audience**: an application author building an HTTP/1 service on eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the platform running locally per `doc/getting-started.md`.
 
-`doc/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/application-authoring.md` covers the general tier-E patterns for non-HTTP transports. `doc/substrate-primitives.md` covers the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+`doc/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/application-authoring.md` covers the general tier-E patterns for non-HTTP transports. `doc/runtime-primitives.md` covers the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 
 ## The mount point
 
@@ -84,7 +84,7 @@ static void create()
 }
 ```
 
-The `create()` clone check is essential: the master sits idle (no clone-number suffix in `object_name`), and only clones call `::create` with arguments. The three positional arguments wire the inherited `Server1` to use this object as the relay (`this_object()`), with the substrate-provided request and fields paths.
+The `create()` clone check is essential: the master sits idle (no clone-number suffix in `object_name`), and only clones call `::create` with arguments. The three positional arguments wire the inherited `Server1` to use this object as the relay (`this_object()`), with the platform-provided request and fields paths.
 
 ### Dispatch
 
@@ -149,7 +149,7 @@ sendMessage(message);
 
 ### Binary-manager glue
 
-Six methods bridge the substrate's user-tier flow contract to the HTTP/1 connection state machine. They are mechanical — replicate them verbatim from the reference application (`examples/http-app/obj/server.c`):
+Six methods bridge the platform's user-tier flow contract to the HTTP/1 connection state machine. They are mechanical — replicate them verbatim from the reference application (`examples/http-app/obj/server.c`):
 
 - `login(str)` — called when a connection arrives; calls `::connection(previous_object())`, `flow()`, and `receiveFirstLine(str)`.
 - `flow_receive_message(str, mode)` — defers `receiveBytes(str)` via `call_out`.
@@ -160,9 +160,9 @@ Six methods bridge the substrate's user-tier flow contract to the HTTP/1 connect
 
 These methods exist because `Server1` (the library form, inheritable) does not carry them; they live in `/usr/HTTP/api/obj/server1.c` (the clonable form, not inheritable). Section "Inherit from `/lib/`, not from `/obj/`" below explains the constraint.
 
-## Substrate contracts
+## Platform contracts
 
-Four substrate contracts apply to every HTTP/1 application server. The reference application honors all four; an application that omits any of them will fail to boot or fail at first request.
+Four platform contracts apply to every HTTP/1 application server. The reference application honors all four; an application that omits any of them will fail to boot or fail at first request.
 
 ### Inherit from `/lib/`, not from `/obj/`
 
@@ -190,13 +190,13 @@ For chunked transfer encoding (`Transfer-Encoding: chunked`), use `expectChunk` 
 
 ## Multiple applications on one port
 
-The substrate mount point is a single path: `/usr/WWW/obj/server`. To run more than one logical application behind one HTTP/1 port, the `/usr/WWW/` server dispatches by route prefix to handlers registered by other domains:
+The platform mount point is a single path: `/usr/WWW/obj/server`. To run more than one logical application behind one HTTP/1 port, the `/usr/WWW/` server dispatches by route prefix to handlers registered by other domains:
 
 - `/usr/WWW/sys/router.c` — a registry mapping route prefixes to handler objects.
 - `/usr/WWW/obj/server.c` — queries the registry from `receiveRequest` and calls the matching handler.
 - `/usr/Counter/sys/handler.c`, `/usr/Inventory/sys/handler.c`, etc. — application handlers that register themselves with `/usr/WWW/sys/router` at boot.
 
-This is a higher-level pattern than the single-application reference. The kernel layer is indifferent to which pattern an application chooses; both rely on the same substrate contracts.
+This is a higher-level pattern than the single-application reference. The kernel layer is indifferent to which pattern an application chooses; both rely on the same platform contracts.
 
 ## Cross-domain initialization order
 
@@ -226,7 +226,7 @@ The 0-second `call_out` runs after the System initd commits, which is after ever
 - `doc/getting-started.md` — install DGD, run the example configuration.
 - `doc/architecture.md` — capability tiers, daemons, kernel-layer libraries.
 - `doc/application-authoring.md` — general tier-E patterns for non-HTTP transports.
-- `doc/substrate-primitives.md` — the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+- `doc/runtime-primitives.md` — the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 - `examples/http-app/` — runnable reference application.
-- `src/usr/System/sys/http_server.c` — the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the substrate-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
+- `src/usr/System/sys/http_server.c` — the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the platform-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
 - `src/usr/HTTP/api/lib/Server1.c` and `src/usr/HTTP/lib/Connection1.c` — the HTTP/1 library implementation that an application server inherits and overrides.

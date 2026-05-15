@@ -2,15 +2,15 @@
 
 # Code Lifecycle
 
-LPC code in the substrate moves through these states: source becomes a master, a master spawns clones, `create()` runs, recompilation replaces a running master in place, `call_touch` schedules lazy upgrades, and `destruct_object` removes objects from the runtime. The object-manager event surface lets the substrate observe each transition. The sections below cover each in turn.
+LPC code in the platform moves through these states: source becomes a master, a master spawns clones, `create()` runs, recompilation replaces a running master in place, `call_touch` schedules lazy upgrades, and `destruct_object` removes objects from the runtime. The object-manager event surface lets the platform observe each transition. The sections below cover each in turn.
 
-For the LPC language constructs these transitions invoke (`inherit`, `create()`, `static`, `nomask`), see `doc/lpc-essentials.md`. For the per-primitive substrate guarantees that bound these transitions (atomicity, hot reload, capability separation), see `doc/substrate-primitives.md`. For the operator surface that drives lifecycle transitions interactively, see `doc/admin-console.md`.
+For the LPC language constructs these transitions invoke (`inherit`, `create()`, `static`, `nomask`), see `doc/lpc-essentials.md`. For the per-primitive runtime guarantees that bound these transitions (atomicity, hot reload, capability separation), see `doc/runtime-primitives.md`. For the operator surface that drives lifecycle transitions interactively, see `doc/admin-console.md`.
 
-**Audience**: an LPC author or operator reasoning about how source becomes a running object, how recompilation propagates to existing instances, how `call_touch` schedules lazy upgrades, and how the substrate observes lifecycle transitions; assumes `doc/lpc-essentials.md` for language constructs and `doc/architecture.md` for the structural model.
+**Audience**: an LPC author or operator reasoning about how source becomes a running object, how recompilation propagates to existing instances, how `call_touch` schedules lazy upgrades, and how the platform observes lifecycle transitions; assumes `doc/lpc-essentials.md` for language constructs and `doc/architecture.md` for the structural model.
 
 ## Transitions
 
-A piece of LPC source moves through these states in the substrate:
+A piece of LPC source moves through these states in the platform:
 
 ```text
    (source on disk)
@@ -36,11 +36,11 @@ Light-Weight Objects (LWOs) follow a parallel pattern via `new_object()`: struct
 
 `compile_object(path)` compiles the LPC source at `path` (with implicit `.c` suffix) and installs the resulting program as the path's master. If a master already exists at `path`, this is a **recompile** — see Hot reload below.
 
-The two-argument form, `compile_object(path, source)`, compiles from an in-memory string rather than from disk; useful for substrates that synthesize LPC at runtime.
+The two-argument form, `compile_object(path, source)`, compiles from an in-memory string rather than from disk; useful for platforms that synthesize LPC at runtime.
 
-Compilation runs in atomic context. If the source has a syntax error or fails type-check, the compile errors and the substrate's prior state (including any prior master at `path`) is unchanged. The atomicity guarantee (`doc/substrate-primitives.md` §1) covers the compile transition itself: either the new program installs cleanly or the runtime rolls back as if the call never happened.
+Compilation runs in atomic context. If the source has a syntax error or fails type-check, the compile errors and the platform's prior state (including any prior master at `path`) is unchanged. The atomicity guarantee (`doc/runtime-primitives.md` §1) covers the compile transition itself: either the new program installs cleanly or the runtime rolls back as if the call never happened.
 
-After successful compile, the master sits idle. Its `create()` does not run until the first function call against the master. The object manager (see below) receives a `compile` event with the master object and the inherited paths; this is the substrate's hook for tracking the dependency graph.
+After successful compile, the master sits idle. Its `create()` does not run until the first function call against the master. The object manager (see below) receives a `compile` event with the master object and the inherited paths; this is the platform's hook for tracking the dependency graph.
 
 ## _F_create: the create-hook dispatch
 
@@ -62,7 +62,7 @@ Three points the wrapper carries:
 
 1. **`if (!creator)` guard** — `_F_create` may be called more than once in the host's dispatch path; the guard ensures the user-visible `create()` runs at most once per object.
 2. **Owner and creator identity** are set from the object's path before `create()` runs. Application `create()` code can rely on `query_owner()` returning the correct identity.
-3. **`create()` is the application hook**; `_F_create` is the substrate wiring. Application authors write `create()`; the kernel auto handles the dispatch.
+3. **`create()` is the application hook**; `_F_create` is the platform wiring. Application authors write `create()`; the kernel auto handles the dispatch.
 
 A clone's `create()` runs in its own dataspace at clone time. The master's `create()` runs once when the first call against the master fires after compile (which may or may not be at compile time depending on the application's pattern; an initd that does `compile_object("/usr/MyApp/obj/foo")` followed by a method call against the master triggers `create()` then). The kernel auto handles the master/clone distinction via its registration logic, so most application authors write a single `create()` body that runs on both master and clones.
 
@@ -74,7 +74,7 @@ A clone's `create()` runs in its own dataspace at clone time. The master's `crea
 
 Constraints:
 
-- The master must be a clonable. By substrate convention this means a path under `/usr/.../obj/` rather than `/usr/.../lib/`. The kernel's `clone_object` kfun enforces the `/obj/` rule.
+- The master must be a clonable. By platform convention this means a path under `/usr/.../obj/` rather than `/usr/.../lib/`. The kernel's `clone_object` kfun enforces the `/obj/` rule.
 - Clones cannot be cloned. `clone_object(clone)` errors.
 - A clone's owner is the **clone-time caller's owner**, not the master's owner. Two clones of the same master can have different owners if their callers do.
 
@@ -94,13 +94,13 @@ LWOs are useful for structured values that need behavior (methods on the LWO's c
 
 `destruct_object(obj)` removes `obj` from the runtime. The object's dataspace is freed; subsequent references resolve to nil. In-flight calls running against the object at destruct time finish on the destructed dataspace and then the storage is released.
 
-The object manager receives a `destruct` event before the destruct fires. The substrate uses this event to invalidate any cached references to the object.
+The object manager receives a `destruct` event before the destruct fires. The platform uses this event to invalidate any cached references to the object.
 
 Destructing the master of a class implicitly destructs every clone of that master. Destructing one clone leaves the master and other clones intact.
 
 ## Hot reload: recompile in place
 
-Calling `compile_object(path)` against a path that already has a master replaces the master's program in place. The substrate primitive at work is **hot reload** (`doc/substrate-primitives.md` §4); Allen's [2000 description][allen-dgd-2000] names the property: code can be updated in the running runtime without restart.
+Calling `compile_object(path)` against a path that already has a master replaces the master's program in place. The runtime primitive at work is **hot reload** (`doc/runtime-primitives.md` §4); Allen's [2000 description][allen-dgd-2000] names the property: code can be updated in the running runtime without restart.
 
 Key guarantees and limits:
 
@@ -110,11 +110,11 @@ Key guarantees and limits:
 | **Next** call after recompile | Dispatches to the new program. |
 | Clones of the recompiled master | Their **code** is now the new master's. Their **dataspace** is unchanged (the clone-side variables retain their values). |
 | Inheriting children | Their code is NOT automatically recompiled. See Library upgrade below. |
-| Atomic context of the recompile | If the recompile errors (syntax, type-check), the old master remains; the substrate rolls back as for any failed atomic operation. |
+| Atomic context of the recompile | If the recompile errors (syntax, type-check), the old master remains; the platform rolls back as for any failed atomic operation. |
 
 The object manager receives a `compile` event (or `compile_lib` for libraries) with the inherited path list, allowing it to track the dependency graph for downstream cascade decisions.
 
-Hot reload is the operator-facing form (`compile` verb in `admin_console`); the substrate-internal form is the same kfun called from any LPC code with sufficient access.
+Hot reload is the operator-facing form (`compile` verb in `admin_console`); the platform-internal form is the same kfun called from any LPC code with sufficient access.
 
 ## Touch: lazy upgrade via call_touch
 
@@ -129,7 +129,7 @@ When a library is recompiled, its inheriting children do NOT automatically pick 
 2. The object manager calls `obj->_F_touch()` on the marked object.
 3. After `_F_touch()` returns, the originally-intended call proceeds.
 
-The application-author hook is `_F_touch()`. Applications that need per-instance migration logic implement this method. The substrate guarantees:
+The application-author hook is `_F_touch()`. Applications that need per-instance migration logic implement this method. The platform guarantees:
 
 - `_F_touch()` runs at most once per `call_touch`.
 - `_F_touch()` runs **before** the next call against the object.
@@ -145,13 +145,13 @@ The trade-off: long-idle objects can accumulate multiple pending upgrades. If th
 - **Periodic global touch.** A scheduled `call_out` walks every owner's objects at low frequency (daily, weekly) and ensures each is touched at least once per cycle.
 - **Snapshot rotation with explicit touch.** A planned snapshot-and-restore cycle pairs with a touch pass during the restore phase.
 
-**Terminology note**: SkotOS-derived deployments often call the application hook `patch()` rather than `_F_touch()`. The substrate dispatch is the same; the name is convention. Operators arriving from a SkotOS background should expect the eOS-kernellib codebase to use `_F_touch()`.
+**Terminology note**: SkotOS-derived deployments often call the application hook `patch()` rather than `_F_touch()`. The platform dispatch is the same; the name is convention. Operators arriving from a SkotOS background should expect the eOS-kernellib codebase to use `_F_touch()`.
 
 ## Library upgrade: recompile cascade through dependents
 
-The substrate ships no automatic recompile-with-dependents mechanism. When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`.
+The platform ships no automatic recompile-with-dependents mechanism. When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`.
 
-SkotOS and some kernellib deployments ship a `progdb` daemon (a port candidate listed in `doc/substrate-primitives.md` §4 Extensions) that:
+SkotOS and some kernellib deployments ship a `progdb` daemon (a port candidate listed in `doc/runtime-primitives.md` §4 Extensions) that:
 
 - Tracks the inheritance graph as it builds via `compile` and `compile_lib` events.
 - Receives a recompile signal for a library.
@@ -164,7 +164,7 @@ The SkotOS Wiztool's `upgrade` verb is the operator-facing form of this cascade 
 
 ## Object-manager events: the lifecycle surface
 
-The substrate dispatches lifecycle events to a registered object manager (`driver->set_object_manager(<obj>)`). The shipped manager at `src/usr/System/sys/objectd.c` consumes these events to maintain a registry of live objects, their owners, their inherits, and their includes.
+The platform dispatches lifecycle events to a registered object manager (`driver->set_object_manager(<obj>)`). The shipped manager at `src/usr/System/sys/objectd.c` consumes these events to maintain a registry of live objects, their owners, their inherits, and their includes.
 
 The event surface (a thin restatement of the kernellib-doc convention):
 
@@ -183,7 +183,7 @@ The event surface (a thin restatement of the kernellib-doc convention):
 | `forbid_call` | `int forbid_call(string path)` | Per `call_other` | Block cross-object calls to specific paths |
 | `forbid_inherit` | `int forbid_inherit(string from, string path, int priv)` | Per inherit | Block specific inheritance patterns |
 
-An application that needs additional behavior typically registers a daemon that **calls into** objectd or wraps its event stream, rather than replacing the shipped manager. Replacement is possible (`driver->set_object_manager(<replacement>)`) but rare; objectd handles the substrate's common cases, and replacements risk losing those.
+An application that needs additional behavior typically registers a daemon that **calls into** objectd or wraps its event stream, rather than replacing the shipped manager. Replacement is possible (`driver->set_object_manager(<replacement>)`) but rare; objectd handles the platform's common cases, and replacements risk losing those.
 
 ## What this doc does not cover
 
@@ -194,8 +194,8 @@ An application that needs additional behavior typically registers a daemon that 
 ## Where to next
 
 - **`doc/lpc-essentials.md`** — the language constructs (`create()`, `inherit`, `static`, `nomask`) the transitions above invoke.
-- **`doc/substrate-primitives.md`** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
-- **`doc/admin-console.md`** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running substrate.
+- **`doc/runtime-primitives.md`** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
+- **`doc/admin-console.md`** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running platform.
 - **`doc/application-authoring.md`** — how an application's code consumes the lifecycle (initd, call_touch upgrade, object tracking patterns).
 - **`src/kernel/lib/auto.c`** — the authoritative source for `_F_create`, `_F_touch`, and the inheritance-discipline enforcement.
 - **`src/usr/System/sys/objectd.c`** — the shipped object manager's implementation of the event surface above.

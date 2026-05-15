@@ -2,11 +2,11 @@
 
 # Application Authoring
 
-A tier-E application on eOS-kernellib lives in a single directory under `src/usr/`, declares its bootstrap in an `initd.c`, and inherits the substrate's System auto to gain owner identity and cross-tier API access. The patterns below apply regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
+A tier-E application on eOS-kernellib lives in a single directory under `src/usr/`, declares its bootstrap in an `initd.c`, and inherits the platform's System auto to gain owner identity and cross-tier API access. The patterns below apply regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
 
-**Audience**: an LPC author writing a tier-E application on top of eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the substrate running locally per `doc/getting-started.md`.
+**Audience**: an LPC author writing a tier-E application on top of eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the platform running locally per `doc/getting-started.md`.
 
-The architecture document (`doc/architecture.md`) covers the substrate's tier model, daemons, and inheritance chain. The HTTP/1-specific application pattern is covered separately in `doc/http-applications.md` with a runnable reference at `examples/http-app/`.
+The architecture document (`doc/architecture.md`) covers the platform's tier model, daemons, and inheritance chain. The HTTP/1-specific application pattern is covered separately in `doc/http-applications.md` with a runnable reference at `examples/http-app/`.
 
 ## Domain layout
 
@@ -82,23 +82,23 @@ The default access posture for a tier-E domain at boot:
 - Other domains have no access to this domain's files without explicit grant.
 - The System tier has cross-domain reach via its `set_global_access("System", TRUE)` grant; other user tiers do not get blanket cross-domain access.
 
-Cross-domain reach for tier-E code is mediated at every relevant kfun call by the access daemon at `/kernel/sys/access_daemon.c`. The access primitives themselves (the `set_access`, `query_user_access`, `query_file_access`, `set_global_access` methods on `/kernel/lib/api/access.c`) are kernel-tier; an application that needs to expose a public read-only library typically requests the access grant through a System-tier helper rather than calling kernel access primitives directly. Applications that ship a binary or HTTP service do not need to manipulate access bits at all — the substrate routes cross-tier calls through the System-tier libraries the application inherits, and access checks happen automatically inside those.
+Cross-domain reach for tier-E code is mediated at every relevant kfun call by the access daemon at `/kernel/sys/access_daemon.c`. The access primitives themselves (the `set_access`, `query_user_access`, `query_file_access`, `set_global_access` methods on `/kernel/lib/api/access.c`) are kernel-tier; an application that needs to expose a public read-only library typically requests the access grant through a System-tier helper rather than calling kernel access primitives directly. Applications that ship a binary or HTTP service do not need to manipulate access bits at all — the platform routes cross-tier calls through the System-tier libraries the application inherits, and access checks happen automatically inside those.
 
 ## Object tracking
 
-The substrate ships an object manager at `/usr/System/sys/objectd.c` that tracks every compiled object's identity, inheritance graph, included files, and active issues. The kernel driver registers `objectd` as the object manager at boot (via `driver->set_object_manager(this_object())` from objectd's own `create`), and the driver dispatches object-lifecycle events (`compile`, `clone`, `destruct`, `touch`, `include_file`, and related) to objectd.
+The platform ships an object manager at `/usr/System/sys/objectd.c` that tracks every compiled object's identity, inheritance graph, included files, and active issues. The kernel driver registers `objectd` as the object manager at boot (via `driver->set_object_manager(this_object())` from objectd's own `create`), and the driver dispatches object-lifecycle events (`compile`, `clone`, `destruct`, `touch`, `include_file`, and related) to objectd.
 
 Tier-E applications consume objectd's query API; they do not normally register a replacement. The query surface lets an application enumerate objects by owner, walk an object's inheritance graph, find objects sharing an included header, and identify which objects need to be touched after a recompile.
 
-Replacing the shipped object manager is possible — `driver->set_object_manager(<replacement>)` is the substrate's hook — but rare. The shipped objectd handles the common cases (object tracking, upgrade coordination, include-file mapping); applications that need additional behavior typically register their own daemon that calls into objectd, rather than replacing it.
+Replacing the shipped object manager is possible — `driver->set_object_manager(<replacement>)` is the platform's hook — but rare. The shipped objectd handles the common cases (object tracking, upgrade coordination, include-file mapping); applications that need additional behavior typically register their own daemon that calls into objectd, rather than replacing it.
 
-Applications also do not normally manipulate the driver's lifecycle callbacks directly. The substrate's objectd routes the events to specialized System-tier daemons (`upgraded` for live upgrades, `errord` for error reporting); tier-E applications interact with those daemons rather than with the driver's raw callback set. See `src/usr/System/sys/objectd.c`, `src/usr/System/sys/upgraded.c`, and `src/usr/System/sys/errord.c` for the actual interface surfaces.
+Applications also do not normally manipulate the driver's lifecycle callbacks directly. The platform's objectd routes the events to specialized System-tier daemons (`upgraded` for live upgrades, `errord` for error reporting); tier-E applications interact with those daemons rather than with the driver's raw callback set. See `src/usr/System/sys/objectd.c`, `src/usr/System/sys/upgraded.c`, and `src/usr/System/sys/errord.c` for the actual interface surfaces.
 
 ## Live code upgrade through call_touch
 
 `call_touch(obj)` (wrapped in the kernel auto at `/kernel/lib/auto.c::call_touch`) marks an object as needing an upgrade. The next time `obj` is called, the kernel driver intercepts the call, dispatches `touch(obj, function)` to the object manager (objectd), and objectd in turn calls `obj->_F_touch()` on the marked object. Only after `_F_touch()` returns does the originally-intended call proceed.
 
-The application-implemented hook is `_F_touch()` on the object's class. Applications that need pre-upgrade migration logic implement this method; the substrate guarantees it runs at most once per `call_touch`, before the next call against the object.
+The application-implemented hook is `_F_touch()` on the object's class. Applications that need pre-upgrade migration logic implement this method; the platform guarantees it runs at most once per `call_touch`, before the next call against the object.
 
 Why not upgrade immediately when a library recompiles? Two reasons:
 
@@ -122,17 +122,17 @@ The kernel binds the telnet and binary ports at boot via the kernel userd's conn
 
 The connection-handling contract for non-HTTP applications is the binary-manager pattern: applications inherit a user library and override the methods that fire when bytes or lines arrive. The reference surfaces:
 
-- **`/kernel/lib/user.c`** — the kernel user library; the substrate-side contract for what a connection-handling object provides. Methods include `set_mode(int mode)` to switch between `MODE_LINE` and `MODE_RAW` framing, plus `login(string)`, `logout(string)` for the connection lifecycle.
+- **`/kernel/lib/user.c`** — the kernel user library; the platform-side contract for what a connection-handling object provides. Methods include `set_mode(int mode)` to switch between `MODE_LINE` and `MODE_RAW` framing, plus `login(string)`, `logout(string)` for the connection lifecycle.
 - **`/usr/System/lib/user.c`** — the System user library; inherits the kernel user library plus the System auto.
 - **`/usr/System/sys/userd.c`** — the System userd; handles the binary-manager protocol on the kernel's behalf.
 
 For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `logout`, `flow_*`, `timeout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
 
-For datagram-shaped applications (UDP), datagram support is a port candidate listed in `doc/substrate-primitives.md` Supporting surfaces; the substrate ships the transport scaffolding but no canonical datagram application yet.
+For datagram-shaped applications (UDP), datagram support is a port candidate listed in `doc/runtime-primitives.md` Supporting surfaces; the platform ships the transport scaffolding but no canonical datagram application yet.
 
 ## Worked example sketch: an in-memory KV service
 
-The substrate's persistence + atomicity guarantees make an in-memory key-value service near-trivial to implement at the application layer. The shape:
+The platform's persistence + atomicity guarantees make an in-memory key-value service near-trivial to implement at the application layer. The shape:
 
 ```text
 src/usr/KV/
@@ -141,21 +141,21 @@ src/usr/KV/
         kv_daemon.c    — singleton holding the mapping
 ```
 
-The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, value)` assigns; `get(key)` reads; `remove(key)` deletes. The substrate guarantees:
+The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, value)` assigns; `get(key)` reads; `remove(key)` deletes. The platform guarantees:
 
 - **Persistence**: the `store` mapping survives restart without explicit serialization.
 - **Atomicity**: a multi-step write (e.g., transactional rename of a key) is atomic if wrapped in a single function call; a partial failure rolls back.
 - **Multi-agent coherence**: callers see a consistent view; the runtime serializes commits.
 - **Capability separation**: only callers reachable from the KV domain (or from System) can call into `kv_daemon`; the access discipline is enforced by the kernel's per-call access checks against the inherited System auto.
 
-The application code is short: the daemon itself is roughly 30 lines of LPC, plus the initd's compile call. The substrate carries the rest.
+The application code is short: the daemon itself is roughly 30 lines of LPC, plus the initd's compile call. The platform carries the rest.
 
 A counter-with-deliberate-failure variant (the canonical atomicity demonstration) is similar shape: a single counter object with `increment_and_fail()` exercises the rollback path; the post-failure read confirms the counter is unchanged.
 
 ## Where to next
 
 - `doc/architecture.md` — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
-- `doc/substrate-primitives.md` — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
+- `doc/runtime-primitives.md` — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
 - `doc/lpc-essentials.md` — LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
 - `doc/kernel-libraries.md` — inheritable libraries shipped under `src/lib/`: String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
 - `doc/http-applications.md` — the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.

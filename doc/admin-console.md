@@ -2,9 +2,9 @@
 
 # admin_console
 
-The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the substrate's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `doc/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
+The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `doc/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
 
-**Audience**: an operator with admin-console access to a running substrate; needs to introspect state, hot-fix code, manage permissions, snapshot, or shut down.
+**Audience**: an operator with admin-console access to a running platform; needs to introspect state, hot-fix code, manage permissions, snapshot, or shut down.
 
 The console is implemented in two files:
 
@@ -15,7 +15,7 @@ A System-tier subclass at `/usr/System/sys/userd.c` registers the console as the
 
 ## Why a console at all
 
-The substrate is an in-memory runtime. State lives in objects; code lives in compiled programs; persistence is a runtime property. None of that is reachable through the host operating system's tools — `ls` on the host filesystem shows the LPC source, not the live object graph; `kill -SIGUSR1` does not snapshot the runtime. Operations on the running substrate go through a runtime-aware interface.
+The platform is an in-memory runtime. State lives in objects; code lives in compiled programs; persistence is a runtime property. None of that is reachable through the host operating system's tools — `ls` on the host filesystem shows the LPC source, not the live object graph; `kill -SIGUSR1` does not snapshot the runtime. Operations on the running platform go through a runtime-aware interface.
 
 admin_console is that interface. Its eight categories of verbs map to eight categories of operational work:
 
@@ -24,13 +24,13 @@ admin_console is that interface. Its eight categories of verbs map to eight cate
 | **State inspection** | Query the live image: objects, owners, resources, connections, system health | Host introspection kfuns (`find_object`, `status`, `query_owners`, `query_users`, `get_dir`) |
 | **Code lifecycle** | Compile, clone, destruct, instantiate LWOs; recompile in place | `compile_object`, `clone_object`, `destruct_object`, `new_object` |
 | **REPL** | Evaluate LPC expressions interactively; replay history | `compile_object` against a temporary path |
-| **Filesystem** | Navigate the substrate's source tree; read and write source files | `get_dir`, `read_file`, `write_file`, `rename_file`, etc. — all gated by per-tier access checks |
+| **Filesystem** | Navigate the platform's source tree; read and write source files | `get_dir`, `read_file`, `write_file`, `rename_file`, etc. — all gated by per-tier access checks |
 | **Editor** | Edit LPC source via DGD's built-in line editor | DGD's `ed` kfun (the LPC `editor` kfun) |
 | **Permissions** | Inspect and modify per-user access bits | Kernel access daemon API (`set_access`, `query_user_access`, `query_file_access`) |
 | **Resources** | Inspect and modify per-owner resource limits | Resource daemon API (`rsrc_set_limit`, `rsrc_get`) |
 | **Persistence and lifecycle** | Swap out memory; snapshot; shutdown; reboot | Host kfuns `swapout`, `dump_state`, `shutdown` |
 
-Each verb is a thin LPC wrapper over a host kfun or a daemon method. The `code` verb is the most general: it compiles its argument as an LPC expression and runs it, which means an operator with sufficient access can reach anything the substrate exposes — the verb set is convenience over `code`, not capability beyond it.
+Each verb is a thin LPC wrapper over a host kfun or a daemon method. The `code` verb is the most general: it compiles its argument as an LPC expression and runs it, which means an operator with sufficient access can reach anything the platform exposes — the verb set is convenience over `code`, not capability beyond it.
 
 ## Connecting
 
@@ -42,29 +42,29 @@ telnet localhost 8023
 
 First-connection behavior depends on whether the kernel has admin credentials persisted:
 
-- **Cold boot, no prior admin**: the kernel prompts to set an admin password. The hash is persisted across statedumps (substrate primitive §3), so subsequent boots find it.
+- **Cold boot, no prior admin**: the kernel prompts to set an admin password. The hash is persisted across statedumps (runtime primitive §3), so subsequent boots find it.
 - **Subsequent connections**: name and password prompt; the hash is checked against the persisted credential.
 
 An operator authenticated as `admin` has tier-spanning reach (kernel and System tiers, plus cross-domain visibility into user-tier code). Other authenticated operators have access bounded by their owner's directory tree and the access-daemon grants on top.
 
 ## Security posture
 
-The admin_console is the substrate's most dangerous interface and the substrate's most useful interface. Two facts shape its security model:
+The admin_console is the platform's most dangerous interface and the platform's most useful interface. Two facts shape its security model:
 
-1. **The `code` verb evaluates arbitrary LPC.** An operator who can invoke `code` can call any kfun the inheriting object has access to. For `admin`, that means every kfun in the runtime. Treat console access as equivalent to host shell access on the substrate's process.
-2. **Permissions inside the console enforce the substrate's tier model.** Non-admin operators see only what their owner permits. `code` invocations still hit per-call access checks at every kfun boundary; a non-admin operator's `code` invocation cannot bypass the tier model.
+1. **The `code` verb evaluates arbitrary LPC.** An operator who can invoke `code` can call any kfun the inheriting object has access to. For `admin`, that means every kfun in the runtime. Treat console access as equivalent to host shell access on the platform's process.
+2. **Permissions inside the console enforce the platform's tier model.** Non-admin operators see only what their owner permits. `code` invocations still hit per-call access checks at every kfun boundary; a non-admin operator's `code` invocation cannot bypass the tier model.
 
 In production deployments, expose the telnet port only on a loopback interface or a dedicated maintenance VLAN. The console wire protocol is unencrypted telnet; remote operators should reach the port through an SSH or TLS tunnel.
 
 ## Operational tasks
 
-The verb categories below are organized around the operational situation an operator is in — not alphabetically. Each section names the verbs in play, the substrate mechanism behind them, and the scenario where the choice of one verb over another matters.
+The verb categories below are organized around the operational situation an operator is in — not alphabetically. Each section names the verbs in play, the platform mechanism behind them, and the scenario where the choice of one verb over another matters.
 
 ### Inspecting runtime state
 
 **Verbs**: `status`, `code`, `people`, `pwd`, `cd`, `ls`, `history`
 
-**Why**: the substrate's value is that the running image is queryable; you do not need a debugger attached to know what the runtime is doing. `status` walks the host's system-wide health vector (memory, swap, objects, users, uptime, call_outs); `code` evaluates an arbitrary LPC expression in the operator's domain and returns the result with history-pointer assignment (`$N`); `people` enumerates live connections.
+**Why**: the platform's value is that the running image is queryable; you do not need a debugger attached to know what the runtime is doing. `status` walks the host's system-wide health vector (memory, swap, objects, users, uptime, call_outs); `code` evaluates an arbitrary LPC expression in the operator's domain and returns the result with history-pointer assignment (`$N`); `people` enumerates live connections.
 
 **How**:
 
@@ -77,7 +77,7 @@ The verb categories below are organized around the operational situation an oper
 
 **What for**:
 
-- **Triage a stuck request**: invoke `status` to inspect resource ceilings, call_out backlog, swap activity. If the substrate is healthy, the issue is logical, not capacity.
+- **Triage a stuck request**: invoke `status` to inspect resource ceilings, call_out backlog, swap activity. If the platform is healthy, the issue is logical, not capacity.
 - **Inspect application state**: `code "/usr/MyApp/sys/daemon"->query()` returns the daemon's current state value without restarting.
 - **Trace a value back through history**: when a sequence of `code` invocations has produced a chain of `$N` results, `history` shows the chain; `code $5->something()` walks one of them.
 - **Locate a file**: `cd /usr/MyApp/obj && ls` enumerates the cloneable masters in the application's `obj/` subdirectory.
@@ -86,7 +86,7 @@ The verb categories below are organized around the operational situation an oper
 
 **Verbs**: `compile`, `clone`, `destruct`, `new`
 
-**Why**: hot reload is a substrate primitive — `compile_object(path)` against a path with an existing master replaces the master's program; subsequent calls dispatch to the new version (`doc/substrate-primitives.md` §4). The console exposes this mechanism plus the clone/destruct/instantiate cycle that surrounds it.
+**Why**: hot reload is a runtime primitive — `compile_object(path)` against a path with an existing master replaces the master's program; subsequent calls dispatch to the new version (`doc/runtime-primitives.md` §4). The console exposes this mechanism plus the clone/destruct/instantiate cycle that surrounds it.
 
 **How**:
 
@@ -107,7 +107,7 @@ The verb categories below are organized around the operational situation an oper
   - Destruct each child (`destruct /usr/MyApp/obj/foo`) and recompile (`compile /usr/MyApp/obj/foo.c`). Loses clone state.
   - Use `call_touch` (via `code`) to mark every dependent for lazy upgrade through `_F_touch()`. Preserves state.
 
-  Substrate-level recompile-with-dependents (the `upgrade` verb in SkotOS Wiztool; the `progdb` daemon pattern) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
+  Platform-level recompile-with-dependents (the `upgrade` verb in SkotOS Wiztool; the `progdb` daemon pattern) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
 - **Recover from a wedged daemon**: `destruct /usr/MyApp/sys/router` then `clone /usr/MyApp/sys/router` would re-instantiate from the master — except `sys/` daemons are singletons that compile at boot, not on demand. The recovery is `destruct` followed by `compile` of the daemon source.
 - **A/B testing**: keep the canonical handler at `/usr/MyApp/obj/handler.c`; copy it to `handler_b.c`; compile the variant; route a percentage of traffic to the variant; compile the winner back as `handler.c` when results are in.
 
@@ -115,29 +115,29 @@ The verb categories below are organized around the operational situation an oper
 
 **Verbs**: `swapout`, `snapshot`, `shutdown`, `reboot`
 
-**Why**: orthogonal persistence means the snapshot IS the backup. The substrate's `dump_state` kfun captures the entire in-memory image to disk; the next boot restores from that image with all object state, all clones, all pending `call_out`s, all access bits, all resource counters intact. Connections do not survive a snapshot restore (open file descriptors are not in the snapshot); on hot boot they do (the file descriptors are inherited across `execv`).
+**Why**: orthogonal persistence means the snapshot IS the backup. The platform's `dump_state` kfun captures the entire in-memory image to disk; the next boot restores from that image with all object state, all clones, all pending `call_out`s, all access bits, all resource counters intact. Connections do not survive a snapshot restore (open file descriptors are not in the snapshot); on hot boot they do (the file descriptors are inherited across `execv`).
 
 **How**:
 
 - `swapout` calls `swapout()`. Swaps every in-memory object to disk (the swap file), reducing memory pressure. Next access faults the object back in. Useful before a snapshot — a swapped-out image fits more cleanly into the snapshot.
 - `snapshot` calls `dump_state(0)` (full image dump). Writes to `dump_file` per the `.dgd` configuration. The previous snapshot moves to `<dump_file>.old`. Cost: I/O for the full image size; runtime briefly blocks.
-- `shutdown` calls `shutdown()` (cold shutdown without snapshot). The substrate exits; the next boot is a cold boot OR a snapshot-restore from the most recent snapshot (depending on whether the snapshot file is present and valid).
+- `shutdown` calls `shutdown()` (cold shutdown without snapshot). The platform exits; the next boot is a cold boot OR a snapshot-restore from the most recent snapshot (depending on whether the snapshot file is present and valid).
 - `reboot` calls `dump_state(1)` (incremental snapshot) followed by `shutdown()`. Effectively: snapshot-and-stop. Next boot restores from the new snapshot.
 
 **What for**:
 
-- **Pre-deployment safety net**: `snapshot` before applying a substantial code change. If the change wedges the substrate, restore from `dump_file.old`.
-- **Scheduled rotation**: the substrate writes automatic snapshots every `dump_interval` seconds (config field). `snapshot` is the operator-on-demand variant; useful before maintenance windows.
-- **Recovery from a wedge**: `reboot` returns the substrate to the last consistent state. Distinct from a host-level `kill`: `reboot` ensures the next boot starts from a consistent committed snapshot.
+- **Pre-deployment safety net**: `snapshot` before applying a substantial code change. If the change wedges the platform, restore from `dump_file.old`.
+- **Scheduled rotation**: the platform writes automatic snapshots every `dump_interval` seconds (config field). `snapshot` is the operator-on-demand variant; useful before maintenance windows.
+- **Recovery from a wedge**: `reboot` returns the platform to the last consistent state. Distinct from a host-level `kill`: `reboot` ensures the next boot starts from a consistent committed snapshot.
 - **Hot binary upgrade**: requires the `.dgd` configuration's `hotboot` tuple. Run `code "/usr/System/sys/userd"->hotboot()` (or operator-equivalent) to invoke `execv` against the new binary; connections survive; state restores from the freshly-written snapshot.
 
-Cold shutdown (`shutdown`) leaves no snapshot of its own; the substrate restarts from whichever snapshot was last written by `dump_interval` or by an explicit `snapshot`/`reboot`. Plan accordingly: a busy substrate with `dump_interval = 3600` and no `snapshot` between rotations loses up to an hour of state on a cold-shutdown-then-recover cycle.
+Cold shutdown (`shutdown`) leaves no snapshot of its own; the platform restarts from whichever snapshot was last written by `dump_interval` or by an explicit `snapshot`/`reboot`. Plan accordingly: a busy platform with `dump_interval = 3600` and no `snapshot` between rotations loses up to an hour of state on a cold-shutdown-then-recover cycle.
 
 ### Managing permissions
 
 **Verbs**: `access`, `grant`, `ungrant`
 
-**Why**: capability separation is a substrate primitive (§2). The kernel access daemon at `/kernel/sys/access_daemon` mediates every cross-domain operation. The console verbs are the operator interface to that daemon.
+**Why**: capability separation is a runtime primitive (§2). The kernel access daemon at `/kernel/sys/access_daemon` mediates every cross-domain operation. The console verbs are the operator interface to that daemon.
 
 **How**:
 
@@ -158,7 +158,7 @@ Cold shutdown (`shutdown`) leaves no snapshot of its own; the substrate restarts
 
 **Verbs**: `quota`, `rsrc`
 
-**Why**: every owner has a resource quota — object count, call_out count, ticks per call, stack depth. The resource daemon (`/kernel/sys/resource_daemon`) tracks usage and enforces the quota at every relevant kfun call. An owner that exhausts their tick budget gets a runtime error (which rolls back the offending atomic context — substrate primitive §1).
+**Why**: every owner has a resource quota — object count, call_out count, ticks per call, stack depth. The resource daemon (`/kernel/sys/resource_daemon`) tracks usage and enforces the quota at every relevant kfun call. An owner that exhausts their tick budget gets a runtime error (which rolls back the offending atomic context — runtime primitive §1).
 
 **How**:
 
@@ -166,28 +166,28 @@ Cold shutdown (`shutdown`) leaves no snapshot of its own; the substrate restarts
 - `quota <user>` prints another user's quota.
 - `quota <user> <rsrc>` shows usage of a specific resource (ticks, stack, callouts, objects, fileblocks).
 - `quota <user> <rsrc> <limit>` sets the limit. `-1` means unlimited (for the resources that permit unlimited).
-- `rsrc` with no arguments shows substrate-wide totals across all owners.
+- `rsrc` with no arguments shows platform-wide totals across all owners.
 - `rsrc <resource>` shows per-owner breakdown for a resource.
-- `rsrc <resource> <limit>` sets the substrate-wide cap (the value also writable via the `.dgd` configuration; this is the runtime override).
+- `rsrc <resource> <limit>` sets the platform-wide cap (the value also writable via the `.dgd` configuration; this is the runtime override).
 
 **What for**:
 
 - **Diagnose a runaway loop**: `rsrc ticks` shows which owner is consuming ticks. The offending domain's code is exhausting its budget — typically an infinite loop or an unbounded recursion.
 - **Adjust a per-owner budget**: a legitimate workload that hits the ticks ceiling needs `quota <owner> ticks <higher-limit>` — but consider whether the workload should be split into multiple smaller atomic contexts (via `call_out`) before raising the limit.
-- **Capacity planning**: `rsrc objects` and `rsrc callouts` show how close the substrate is to its hard caps (`objects`, `call_outs` in `.dgd`). Approaching the cap means a config increase is due.
+- **Capacity planning**: `rsrc objects` and `rsrc callouts` show how close the platform is to its hard caps (`objects`, `call_outs` in `.dgd`). Approaching the cap means a config increase is due.
 
 ### Editing files
 
 **Verbs**: `ed`
 
-**Why**: operators sometimes need to edit substrate source files from within the substrate — when the host filesystem is not directly accessible (the kernel's `directory` is chrooted), or when the substrate is the host's only interactive entry point. DGD ships a line editor reachable through the host's `editor` kfun; the `ed` verb is the operator wrapper.
+**Why**: operators sometimes need to edit platform source files from within the platform — when the host filesystem is not directly accessible (the kernel's `directory` is chrooted), or when the platform is the host's only interactive entry point. DGD ships a line editor reachable through the host's `editor` kfun; the `ed` verb is the operator wrapper.
 
-**How**: `ed <file>` invokes the host `editor` kfun against the named file. The verb is a thin wrapper. The editor is a classic line-oriented editor (the substrate's name `ed` reflects this); navigation by line number, search by regular expression, edits by line range. See the host's editor reference for the command set.
+**How**: `ed <file>` invokes the host `editor` kfun against the named file. The verb is a thin wrapper. The editor is a classic line-oriented editor (the verb name `ed` reflects this); navigation by line number, search by regular expression, edits by line range. See the host's editor reference for the command set.
 
 **What for**:
 
 - **Quick fix without host access**: a one-line patch to a wedged daemon when the operator does not have shell access to the host machine.
-- **Cross-platform edit consistency**: the substrate editor handles line endings consistently regardless of the host platform — useful when host editors might write `\r\n` files that DGD does not accept.
+- **Cross-platform edit consistency**: the platform editor handles line endings consistently regardless of the host platform — useful when host editors might write `\r\n` files that DGD does not accept.
 
 For substantial edits, prefer a host-side editor. The `ed` verb is for cases where it's the only option.
 
@@ -195,7 +195,7 @@ For substantial edits, prefer a host-side editor. The `ed` verb is for cases whe
 
 **Verbs**: `cd`, `pwd`, `ls`, `cp`, `mv`, `rm`, `mkdir`, `rmdir`
 
-**Why**: the substrate exposes a virtual filesystem rooted at the `.dgd` configuration's `directory` setting. All filesystem-style kfuns (`read_file`, `write_file`, `get_dir`, etc.) are gated by the per-tier access checks. Operating on substrate files through the console (rather than the host OS) enforces the tier model — `rm` on a file the operator does not own fails the same access check that an LPC `remove_file()` call would fail. The verbs name themselves after Unix equivalents to minimize surprise; the underlying behavior is access-checked, not raw filesystem.
+**Why**: the platform exposes a virtual filesystem rooted at the `.dgd` configuration's `directory` setting. All filesystem-style kfuns (`read_file`, `write_file`, `get_dir`, etc.) are gated by the per-tier access checks. Operating on these files through the console (rather than the host OS) enforces the tier model — `rm` on a file the operator does not own fails the same access check that an LPC `remove_file()` call would fail. The verbs name themselves after Unix equivalents to minimize surprise; the underlying behavior is access-checked, not raw filesystem.
 
 **How**: each verb maps to a host kfun, with the access daemon's per-call check applied at every operation:
 
@@ -220,13 +220,13 @@ For substantial edits, prefer a host-side editor. The `ed` verb is for cases whe
 
 **Verbs**: `people`
 
-**Why**: the substrate's connection layer (`/kernel/sys/userd`) maintains the live list of active connections. Operators inspect that list for capacity planning, incident response, and security audit.
+**Why**: the platform's connection layer (`/kernel/sys/userd`) maintains the live list of active connections. Operators inspect that list for capacity planning, incident response, and security audit.
 
-**How**: `people` queries the host's `query_users()` kfun and prints, per user: connection state, address, current command (when in the editor), idle time. The verb name reflects the substrate's MUD heritage; the underlying mechanism is connection enumeration.
+**How**: `people` queries the host's `query_users()` kfun and prints, per user: connection state, address, current command (when in the editor), idle time. The verb name reflects the runtime's MUD heritage; the underlying mechanism is connection enumeration.
 
 **What for**:
 
-- **Incident response**: who's connected when the substrate is misbehaving? Compare against expected operator population.
+- **Incident response**: who's connected when the platform is misbehaving? Compare against expected operator population.
 - **Capacity check**: connection count against the `users` cap in `.dgd`.
 - **Audit**: combine with `status` for full snapshot of who-is-on plus what-is-going-on.
 
@@ -236,7 +236,7 @@ On first cold boot with no persisted admin password:
 
 1. Telnet to the kernel's `telnet_port`.
 2. The kernel prompts to set the initial admin password.
-3. The password hash persists into the substrate's snapshot via the persistence primitive (§3); no separate "save credentials" step.
+3. The password hash persists into the platform's snapshot via the persistence primitive (§3); no separate "save credentials" step.
 4. Subsequent connections prompt for the credential.
 
 To reset the admin password from outside the console: the kernel's auth state lives in the access daemon (`/kernel/sys/access_daemon`). Cold-boot from a snapshot taken before the password was set, OR boot with the snapshot removed (cold boot from scratch). Both are operator-level actions outside the console.
@@ -253,7 +253,7 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `compile <file.c> [...]` | Code lifecycle | Compile one or more LPC source files |
 | `cp <src> <dst>` | Filesystem | Copy file (access-checked at each side) |
 | `destruct <obj>\|$N` | Code lifecycle | Destruct an object |
-| `ed <file>` | Editor | Open the substrate's line editor on a file |
+| `ed <file>` | Editor | Open the platform's line editor on a file |
 | `grant <user> <dir> <mode>` | Permissions | Grant access at the given mode |
 | `history [N]` | REPL | Show last N values from the code-history ring |
 | `ls [-l] [<glob>]` | Filesystem | List directory; `-l` shows size + timestamp |
@@ -266,7 +266,7 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `reboot` | Lifecycle | Incremental snapshot + cold shutdown (recovers from snapshot on next boot) |
 | `rm <path>` | Filesystem | Remove file |
 | `rmdir <path>` | Filesystem | Remove empty directory |
-| `rsrc [<resource> [<limit>]]` | Resources | Read or set substrate-wide resource caps |
+| `rsrc [<resource> [<limit>]]` | Resources | Read or set platform-wide resource caps |
 | `shutdown` | Lifecycle | Cold shutdown without snapshot |
 | `snapshot` | Persistence | Write a full statedump to `dump_file` |
 | `status [<obj>]` | State inspection | System-wide health vector, or per-object status |
@@ -276,6 +276,6 @@ To reset the admin password from outside the console: the kernel's auth state li
 ## Where to next
 
 - `doc/operations.md` — the deployment surface: `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.
-- `doc/architecture.md` — the substrate's tier model, daemons, and inheritance chain that the console verbs operate against.
-- `doc/substrate-primitives.md` — the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
+- `doc/architecture.md` — the platform's tier model, daemons, and inheritance chain that the console verbs operate against.
+- `doc/runtime-primitives.md` — the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
 - `src/kernel/lib/admin_console.c` — the authoritative LPC source for every verb's exact dispatch.
