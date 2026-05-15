@@ -59,10 +59,12 @@ LPC.md §3.4.3 defines four modifiers that prefix a function or variable declara
 
 `varargs` is also a keyword (LPC.md §3.1.4) prefixing a function whose parameter list is variable-length.
 
-Two consequences of `static` for variable declarations are worth flagging because they connect LPC to the substrate's persistence semantics:
+Two consequences of `static` on variable declarations are worth flagging because they connect LPC to the substrate's persistence semantics:
 
-1. A `static` global variable holds runtime state that does not survive a snapshot restore. Use it for caches, derived state, or anything whose contents can be reconstructed.
-2. A non-`static` global variable is *persistent* by default -- its value is captured in the next snapshot and restored on the next boot.
+1. A `static` global variable is **excluded from `save_object()`** — the per-object save mechanism. LPC.md §3.4.3 names this directly: "For variables that are declared as static, the variable will be defined globally for that object, and it will not be saved when save_object is called." Full statedumps (the substrate's `dump_state` mechanism) capture the entire in-memory image, so a `static` variable's current value is preserved across statedump-restore boots regardless of the modifier — `static` affects the per-object save format, not the substrate-wide snapshot. See [the 2003 DGD-list discussion of the keyword][croes-static-2003] for the runtime semantics in detail.
+2. A non-`static` global variable is captured in `save_object()` output and is therefore portable across the per-object save/restore cycle. It is also captured in statedumps. Use non-`static` for state you want both in the substrate-wide snapshot and in an ad-hoc per-object save file; use `static` for state you want only in the in-memory image.
+
+[croes-static-2003]: https://mail.dworkin.nl/pipermail/dgd/2003-April/003390.html
 
 The `atomic` modifier carries two trade-offs the spec calls out (LPC.md §3.4.3):
 
@@ -125,7 +127,9 @@ For deeper substrate dispatch (how the kernel auto handles master vs clone, how 
 
 ## Atomicity
 
-Every function call is its own atomic context by default. The function either runs to completion (its dataspace mutations survive) or errors (its dataspace mutations are rolled back as if the call had never happened).
+Every function call is its own atomic context by default. The function either runs to completion (its dataspace mutations survive) or errors (its dataspace mutations are rolled back as if the call had never happened). Christopher Allen's [2000 description of DGD][allen-dgd-2000] frames the property historically: "atomic function calls allow full system-state rollback in the event of a run-time error."
+
+[allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
 
 The `atomic` modifier extends this across nested calls:
 

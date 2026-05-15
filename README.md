@@ -6,6 +6,10 @@ eOS-kernellib is the kernel layer for orthogonally-persistent servers built on t
 
 An orthogonally-persistent server treats in-memory state as the primary state of the system. Objects survive restart without explicit serialization; transactions roll back partial effects on failure; loaded code joins the running runtime under capability bounds. eOS-kernellib makes these properties available to the application above it.
 
+DGD has carried these properties since 2000; Christopher Allen's [contemporary MUD-Dev description][allen-dgd-2000] names them concisely — "DGD maintains persistence as a characteristic of its runtime environment," "atomic function calls allow full system-state rollback in the event of a run-time error," "full system state dump files implement persistence across reboots." eOS-kernellib is a contemporary repackaging of the same substrate properties around a documented kernel-layer surface for builders who are not specifically writing for the substrate's original use case.
+
+[allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
+
 ## What it provides
 
 - **Atomicity** -- Operations commit wholly or roll back wholly. Partial effects do not escape on failure.

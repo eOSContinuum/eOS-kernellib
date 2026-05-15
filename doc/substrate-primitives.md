@@ -20,7 +20,7 @@ The architectural commitment behind this list — why these eight are surfaced a
 
 Operations commit wholly or roll back wholly. Partial effects do not escape on failure.
 
-**Foundation**: DGD atomic-function semantics. A function declared `atomic` (or invoked through `call_limited` with an atomic envelope) that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point; the application carries no roll-back code.
+**Foundation**: DGD atomic-function semantics. A function declared `atomic` (or invoked through `call_limited` with an atomic envelope) that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point; the application carries no roll-back code. The property is older than this repository — Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
 **Demonstration**: HTTP/1 substrate startup, observed in the bootstrap log. An HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the `[atomic]` annotation in the log marks the rollback firing; the substrate continues accepting subsequent connections from clean state.
 
@@ -64,8 +64,10 @@ Code runs under a capability tier that bounds what it can call.
 The in-memory object graph survives restart without explicit serialization.
 
 **Foundation**:
-- Host-runtime orthogonal persistence. The substrate's statedump mechanism captures the entire image to disk; restore reconstructs it. Objects in the image survive restart without application-level serialize / deserialize code.
+- Host-runtime orthogonal persistence. The substrate's statedump mechanism captures the entire image to disk; restore reconstructs it. Objects in the image survive restart without application-level serialize / deserialize code. Allen's [2000 description][allen-dgd-2000] names the property concisely: "DGD maintains persistence as a characteristic of its runtime environment ... full system state dump files implement persistence across reboots as well as snapshot-style state backups." Atkinson and Morrison's "Orthogonally Persistent Object Systems" (VLDB Journal 4, 1995) is the canonical academic statement of this architectural property.
 - `save_object` / `restore_object` provide a complementary per-object snapshot mechanism for daemons that need an explicit save point independent of full image dumps.
+
+[allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
 
 **Demonstration**: Admin authentication credentials persist across restarts. Bootstrap writes the password hash; subsequent boots find the hash without an explicit save call from the admin_console object.
 
