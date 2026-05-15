@@ -2,6 +2,8 @@
 
 # eOS-kernellib
 
+**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated through the BD-1 through HW-3 work captured in `doc/getting-started.md` and verified as of 2026-05-15.
+
 eOS-kernellib is the kernel layer for orthogonally-persistent servers built on the [DGD] driver. It is the runtime platform above the driver and below an application — providing capability tiers, daemons, and runtime primitives the application uses to express its own logic.
 
 An orthogonally-persistent server treats in-memory state as the primary state of the system. Objects survive restart without explicit serialization; transactions roll back partial effects on failure; loaded code joins the running runtime under capability bounds. eOS-kernellib makes these properties available to the application above it.
@@ -24,6 +26,10 @@ DGD has carried these properties since 2000; Christopher Allen's [contemporary M
 `doc/architecture.md` covers the architecture: capability tiers, daemons, boot sequence, auto-inheritance, System global-access, and host-driver extensions. `doc/runtime-primitives.md` covers each primitive's foundation, demonstration status, supporting extensions, and open work.
 
 Treating these eight as runtime primitives is the architectural commitment of eOS-kernellib: each one is a runtime guarantee the application inherits rather than a pattern the application reimplements. An orthogonally-persistent server cannot fake them at the application layer — atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. Asking the application to provide them is asking it to reproduce the runtime in user space.
+
+## Quickstart
+
+New to eOS-kernellib? Read `doc/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. After that, `doc/architecture.md` orients you to the platform model and `doc/application-authoring.md` covers writing your own application on top.
 
 ## Documentation
 
@@ -56,6 +62,10 @@ The platform's text-MUD heritage shows in some implementation details — the co
 
 [ChatTheatre/kernellib]: https://github.com/ChatTheatre/kernellib
 [SkotOS]: https://github.com/ChatTheatre/SkotOS
+
+## Contributing
+
+Contributions are welcome. A formal `CONTRIBUTING.md` is in progress; until it lands, the practical guidance is: open an issue describing the change before submitting a pull request, keep commits atomic and signed (`git commit -S -s`), and follow the conventions visible in recent history (declarative-topic doc openers, lowercase doc filenames, ASCII commit messages). The doc set's authoring conventions are exercised across every doc in `doc/`; new content should match the established shape.
 
 ## License
 

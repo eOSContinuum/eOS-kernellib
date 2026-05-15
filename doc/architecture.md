@@ -69,7 +69,9 @@ Adding tier-D or tier-E daemons follows the same pattern: a singleton under `/us
 
 The kernel layer recognizes three boot modes.
 
-**Cold boot.** The host driver starts, reads the `.dgd` configuration file, and compiles the path named by the config's `auto_object` (typically `/kernel/lib/auto`). The driver then compiles `src/kernel/sys/driver.c` (the object DGD will call into for fundamental events) and the three other tier-B daemons in dependency order. The driver then compiles `src/usr/System/initd.c`, which:
+### Cold boot
+
+The host driver starts, reads the `.dgd` configuration file, and compiles the path named by the config's `auto_object` (typically `/kernel/lib/auto`). The driver then compiles `src/kernel/sys/driver.c` (the object DGD will call into for fundamental events) and the three other tier-B daemons in dependency order. The driver then compiles `src/usr/System/initd.c`, which:
 
 1. Grants System global access (`set_global_access("System", TRUE)`).
 2. Compiles the System-tier daemons and bootstrap objects (userd, objectd, errord, upgraded, http_server, etc.).
@@ -78,9 +80,13 @@ The kernel layer recognizes three boot modes.
 
 The boot completes when the System initd's `create()` returns. The host driver then accepts external connections on the ports declared in the config.
 
-**Statedump-restore boot.** The host driver loads the snapshot file named by the config's `dump_file` and restores the in-memory object graph from it. No domain initds run; the objects, their owners, their access bits, and their internal state are present from the snapshot. The driver then resumes serving connections on the configured ports. Persistent state is the platform's default mode; cold boot is the recovery path when no snapshot is available.
+### Statedump-restore boot
 
-**Hot boot.** The host driver writes a snapshot, replaces the running executable via `execv` (e.g., to pick up a new DGD binary or change a config value), reloads the snapshot, and continues serving the same persistent connections that were open before the replace. The connection file descriptors survive the `execv` via POSIX fd inheritance; the host runtime serializes per-connection state during hotboot and restores it on the receiving side. The kernel driver's `restored(int hotboot)` hook distinguishes hotboot-resume from statedump-resume so userd and initd can re-attach to the surviving connections. Hot boot enables platform-level deployment without disconnecting active sessions; cold boot is the fallback when the snapshot is unrecoverable.
+The host driver loads the snapshot file named by the config's `dump_file` and restores the in-memory object graph from it. No domain initds run; the objects, their owners, their access bits, and their internal state are present from the snapshot. The driver then resumes serving connections on the configured ports. Persistent state is the platform's default mode; cold boot is the recovery path when no snapshot is available.
+
+### Hot boot
+
+The host driver writes a snapshot, replaces the running executable via `execv` (e.g., to pick up a new DGD binary or change a config value), reloads the snapshot, and continues serving the same persistent connections that were open before the replace. The connection file descriptors survive the `execv` via POSIX fd inheritance; the host runtime serializes per-connection state during hotboot and restores it on the receiving side. The kernel driver's `restored(int hotboot)` hook distinguishes hotboot-resume from statedump-resume so userd and initd can re-attach to the surviving connections. Hot boot enables platform-level deployment without disconnecting active sessions; cold boot is the fallback when the snapshot is unrecoverable.
 
 Statedump cadence is governed by the config's `dump_interval`. Statedumps occur between timeslices, never inside an atomic operation; the runtime guarantees that the snapshot represents a consistent state-graph commit boundary.
 

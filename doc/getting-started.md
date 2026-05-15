@@ -6,6 +6,8 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 **Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the platform.
 
+**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), 2026-05-15. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
+
 ## Prerequisites
 
 A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`.

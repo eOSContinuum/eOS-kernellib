@@ -36,7 +36,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 ### Working example
 
-- `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside `http-applications.md`.
+- `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
 
 ## Reading paths
 
