@@ -1,22 +1,22 @@
 <!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
 
-# Substrate Primitives
+# Runtime Primitives
 
-eOS-kernellib's substrate exposes eight runtime primitives the application above consumes directly: atomicity, capability separation, persistent state, hot reload, sandboxed code load, asynchronous events, multi-agent coherence, and state introspection. This document is the per-primitive foundation-and-proof statement: for each primitive, the substrate mechanism behind it, the demonstration it works in practice, the current status, the supporting extensions, and the open work.
+eOS-kernellib's runtime platform exposes eight primitives the application above consumes directly: atomicity, capability separation, persistent state, hot reload, sandboxed code load, asynchronous events, multi-agent coherence, and state introspection. This document is the per-primitive foundation-and-proof statement: for each primitive, the platform mechanism behind it, the demonstration it works in practice, the current status, the supporting extensions, and the open work.
 
-The architectural commitment behind this list — why these eight are surfaced as substrate primitives rather than left for applications to rebuild — is that each is a runtime guarantee an orthogonally-persistent server cannot fake at the application layer. Atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. The remaining four (sandboxed code load, asynchronous events, multi-agent coherence, state introspection) layer on top of those four. Asking the application to provide them is asking it to reproduce the runtime in user space. The substrate's stance is that these properties are the substrate's responsibility; the sections below name the foundation, status, and pending proofs primitive by primitive.
+The architectural commitment behind this list — why these eight are surfaced as runtime primitives rather than left for applications to rebuild — is that each is a runtime guarantee an orthogonally-persistent server cannot fake at the application layer. Atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. The remaining four (sandboxed code load, asynchronous events, multi-agent coherence, state introspection) layer on top of those four. Asking the application to provide them is asking it to reproduce the runtime in user space. The platform's stance is that these properties are the platform's responsibility; the sections below name the foundation, status, and pending proofs primitive by primitive.
 
-**Audience**: a developer or architect deciding whether eOS-kernellib's substrate properties fit a use case, or auditing the substrate's runtime guarantees against application requirements; wants the per-primitive foundation, demonstration status, supporting extensions, and open work for each of the eight primitives; assumes `doc/architecture.md` for the structural model and tier vocabulary.
+**Audience**: a developer or architect deciding whether eOS-kernellib's runtime platform fits a use case, or auditing the platform's runtime guarantees against application requirements; wants the per-primitive foundation, demonstration status, supporting extensions, and open work for each of the eight primitives; assumes `doc/architecture.md` for the structural model and tier vocabulary.
 
-**Section template.** Each primitive section below follows the same structure: a one-sentence claim opener, then **Foundation** (the substrate mechanism that provides the property), **Demonstration** (evidence the property works in practice), **Status** (Validated / Partial / Foundation-only), **Extensions** (additional support shipped or proposed), and **Open** (unresolved questions). The bold prose-headers act as in-section anchors when reading or scanning.
+**Section template.** Each primitive section below follows the same structure: a one-sentence claim opener, then **Foundation** (the platform mechanism that provides the property), **Demonstration** (evidence the property works in practice), **Status** (Validated / Partial / Foundation-only), **Extensions** (additional support shipped or proposed), and **Open** (unresolved questions). The bold prose-headers act as in-section anchors when reading or scanning.
 
 **Status legend.** Each primitive's Status carries one of three values:
 
-- **Validated** — foundation present in the substrate, demonstrated empirically by a cited test or observation.
+- **Validated** — foundation present in the platform, demonstrated empirically by a cited test or observation.
 - **Partial** — foundation present, demonstration partial. Some surface of the primitive is observed; complete demonstration is not yet authored.
-- **Foundation-only** — substrate mechanism is present, but no empirical demonstration of the primitive exists yet.
+- **Foundation-only** — platform mechanism is present, but no empirical demonstration of the primitive exists yet.
 
-**Tier vocabulary** used throughout this document is defined in the Appendix. Briefly: kernel-tier code lives in `/kernel/` (tier B); System-tier code in `/usr/System/` (tier C); shipped substrate domains in `/usr/HTTP/`, `/usr/TLS/`, `/usr/LPC/`, etc. (tier D); application domains outside the kernel layer (tier E).
+**Tier vocabulary** used throughout this document is defined in the Appendix. Briefly: kernel-tier code lives in `/kernel/` (tier B); System-tier code in `/usr/System/` (tier C); shipped platform domains in `/usr/HTTP/`, `/usr/TLS/`, `/usr/LPC/`, etc. (tier D); application domains outside the kernel layer (tier E).
 
 ---
 
@@ -26,11 +26,11 @@ Operations commit wholly or roll back wholly. Partial effects do not escape on f
 
 **Foundation**: DGD atomic-function semantics. A function declared `atomic` (or invoked through `call_limited` with an atomic envelope) that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point; the application carries no roll-back code. The property is older than this repository — Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
-**Demonstration**: HTTP/1 substrate startup, observed in the bootstrap log. An HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the `[atomic]` annotation in the log marks the rollback firing; the substrate continues accepting subsequent connections from clean state.
+**Demonstration**: HTTP/1 platform startup, observed in the bootstrap log. An HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the `[atomic]` annotation in the log marks the rollback firing; the platform continues accepting subsequent connections from clean state.
 
 **Status**: Partial. Foundation present; rollback observed in failure mode; a deliberate-failure demonstration with a user-authored handler is pending.
 
-**Extensions**: None at substrate level. Atomicity is a host-runtime property; eOS-kernellib does not extend it beyond the host's contract.
+**Extensions**: None at the platform level. Atomicity is a host-runtime property; eOS-kernellib does not extend it beyond the host's contract.
 
 **Open**:
 - Compound-operation atomic envelopes spanning multiple sub-calls. The host envelope is per-call; multi-call transactional semantics are an application concern.
@@ -68,7 +68,7 @@ Code runs under a capability tier that bounds what it can call.
 The in-memory object graph survives restart without explicit serialization.
 
 **Foundation**:
-- Host-runtime orthogonal persistence. The substrate's statedump mechanism captures the entire image to disk; restore reconstructs it. Objects in the image survive restart without application-level serialize / deserialize code. Allen's [2000 description][allen-dgd-2000] names the property concisely: "DGD maintains persistence as a characteristic of its runtime environment ... full system state dump files implement persistence across reboots as well as snapshot-style state backups." Atkinson and Morrison's "Orthogonally Persistent Object Systems" (VLDB Journal 4, 1995) is the canonical academic statement of this architectural property.
+- Host-runtime orthogonal persistence. The platform's statedump mechanism captures the entire image to disk; restore reconstructs it. Objects in the image survive restart without application-level serialize / deserialize code. Allen's [2000 description][allen-dgd-2000] names the property concisely: "DGD maintains persistence as a characteristic of its runtime environment ... full system state dump files implement persistence across reboots as well as snapshot-style state backups." Atkinson and Morrison's "Orthogonally Persistent Object Systems" (VLDB Journal 4, 1995) is the canonical academic statement of this architectural property.
 - `save_object` / `restore_object` provide a complementary per-object snapshot mechanism for daemons that need an explicit save point independent of full image dumps.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
@@ -82,7 +82,7 @@ The in-memory object graph survives restart without explicit serialization.
 - Two-level mapping (port candidate, `bigmap` / `bigmap_iterator`): bypasses the host runtime's per-mapping size limit, with iterator pattern for subclass masking. Useful when a persistent collection grows past the host-language ceiling.
 
 **Open**:
-- Statedump scheduling and integrity policy (when does the substrate write a full image dump? What happens on dump failure?). Operator-facing; outside the substrate's enforcement surface.
+- Statedump scheduling and integrity policy (when does the platform write a full image dump? What happens on dump failure?). Operator-facing; outside the platform's enforcement surface.
 
 ---
 
@@ -92,7 +92,7 @@ Code recompiles into the live runtime; existing objects update in place.
 
 **Foundation**: Host-runtime `compile_object` kfun. Passing a path that already has a master in memory replaces the master with the recompiled version. Existing references to the old master continue to function for the in-flight call; subsequent calls dispatch to the new version. No deploy step.
 
-**Demonstration**: An HTTP application exposing a baseline `GET` route and a `POST /compile` route that calls `compile_object` on the route handler's source path. Sequence: baseline `GET` returns the cold-boot string; `POST /compile` with revised LPC source on the same path returns `200 OK`; immediate `GET` returns the new string. No DGD restart, no application-layer reload mechanism — `compile_object` is the substrate mechanism, exercised through the HTTP application surface.
+**Demonstration**: An HTTP application exposing a baseline `GET` route and a `POST /compile` route that calls `compile_object` on the route handler's source path. Sequence: baseline `GET` returns the cold-boot string; `POST /compile` with revised LPC source on the same path returns `200 OK`; immediate `GET` returns the new string. No DGD restart, no application-layer reload mechanism — `compile_object` is the platform mechanism, exercised through the HTTP application surface.
 
 **Status**: Validated for single-object replacement. Library-inheritance cascade (recompiling a parent library and observing dependents pick up the new parent) is not yet addressed.
 
@@ -102,7 +102,7 @@ Code recompiles into the live runtime; existing objects update in place.
 
 **Open**:
 - Library-cascade behavior in the absence of progdb (does an existing clone of an old parent become stale, or does the host's late binding catch the new parent on next dispatch?).
-- Concurrent in-flight calls during recompile (what's the substrate's guarantee about a method executing in the old version while the new version compiles?).
+- Concurrent in-flight calls during recompile (what's the platform's guarantee about a method executing in the old version while the new version compiles?).
 - Interaction with host-driver extensions that maintain a compiled-code cache (see Appendix §Tier A: extensions). When `compile_object` recompiles a path, an extension's per-program code cache must invalidate or re-key the corresponding entry, otherwise stale compiled code shadows the new bytecode and hot reload silently fails. Empirically unverified for any specific extension; operators loading such an extension should test the recompile path against their workload before relying on hot reload in production.
 
 ---
@@ -115,20 +115,20 @@ New code compiles into the runtime under capability bounds set at load time.
 - Host-runtime `compile_object` plus the access checks invoked during compilation (the driver validates that the caller's tier permits compiling a path in the target tier).
 - Capability separation (§2) bounds what compiled code can call once running.
 
-**Demonstration**: None at substrate level. A `POST /compile` route on an application server compiles unsandboxed; the bounds it carries are the inheriting application's tier-D bounds, not bounds derived from the load operation.
+**Demonstration**: None at the platform level. A `POST /compile` route on an application server compiles unsandboxed; the bounds it carries are the inheriting application's tier-D bounds, not bounds derived from the load operation.
 
 **Status**: Foundation-only. Mechanism present; bounded-load demonstration pending.
 
 **Extensions**:
 - LPC self-compiler at `/usr/LPC/` (as in §4): enables grammar-pass safety transforms — denylist host kfuns, refuse dangerous productions, rewrite decorated source into capability-bounded AST nodes — before handing the result to `compile_object`.
 - Decoration-and-compile sandbox pattern (port candidate, under research): decorated host-language source compiles into pure host AST via a grammar pass; the AST is denylisted of dangerous kfuns at the dispatch boundary; the result runs at host-native speed inside the host's atomic envelope. The pattern's distinctive claim is five-axis containment — language (source-grammar constrains what can be expressed), location (source compiles only where the dispatcher routes it), invocation (caller's tier bounds what callable code can do), capability (kfun denylist enforced by the AST pass), and atomic rollback (errors revert dataspace mutations). The reference implementation of this pattern lives in the Meriadoc subsystem of ChatTheatre's SkotOS deployment.
-- Property-graph substrate layer (must-build): the Meriadoc pattern requires a property system providing four capabilities:
+- Property-graph subsystem (must-build): the Meriadoc pattern requires a property system providing four capabilities:
   - Keyed property map per object.
   - Set-time hook firing an event on property write (so the compile-from-source step is triggered atomically with state change).
   - Data-object inheritance on read (ur-parent chain), distinct from host-language code inheritance.
   - Persistent property storage.
   
-  Of these, only persistent storage (§3) is present in eOS-kernellib. The other three are absent. A tier-D domain (`/usr/Properties/` or equivalent) providing the missing three is a prerequisite for the Meriadoc port. The layer is **cross-primitive**: set-time hooks are an instance of §6 (asynchronous events that are atomic with state change); ur-parent inheritance is an instance of §8 (state introspection via the data graph). The property-graph substrate layer is named under §5 because Meriadoc is the most demanding consumer; it deepens §6 and §8 as well.
+  Of these, only persistent storage (§3) is present in eOS-kernellib. The other three are absent. A tier-D domain (`/usr/Properties/` or equivalent) providing the missing three is a prerequisite for the Meriadoc port. The subsystem is **cross-primitive**: set-time hooks are an instance of §6 (asynchronous events that are atomic with state change); ur-parent inheritance is an instance of §8 (state introspection via the data graph). The property-graph subsystem is named under §5 because Meriadoc is the most demanding consumer; it deepens §6 and §8 as well.
 
 **Open**:
 - Re-entrancy detection: does the runtime prevent a handler from modifying the property it is reacting to?
@@ -160,7 +160,7 @@ Event delivery is atomic with the state change that produced it.
 
 **Open**:
 - Multi-subscriber event semantics (when multiple subscribers exist, what is the ordering guarantee?).
-- Event-during-compile semantics (an event firing while the substrate is compiling new code — atomic envelope behavior?).
+- Event-during-compile semantics (an event firing while the platform is compiling new code — atomic envelope behavior?).
 
 ---
 
@@ -169,14 +169,14 @@ Event delivery is atomic with the state change that produced it.
 Multiple callers see a consistent view of state without user-land coordination.
 
 **Foundation**:
-- Single-coherence-domain architecture: one address space, one execution slot at a time, no concurrent state mutation. Cross-domain coordination is unnecessary because the substrate provides serializability natively.
+- Single-coherence-domain architecture: one address space, one execution slot at a time, no concurrent state mutation. Cross-domain coordination is unnecessary because the platform provides serializability natively.
 - Atomicity (§1) prevents partial-state visibility: a reader observing an in-progress write sees either pre-state or post-state, never a torn intermediate.
 
-**Demonstration**: None at substrate level beyond single-call traces. Multi-caller / multi-agent demonstrations are pending.
+**Demonstration**: None at the platform level beyond single-call traces. Multi-caller / multi-agent demonstrations are pending.
 
 **Status**: Foundation-only. Emergent from §1 plus the single-coherence-domain architecture; multi-call demonstration pending.
 
-**Extensions**: None specific. Multi-agent coherence is an architectural property; substrate primitives that strengthen it appear elsewhere (atomicity, asynchronous events).
+**Extensions**: None specific. Multi-agent coherence is an architectural property; runtime primitives that strengthen it appear elsewhere (atomicity, asynchronous events).
 
 **Open**:
 - Concurrent HTTP requests against the same application state (two POST /compile requests to the same path; two GET /counter requests during a POST /increment) with serializable behavior visible at the HTTP responses.
@@ -191,7 +191,7 @@ The state graph is queryable directly through runtime calls.
 - Host-runtime introspection kfuns: `find_object`, `object_name`, `status`, `query_owners`, `query_users`, `get_dir`. Available to any tier that has the access bit; constrained per tier.
 - Object registry at `/usr/System/sys/objectd.c`: a System-tier daemon maintaining a populated registry of object existence, called during compilation and destruction. The registry is populated; a structured query surface for application code is not currently exposed.
 
-**Demonstration**: admin_console (the binary-port REPL on the kernel telnet port) provides interactive introspection: `compile <path>` returns the master object reference, `code <expression>` evaluates an arbitrary LPC expression against the live image, `status` returns the system-wide health table (server / swap / memory / objects / users / uptime / call_outs). Substrate smoke testing exercises this surface over telnet and asserts the expected responses.
+**Demonstration**: admin_console (the binary-port REPL on the kernel telnet port) provides interactive introspection: `compile <path>` returns the master object reference, `code <expression>` evaluates an arbitrary LPC expression against the live image, `status` returns the system-wide health table (server / swap / memory / objects / users / uptime / call_outs). Platform smoke testing exercises this surface over telnet and asserts the expected responses.
 
 **Status**: Partial. Foundation kfuns work; structured object-graph queries (per-owner enumeration, inheritance-chain walks, clone enumeration) require either ad-hoc LPC code or a daemon exposing them.
 
@@ -211,7 +211,7 @@ The following are not primitives; they are surfaces through which primitives man
 
 ### Transport tier
 
-- **HTTP/1 server library** at `/usr/HTTP/api/lib/Server1.c` + `/usr/HTTP/lib/Connection1.c` and supporting parsers. Application subclass pattern: inherit `Http1Server` and `/usr/System/lib/user`, override `receiveRequest`, and call inherited `expectEntity(length)` for body-bearing methods to opt into body receipt. The reference application at `examples/http-app/` exercises the pattern end-to-end (GET, POST with body, 404 fallback) against a running substrate.
+- **HTTP/1 server library** at `/usr/HTTP/api/lib/Server1.c` + `/usr/HTTP/lib/Connection1.c` and supporting parsers. Application subclass pattern: inherit `Http1Server` and `/usr/System/lib/user`, override `receiveRequest`, and call inherited `expectEntity(length)` for body-bearing methods to opt into body receipt. The reference application at `examples/http-app/` exercises the pattern end-to-end (GET, POST with body, 404 fallback) against a running platform.
 - **HTTP/1 TLS server and client** at `/usr/HTTP/api/lib/{TlsServer1, TlsClient1}.c` (extends `BufferedConnection1`). Compiled at boot; depends on the TLS 1.3 stack (gated on the host being built with `KF_SECURE_RANDOM`). No application subclass currently exists.
 - **WebSocket framing** in `/usr/HTTP/lib/Connection1.c`: `expectWsFrame`, `receiveWsFrame`, `receiveWsChunk`, `sendWsChunk`, frame masking. Same opt-in subclass-callback pattern as `expectEntity`. No HTTP-to-WebSocket upgrade application currently exists.
 - **TLS 1.3 stack** at `/usr/TLS/`: record layer, handshake, all extensions. Entire `TLS/initd::create()` body is gated on `# ifdef KF_SECURE_RANDOM`. The HTTP TLS variants are the only declared consumers.
@@ -228,22 +228,22 @@ The following are not primitives; they are surfaces through which primitives man
 
 ## Appendix: tier vocabulary used in this document
 
-This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary defined in `doc/architecture.md` Capability tiers (Kernel / System / User). The five-tier splits the C host driver from the LPC kernel (A vs B) and shipped substrate domains from application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis above. The canonical table lives in `doc/architecture.md`; this document does not duplicate it.
+This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary defined in `doc/architecture.md` Capability tiers (Kernel / System / User). The five-tier splits the C host driver from the LPC kernel (A vs B) and shipped platform domains from application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis above. The canonical table lives in `doc/architecture.md`; this document does not duplicate it.
 
 Two implications worth restating at this scope:
 
 1. **What "is" eOS-kernellib** is tiers B + C + D. Tier A is the host driver; tier E is the consumer's responsibility.
-2. **Tier D and tier E are mechanically identical.** The boundary is packaging convention, not enforcement. A primitive that currently exists as a tier-E pattern in a consumer's distribution can be promoted to tier D in eOS-kernellib by adding the domain to the shipped substrate set.
+2. **Tier D and tier E are mechanically identical.** The boundary is packaging convention, not enforcement. A primitive that currently exists as a tier-E pattern in a consumer's distribution can be promoted to tier D in eOS-kernellib by adding the domain to the shipped platform set.
 
-### Extensions and the substrate's contract
+### Extensions and the platform's contract
 
-The structural model of the host-driver extension surface — dlopen-loaded modules registered in the `.dgd` configuration's `modules =` mapping, the 256-kfun cap that drives extension minimalism, the statedump-binding constraint — is documented in `doc/architecture.md` Host-driver extensions, with deployment-time mechanics in `doc/operations.md` Loading host-driver extensions. The substrate-level point relevant to this document is narrower:
+The structural model of the host-driver extension surface — dlopen-loaded modules registered in the `.dgd` configuration's `modules =` mapping, the 256-kfun cap that drives extension minimalism, the statedump-binding constraint — is documented in `doc/architecture.md` Host-driver extensions, with deployment-time mechanics in `doc/operations.md` Loading host-driver extensions. The platform-level point relevant to this document is narrower:
 
-**eOS-kernellib's substrate requires no extension and loads none.** Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity ("Behavior under host-driver extensions that compile LPC bytecode to native code") and §4 Hot reload ("Interaction with host-driver extensions that maintain a compiled-code cache") name what happens when a deployment chooses to load an extension whose codepaths interact with those primitives. In both cases the substrate's contract becomes empirically unverified, not violated; operators loading such an extension should measure against their workload before relying on the corresponding primitive in production.
+**eOS-kernellib's runtime platform requires no extension and loads none.** Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity ("Behavior under host-driver extensions that compile LPC bytecode to native code") and §4 Hot reload ("Interaction with host-driver extensions that maintain a compiled-code cache") name what happens when a deployment chooses to load an extension whose codepaths interact with those primitives. In both cases the platform's contract becomes empirically unverified, not violated; operators loading such an extension should measure against their workload before relying on the corresponding primitive in production.
 
 ## Where to next
 
-- `doc/architecture.md` — the substrate's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
+- `doc/architecture.md` — the platform's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
 - `doc/persistence.md` — the full orthogonal-persistence story behind §3 (statedump cycle, hot boot, save_object semantics, persistence boundaries).
 - `doc/code-lifecycle.md` — the full compile / clone / destruct / touch story behind §4 and §5 (object-manager events, library upgrade cascade, `_F_touch` hook).
 - `doc/operations.md` Open empirical questions — the deployment-time interpretation of the Open entries on §1 and §4.
