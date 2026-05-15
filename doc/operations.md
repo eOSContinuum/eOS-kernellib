@@ -115,7 +115,7 @@ The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext]
 
 ### Open empirical questions
 
-Two substrate guarantees have unverified behavior under extension-loaded codepaths. Until empirically verified, an operator enabling such an extension in production should treat these as known unknowns:
+The two substrate primitives with unverified extension behavior are atomicity (`doc/substrate-primitives.md` §1 Open) and hot reload (§4 Open). Both have the same shape: the substrate guarantee holds without extensions; whether it survives an extension-loaded codepath is unverified. Until verified, an operator enabling such an extension in production should treat these as known unknowns:
 
 - **Atomicity under extension-loaded JIT.** Does the platform's atomic-commit rollback fire when an extension-compiled native function errors mid-call? The atomicity primitive (`doc/substrate-primitives.md` §1) hinges on the runtime restoring in-memory state on error; if extension-compiled code skips the rollback path (for example by writing directly to dataspace memory without going through the atomic-transaction layer), the guarantee holds only without the extension loaded.
 - **Hot reload under extension-loaded compiled-code caches.** Does `compile_object(path, source)` interact correctly with an extension's per-program code cache? The hot-reload primitive (§4) requires that the next call after recompilation runs the new logic; if the extension's cache is keyed on something stale, recompiled code can be shadowed by previously-compiled native code.

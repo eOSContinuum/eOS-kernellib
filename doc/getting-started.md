@@ -70,9 +70,10 @@ The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an appli
 
 ## Where to next
 
-- `doc/architecture.md` covers the substrate's tier model, daemons, boot sequence; `doc/substrate-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `examples/http-app/README.md` and `doc/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the substrate is running.
 - `doc/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
-- `doc/application-authoring.md` covers writing a tier-E application on top of the substrate; `doc/http-applications.md` covers HTTP/1 specifically; `examples/http-app/` is a runnable reference.
+- `doc/architecture.md` covers the substrate's tier model, daemons, and boot sequence; `doc/substrate-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `doc/application-authoring.md` covers writing a tier-E application on top of the substrate (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
 - `doc/building.md` covers DGD build details and platform-specific notes.
 
 [DGD]: https://github.com/dworkin/dgd

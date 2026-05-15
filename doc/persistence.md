@@ -163,6 +163,8 @@ The substrate's persistence model has explicit boundaries. Each requires applica
 - **Time**: the substrate restores to the snapshot's logical time, but the host clock advances independently. `call_out` deferrals scheduled before the snapshot fire at the original target time relative to the snapshot's clock, which means a snapshot restored hours after capture has accumulated overdue `call_out`s ready to fire. Applications relying on `call_out` for time-sensitive work should handle the case where a deferred call fires later than originally scheduled.
 - **Snapshot integrity**: the substrate writes snapshots atomically (rotation + write), but a host-level failure during the write (disk full, power loss) can produce a corrupt `dump_file`. The `<dump_file>.old` rotation is the substrate's recovery mechanism. Backup snapshots to off-host storage for disaster recovery.
 
+For operator-level recovery procedures when any of these boundaries are hit, see `doc/operations.md` Common failure modes (table of symptoms and diagnoses) and `doc/admin-console.md` for the `snapshot`, `reboot`, and `shutdown` verbs that manage the persistence cycle.
+
 ## Persistence under host-driver extensions
 
 Loading a host-driver extension (`doc/operations.md` Loading host-driver extensions; `doc/architecture.md` Host-driver extensions) binds the substrate's snapshot to that extension's presence: a snapshot taken with the extension active requires the same extension to restore. This is documented in [Felix Croes' 2010 Hydra mailing-list note][croes-hydra-2010] and is a durable architectural commitment, not an opt-in convenience.

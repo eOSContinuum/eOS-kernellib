@@ -148,7 +148,7 @@ The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, v
 - **Multi-agent coherence**: callers see a consistent view; the runtime serializes commits.
 - **Capability separation**: only callers reachable from the KV domain (or from System) can call into `kv_daemon`; the access discipline is enforced by the kernel's per-call access checks against the inherited System auto.
 
-The application code is short: the daemon itself is perhaps 30 lines of LPC, plus the initd's compile call. The substrate carries the rest.
+The application code is short: the daemon itself is roughly 30 lines of LPC, plus the initd's compile call. The substrate carries the rest.
 
 A counter-with-deliberate-failure variant (the canonical atomicity demonstration) is similar shape: a single counter object with `increment_and_fail()` exercises the rollback path; the post-failure read confirms the counter is unchanged.
 
