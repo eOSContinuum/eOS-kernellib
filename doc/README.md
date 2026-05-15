@@ -38,6 +38,11 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
 
+### Reference
+
+- [glossary.md](glossary.md) — definitions for terms used inline across the doc set (atomic, auto-inheritance, dataspace, statedump, hotboot, capability tier, mount point, principal, master, clone, LWO, and similar).
+- [references.md](references.md) — citations for the orthogonal-persistence literature (Atkinson and Morrison 1995; KeyKOS / EROS), DGD mailing-list discussions (Allen 2000, Croes 2003, Croes 2010), and upstream documentation (DGD itself, lpc-doc, kernellib lineage).
+
 ## Reading paths
 
 Common goals and the docs that serve them.
@@ -49,6 +54,8 @@ Common goals and the docs that serve them.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
 - **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md).
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
+- **Cross-reference an unfamiliar term mid-document** — [glossary.md](glossary.md).
+- **Follow a citation back to its source** — [references.md](references.md).
 
 [DGD]: https://github.com/dworkin/dgd
 [lpc-doc]: https://github.com/dworkin/lpc-doc
