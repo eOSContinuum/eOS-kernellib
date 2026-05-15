@@ -6,6 +6,8 @@ LPC is the programming language used by the [DGD] driver and the layers built on
 
 For depth on a specific construct, follow the section citations into LPC.md. For the kfun catalog, see [dworkin/lpc-doc/kfun/]. For how LPC fits into eOS-kernellib's substrate (tier model, daemons, the auto-inheritance chain that hands every object its identity), see `doc/architecture.md`. For the patterns an application author writes on top of the substrate, see `doc/application-authoring.md`.
 
+**Audience**: a programmer new to LPC; familiar with at least one C-family language (C, C++, Java, Go, or similar); reading this to gain enough LPC literacy to read substrate code and write application code on top. The formal language reference at [dworkin/lpc-doc] is authoritative; this document is the bridge to it.
+
 ## What is familiar
 
 A reader from C, C++, Java, or Go will recognize most of LPC's surface. Curly braces, semicolons, `if` / `while` / `for` / `switch`, `int` / `float` / `string` declarations, function definitions with parameter lists, the C preprocessor (`#include`, `#define`, `#ifdef`). Source files compile to objects; functions take and return values; expressions and operators look the way you expect. LPC.md §3.1 covers lexical elements, §3.2 expressions, §3.5 statements, §3.7 preprocessing.

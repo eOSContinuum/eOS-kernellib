@@ -6,6 +6,8 @@ eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the
 
 This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The per-primitive foundation-and-proof statement lives in `doc/substrate-primitives.md`, which also names the substrate's commitment behind each primitive.
 
+**Audience**: a developer or architect orienting to the substrate's structural model; wants to know how the kernel layer is organized — what runs at which tier, which daemons mediate which surfaces, how the boot sequence reaches a steady state, where an application plugs in — before writing or operating code on the substrate.
+
 ## Capability tiers
 
 The kernel layer divides code into capability tiers that bound what each tier can call. The tier of a piece of code is determined by its file path and is enforced by the host driver's access checks at every kfun call.

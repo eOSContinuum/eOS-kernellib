@@ -6,6 +6,8 @@ LPC code in the substrate moves through these states: source becomes a master, a
 
 For the LPC language constructs these transitions invoke (`inherit`, `create()`, `static`, `nomask`), see `doc/lpc-essentials.md`. For the per-primitive substrate guarantees that bound these transitions (atomicity, hot reload, capability separation), see `doc/substrate-primitives.md`. For the operator surface that drives lifecycle transitions interactively, see `doc/admin-console.md`.
 
+**Audience**: an LPC author or operator reasoning about how source becomes a running object, how recompilation propagates to existing instances, how `call_touch` schedules lazy upgrades, and how the substrate observes lifecycle transitions; assumes `doc/lpc-essentials.md` for language constructs and `doc/architecture.md` for the structural model.
+
 ## Transitions
 
 A piece of LPC source moves through these states in the substrate:

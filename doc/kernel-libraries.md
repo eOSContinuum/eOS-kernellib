@@ -6,6 +6,8 @@ eOS-kernellib ships a small set of inheritable libraries under `src/lib/` for ap
 
 For the LPC mechanics that make these libraries work (inherit syntax, type modifiers, lifecycle), see `doc/lpc-essentials.md`. For where these libraries fit in the substrate's tier model, see `doc/architecture.md`.
 
+**Audience**: an LPC application author looking up which inheritable library serves a common need (strings, persistent collections, iteration, asynchronous control, time, utilities); assumes `doc/lpc-essentials.md` for inherit syntax and `doc/architecture.md` for the tier model that bounds where each library is callable from.
+
 ## Strings
 
 | Class | File | Header | Role |

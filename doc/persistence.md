@@ -8,6 +8,8 @@ This document covers what persists, how the substrate captures and restores it, 
 
 For the language-level interaction between LPC's `static` modifier and persistence, see `doc/lpc-essentials.md` Type modifiers. For operator commands that drive the persistence cycle, see `doc/admin-console.md` Snapshot, restore, and shutdown. For the per-primitive substrate guarantee, see `doc/substrate-primitives.md` §3.
 
+**Audience**: a developer, architect, or operator reasoning about what survives a restart, what does not, and how the substrate captures and restores state; assumes `doc/architecture.md` for the structural model and basic familiarity with the substrate's boot sequence.
+
 ## Orthogonal persistence as architectural property
 
 **Orthogonal persistence** is the architectural property that an object's lifetime is decoupled from the lifetime of the program that created it. The same code that operates on a transient value operates on a persistent value; the persistence machinery is the runtime's concern, not the application's. Atkinson and Morrison's "Orthogonally Persistent Object Systems" (VLDB Journal 4, 1995) is the canonical academic statement of the property; KeyKOS and EROS extended the model with capability-based access control.

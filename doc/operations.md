@@ -4,7 +4,7 @@
 
 This document covers running an eOS-kernellib substrate: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`doc/architecture.md`) covers the substrate's structural model; this document covers the operator's surface for keeping it running.
 
-Audience: someone running the substrate — responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/application-authoring.md` and `doc/http-applications.md`.
+**Audience**: someone running the substrate — responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/application-authoring.md` and `doc/http-applications.md`.
 
 ## The .dgd configuration file
 
