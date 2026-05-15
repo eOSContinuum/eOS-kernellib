@@ -222,35 +222,17 @@ The following are not primitives; they are surfaces through which primitives man
 
 ---
 
-## Appendix: Tier model
+## Appendix: tier vocabulary used in this document
 
-This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary in `doc/architecture.md` (Kernel / System / User). The five-tier splits the C-language host driver from the LPC kernel (A vs B) and the shipped substrate domains from the application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis below.
+This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary defined in `doc/architecture.md` Capability tiers (Kernel / System / User). The five-tier splits the C host driver from the LPC kernel (A vs B) and shipped substrate domains from application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis above. The canonical table lives in `doc/architecture.md`; this document does not duplicate it.
 
-The substrate organizes code into five tiers. Tier identity is determined by the path under which the source compiles, and is enforced by the host driver's access checks at every kfun call.
+Two implications worth restating at this scope:
 
-| Tier | Location | Role |
-|---|---|---|
-| **A** | C code (host driver) | Parses, executes, manages atomicity / persistence / swap / call_outs. Not LPC; not part of eOS-kernellib's source. |
-| **B** | `/kernel/` | Hard-trusted kernel-tier LPC. The driver hooks (`driver.c`, the user / access / resource daemons, the kernel auto, kernel API libraries). Hand-edited rarely. |
-| **C** | `/usr/System/` | Privileged user-tier code, owner `System`, with `set_global_access("System", TRUE)`. The System auto (`/usr/System/lib/auto.c`) is the inheritance root for everything in tiers D and E. |
-| **D** | `/usr/HTTP/`, `/usr/TLS/`, `/usr/LPC/`, etc. | Shipped substrate domains. Each domain has its own owner and is isolated from other user-tier code unless explicit cross-domain access is granted. These domains are shipped together with eOS-kernellib as the substrate's distribution. |
-| **E** | Application-supplied `/usr/<Domain>/` | Same user-tier mechanics as tier D — owner, access bits, inheritance chains — but distributed by the consuming application, not by eOS-kernellib. |
+1. **What "is" eOS-kernellib** is tiers B + C + D. Tier A is the host driver; tier E is the consumer's responsibility.
+2. **Tier D and tier E are mechanically identical.** The boundary is packaging convention, not enforcement. A primitive that currently exists as a tier-E pattern in a consumer's distribution can be promoted to tier D in eOS-kernellib by adding the domain to the shipped substrate set.
 
-Two implications matter for builders authoring on top of eOS-kernellib:
+### Extensions and the substrate's contract
 
-1. **What "is" eOS-kernellib** is tiers B + C + D. Tier A is the driver; tier E is the consumer's responsibility.
-2. **Tier D items are technically the same kind of thing as tier E items.** A user-tier domain is a user-tier domain. The boundary between D and E is packaging convention. A primitive that currently exists as a tier-E pattern in some consumer's distribution can be promoted to tier D in eOS-kernellib by adding the domain to the shipped substrate set.
+The structural model of the host-driver extension surface — dlopen-loaded modules registered in the `.dgd` configuration's `modules =` mapping, the 256-kfun cap that drives extension minimalism, the statedump-binding constraint — is documented in `doc/architecture.md` Host-driver extensions, with deployment-time mechanics in `doc/operations.md` Loading host-driver extensions. The substrate-level point relevant to this document is narrower:
 
-### Tier A: extensions
-
-Tier A has a sub-surface beyond the core driver: dlopen-loaded extension modules registered in the `.dgd` configuration's `modules =` mapping. Extension modules add kfuns to the runtime; from the LPC layer above, an extension kfun is indistinguishable from a host built-in.
-
-The core driver ships a small minimalist kfun set (capped at 256 kfuns by the 1-byte kfun numbering) covering object lifecycle, compilation, atomicity, connections, and basic math / strings / arrays. Functionality requiring C-level access beyond that core -- hardware-accelerated crypto, AOT compilation, native regex, system-database integration -- is added at runtime via this extension surface rather than by growing the core.
-
-eOS-kernellib's substrate requires no extension and loads none. Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity and §4 Hot reload concern what happens when a deployment chooses to load an extension whose codepaths interact with those primitives -- the substrate's contract is unverified there, not violated.
-
-The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance and others. The architectural pattern matters for this document; specific module choice is a deployment concern covered in `doc/operations.md`.
-
-Loading an extension binds the substrate's statedump to the extension's presence: a snapshot taken with an extension active requires that same extension to restore. This makes extension loading a durable architectural commitment, not an opt-in convenience.
-
-[dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext
+**eOS-kernellib's substrate requires no extension and loads none.** Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity ("Behavior under host-driver extensions that compile LPC bytecode to native code") and §4 Hot reload ("Interaction with host-driver extensions that maintain a compiled-code cache") name what happens when a deployment chooses to load an extension whose codepaths interact with those primitives. In both cases the substrate's contract becomes empirically unverified, not violated; operators loading such an extension should measure against their workload before relying on the corresponding primitive in production.
