@@ -17,7 +17,9 @@ An orthogonally-persistent server treats in-memory state as the primary state of
 - **Multi-agent coherence** -- Multiple callers see a consistent view of state without user-land coordination.
 - **State introspection** -- The state graph is queryable directly through runtime calls.
 
-`doc/architecture.md` covers the architecture: capability tiers, daemons, boot sequence, auto-inheritance, System global-access, and host-driver extensions. `doc/substrate-primitives.md` covers each primitive's foundation, demonstration status, supporting extensions, and open work. The architectural argument for treating these properties as substrate primitives -- rather than as application-layer patterns or external glue -- lives at [eOS-DeepContext].
+`doc/architecture.md` covers the architecture: capability tiers, daemons, boot sequence, auto-inheritance, System global-access, and host-driver extensions. `doc/substrate-primitives.md` covers each primitive's foundation, demonstration status, supporting extensions, and open work.
+
+Treating these eight as substrate primitives is the architectural commitment of eOS-kernellib: each one is a runtime guarantee the application inherits rather than a pattern the application reimplements. An orthogonally-persistent server cannot fake them at the application layer — atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. Asking the application to provide them is asking it to reproduce the runtime in user space.
 
 ## Getting started
 
@@ -30,11 +32,10 @@ eOS-kernellib sits between the [DGD] driver and the application built on top:
 - **Below**: DGD provides the LPC runtime, the storage manager, and the atomic-commit boundary.
 - **Above**: An application uses the kernel layer's capability tiers, daemons, and primitives to express its own logic.
 
-eos-harness is one example of an application built on eOS-kernellib -- an agent-runtime harness that exercises the substrate primitives directly. Other applications -- long-running stateful workflows, customer-authored automation, durable memory for stateful long-lived processes, and other orthogonally-persistent-server use cases -- can build on the same kernel layer.
+The kernel layer is application-neutral. Long-running stateful workflows, customer-authored automation, durable memory for long-lived processes, agent-runtime harnesses, and other orthogonally-persistent-server use cases all build on the same substrate primitives.
 
 ## License
 
 `LICENSE.md` carries the full text. Files in this repository are released under either the Unlicense or BSD-2-Clause-Patent; `LICENSE.md` identifies which applies where.
 
 [DGD]: https://github.com/dworkin/dgd
-[eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext

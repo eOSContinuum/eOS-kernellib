@@ -4,7 +4,7 @@
 
 eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the [DGD] driver. It sits between DGD and an application, providing the substrate primitives the application uses to express its own logic.
 
-This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The architectural argument behind these choices -- why these primitives belong in the substrate rather than the application layer -- lives at [eOS-DeepContext]. The per-primitive foundation-and-proof statement lives in `doc/substrate-primitives.md`.
+This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The per-primitive foundation-and-proof statement lives in `doc/substrate-primitives.md`, which also names the substrate's commitment behind each primitive.
 
 ## Capability tiers
 
@@ -194,5 +194,4 @@ For non-HTTP applications, the patterns are covered in `doc/application-authorin
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
 
 [DGD]: https://github.com/dworkin/dgd
-[eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext

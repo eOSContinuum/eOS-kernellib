@@ -57,7 +57,7 @@ The verb categories below cover the shipped surface; each verb prints its own he
 | State management | `swapout`, `snapshot` |
 | Substrate lifecycle | `shutdown`, `reboot` |
 
-`code` is the LPC eval verb: it compiles its argument as an LPC expression in the operator's domain, evaluates it, and prints the result. The eos-harness `tests/admin-console-smoke.py` exercises a representative subset (`pwd`, `cd`, `ls`, `code`, `status`, `shutdown`) and verifies the cold-boot REPL is reachable end-to-end.
+`code` is the LPC eval verb: it compiles its argument as an LPC expression in the operator's domain, evaluates it, and prints the result. See `doc/admin-console.md` for per-verb mechanics, operational scenarios, and the underlying kfun dispatch for each verb.
 
 ## State persistence
 
@@ -120,7 +120,7 @@ Two substrate guarantees have unverified behavior under extension-loaded codepat
 - **Atomicity under extension-loaded JIT.** Does the platform's atomic-commit rollback fire when an extension-compiled native function errors mid-call? The atomicity primitive (`doc/substrate-primitives.md` §1) hinges on the runtime restoring in-memory state on error; if extension-compiled code skips the rollback path (for example by writing directly to dataspace memory without going through the atomic-transaction layer), the guarantee holds only without the extension loaded.
 - **Hot reload under extension-loaded compiled-code caches.** Does `compile_object(path, source)` interact correctly with an extension's per-program code cache? The hot-reload primitive (§4) requires that the next call after recompilation runs the new logic; if the extension's cache is keyed on something stale, recompiled code can be shadowed by previously-compiled native code.
 
-Both questions are scoped to the eos-harness MVA workstream's #AO-4 probe; once results land, this section will resolve to either "verified preserves" or "verified breaks" with a citation to the Empirical Observation node carrying the evidence.
+Both questions are open. Empirical verification requires running the substrate under each extension of interest and exercising the atomicity and hot-reload paths with the extension active. Once results land, this section will resolve to either "verified preserves" or "verified breaks" with a citation to the test result.
 
 ## Common failure modes
 

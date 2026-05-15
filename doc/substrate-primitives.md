@@ -4,9 +4,7 @@
 
 eOS-kernellib is the kernel layer for orthogonally-persistent servers. An orthogonally-persistent server treats in-memory state as the primary state of the system: objects survive restart without explicit serialization; operations commit wholly or roll back wholly; new code joins the running runtime under capability bounds. The substrate's properties are surfaced as eight named primitives that the application above consumes; this document is the per-primitive foundation-and-proof statement.
 
-The architectural argument for why these eight is the framing question lives in [eOS-DeepContext]. This document is not the argument; it is the foundation, the status, and the pending proofs, primitive by primitive.
-
-[eOS-DeepContext]: https://github.com/eOSContinuum/eOS-DeepContext
+The architectural commitment behind this list — why these eight are surfaced as substrate primitives rather than left for applications to rebuild — is that each is a runtime guarantee an orthogonally-persistent server cannot fake at the application layer. Atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. The remaining four (sandboxed code load, asynchronous events, multi-agent coherence, state introspection) layer on top of those four. Asking the application to provide them is asking it to reproduce the runtime in user space. eOS-kernellib's stance is that these properties are the substrate's responsibility; the sections below name the foundation, status, and pending proofs primitive by primitive.
 
 **Status legend.** Each primitive carries one of three statuses:
 
@@ -117,7 +115,7 @@ New code compiles into the runtime under capability bounds set at load time.
 
 **Extensions**:
 - LPC self-compiler at `/usr/LPC/` (as in §4): enables grammar-pass safety transforms — denylist host kfuns, refuse dangerous productions, rewrite decorated source into capability-bounded AST nodes — before handing the result to `compile_object`.
-- Decoration-and-compile sandbox pattern (port candidate, the canonical Meriadoc reference in `eOS-DeepContext/nodes/References/Meriadoc (ChatTheatre, 2026).md`): decorated host-language source compiles into pure host AST via a grammar pass; AST is denylisted of dangerous kfuns at the dispatch boundary; result runs at host-native speed inside the host's atomic envelope. The five-axis containment claim (language / location / invocation / capability / atomic rollback) is grounded in the source.
+- Decoration-and-compile sandbox pattern (port candidate, under research): decorated host-language source compiles into pure host AST via a grammar pass; the AST is denylisted of dangerous kfuns at the dispatch boundary; the result runs at host-native speed inside the host's atomic envelope. The pattern's distinctive claim is five-axis containment — language (source-grammar constrains what can be expressed), location (source compiles only where the dispatcher routes it), invocation (caller's tier bounds what callable code can do), capability (kfun denylist enforced by the AST pass), and atomic rollback (errors revert dataspace mutations). The reference implementation of this pattern lives in the Meriadoc subsystem of ChatTheatre's SkotOS deployment.
 - Property-graph substrate layer (must-build): the Meriadoc pattern requires a property system providing four capabilities:
   - Keyed property map per object.
   - Set-time hook firing an event on property write (so the compile-from-source step is triggered atomically with state change).
@@ -207,7 +205,7 @@ The following are not primitives; they are surfaces through which primitives man
 
 ### Transport tier
 
-- **HTTP/1 server library** at `/usr/HTTP/api/lib/Server1.c` + `/usr/HTTP/lib/Connection1.c` and supporting parsers. Application subclass pattern: inherit `Http1Server` and `/usr/System/lib/user`, override `receiveRequest`, and call inherited `expectEntity(length)` for body-bearing methods to opt into body receipt. Validated end-to-end via eos-harness HW-2 / HW-2b.
+- **HTTP/1 server library** at `/usr/HTTP/api/lib/Server1.c` + `/usr/HTTP/lib/Connection1.c` and supporting parsers. Application subclass pattern: inherit `Http1Server` and `/usr/System/lib/user`, override `receiveRequest`, and call inherited `expectEntity(length)` for body-bearing methods to opt into body receipt. The reference application at `examples/http-app/` exercises the pattern end-to-end (GET, POST with body, 404 fallback) against a running substrate.
 - **HTTP/1 TLS server and client** at `/usr/HTTP/api/lib/{TlsServer1, TlsClient1}.c` (extends `BufferedConnection1`). Compiled at boot; depends on the TLS 1.3 stack (gated on the host being built with `KF_SECURE_RANDOM`). No application subclass currently exists.
 - **WebSocket framing** in `/usr/HTTP/lib/Connection1.c`: `expectWsFrame`, `receiveWsFrame`, `receiveWsChunk`, `sendWsChunk`, frame masking. Same opt-in subclass-callback pattern as `expectEntity`. No HTTP-to-WebSocket upgrade application currently exists.
 - **TLS 1.3 stack** at `/usr/TLS/`: record layer, handshake, all extensions. Entire `TLS/initd::create()` body is gated on `# ifdef KF_SECURE_RANDOM`. The HTTP TLS variants are the only declared consumers.
