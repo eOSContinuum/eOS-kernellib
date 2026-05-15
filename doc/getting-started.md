@@ -37,7 +37,7 @@ The repository contains LPC source under `src/`. DGD compiles LPC at runtime; th
 
 Edit `example.dgd` to set `directory` to the absolute path of `eOS-kernellib/src/`:
 
-```
+```text
 directory       = "/absolute/path/to/eOS-kernellib/src";
 ```
 
@@ -55,8 +55,8 @@ Run the driver against the configuration:
 
 The driver compiles the kernel objects and binds two ports:
 
-- `8023` -- telnet port for administrative access
-- `8080` -- HTTP/1 port
+- `8023` — telnet port for administrative access
+- `8080` — HTTP/1 port
 
 ## Connect
 

@@ -41,8 +41,8 @@ LPC.md §3.4.2 lists eight types:
 
 Two composite shapes are not in the type list but are first-class:
 
-- **Arrays** -- written `({ a, b, c })`. Heterogeneous (an array can hold mixed types). `arr[0]` indexes; `arr[1..3]` slices.
-- **Lightweight objects (LWOs)** -- value-shaped objects that travel inside another object's dataspace rather than living independently. Cloned with `new` (different from `clone_object()`); the lifetime is tied to the containing object's reference.
+- **Arrays** — written `({ a, b, c })`. Heterogeneous (an array can hold mixed types). `arr[0]` indexes; `arr[1..3]` slices.
+- **Lightweight objects (LWOs)** — value-shaped objects that travel inside another object's dataspace rather than living independently. Cloned with `new` (different from `clone_object()`); the lifetime is tied to the containing object's reference.
 
 `int` and `float` arithmetic does not auto-coerce; `1 + 1.0` is a type error. Use `(float) 1` or `(int) 1.0` to convert explicitly.
 
@@ -84,7 +84,7 @@ parent::foo();      /* inherited (named): foo from inherit named "parent" */
 
 Cross-object calls (`->`) go through the host runtime's kfun layer and are subject to per-tier access checks. The inherited call operators (`::` and `name::`) are language constructs and dispatch directly into the inherited program.
 
-Some functions are not defined in any LPC source -- they are *kfuns*, provided by the host driver. From the calling site, kfuns look identical to local functions: `compile_object("/usr/MyApp/obj/widget")` is a kfun call, but the syntax does not say so. The catalog lives in [dworkin/lpc-doc/kfun/]. Note that kfuns split into two surfaces: the small minimalist core the host driver ships, and the optional extension modules a deployment may load (covered in `doc/architecture.md` "Host-driver extensions" and `doc/operations.md` "Loading host-driver extensions").
+Some functions are not defined in any LPC source — they are *kfuns*, provided by the host driver. From the calling site, kfuns look identical to local functions: `compile_object("/usr/MyApp/obj/widget")` is a kfun call, but the syntax does not say so. The catalog lives in [dworkin/lpc-doc/kfun/]. Note that kfuns split into two surfaces: the small minimalist core the host driver ships, and the optional extension modules a deployment may load (covered in `doc/architecture.md` "Host-driver extensions" and `doc/operations.md` "Loading host-driver extensions").
 
 ## Inheritance
 
@@ -103,9 +103,9 @@ The `private` keyword may prefix `inherit` to restrict the inherited members to 
 
 ## Lifecycle: create()
 
-LPC.md does not have a dedicated lifecycle section; `create()` is shown as an example function. The host driver invokes a configured "create" hook on every object's first function call -- the hook name comes from the `.dgd` config's `create` field. eOS-kernellib's setting is:
+LPC.md does not have a dedicated lifecycle section; `create()` is shown as an example function. The host driver invokes a configured "create" hook on every object's first function call — the hook name comes from the `.dgd` config's `create` field. eOS-kernellib's setting is:
 
-```
+```text
 create = "_F_create";
 ```
 
@@ -121,7 +121,7 @@ static void create()
 }
 ```
 
-Calling `::create()` chains into the parent's create. The `static` keyword keeps `create` callable only from this object and its children -- a convention that prevents external callers from re-running the constructor.
+Calling `::create()` chains into the parent's create. The `static` keyword keeps `create` callable only from this object and its children — a convention that prevents external callers from re-running the constructor.
 
 For deeper substrate dispatch (how the kernel auto handles master vs clone, how owner identity is set, how the clone registry is maintained), see `doc/architecture.md` "Auto-inheritance pattern."
 
@@ -157,11 +157,11 @@ Returns a handle. Schedules `func` to be called on `this_object()` after `delay`
 
 Common shapes:
 
-- `call_out("retry", 5, params)` -- retry a failing operation after a delay
-- `call_out("flush", 0)` -- defer work to after the current call returns; the caller commits a consistent state before the deferred work runs
-- `call_out("tick", 1)` -- schedule recurring work; the called function re-arms the call_out before returning
+- `call_out("retry", 5, params)` — retry a failing operation after a delay
+- `call_out("flush", 0)` — defer work to after the current call returns; the caller commits a consistent state before the deferred work runs
+- `call_out("tick", 1)` — schedule recurring work; the called function re-arms the call_out before returning
 
-A call_out fired from inside an `atomic` function does not extend the caller's atomic context -- the deferred call is its own transaction, runs after the caller commits. This is the substrate's only mechanism for async work and the only way to escape a single atomic context's tick budget.
+A call_out fired from inside an `atomic` function does not extend the caller's atomic context — the deferred call is its own transaction, runs after the caller commits. This is the substrate's only mechanism for async work and the only way to escape a single atomic context's tick budget.
 
 ## Error handling
 
@@ -205,12 +205,12 @@ Calling `query()` returns the current counter. Calling `increment_with_failure()
 
 ## Where to next
 
-- **[LPC.md]** -- the formal language spec, pinned by DGD at commit `403cd0b`. §3.1 lexical elements, §3.2 expressions, §3.4 declarations and types, §3.5 statements, §3.6 inheritance, §3.7 preprocessing.
-- **[dworkin/lpc-doc/kfun/]** -- the kfun catalog. Every host-provided function the language calls.
-- **`doc/architecture.md`** -- the substrate's tier model, daemons, the auto-inheritance chain, the host-driver extension surface.
-- **`doc/application-authoring.md`** -- what writing a tier-E application on top of this substrate looks like: domain layout, initd, owner / access, the object-manager lifecycle, `call_touch` upgrade.
-- **`doc/kernel-libraries.md`** -- the inheritable libraries shipped under `src/lib/` (String, StringBuffer, KVstore, Iterator, Continuation variants, Time).
-- **`doc/substrate-primitives.md`** -- per-primitive foundation-and-status statement (atomicity, persistent state, hot reload, capability separation, etc.).
+- **[LPC.md]** — the formal language spec, pinned by DGD at commit `403cd0b`. §3.1 lexical elements, §3.2 expressions, §3.4 declarations and types, §3.5 statements, §3.6 inheritance, §3.7 preprocessing.
+- **[dworkin/lpc-doc/kfun/]** — the kfun catalog. Every host-provided function the language calls.
+- **`doc/architecture.md`** — the substrate's tier model, daemons, the auto-inheritance chain, the host-driver extension surface.
+- **`doc/application-authoring.md`** — what writing a tier-E application on top of this substrate looks like: domain layout, initd, owner / access, the object-manager lifecycle, `call_touch` upgrade.
+- **`doc/kernel-libraries.md`** — the inheritable libraries shipped under `src/lib/` (String, StringBuffer, KVstore, Iterator, Continuation variants, Time).
+- **`doc/substrate-primitives.md`** — per-primitive foundation-and-status statement (atomicity, persistent state, hot reload, capability separation, etc.).
 
 [DGD]: https://github.com/dworkin/dgd
 [dworkin/lpc-doc]: https://github.com/dworkin/lpc-doc

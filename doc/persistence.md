@@ -76,7 +76,7 @@ Hot boot is the substrate's mechanism for upgrading the host binary or `.dgd` co
 
 Prerequisites: the `.dgd` configuration carries a `hotboot` tuple naming the new binary, the new config, and the snapshot paths:
 
-```
+```text
 hotboot = ({ "/path/to/new/dgd", "/path/to/new/config.dgd", "/path/to/dump_file", "/path/to/dump_file.old" });
 ```
 

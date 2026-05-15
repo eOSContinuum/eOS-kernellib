@@ -10,14 +10,14 @@ For the LPC language constructs these transitions invoke (`inherit`, `create()`,
 
 A piece of LPC source moves through these states in the substrate:
 
-```
+```text
    (source on disk)
         |
         | compile_object(path)
         v
      master  -----------------------+
         |                           | (recompile)
-        | clone_object(master)      | compile_object(path)  -- same path
+        | clone_object(master)      | compile_object(path)  — same path
         v                           v
       clone                      master'  (same path, new program)
         |

@@ -58,8 +58,8 @@ The swap file is recreated on each boot. The snapshot file persists across boots
 
 ## Where to next
 
-- `doc/getting-started.md` -- run the example configuration once the driver is built.
-- `doc/operations.md` -- the `.dgd` configuration field reference, boot modes, and operator surface.
-- `doc/architecture.md` -- the substrate's tier model and where the build fits.
+- `doc/getting-started.md` — run the example configuration once the driver is built.
+- `doc/operations.md` — the `.dgd` configuration field reference, boot modes, and operator surface.
+- `doc/architecture.md` — the substrate's tier model and where the build fits.
 
 [DGD]: https://github.com/dworkin/dgd

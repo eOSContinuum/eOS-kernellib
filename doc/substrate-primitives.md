@@ -241,8 +241,8 @@ The structural model of the host-driver extension surface — dlopen-loaded modu
 
 ## Where to next
 
-- `doc/architecture.md` -- the substrate's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
-- `doc/persistence.md` -- the full orthogonal-persistence story behind §3 (statedump cycle, hot boot, save_object semantics, persistence boundaries).
-- `doc/code-lifecycle.md` -- the full compile / clone / destruct / touch story behind §4 and §5 (object-manager events, library upgrade cascade, `_F_touch` hook).
-- `doc/operations.md` Open empirical questions -- the deployment-time interpretation of the Open entries on §1 and §4.
-- `doc/application-authoring.md` -- how a tier-E application consumes the primitives.
+- `doc/architecture.md` — the substrate's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
+- `doc/persistence.md` — the full orthogonal-persistence story behind §3 (statedump cycle, hot boot, save_object semantics, persistence boundaries).
+- `doc/code-lifecycle.md` — the full compile / clone / destruct / touch story behind §4 and §5 (object-manager events, library upgrade cascade, `_F_touch` hook).
+- `doc/operations.md` Open empirical questions — the deployment-time interpretation of the Open entries on §1 and §4.
+- `doc/application-authoring.md` — how a tier-E application consumes the primitives.

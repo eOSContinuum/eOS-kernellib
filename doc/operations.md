@@ -4,7 +4,7 @@
 
 This document covers running an eOS-kernellib substrate: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`doc/architecture.md`) covers the substrate's structural model; this document covers the operator's surface for keeping it running.
 
-Audience: someone running the substrate -- responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/application-authoring.md` and `doc/http-applications.md`.
+Audience: someone running the substrate — responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/application-authoring.md` and `doc/http-applications.md`.
 
 ## The .dgd configuration file
 
@@ -63,9 +63,9 @@ The verb categories below cover the shipped surface; each verb prints its own he
 
 The substrate has three kfuns that operate on persistent state:
 
-- `swapout()` -- swap all in-memory objects to the swap file. Frees memory at the cost of paging on next access.
-- `dump_state(int incr)` -- write a snapshot to `dump_file`. With argument `0` (or no argument), writes a full snapshot. With non-zero argument, writes an incremental snapshot.
-- `shutdown(int hotboot)` -- shut down the substrate. The kfun does not snapshot before exiting; whether the next boot has a snapshot to restore from depends on whether one was taken (by automatic `dump_interval`, by the `snapshot` verb, or by an explicit `dump_state` call). With non-zero argument and a `hotboot` tuple in the `.dgd` config, performs a hot boot via `execv` instead of exiting; if the `hotboot` tuple is absent, the kfun raises "Hotbooting is disabled".
+- `swapout()` — swap all in-memory objects to the swap file. Frees memory at the cost of paging on next access.
+- `dump_state(int incr)` — write a snapshot to `dump_file`. With argument `0` (or no argument), writes a full snapshot. With non-zero argument, writes an incremental snapshot.
+- `shutdown(int hotboot)` — shut down the substrate. The kfun does not snapshot before exiting; whether the next boot has a snapshot to restore from depends on whether one was taken (by automatic `dump_interval`, by the `snapshot` verb, or by an explicit `dump_state` call). With non-zero argument and a `hotboot` tuple in the `.dgd` config, performs a hot boot via `execv` instead of exiting; if the `hotboot` tuple is absent, the kfun raises "Hotbooting is disabled".
 
 The admin_console wraps these: `swapout` calls `swapout()`, `snapshot` calls `dump_state(0)`, `shutdown` calls `shutdown()` (cold shutdown without snapshot), `reboot` calls `dump_state(1)` then `shutdown()` (incremental snapshot then cold shutdown). For a clean shutdown that leaves a current restore point, run `snapshot` then `shutdown`, or use `reboot`.
 
@@ -77,7 +77,7 @@ A snapshot captures the persistent object graph: every object's variables, every
 
 The driver provides a `message(string)` function that timestamps and emits diagnostic output:
 
-```
+```c
 ctime(time())[4..18] + " ** " + str
 ```
 
@@ -103,7 +103,7 @@ Per-owner limits are managed by the resource daemon at `/kernel/sys/resource_dae
 
 The substrate loads no extensions by default. Optional extensions are loaded via the `.dgd` file's `modules` mapping:
 
-```
+```text
 modules = ([ "/path/to/some-extension.1.5" : "module config" ]);
 ```
 
@@ -136,9 +136,9 @@ Both questions are open. Empirical verification requires running the substrate u
 
 ## Where to next
 
-- **`doc/architecture.md`** -- substrate tier model, daemons, boot sequence in detail.
-- **`doc/substrate-primitives.md`** -- the substrate's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
-- **`doc/application-authoring.md`** -- writing a tier-E application on top of this substrate.
-- **DGD upstream reference** at <https://github.com/dworkin/dgd> -- full kfun reference, `.dgd` field reference, host-binary build instructions.
+- **`doc/architecture.md`** — substrate tier model, daemons, boot sequence in detail.
+- **`doc/substrate-primitives.md`** — the substrate's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
+- **`doc/application-authoring.md`** — writing a tier-E application on top of this substrate.
+- **DGD upstream reference** at <https://github.com/dworkin/dgd> — full kfun reference, `.dgd` field reference, host-binary build instructions.
 
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext
