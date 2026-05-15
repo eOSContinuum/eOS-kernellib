@@ -34,6 +34,21 @@ eOS-kernellib sits between the [DGD] driver and the application built on top:
 
 The kernel layer is application-neutral. Long-running stateful workflows, customer-authored automation, durable memory for long-lived processes, agent-runtime harnesses, and other orthogonally-persistent-server use cases all build on the same substrate primitives.
 
+## Heritage
+
+eOS-kernellib descends from a multi-decade lineage of orthogonal-persistence runtime work:
+
+- **[DGD]** (Felix Croes, 1993-present) -- the LPC runtime this kernel layer runs on. Its original use case was the LPMud lineage of multi-user text environments; the atomicity, persistence, and hot-reload primitives the substrate surfaces are the same ones that supported those environments at production scale.
+- **Kernellib** (Felix Croes; declared public domain in 2016. The [ChatTheatre/kernellib] fork is released under CC0 1.0 with further public-domain declarations from Skotos Tech, Dyvers Hands, Christopher Allen, and Noah Gibbs) -- the architectural ancestor of this repository. Established the tier discipline (kernel / system / user), the auto-inheritance pattern, and the per-owner resource model.
+- **[SkotOS]** (Skotos Tech, 1999-2018; now owned in full by Christopher Allen) -- a long-running production deployment of the kernellib pattern. Demonstrates the substrate at multi-decade scale and contributes structural patterns (object Vault, signal-based events, four-phase event dispatch, the wiztool operator surface) that inform substrate-layer extensions under consideration here.
+
+Earlier work in the systems literature grounds the architectural property the substrate provides. Atkinson and Morrison's *Orthogonally Persistent Object Systems* (VLDB Journal 4, 1995) names the property explicitly; the KeyKOS and EROS capability-systems literature names the runtime-enforced-capability model.
+
+The substrate's text-MUD heritage shows in some implementation details -- the connection-handling vocabulary, the `people` admin_console verb, the wiztool patterns inherited from SkotOS. The runtime primitives themselves are application-neutral. Online text environments are one historical use case; the substrate suits any application class that values orthogonal persistence and runtime-enforced capabilities.
+
+[ChatTheatre/kernellib]: https://github.com/ChatTheatre/kernellib
+[SkotOS]: https://github.com/ChatTheatre/SkotOS
+
 ## License
 
 `LICENSE.md` carries the full text. Files in this repository are released under either the Unlicense or BSD-2-Clause-Patent; `LICENSE.md` identifies which applies where.
