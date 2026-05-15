@@ -2,9 +2,11 @@
 
 # Writing HTTP/1 applications
 
-This document walks through writing an HTTP/1 application that runs on top of eOS-kernellib. The kernel layer binds the HTTP/1 substrate to the binary port and hands incoming connections to an application-supplied server object; this guide shows what that server object looks like, what it must inherit, and how it routes requests.
+An HTTP/1 application on eOS-kernellib supplies a clonable server object at `/usr/WWW/obj/server`; the kernel layer's HTTP/1 substrate binds the binary port and clones that object for every incoming connection. The sections below show what the server object looks like, what it must inherit, how it routes requests, and how an application supports multiple logical apps behind one HTTP/1 port.
 
-`doc/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/substrate-primitives.md` covers the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+**Audience**: an application author building an HTTP/1 service on eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the substrate running locally per `doc/getting-started.md`.
+
+`doc/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/application-authoring.md` covers the general tier-E patterns for non-HTTP transports. `doc/substrate-primitives.md` covers the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 
 ## The mount point
 
@@ -219,10 +221,11 @@ static void registerWithWWW()
 
 The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where alphabetical compilation order would otherwise leave a dependency unsatisfied.
 
-## Next steps
+## Where to next
 
 - `doc/getting-started.md` -- install DGD, run the example configuration.
 - `doc/architecture.md` -- capability tiers, daemons, kernel-layer libraries.
+- `doc/application-authoring.md` -- general tier-E patterns for non-HTTP transports.
 - `doc/substrate-primitives.md` -- the substrate properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 - `examples/http-app/` -- runnable reference application.
 - `src/usr/System/sys/http_server.c` -- the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the substrate-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).

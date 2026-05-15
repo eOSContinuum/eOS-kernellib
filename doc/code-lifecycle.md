@@ -2,7 +2,7 @@
 
 # Code Lifecycle
 
-This document covers the lifecycle of LPC code in the substrate: how source becomes a master, how a master spawns clones, how `create()` runs, how recompilation replaces a running master in place, how `call_touch` schedules lazy upgrades, and how the object-manager event surface lets the substrate observe each of these transitions.
+LPC code in the substrate moves through these states: source becomes a master, a master spawns clones, `create()` runs, recompilation replaces a running master in place, `call_touch` schedules lazy upgrades, and `destruct_object` removes objects from the runtime. The object-manager event surface lets the substrate observe each transition. The sections below cover each in turn.
 
 For the LPC language constructs these transitions invoke (`inherit`, `create()`, `static`, `nomask`), see `doc/lpc-essentials.md`. For the per-primitive substrate guarantees that bound these transitions (atomicity, hot reload, capability separation), see `doc/substrate-primitives.md`. For the operator surface that drives lifecycle transitions interactively, see `doc/admin-console.md`.
 
@@ -40,7 +40,7 @@ Compilation runs in atomic context. If the source has a syntax error or fails ty
 
 After successful compile, the master sits idle. Its `create()` does not run until the first function call against the master. The object manager (see below) receives a `compile` event with the master object and the inherited paths; this is the substrate's hook for tracking the dependency graph.
 
-## _F_create dispatch
+## _F_create: the create-hook dispatch
 
 The host driver invokes a configured "create" hook on every object's **first function call**. The `.dgd` configuration's `create` line names the hook; eOS-kernellib uses `_F_create`. The kernel auto at `src/kernel/lib/auto.c` implements it:
 
@@ -107,7 +107,7 @@ Key guarantees and limits:
 | In-flight calls on the **old** master | Finish on the old program. The dispatch was bound at call-start; the recompile does not interrupt them. |
 | **Next** call after recompile | Dispatches to the new program. |
 | Clones of the recompiled master | Their **code** is now the new master's. Their **dataspace** is unchanged (the clone-side variables retain their values). |
-| Inheriting children | Their code is NOT automatically recompiled. See Library recompilation below. |
+| Inheriting children | Their code is NOT automatically recompiled. See Library upgrade below. |
 | Atomic context of the recompile | If the recompile errors (syntax, type-check), the old master remains; the substrate rolls back as for any failed atomic operation. |
 
 The object manager receives a `compile` event (or `compile_lib` for libraries) with the inherited path list, allowing it to track the dependency graph for downstream cascade decisions.
@@ -145,7 +145,7 @@ The trade-off: long-idle objects can accumulate multiple pending upgrades. If th
 
 **Terminology note**: SkotOS-derived deployments often call the application hook `patch()` rather than `_F_touch()`. The substrate dispatch is the same; the name is convention. Operators arriving from a SkotOS background should expect the eOS-kernellib codebase to use `_F_touch()`.
 
-## Library recompilation and dependent cascade
+## Library upgrade: recompile cascade through dependents
 
 The substrate ships no automatic recompile-with-dependents mechanism. When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`.
 

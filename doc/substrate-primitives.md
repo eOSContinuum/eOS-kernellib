@@ -6,9 +6,11 @@ eOS-kernellib is the kernel layer for orthogonally-persistent servers. An orthog
 
 The architectural commitment behind this list — why these eight are surfaced as substrate primitives rather than left for applications to rebuild — is that each is a runtime guarantee an orthogonally-persistent server cannot fake at the application layer. Atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. The remaining four (sandboxed code load, asynchronous events, multi-agent coherence, state introspection) layer on top of those four. Asking the application to provide them is asking it to reproduce the runtime in user space. eOS-kernellib's stance is that these properties are the substrate's responsibility; the sections below name the foundation, status, and pending proofs primitive by primitive.
 
-**Status legend.** Each primitive carries one of three statuses:
+**Section template.** Each primitive section below follows the same structure: a one-sentence claim opener, then **Foundation** (the substrate mechanism that provides the property), **Demonstration** (evidence the property works in practice), **Status** (Validated / Partial / Foundation-only), **Extensions** (additional support shipped or proposed), and **Open** (unresolved questions). The bold prose-headers act as in-section anchors when reading or scanning.
 
-- **Validated** — foundation present in the substrate, demonstrated empirically by an Observation citation.
+**Status legend.** Each primitive's Status carries one of three values:
+
+- **Validated** — foundation present in the substrate, demonstrated empirically by a cited test or observation.
 - **Partial** — foundation present, demonstration partial. Some surface of the primitive is observed; complete demonstration is not yet authored.
 - **Foundation-only** — substrate mechanism is present, but no empirical demonstration of the primitive exists yet.
 
@@ -236,3 +238,11 @@ Two implications worth restating at this scope:
 The structural model of the host-driver extension surface — dlopen-loaded modules registered in the `.dgd` configuration's `modules =` mapping, the 256-kfun cap that drives extension minimalism, the statedump-binding constraint — is documented in `doc/architecture.md` Host-driver extensions, with deployment-time mechanics in `doc/operations.md` Loading host-driver extensions. The substrate-level point relevant to this document is narrower:
 
 **eOS-kernellib's substrate requires no extension and loads none.** Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity ("Behavior under host-driver extensions that compile LPC bytecode to native code") and §4 Hot reload ("Interaction with host-driver extensions that maintain a compiled-code cache") name what happens when a deployment chooses to load an extension whose codepaths interact with those primitives. In both cases the substrate's contract becomes empirically unverified, not violated; operators loading such an extension should measure against their workload before relying on the corresponding primitive in production.
+
+## Where to next
+
+- `doc/architecture.md` -- the substrate's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
+- `doc/persistence.md` -- the full orthogonal-persistence story behind §3 (statedump cycle, hot boot, save_object semantics, persistence boundaries).
+- `doc/code-lifecycle.md` -- the full compile / clone / destruct / touch story behind §4 and §5 (object-manager events, library upgrade cascade, `_F_touch` hook).
+- `doc/operations.md` Open empirical questions -- the deployment-time interpretation of the Open entries on §1 and §4.
+- `doc/application-authoring.md` -- how a tier-E application consumes the primitives.

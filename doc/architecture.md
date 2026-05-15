@@ -191,6 +191,14 @@ For HTTP-based applications, the kernel's HTTP/1 server is already bound on the 
 
 For non-HTTP applications, the patterns are covered in `doc/application-authoring.md`. The LPC language itself is covered in `doc/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` -- string buffers, persistent collections, iterators, async continuations, time -- are catalogued in `doc/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `doc/operations.md`.
 
+## Where to next
+
+- `doc/substrate-primitives.md` -- per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
+- `doc/persistence.md` -- the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
+- `doc/code-lifecycle.md` -- compile, clone, destruct, recompile, and the object-manager event surface in detail.
+- `doc/operations.md` -- the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
+- `doc/application-authoring.md` -- writing tier-E applications on top of this architecture.
+
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
 
 [DGD]: https://github.com/dworkin/dgd

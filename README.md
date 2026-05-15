@@ -25,9 +25,13 @@ DGD has carried these properties since 2000; Christopher Allen's [contemporary M
 
 Treating these eight as substrate primitives is the architectural commitment of eOS-kernellib: each one is a runtime guarantee the application inherits rather than a pattern the application reimplements. An orthogonally-persistent server cannot fake them at the application layer — atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. Asking the application to provide them is asking it to reproduce the runtime in user space.
 
-## Getting started
+## Documentation
 
-`doc/getting-started.md` covers installing DGD, fetching this repository, building, and running a minimal configuration. `doc/building.md` is the deeper build reference.
+- **Setup** -- `doc/getting-started.md` (first-time setup, install DGD, run the example configuration), `doc/building.md` (DGD build details, platform-specific notes)
+- **Substrate model** -- `doc/architecture.md` (capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions), `doc/substrate-primitives.md` (the eight runtime primitives with per-primitive foundation and status), `doc/persistence.md` (orthogonal persistence, statedump cycle, hot boot), `doc/code-lifecycle.md` (compile / clone / destruct / call_touch / object-manager events)
+- **Writing applications** -- `doc/lpc-essentials.md` (LPC language orientation, bridges to the formal spec), `doc/kernel-libraries.md` (the inheritable libraries under `src/lib/`), `doc/application-authoring.md` (general tier-E application patterns, non-HTTP transports), `doc/http-applications.md` (HTTP/1-specific patterns)
+- **Operations** -- `doc/operations.md` (`.dgd` configuration, boot modes, state persistence, logging, resource limits, extension loading), `doc/admin-console.md` (operator console: connecting, security posture, per-task operational reference, verb appendix)
+- **Working example** -- `examples/http-app/` (minimal HTTP/1 application with GET /health, POST /echo, 404 fallback)
 
 ## How it composes
 

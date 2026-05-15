@@ -2,9 +2,11 @@
 
 # Application Authoring
 
-This document walks through writing a tier-E application on top of eOS-kernellib. The architecture document (`doc/architecture.md`) covers the substrate's tier model, daemons, and inheritance chain; this document covers what an application built on top of that substrate looks like.
+A tier-E application on eOS-kernellib lives in a single directory under `src/usr/`, declares its bootstrap in an `initd.c`, and inherits the substrate's System auto to gain owner identity and cross-tier API access. The patterns below apply regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
 
-The canonical HTTP/1 application pattern is covered separately in `doc/http-applications.md` with a runnable reference at `examples/http-app/`. This document covers the patterns that apply to applications regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
+**Audience**: an LPC author writing a tier-E application on top of eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the substrate running locally per `doc/getting-started.md`.
+
+The architecture document (`doc/architecture.md`) covers the substrate's tier model, daemons, and inheritance chain. The HTTP/1-specific application pattern is covered separately in `doc/http-applications.md` with a runnable reference at `examples/http-app/`.
 
 ## Domain layout
 

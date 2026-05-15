@@ -4,6 +4,8 @@
 
 This guide installs the [DGD] driver, fetches this repository, and runs an eOS-kernellib server with the bundled example configuration.
 
+**Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the substrate.
+
 ## Prerequisites
 
 A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`.
@@ -66,10 +68,11 @@ telnet localhost 8023
 
 The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an application mounted on top, the server returns errors for routes it does not handle.
 
-## Next steps
+## Where to next
 
-- `doc/architecture.md` covers the architecture; `doc/substrate-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `doc/architecture.md` covers the substrate's tier model, daemons, boot sequence; `doc/substrate-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `doc/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
+- `doc/application-authoring.md` covers writing a tier-E application on top of the substrate; `doc/http-applications.md` covers HTTP/1 specifically; `examples/http-app/` is a runnable reference.
 - `doc/building.md` covers DGD build details and platform-specific notes.
-- Build your own application on top by adding a user-layer domain under `src/usr/`.
 
 [DGD]: https://github.com/dworkin/dgd

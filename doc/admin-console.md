@@ -4,6 +4,8 @@
 
 The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the substrate's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `doc/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
 
+**Audience**: an operator with admin-console access to a running substrate; needs to introspect state, hot-fix code, manage permissions, snapshot, or shut down.
+
 The console is implemented in two files:
 
 - `src/kernel/lib/admin_console.c` — the library (~2,300 lines of LPC). Defines every verb, the parser, the history table, the dispatch.

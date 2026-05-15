@@ -2,7 +2,9 @@
 
 # Building
 
-eOS-kernellib has no build step of its own. The kernel layer is LPC source that DGD compiles at runtime. The build work in this guide is for the [DGD] driver, which is a build-time dependency.
+Building eOS-kernellib means building DGD; the kernel layer is LPC source that DGD compiles at runtime. The build work in this guide is for the [DGD] driver, which is a build-time dependency.
+
+**Audience**: a developer building DGD as a dependency of eOS-kernellib; comfortable with a C toolchain (`cc`, `make`, `bison` or `yacc`).
 
 ## DGD
 
@@ -53,5 +55,11 @@ mkdir -p state
 ```
 
 The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph at the last `dump_interval` checkpoint.
+
+## Where to next
+
+- `doc/getting-started.md` -- run the example configuration once the driver is built.
+- `doc/operations.md` -- the `.dgd` configuration field reference, boot modes, and operator surface.
+- `doc/architecture.md` -- the substrate's tier model and where the build fits.
 
 [DGD]: https://github.com/dworkin/dgd
