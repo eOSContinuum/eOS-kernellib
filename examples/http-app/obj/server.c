@@ -1,5 +1,3 @@
-/* SPDX-License-Identifier: BSD-2-Clause-Patent */
-
 /*
  * Reference HTTP/1 application server for eOS-kernellib.
  *

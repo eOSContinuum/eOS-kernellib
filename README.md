@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # eOS-kernellib
 
 **Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated through the BD-1 through HW-3 work captured in `doc/getting-started.md` and verified as of 2026-05-15.
@@ -50,13 +48,15 @@ The kernel layer is application-neutral. Long-running stateful workflows, custom
 
 ## Heritage
 
-eOS-kernellib descends from a multi-decade lineage of orthogonal-persistence runtime work:
+eOS-kernellib descends from a multi-decade lineage of orthogonal-persistence runtime work. The credits below are the project's canonical attribution; see `LICENSE.md` for the legal license posture.
 
-- **[DGD]** (Felix Croes, 1993-present) — the LPC runtime this kernel layer runs on. Its original use case was the LPMud lineage of multi-user text environments; the atomicity, persistence, and hot-reload primitives the platform surfaces are the same ones that supported those environments at production scale.
-- **Kernellib** (Felix Croes; declared public domain in 2016. The [ChatTheatre/kernellib] fork is released under CC0 1.0 with further public-domain declarations from Skotos Tech, Dyvers Hands, Christopher Allen, and Noah Gibbs) — the architectural ancestor of this repository. Established the tier discipline (kernel / system / user), the auto-inheritance pattern, and the per-owner resource model.
-- **[SkotOS]** (Skotos Tech, 1999-2018; now owned in full by Christopher Allen) — a long-running production deployment of the kernellib pattern. Demonstrates the platform at multi-decade scale and contributes structural patterns (object Vault, signal-based events, four-phase event dispatch, the wiztool operator surface) that inform platform-layer extensions under consideration here.
+**Built on**: [DGD] (Felix Croes, 1993-present), the LPC runtime this kernel layer runs on. AGPL-3.0 as a runtime dependency; eos-kernellib builds *on* DGD without modifying its source.
 
-Earlier work in the systems literature grounds the architectural property the platform provides. Atkinson and Morrison's *Orthogonally Persistent Object Systems* (VLDB Journal 4, 1995) names the property explicitly; the KeyKOS and EROS capability-systems literature names the runtime-enforced-capability model.
+**Forked from**: [ChatTheatre/kernellib] (CC0 public domain, with further public-domain declarations from Skotos Tech, Dyvers Hands, Christopher Allen, and Noah Gibbs), which descends from Felix Croes' kernellib (declared public domain in 2016). The kernellib lineage established the tier discipline (kernel / system / user), the auto-inheritance pattern, and the per-owner resource model the platform's capability machinery rests on.
+
+**Inspired by**: [SkotOS] (Skotos Tech, 1999-2018; now owned in full by Christopher Allen), the largest application built on this lineage and a long-running production deployment of the kernellib pattern. Pattern-level reference for application authoring on top of a kernellib-derived kernel; not a foundation. Structural patterns (object Vault, signal-based events, four-phase event dispatch, the wiztool operator surface) inform platform-layer extensions under consideration here.
+
+**Grounded in**: the orthogonal-persistence research canon. Atkinson and Morrison's *Orthogonally Persistent Object Systems* (VLDB Journal 4, 1995) names the architectural property explicitly; the KeyKOS and EROS capability-systems literature names the runtime-enforced-capability model. Christopher Allen's 2000 MUD-Dev description of DGD names the same properties in operational vocabulary. See [doc/references.md](doc/references.md) for citation detail.
 
 The platform's text-MUD heritage shows in some implementation details — the connection-handling vocabulary, the `people` admin_console verb, the wiztool patterns inherited from SkotOS. The runtime primitives themselves are application-neutral. Online text environments are one historical use case; the platform suits any application class that values orthogonal persistence and runtime-enforced capabilities.
 
@@ -69,6 +69,6 @@ Contributions are welcome. A formal `CONTRIBUTING.md` is in progress; until it l
 
 ## License
 
-`LICENSE.md` carries the full text. Files in this repository are released under either the Unlicense or BSD-2-Clause-Patent; `LICENSE.md` identifies which applies where.
+eOS-kernellib is released under the BSD 2-Clause Plus Patent License. See [LICENSE.md](LICENSE.md) for the full text. Code inherited from public-domain ancestors is incorporated under those original dedications and acknowledged in the Heritage section above; the repository as a whole is governed by the BSD 2-Clause Plus Patent License.
 
 [DGD]: https://github.com/dworkin/dgd

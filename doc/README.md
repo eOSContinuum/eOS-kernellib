@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # eOS-kernellib documentation
 
 This directory contains the reference documentation for eOS-kernellib — the kernel layer for orthogonally-persistent servers built on the [DGD] driver. The root `README.md` introduces the project and what the runtime platform provides; the docs here cover the platform's model, operator surface, and application-authoring patterns in depth.

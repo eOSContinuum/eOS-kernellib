@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Architecture
 
 eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the [DGD] driver. It sits between DGD and an application, providing the runtime primitives the application uses to express its own logic.

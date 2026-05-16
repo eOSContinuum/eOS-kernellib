@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Getting Started
 
 This guide installs the [DGD] driver, fetches this repository, and runs an eOS-kernellib server with the bundled example configuration.

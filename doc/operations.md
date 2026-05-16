@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Operations
 
 This document covers running an eOS-kernellib instance: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`doc/architecture.md`) covers the platform's structural model; this document covers the operator's surface for keeping it running.

@@ -1,5 +1,3 @@
-/* SPDX-License-Identifier: BSD-2-Clause-Patent */
-
 # include <kernel/kernel.h>
 # include <kernel/user.h>
 # include <status.h>

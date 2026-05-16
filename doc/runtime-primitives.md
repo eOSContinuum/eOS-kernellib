@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Runtime Primitives
 
 eOS-kernellib's runtime platform exposes eight primitives the application above consumes directly: atomicity, capability separation, persistent state, hot reload, sandboxed code load, asynchronous events, multi-agent coherence, and state introspection. This document is the per-primitive foundation-and-proof statement: for each primitive, the platform mechanism behind it, the demonstration it works in practice, the current status, the supporting extensions, and the open work.

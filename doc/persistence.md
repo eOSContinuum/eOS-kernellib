@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Persistence
 
 The platform's signature property: in-memory state is the primary state of the system. Objects, their variables, their dataspaces, their pending `call_out`s, their access bits, their resource counters — every piece of runtime state — survive process exit and return on the next boot. Applications do not write save/load code for the platform-tracked state; the runtime does the work.

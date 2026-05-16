@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Glossary
 
 Definitions for terms used inline across the eOS-kernellib doc set. Each entry names where the term is load-bearing so a reader landing on a term mid-document can find the doc that explains it in depth.

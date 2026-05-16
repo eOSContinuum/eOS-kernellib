@@ -1,5 +1,3 @@
-/* SPDX-License-Identifier: BSD-2-Clause-Patent */
-
 /*
  * Domain initd for the reference HTTP application.
  *

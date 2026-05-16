@@ -1,15 +1,10 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # License
 
-eOS-kernellib is dual-licensed. Each file is governed by one of two licenses, identified by an SPDX header at the top of the file:
+eOS-kernellib is released under the BSD 2-Clause Plus Patent License.
 
-- Files declaring `SPDX-License-Identifier: BSD-2-Clause-Patent` are released under the BSD 2-Clause Plus Patent License (Section A below).
-- Files declaring `SPDX-License-Identifier: Unlicense`, and files that carry no SPDX identifier, are released into the public domain under the Unlicense (Section B below).
+The repository's heritage (DGD as the runtime driver, the kernellib lineage as its architectural ancestor, SkotOS as the largest application built on the lineage, and the orthogonal-persistence research canon) is acknowledged in the project [README.md](README.md) Heritage section. Code inherited from public-domain ancestors (`dworkin/kernellib`, declared public domain in 2016; `ChatTheatre/kernellib`, released under CC0) is incorporated under those original dedications; the BSD 2-Clause Plus Patent License governs the eOS-kernellib repository as a whole and all newly authored files within it.
 
-New files added to this repository carry an SPDX header identifying which license applies. Files without an SPDX header are treated as Unlicense.
-
-## A. BSD 2-Clause Plus Patent License
+## BSD 2-Clause Plus Patent License
 
 Copyright (c) 2026 Christopher Allen
 
@@ -60,30 +55,3 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
-
-## B. The Unlicense
-
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
-
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org/>

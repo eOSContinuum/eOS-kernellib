@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Kernel Libraries
 
 eOS-kernellib ships a small set of inheritable libraries under `src/lib/` for application authors to consume directly. Each library is an LPC class an application either inherits or instantiates via the canonical-name `#define` from a header in `src/include/`. This document is a topical reference; the source files at the cited paths are authoritative for the actual API surface.

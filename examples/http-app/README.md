@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # Reference HTTP application
 
 A minimal HTTP/1 application that runs on top of eOS-kernellib. Demonstrates the platform contracts an HTTP/1 application server honors; the full walkthrough lives in `doc/http-applications.md`.

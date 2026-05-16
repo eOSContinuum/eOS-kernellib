@@ -1,5 +1,3 @@
-<!-- SPDX-License-Identifier: BSD-2-Clause-Patent -->
-
 # References and further reading
 
 Citations referenced inline across the eOS-kernellib doc set, plus the upstream documentation a reader following the citations may want to consult. Each entry carries a stable anchor; inline citations in other docs link to the anchor here.
