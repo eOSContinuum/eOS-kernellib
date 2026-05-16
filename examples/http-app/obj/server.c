@@ -1,5 +1,3 @@
-/* SPDX-License-Identifier: BSD-2-Clause-Patent */
-
 /*
  * Reference HTTP/1 application server for eOS-kernellib.
  *
@@ -119,7 +117,7 @@ private void dispatch(HttpRequest request, StringBuffer body)
  *
  * For methods that carry a request body, call expectEntity(length) to
  * switch the connection to MODE_RAW for Content-Length bytes; the
- * substrate does not opt in on the subclass's behalf. The body arrives
+ * platform does not opt in on the subclass's behalf. The body arrives
  * via receiveEntity below. Transfer-Encoding: chunked would require
  * expectChunk instead, omitted here for brevity.
  */
@@ -168,7 +166,7 @@ static void receiveEntity(StringBuffer chunk)
 
 /*
  * Binary-manager glue replicated from /usr/HTTP/api/obj/server1 (which is
- * under /obj/ and not inheritable). These methods connect the substrate's
+ * under /obj/ and not inheritable). These methods connect the platform's
  * user-tier flow contract with the HTTP/1 connection state machine.
  */
 int login(string str)
