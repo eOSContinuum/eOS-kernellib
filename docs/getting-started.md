@@ -20,7 +20,7 @@ cd dgd/src
 make install
 ```
 
-The driver binary lands at `dgd/bin/dgd`. See `doc/building.md` for platform-specific notes.
+The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes.
 
 ## Fetch eOS-kernellib
 
@@ -70,10 +70,10 @@ The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an appli
 
 ## Where to next
 
-- `examples/http-app/README.md` and `doc/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
-- `doc/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
-- `doc/architecture.md` covers the platform's tier model, daemons, and boot sequence; `doc/runtime-primitives.md` covers the per-primitive foundation-and-proof statement.
-- `doc/application-authoring.md` covers writing a tier-E application on top of the platform (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
-- `doc/building.md` covers DGD build details and platform-specific notes.
+- `examples/http-app/README.md` and `docs/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
+- `docs/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
+- `docs/architecture.md` covers the platform's tier model, daemons, and boot sequence; `docs/runtime-primitives.md` covers the per-primitive foundation-and-proof statement.
+- `docs/application-authoring.md` covers writing a tier-E application on top of the platform (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
+- `docs/building.md` covers DGD build details and platform-specific notes.
 
 [DGD]: https://github.com/dworkin/dgd

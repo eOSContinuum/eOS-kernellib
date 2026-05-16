@@ -1,6 +1,6 @@
 # admin_console
 
-The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `doc/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
+The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `docs/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
 
 **Audience**: an operator with admin-console access to a running platform; needs to introspect state, hot-fix code, manage permissions, snapshot, or shut down.
 
@@ -84,7 +84,7 @@ The verb categories below are organized around the operational situation an oper
 
 **Verbs**: `compile`, `clone`, `destruct`, `new`
 
-**Why**: hot reload is a runtime primitive — `compile_object(path)` against a path with an existing master replaces the master's program; subsequent calls dispatch to the new version (`doc/runtime-primitives.md` §4). The console exposes this mechanism plus the clone/destruct/instantiate cycle that surrounds it.
+**Why**: hot reload is a runtime primitive — `compile_object(path)` against a path with an existing master replaces the master's program; subsequent calls dispatch to the new version (`docs/runtime-primitives.md` §4). The console exposes this mechanism plus the clone/destruct/instantiate cycle that surrounds it.
 
 **How**:
 
@@ -273,7 +273,7 @@ To reset the admin password from outside the console: the kernel's auth state li
 
 ## Where to next
 
-- `doc/operations.md` — the deployment surface: `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.
-- `doc/architecture.md` — the platform's tier model, daemons, and inheritance chain that the console verbs operate against.
-- `doc/runtime-primitives.md` — the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
+- `docs/operations.md` — the deployment surface: `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.
+- `docs/architecture.md` — the platform's tier model, daemons, and inheritance chain that the console verbs operate against.
+- `docs/runtime-primitives.md` — the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
 - `src/kernel/lib/admin_console.c` — the authoritative LPC source for every verb's exact dispatch.

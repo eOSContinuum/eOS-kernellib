@@ -2,9 +2,9 @@
 
 eOS-kernellib ships a small set of inheritable libraries under `src/lib/` for application authors to consume directly. Each library is an LPC class an application either inherits or instantiates via the canonical-name `#define` from a header in `src/include/`. This document is a topical reference; the source files at the cited paths are authoritative for the actual API surface.
 
-For the LPC mechanics that make these libraries work (inherit syntax, type modifiers, lifecycle), see `doc/lpc-essentials.md`. For where these libraries fit in the platform's tier model, see `doc/architecture.md`.
+For the LPC mechanics that make these libraries work (inherit syntax, type modifiers, lifecycle), see `docs/lpc-essentials.md`. For where these libraries fit in the platform's tier model, see `docs/architecture.md`.
 
-**Audience**: an LPC application author looking up which inheritable library serves a common need (strings, persistent collections, iteration, asynchronous control, time, utilities); assumes `doc/lpc-essentials.md` for inherit syntax and `doc/architecture.md` for the tier model that bounds where each library is callable from.
+**Audience**: an LPC application author looking up which inheritable library serves a common need (strings, persistent collections, iteration, asynchronous control, time, utilities); assumes `docs/lpc-essentials.md` for inherit syntax and `docs/architecture.md` for the tier model that bounds where each library is callable from.
 
 ## Strings
 
@@ -69,10 +69,10 @@ The `src/lib/util/` subdirectory holds small utility libraries that wrap kfun-le
 | `src/lib/util/random.c` | host kfun `random` | Pseudo-random string generation |
 | `src/lib/util/unicode.c` | UTF-8 encoding | Unicode code-point conversion |
 
-These are inherited via `inherit "/lib/util/<name>"`. Because the wrapped functions are declared `static` (per LPC type-modifier semantics in `doc/lpc-essentials.md`), they are callable from the inheriting object and its children but not from arbitrary callers.
+These are inherited via `inherit "/lib/util/<name>"`. Because the wrapped functions are declared `static` (per LPC type-modifier semantics in `docs/lpc-essentials.md`), they are callable from the inheriting object and its children but not from arbitrary callers.
 
 ## Where to next
 
-- **`doc/lpc-essentials.md`** — LPC mechanics: inherit syntax, type modifiers, kfun calls, the patterns these libraries assume the reader knows.
-- **`doc/architecture.md`** — the platform's tier model and where `src/lib/` fits in it.
-- **`doc/application-authoring.md`** — how an application's LPC source consumes these libraries from a tier-E domain.
+- **`docs/lpc-essentials.md`** — LPC mechanics: inherit syntax, type modifiers, kfun calls, the patterns these libraries assume the reader knows.
+- **`docs/architecture.md`** — the platform's tier model and where `src/lib/` fits in it.
+- **`docs/application-authoring.md`** — how an application's LPC source consumes these libraries from a tier-E domain.

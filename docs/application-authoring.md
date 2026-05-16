@@ -2,9 +2,9 @@
 
 A tier-E application on eOS-kernellib lives in a single directory under `src/usr/`, declares its bootstrap in an `initd.c`, and inherits the platform's System auto to gain owner identity and cross-tier API access. The patterns below apply regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
 
-**Audience**: an LPC author writing a tier-E application on top of eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the platform running locally per `doc/getting-started.md`.
+**Audience**: an LPC author writing a tier-E application on top of eOS-kernellib; comfortable with LPC syntax (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
 
-The architecture document (`doc/architecture.md`) covers the platform's tier model, daemons, and inheritance chain. The HTTP/1-specific application pattern is covered separately in `doc/http-applications.md` with a runnable reference at `examples/http-app/`.
+The architecture document (`docs/architecture.md`) covers the platform's tier model, daemons, and inheritance chain. The HTTP/1-specific application pattern is covered separately in `docs/http-applications.md` with a runnable reference at `examples/http-app/`.
 
 ## Domain layout
 
@@ -126,7 +126,7 @@ The connection-handling contract for non-HTTP applications is the binary-manager
 
 For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `logout`, `flow_*`, `timeout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
 
-For datagram-shaped applications (UDP), datagram support is a port candidate listed in `doc/runtime-primitives.md` Supporting surfaces; the platform ships the transport scaffolding but no canonical datagram application yet.
+For datagram-shaped applications (UDP), datagram support is a port candidate listed in `docs/runtime-primitives.md` Supporting surfaces; the platform ships the transport scaffolding but no canonical datagram application yet.
 
 ## Worked example sketch: an in-memory KV service
 
@@ -152,11 +152,11 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 ## Where to next
 
-- `doc/architecture.md` — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
-- `doc/runtime-primitives.md` — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
-- `doc/lpc-essentials.md` — LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
-- `doc/kernel-libraries.md` — inheritable libraries shipped under `src/lib/`: String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
-- `doc/http-applications.md` — the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
-- `doc/operations.md` — the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
+- `docs/architecture.md` — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
+- `docs/runtime-primitives.md` — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
+- `docs/lpc-essentials.md` — LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
+- `docs/kernel-libraries.md` — inheritable libraries shipped under `src/lib/`: String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
+- `docs/http-applications.md` — the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
+- `docs/operations.md` — the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
 
-[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
+[LPC.md]: https://github.com/dworkin/lpc-docs/blob/master/LPC.md

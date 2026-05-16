@@ -2,7 +2,7 @@
 
 eOS-kernellib is the LPC kernel layer for orthogonally-persistent servers on the [DGD] driver. It sits between DGD and an application, providing the runtime primitives the application uses to express its own logic.
 
-This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The per-primitive foundation-and-proof statement lives in `doc/runtime-primitives.md`, which also names the platform's commitment behind each primitive.
+This document describes the architecture: capability tiers, the daemons that run at the kernel level, the boot sequence, the auto-inheritance pattern, the System global-access mechanism, the library modules shipped under `src/usr/`, the host-driver extension surface, and the points where an application plugs in. The per-primitive foundation-and-proof statement lives in `docs/runtime-primitives.md`, which also names the platform's commitment behind each primitive.
 
 **Audience**: a developer or architect orienting to the platform's structural model; wants to know how the kernel layer is organized — what runs at which tier, which daemons mediate which surfaces, how the boot sequence reaches a steady state, where an application plugs in — before writing or operating code on the platform.
 
@@ -164,7 +164,7 @@ The extension surface is intentionally separate from the host driver's own kfun 
 
 The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext], which includes modules such as an AOT-compiling JIT for performance, a regex kfun, a TLS-primitive kfun, and others. eOS-kernellib's runtime platform requires no extension and loads none; deployments choose what to load based on their needs.
 
-An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `doc/operations.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the platform's atomicity and hot-reload guarantees.
+An extension you load today is one your statedump binds to: a snapshot taken with an extension active will require that same extension to restore. Removing an extension means losing state. That makes extension loading a durable architectural commitment, not an opt-in convenience. See `docs/operations.md` for deployment-time guidance on loading and managing extensions, including the open empirical questions about how extension-loaded codepaths interact with the platform's atomicity and hot-reload guarantees.
 
 Extension kfuns sit alongside built-in kfuns at the host-driver level, with the same per-tier access checks. An LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension; the deployment's `.dgd` config determines which kfuns are present.
 
@@ -181,7 +181,7 @@ The kernel layer surfaces eight runtime primitives:
 - **Multi-agent coherence** — multiple callers see a consistent view of state without user-land synchronization.
 - **State introspection** — the state graph is queryable directly through host driver primitives.
 
-Each primitive's foundation, demonstration status, supporting extensions, and open work are documented in `doc/runtime-primitives.md`. The reference there is the authoritative per-primitive statement; this section is a quick index.
+Each primitive's foundation, demonstration status, supporting extensions, and open work are documented in `docs/runtime-primitives.md`. The reference there is the authoritative per-primitive statement; this section is a quick index.
 
 ## Where an application plugs in
 
@@ -193,19 +193,19 @@ An application built on the kernel layer adds:
 
 The kernel daemons (driver, access_daemon, resource_daemon, userd) require no modification. The application registers its objects, hooks into events, and consumes the runtime primitives.
 
-For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` — `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `doc/http-applications.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
+For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server` — `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `docs/http-applications.md` walks through writing the application server; `examples/http-app/` is a runnable reference.
 
-For non-HTTP applications, the patterns are covered in `doc/application-authoring.md`. The LPC language itself is covered in `doc/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` — string buffers, persistent collections, iterators, async continuations, time — are catalogued in `doc/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `doc/operations.md`.
+For non-HTTP applications, the patterns are covered in `docs/application-authoring.md`. The LPC language itself is covered in `docs/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` — string buffers, persistent collections, iterators, async continuations, time — are catalogued in `docs/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `docs/operations.md`.
 
 ## Where to next
 
-- `doc/runtime-primitives.md` — per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
-- `doc/persistence.md` — the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
-- `doc/code-lifecycle.md` — compile, clone, destruct, recompile, and the object-manager event surface in detail.
-- `doc/operations.md` — the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
-- `doc/application-authoring.md` — writing tier-E applications on top of this architecture.
+- `docs/runtime-primitives.md` — per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
+- `docs/persistence.md` — the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
+- `docs/code-lifecycle.md` — compile, clone, destruct, recompile, and the object-manager event surface in detail.
+- `docs/operations.md` — the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
+- `docs/application-authoring.md` — writing tier-E applications on top of this architecture.
 
-[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
+[LPC.md]: https://github.com/dworkin/lpc-docs/blob/master/LPC.md
 
 [DGD]: https://github.com/dworkin/dgd
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext

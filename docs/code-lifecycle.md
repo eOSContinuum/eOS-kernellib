@@ -2,9 +2,9 @@
 
 LPC code in the platform moves through these states: source becomes a master, a master spawns clones, `create()` runs, recompilation replaces a running master in place, `call_touch` schedules lazy upgrades, and `destruct_object` removes objects from the runtime. The object-manager event surface lets the platform observe each transition. The sections below cover each in turn.
 
-For the LPC language constructs these transitions invoke (`inherit`, `create()`, `static`, `nomask`), see `doc/lpc-essentials.md`. For the per-primitive runtime guarantees that bound these transitions (atomicity, hot reload, capability separation), see `doc/runtime-primitives.md`. For the operator surface that drives lifecycle transitions interactively, see `doc/admin-console.md`.
+For the LPC language constructs these transitions invoke (`inherit`, `create()`, `static`, `nomask`), see `docs/lpc-essentials.md`. For the per-primitive runtime guarantees that bound these transitions (atomicity, hot reload, capability separation), see `docs/runtime-primitives.md`. For the operator surface that drives lifecycle transitions interactively, see `docs/admin-console.md`.
 
-**Audience**: an LPC author or operator reasoning about how source becomes a running object, how recompilation propagates to existing instances, how `call_touch` schedules lazy upgrades, and how the platform observes lifecycle transitions; assumes `doc/lpc-essentials.md` for language constructs and `doc/architecture.md` for the structural model.
+**Audience**: an LPC author or operator reasoning about how source becomes a running object, how recompilation propagates to existing instances, how `call_touch` schedules lazy upgrades, and how the platform observes lifecycle transitions; assumes `docs/lpc-essentials.md` for language constructs and `docs/architecture.md` for the structural model.
 
 ## Transitions
 
@@ -36,7 +36,7 @@ Light-Weight Objects (LWOs) follow a parallel pattern via `new_object()`: struct
 
 The two-argument form, `compile_object(path, source)`, compiles from an in-memory string rather than from disk; useful for platforms that synthesize LPC at runtime.
 
-Compilation runs in atomic context. If the source has a syntax error or fails type-check, the compile errors and the platform's prior state (including any prior master at `path`) is unchanged. The atomicity guarantee (`doc/runtime-primitives.md` §1) covers the compile transition itself: either the new program installs cleanly or the runtime rolls back as if the call never happened.
+Compilation runs in atomic context. If the source has a syntax error or fails type-check, the compile errors and the platform's prior state (including any prior master at `path`) is unchanged. The atomicity guarantee (`docs/runtime-primitives.md` §1) covers the compile transition itself: either the new program installs cleanly or the runtime rolls back as if the call never happened.
 
 After successful compile, the master sits idle. Its `create()` does not run until the first function call against the master. The object manager (see below) receives a `compile` event with the master object and the inherited paths; this is the platform's hook for tracking the dependency graph.
 
@@ -98,7 +98,7 @@ Destructing the master of a class implicitly destructs every clone of that maste
 
 ## Hot reload: recompile in place
 
-Calling `compile_object(path)` against a path that already has a master replaces the master's program in place. The runtime primitive at work is **hot reload** (`doc/runtime-primitives.md` §4); Allen's [2000 description][allen-dgd-2000] names the property: code can be updated in the running runtime without restart.
+Calling `compile_object(path)` against a path that already has a master replaces the master's program in place. The runtime primitive at work is **hot reload** (`docs/runtime-primitives.md` §4); Allen's [2000 description][allen-dgd-2000] names the property: code can be updated in the running runtime without restart.
 
 Key guarantees and limits:
 
@@ -149,7 +149,7 @@ The trade-off: long-idle objects can accumulate multiple pending upgrades. If th
 
 The platform ships no automatic recompile-with-dependents mechanism. When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`.
 
-SkotOS and some kernellib deployments ship a `progdb` daemon (a port candidate listed in `doc/runtime-primitives.md` §4 Extensions) that:
+SkotOS and some kernellib deployments ship a `progdb` daemon (a port candidate listed in `docs/runtime-primitives.md` §4 Extensions) that:
 
 - Tracks the inheritance graph as it builds via `compile` and `compile_lib` events.
 - Receives a recompile signal for a library.
@@ -186,15 +186,15 @@ An application that needs additional behavior typically registers a daemon that 
 ## What this doc does not cover
 
 - The host-driver implementation of the dispatch (the C code inside DGD that fires these events). See the upstream DGD source at <https://github.com/dworkin/dgd>.
-- The per-owner resource consumption of each transition (compile costs ticks; destruct frees them; clone consumes object-quota). See `doc/operations.md` Resource limits and the resource_daemon source.
-- Per-tier access control on each transition (who can compile what; who can destruct what). See `doc/architecture.md` Capability tiers and the access_daemon source.
+- The per-owner resource consumption of each transition (compile costs ticks; destruct frees them; clone consumes object-quota). See `docs/operations.md` Resource limits and the resource_daemon source.
+- Per-tier access control on each transition (who can compile what; who can destruct what). See `docs/architecture.md` Capability tiers and the access_daemon source.
 
 ## Where to next
 
-- **`doc/lpc-essentials.md`** — the language constructs (`create()`, `inherit`, `static`, `nomask`) the transitions above invoke.
-- **`doc/runtime-primitives.md`** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
-- **`doc/admin-console.md`** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running platform.
-- **`doc/application-authoring.md`** — how an application's code consumes the lifecycle (initd, call_touch upgrade, object tracking patterns).
+- **`docs/lpc-essentials.md`** — the language constructs (`create()`, `inherit`, `static`, `nomask`) the transitions above invoke.
+- **`docs/runtime-primitives.md`** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
+- **`docs/admin-console.md`** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running platform.
+- **`docs/application-authoring.md`** — how an application's code consumes the lifecycle (initd, call_touch upgrade, object tracking patterns).
 - **`src/kernel/lib/auto.c`** — the authoritative source for `_F_create`, `_F_touch`, and the inheritance-discipline enforcement.
 - **`src/usr/System/sys/objectd.c`** — the shipped object manager's implementation of the event surface above.
 

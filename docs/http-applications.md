@@ -2,9 +2,9 @@
 
 An HTTP/1 application on eOS-kernellib supplies a clonable server object at `/usr/WWW/obj/server`; the kernel layer's HTTP/1 transport binds the binary port and clones that object for every incoming connection. The sections below show what the server object looks like, what it must inherit, how it routes requests, and how an application supports multiple logical apps behind one HTTP/1 port.
 
-**Audience**: an application author building an HTTP/1 service on eOS-kernellib; comfortable with LPC syntax (or read `doc/lpc-essentials.md` first); has the platform running locally per `doc/getting-started.md`.
+**Audience**: an application author building an HTTP/1 service on eOS-kernellib; comfortable with LPC syntax (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
 
-`doc/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `doc/application-authoring.md` covers the general tier-E patterns for non-HTTP transports. `doc/runtime-primitives.md` covers the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+`docs/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `docs/application-authoring.md` covers the general tier-E patterns for non-HTTP transports. `docs/runtime-primitives.md` covers the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 
 ## The mount point
 
@@ -221,10 +221,10 @@ The 0-second `call_out` runs after the System initd commits, which is after ever
 
 ## Where to next
 
-- `doc/getting-started.md` — install DGD, run the example configuration.
-- `doc/architecture.md` — capability tiers, daemons, kernel-layer libraries.
-- `doc/application-authoring.md` — general tier-E patterns for non-HTTP transports.
-- `doc/runtime-primitives.md` — the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+- `docs/getting-started.md` — install DGD, run the example configuration.
+- `docs/architecture.md` — capability tiers, daemons, kernel-layer libraries.
+- `docs/application-authoring.md` — general tier-E patterns for non-HTTP transports.
+- `docs/runtime-primitives.md` — the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 - `examples/http-app/` — runnable reference application.
 - `src/usr/System/sys/http_server.c` — the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the platform-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
 - `src/usr/HTTP/api/lib/Server1.c` and `src/usr/HTTP/lib/Connection1.c` — the HTTP/1 library implementation that an application server inherits and overrides.
