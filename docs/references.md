@@ -41,7 +41,7 @@ Authoritative statement on the statedump-binding constraint for host-driver exte
 
 <a id="dgd-repo"></a>**[dworkin/dgd](https://github.com/dworkin/dgd)** — the DGD driver this kernel layer runs on. Felix Croes' active development repository.
 
-<a id="dgd-doc-extensions"></a>**DGD `doc/extensions.md`** in the dgd repository. Canonical documentation for the host-driver extension surface: the `.dgd` config's `modules = ([ path : config ])` mapping, the dlopen activation pattern, the 1-byte kfun numbering that caps the kfun set architecturally. Cited in [architecture.md](architecture.md) Host-driver extensions and [operations.md](operations.md) Loading host-driver extensions.
+<a id="dgd-doc-extensions"></a>**DGD `docs/extensions.md`** in the dgd repository. Canonical documentation for the host-driver extension surface: the `.dgd` config's `modules = ([ path : config ])` mapping, the dlopen activation pattern, the 1-byte kfun numbering that caps the kfun set architecturally. Cited in [architecture.md](architecture.md) Host-driver extensions and [operations.md](operations.md) Loading host-driver extensions.
 
 ### LPC language reference
 

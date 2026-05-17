@@ -1,6 +1,6 @@
 # Reference HTTP application
 
-A minimal HTTP/1 application that runs on top of eOS-kernellib. Demonstrates the platform contracts an HTTP/1 application server honors; the full walkthrough lives in `doc/http-applications.md`.
+A minimal HTTP/1 application that runs on top of eOS-kernellib. Demonstrates the platform contracts an HTTP/1 application server honors; the full walkthrough lives in `docs/http-applications.md`.
 
 The code in this directory is a stripped-down derivative of a verified working HTTP/1 application; the inheritance pattern, the `::create` clone-arg wiring, and the binary-manager glue are preserved verbatim from the verified source, with simplified inline routing replacing a registry pattern.
 

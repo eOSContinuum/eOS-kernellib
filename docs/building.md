@@ -42,7 +42,7 @@ The DGD source compiles on Linux, FreeBSD, and other POSIX-compatible systems wi
 
 There is no build step. DGD compiles the LPC source under `src/` at runtime, on first load and on hot-reload requests.
 
-Verify the kernel layer compiles by running the driver against `example.dgd` per the steps in `doc/getting-started.md`. Compile errors surface in the driver's standard output during boot.
+Verify the kernel layer compiles by running the driver against `example.dgd` per the steps in `docs/getting-started.md`. Compile errors surface in the driver's standard output during boot.
 
 ## State and snapshot files
 
@@ -56,8 +56,8 @@ The swap file is recreated on each boot. The snapshot file persists across boots
 
 ## Where to next
 
-- `doc/getting-started.md` — run the example configuration once the driver is built.
-- `doc/operations.md` — the `.dgd` configuration field reference, boot modes, and operator surface.
-- `doc/architecture.md` — the platform's tier model and where the build fits.
+- `docs/getting-started.md` — run the example configuration once the driver is built.
+- `docs/operations.md` — the `.dgd` configuration field reference, boot modes, and operator surface.
+- `docs/architecture.md` — the platform's tier model and where the build fits.
 
 [DGD]: https://github.com/dworkin/dgd

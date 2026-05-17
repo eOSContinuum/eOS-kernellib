@@ -1,8 +1,8 @@
 # Operations
 
-This document covers running an eOS-kernellib instance: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`doc/architecture.md`) covers the platform's structural model; this document covers the operator's surface for keeping it running.
+This document covers running an eOS-kernellib instance: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`docs/architecture.md`) covers the platform's structural model; this document covers the operator's surface for keeping it running.
 
-**Audience**: someone running the platform — responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `doc/application-authoring.md` and `doc/http-applications.md`.
+**Audience**: someone running the platform — responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `docs/application-authoring.md` and `docs/http-applications.md`.
 
 ## The .dgd configuration file
 
@@ -22,7 +22,7 @@ The host driver reads its configuration from a `.dgd` file passed on the command
 | `static_chunk`, `dynamic_chunk` | Memory allocator chunk sizes |
 | `dump_file` | Path the platform writes snapshots to |
 | `dump_interval` | Seconds between automatic snapshots; 3600 (one hour) is a reasonable default |
-| `hotboot` | Tuple of `({ binary, config, snapshot, snapshot.old })` enabling hot boot via `execv` (see `doc/architecture.md` boot sequence) |
+| `hotboot` | Tuple of `({ binary, config, snapshot, snapshot.old })` enabling hot boot via `execv` (see `docs/architecture.md` boot sequence) |
 | `typechecking` | Strictness of compile-time type checks; production deployments should set `2` (full) |
 | `users`, `editors`, `objects`, `call_outs`, `array_size` | Hard caps on platform-wide resource counts |
 | `modules` | Optional mapping of host-driver extensions to load at boot (see Loading host-driver extensions below) |
@@ -31,7 +31,7 @@ A minimal example is included at `example.dgd` in the repository root.
 
 ## Booting
 
-The platform has three boot modes; `doc/architecture.md` covers the dispatch in detail. Briefly:
+The platform has three boot modes; `docs/architecture.md` covers the dispatch in detail. Briefly:
 
 - **Cold boot**: started with no snapshot present. The driver compiles `/kernel/sys/driver`, runs the kernel auto's initd cascade through every `/usr/[A-Z]*/initd.c`, and reaches the running state. This is the path for first-time bring-up and after intentional state wipe.
 - **Snapshot restore**: started with a snapshot file present at `dump_file`. The driver reloads the snapshotted object graph and dataspaces, then calls the registered `restored(int hotboot)` driver hook. Initd cascades do not run; the platform resumes the state captured at the snapshot.
@@ -55,7 +55,7 @@ The verb categories below cover the shipped surface; each verb prints its own he
 | State management | `swapout`, `snapshot` |
 | Platform lifecycle | `shutdown`, `reboot` |
 
-`code` is the LPC eval verb: it compiles its argument as an LPC expression in the operator's domain, evaluates it, and prints the result. See `doc/admin-console.md` for per-verb mechanics, operational scenarios, and the underlying kfun dispatch for each verb.
+`code` is the LPC eval verb: it compiles its argument as an LPC expression in the operator's domain, evaluates it, and prints the result. See `docs/admin-console.md` for per-verb mechanics, operational scenarios, and the underlying kfun dispatch for each verb.
 
 ## State persistence
 
@@ -113,9 +113,9 @@ The ecosystem provides extension bundles. The canonical one is [dworkin/lpc-ext]
 
 ### Open empirical questions
 
-The two runtime primitives with unverified extension behavior are atomicity (`doc/runtime-primitives.md` §1 Open) and hot reload (§4 Open). Both have the same shape: the platform guarantee holds without extensions; whether it survives an extension-loaded codepath is unverified. Until verified, an operator enabling such an extension in production should treat these as known unknowns:
+The two runtime primitives with unverified extension behavior are atomicity (`docs/runtime-primitives.md` §1 Open) and hot reload (§4 Open). Both have the same shape: the platform guarantee holds without extensions; whether it survives an extension-loaded codepath is unverified. Until verified, an operator enabling such an extension in production should treat these as known unknowns:
 
-- **Atomicity under extension-loaded JIT.** Does the platform's atomic-commit rollback fire when an extension-compiled native function errors mid-call? The atomicity primitive (`doc/runtime-primitives.md` §1) hinges on the runtime restoring in-memory state on error; if extension-compiled code skips the rollback path (for example by writing directly to dataspace memory without going through the atomic-transaction layer), the guarantee holds only without the extension loaded.
+- **Atomicity under extension-loaded JIT.** Does the platform's atomic-commit rollback fire when an extension-compiled native function errors mid-call? The atomicity primitive (`docs/runtime-primitives.md` §1) hinges on the runtime restoring in-memory state on error; if extension-compiled code skips the rollback path (for example by writing directly to dataspace memory without going through the atomic-transaction layer), the guarantee holds only without the extension loaded.
 - **Hot reload under extension-loaded compiled-code caches.** Does `compile_object(path, source)` interact correctly with an extension's per-program code cache? The hot-reload primitive (§4) requires that the next call after recompilation runs the new logic; if the extension's cache is keyed on something stale, recompiled code can be shadowed by previously-compiled native code.
 
 Both questions are open. Empirical verification requires running the platform under each extension of interest and exercising the atomicity and hot-reload paths with the extension active. Once results land, this section will resolve to either "verified preserves" or "verified breaks" with a citation to the test result.
@@ -134,9 +134,9 @@ Both questions are open. Empirical verification requires running the platform un
 
 ## Where to next
 
-- **`doc/architecture.md`** — platform tier model, daemons, boot sequence in detail.
-- **`doc/runtime-primitives.md`** — the platform's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
-- **`doc/application-authoring.md`** — writing a tier-E application on top of this platform.
+- **`docs/architecture.md`** — platform tier model, daemons, boot sequence in detail.
+- **`docs/runtime-primitives.md`** — the platform's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
+- **`docs/application-authoring.md`** — writing a tier-E application on top of this platform.
 - **DGD upstream reference** at <https://github.com/dworkin/dgd> — full kfun reference, `.dgd` field reference, host-binary build instructions.
 
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext

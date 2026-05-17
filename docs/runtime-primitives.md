@@ -4,7 +4,7 @@ eOS-kernellib's runtime platform exposes eight primitives the application above 
 
 The architectural commitment behind this list — why these eight are surfaced as runtime primitives rather than left for applications to rebuild — is that each is a runtime guarantee an orthogonally-persistent server cannot fake at the application layer. Atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. The remaining four (sandboxed code load, asynchronous events, multi-agent coherence, state introspection) layer on top of those four. Asking the application to provide them is asking it to reproduce the runtime in user space. The platform's stance is that these properties are the platform's responsibility; the sections below name the foundation, status, and pending proofs primitive by primitive.
 
-**Audience**: a developer or architect deciding whether eOS-kernellib's runtime platform fits a use case, or auditing the platform's runtime guarantees against application requirements; wants the per-primitive foundation, demonstration status, supporting extensions, and open work for each of the eight primitives; assumes `doc/architecture.md` for the structural model and tier vocabulary.
+**Audience**: a developer or architect deciding whether eOS-kernellib's runtime platform fits a use case, or auditing the platform's runtime guarantees against application requirements; wants the per-primitive foundation, demonstration status, supporting extensions, and open work for each of the eight primitives; assumes `docs/architecture.md` for the structural model and tier vocabulary.
 
 **Section template.** Each primitive section below follows the same structure: a one-sentence claim opener, then **Foundation** (the platform mechanism that provides the property), **Demonstration** (evidence the property works in practice), **Status** (Validated / Partial / Foundation-only), **Extensions** (additional support shipped or proposed), and **Open** (unresolved questions). The bold prose-headers act as in-section anchors when reading or scanning.
 
@@ -226,7 +226,7 @@ The following are not primitives; they are surfaces through which primitives man
 
 ## Appendix: tier vocabulary used in this document
 
-This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary defined in `doc/architecture.md` Capability tiers (Kernel / System / User). The five-tier splits the C host driver from the LPC kernel (A vs B) and shipped platform domains from application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis above. The canonical table lives in `doc/architecture.md`; this document does not duplicate it.
+This document uses a five-tier vocabulary (A/B/C/D/E) that refines the three-tier vocabulary defined in `docs/architecture.md` Capability tiers (Kernel / System / User). The five-tier splits the C host driver from the LPC kernel (A vs B) and shipped platform domains from application-supplied domains (D vs E). Both vocabularies describe the same boundaries; the five-tier provides more resolution where boundary discrimination matters in the per-primitive analysis above. The canonical table lives in `docs/architecture.md`; this document does not duplicate it.
 
 Two implications worth restating at this scope:
 
@@ -235,14 +235,14 @@ Two implications worth restating at this scope:
 
 ### Extensions and the platform's contract
 
-The structural model of the host-driver extension surface — dlopen-loaded modules registered in the `.dgd` configuration's `modules =` mapping, the 256-kfun cap that drives extension minimalism, the statedump-binding constraint — is documented in `doc/architecture.md` Host-driver extensions, with deployment-time mechanics in `doc/operations.md` Loading host-driver extensions. The platform-level point relevant to this document is narrower:
+The structural model of the host-driver extension surface — dlopen-loaded modules registered in the `.dgd` configuration's `modules =` mapping, the 256-kfun cap that drives extension minimalism, the statedump-binding constraint — is documented in `docs/architecture.md` Host-driver extensions, with deployment-time mechanics in `docs/operations.md` Loading host-driver extensions. The platform-level point relevant to this document is narrower:
 
 **eOS-kernellib's runtime platform requires no extension and loads none.** Every primitive above is foundation-and-status-stated against an extension-free deployment. The two Open entries on §1 Atomicity ("Behavior under host-driver extensions that compile LPC bytecode to native code") and §4 Hot reload ("Interaction with host-driver extensions that maintain a compiled-code cache") name what happens when a deployment chooses to load an extension whose codepaths interact with those primitives. In both cases the platform's contract becomes empirically unverified, not violated; operators loading such an extension should measure against their workload before relying on the corresponding primitive in production.
 
 ## Where to next
 
-- `doc/architecture.md` — the platform's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
-- `doc/persistence.md` — the full orthogonal-persistence story behind §3 (statedump cycle, hot boot, save_object semantics, persistence boundaries).
-- `doc/code-lifecycle.md` — the full compile / clone / destruct / touch story behind §4 and §5 (object-manager events, library upgrade cascade, `_F_touch` hook).
-- `doc/operations.md` Open empirical questions — the deployment-time interpretation of the Open entries on §1 and §4.
-- `doc/application-authoring.md` — how a tier-E application consumes the primitives.
+- `docs/architecture.md` — the platform's structural mechanics (tier model, daemons, boot sequence, auto-inheritance, host-driver extension surface) that the primitives above rest on.
+- `docs/persistence.md` — the full orthogonal-persistence story behind §3 (statedump cycle, hot boot, save_object semantics, persistence boundaries).
+- `docs/code-lifecycle.md` — the full compile / clone / destruct / touch story behind §4 and §5 (object-manager events, library upgrade cascade, `_F_touch` hook).
+- `docs/operations.md` Open empirical questions — the deployment-time interpretation of the Open entries on §1 and §4.
+- `docs/application-authoring.md` — how a tier-E application consumes the primitives.

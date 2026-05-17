@@ -4,9 +4,9 @@ The platform's signature property: in-memory state is the primary state of the s
 
 This document covers what persists, how the platform captures and restores it, how the operator drives that cycle, and where the platform's persistence model differs from common alternatives (databases, ORMs, file-backed serialization).
 
-For the language-level interaction between LPC's `static` modifier and persistence, see `doc/lpc-essentials.md` Type modifiers. For operator commands that drive the persistence cycle, see `doc/admin-console.md` Snapshot, restore, and shutdown. For the per-primitive runtime guarantee, see `doc/runtime-primitives.md` §3.
+For the language-level interaction between LPC's `static` modifier and persistence, see `docs/lpc-essentials.md` Type modifiers. For operator commands that drive the persistence cycle, see `docs/admin-console.md` Snapshot, restore, and shutdown. For the per-primitive runtime guarantee, see `docs/runtime-primitives.md` §3.
 
-**Audience**: a developer, architect, or operator reasoning about what survives a restart, what does not, and how the platform captures and restores state; assumes `doc/architecture.md` for the structural model and basic familiarity with the platform's boot sequence.
+**Audience**: a developer, architect, or operator reasoning about what survives a restart, what does not, and how the platform captures and restores state; assumes `docs/architecture.md` for the structural model and basic familiarity with the platform's boot sequence.
 
 ## Orthogonal persistence as architectural property
 
@@ -114,7 +114,7 @@ Use `save_object`/`restore_object` when:
 - State needs to be portable across platforms (the per-object save file is human-readable and can be hand-edited or imported into a different platform).
 - A subset of an object's state needs a stable on-disk representation distinct from the snapshot.
 
-Do **not** use `save_object`/`restore_object` as a general persistence mechanism — that role is the platform's, and reinventing it on top is reproducing the runtime's work in application code (`doc/runtime-primitives.md` §3 names this as the platform's architectural commitment).
+Do **not** use `save_object`/`restore_object` as a general persistence mechanism — that role is the platform's, and reinventing it on top is reproducing the runtime's work in application code (`docs/runtime-primitives.md` §3 names this as the platform's architectural commitment).
 
 ## Variable persistence semantics
 
@@ -130,7 +130,7 @@ The platform-wide statedump captures the in-memory image without consulting modi
 
 The application-level implication: a `static` variable is for state that is part of the object's in-memory identity (so it survives full statedump) but is not part of the object's portable per-object save (so it can hold derived values, caches, or runtime-only state without polluting the save file). A non-static variable is the default — captured in both places.
 
-See `doc/lpc-essentials.md` Type modifiers for the language reference; the 2003 DGD-list discussion of the `static` keyword by Felix Croes covers the runtime semantics in detail.
+See `docs/lpc-essentials.md` Type modifiers for the language reference; the 2003 DGD-list discussion of the `static` keyword by Felix Croes covers the runtime semantics in detail.
 
 ## Operator workflow
 
@@ -161,25 +161,25 @@ The platform's persistence model has explicit boundaries. Each requires applicat
 - **Time**: the platform restores to the snapshot's logical time, but the host clock advances independently. `call_out` deferrals scheduled before the snapshot fire at the original target time relative to the snapshot's clock, which means a snapshot restored hours after capture has accumulated overdue `call_out`s ready to fire. Applications relying on `call_out` for time-sensitive work should handle the case where a deferred call fires later than originally scheduled.
 - **Snapshot integrity**: the platform writes snapshots atomically (rotation + write), but a host-level failure during the write (disk full, power loss) can produce a corrupt `dump_file`. The `<dump_file>.old` rotation is the platform's recovery mechanism. Backup snapshots to off-host storage for disaster recovery.
 
-For operator-level recovery procedures when any of these boundaries are hit, see `doc/operations.md` Common failure modes (table of symptoms and diagnoses) and `doc/admin-console.md` for the `snapshot`, `reboot`, and `shutdown` verbs that manage the persistence cycle.
+For operator-level recovery procedures when any of these boundaries are hit, see `docs/operations.md` Common failure modes (table of symptoms and diagnoses) and `docs/admin-console.md` for the `snapshot`, `reboot`, and `shutdown` verbs that manage the persistence cycle.
 
 ## Persistence under host-driver extensions
 
-Loading a host-driver extension (`doc/operations.md` Loading host-driver extensions; `doc/architecture.md` Host-driver extensions) binds the platform's snapshot to that extension's presence: a snapshot taken with the extension active requires the same extension to restore. This is documented in [Felix Croes' 2010 Hydra mailing-list note][croes-hydra-2010] and is a durable architectural commitment, not an opt-in convenience.
+Loading a host-driver extension (`docs/operations.md` Loading host-driver extensions; `docs/architecture.md` Host-driver extensions) binds the platform's snapshot to that extension's presence: a snapshot taken with the extension active requires the same extension to restore. This is documented in [Felix Croes' 2010 Hydra mailing-list note][croes-hydra-2010] and is a durable architectural commitment, not an opt-in convenience.
 
 Operational implication: removing an extension and restoring an old snapshot loses state. Plan extension choices accordingly. Treat extension addition as a one-way schema migration of the platform's persistence format.
 
-For the question of how extension-loaded codepaths interact with the platform's atomic-rollback path (and therefore with the atomicity-of-state property that persistence relies on), see `doc/runtime-primitives.md` §1 Open and `doc/operations.md` Open empirical questions.
+For the question of how extension-loaded codepaths interact with the platform's atomic-rollback path (and therefore with the atomicity-of-state property that persistence relies on), see `docs/runtime-primitives.md` §1 Open and `docs/operations.md` Open empirical questions.
 
 [croes-hydra-2010]: https://mail.dworkin.nl/pipermail/dgd/2010-August/006717.html
 
 ## Where to next
 
-- **`doc/runtime-primitives.md`** §3 — the per-primitive foundation-and-status statement for persistent state.
-- **`doc/admin-console.md`** Snapshot, restore, and shutdown — operator verbs for driving the persistence cycle interactively.
-- **`doc/operations.md`** — `.dgd` configuration fields (`dump_file`, `dump_interval`, `swap_file`, `hotboot` tuple), boot modes, failure-mode table.
-- **`doc/lpc-essentials.md`** Type modifiers — language semantics for `static` and how it interacts with persistence.
-- **`doc/architecture.md`** Boot sequence — the three boot modes (cold, statedump-restore, hot boot) at the platform level.
+- **`docs/runtime-primitives.md`** §3 — the per-primitive foundation-and-status statement for persistent state.
+- **`docs/admin-console.md`** Snapshot, restore, and shutdown — operator verbs for driving the persistence cycle interactively.
+- **`docs/operations.md`** — `.dgd` configuration fields (`dump_file`, `dump_interval`, `swap_file`, `hotboot` tuple), boot modes, failure-mode table.
+- **`docs/lpc-essentials.md`** Type modifiers — language semantics for `static` and how it interacts with persistence.
+- **`docs/architecture.md`** Boot sequence — the three boot modes (cold, statedump-restore, hot boot) at the platform level.
 - **`src/kernel/sys/driver.c`** — the `restored(int hotboot)` hook implementation.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
