@@ -1,14 +1,13 @@
 # eOS-kernellib
 
-**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated through the BD-1 through HW-3 work captured in `docs/getting-started.md` and verified as of 2026-05-15.
+Build applications where:
 
-eOS-kernellib is the kernel layer for orthogonally-persistent servers built on the [DGD] driver. It is the runtime platform above the driver and below an application — providing capability tiers, daemons, and runtime primitives the application uses to express its own logic.
+- **Objects survive restart** without serialization code. The in-memory object graph IS the storage layer.
+- **Operations commit atomically or roll back wholly.** Partial effects do not escape on failure; the runtime undoes everything in the failing call.
+- **Code recompiles into the live runtime.** Hot-reload a function and existing objects pick up the new behavior without losing state.
+- **Multiple actors see coherent state** without distributed-lock coordination.
 
-An orthogonally-persistent server treats in-memory state as the primary state of the system. Objects survive restart without explicit serialization; transactions roll back partial effects on failure; loaded code joins the running runtime under capability bounds. eOS-kernellib makes these properties available to the application above it.
-
-DGD has carried these properties since 2000; Christopher Allen's [contemporary MUD-Dev description][allen-dgd-2000] names them concisely — "DGD maintains persistence as a characteristic of its runtime environment," "atomic function calls allow full system-state rollback in the event of a run-time error," "full system state dump files implement persistence across reboots." eOS-kernellib is a contemporary repackaging of the same platform properties around a documented kernel-layer surface for builders who are not specifically writing for the platform's original use case.
-
-[allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
+eOS-kernellib is the kernel layer that exposes these as runtime primitives — capability tiers, daemons, and the eight runtime guarantees every application inherits rather than reimplements. It sits above the [DGD] LPC driver (Felix Croes, 1993-present, which has carried orthogonal persistence at production scale for three decades) and below your application.
 
 ## What it provides
 
@@ -28,6 +27,8 @@ Treating these eight as runtime primitives is the architectural commitment of eO
 ## Quickstart
 
 New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top.
+
+**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated as of 2026-05-15. Other POSIX-compatible systems should work; `docs/building.md` covers platform-specific build notes.
 
 ## Documentation
 
@@ -50,7 +51,9 @@ The kernel layer is application-neutral. Long-running stateful workflows, custom
 
 eOS-kernellib descends from a multi-decade lineage of orthogonal-persistence runtime work. The credits below are the project's canonical attribution; see `LICENSE.md` for the legal license posture.
 
-**Built on**: [DGD] (Felix Croes, 1993-present), the LPC runtime this kernel layer runs on. AGPL-3.0 as a runtime dependency; eos-kernellib builds *on* DGD without modifying its source.
+**Built on**: [DGD] (Felix Croes, 1993-present), the LPC runtime this kernel layer runs on. AGPL-3.0 as a runtime dependency; eOS-kernellib builds *on* DGD without modifying its source. DGD has carried orthogonal-persistence, atomic rollback, and statedump-based snapshot since 2000; Christopher Allen's [contemporary MUD-Dev description][allen-dgd-2000] names the properties concisely — "DGD maintains persistence as a characteristic of its runtime environment," "atomic function calls allow full system-state rollback in the event of a run-time error," "full system state dump files implement persistence across reboots." eOS-kernellib is a contemporary repackaging of the same properties around a documented kernel-layer surface for builders who are not specifically writing for the platform's original use case.
+
+[allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
 
 **Forked from**: [ChatTheatre/kernellib] (CC0 public domain, with further public-domain declarations from Skotos Tech, Dyvers Hands, Christopher Allen, and Noah Gibbs), which descends from Felix Croes' kernellib (declared public domain in 2016). The kernellib lineage established the tier discipline (kernel / system / user), the auto-inheritance pattern, and the per-owner resource model the platform's capability machinery rests on.
 
