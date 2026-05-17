@@ -1,3 +1,7 @@
+[![License: BSD-2-Clause-Patent](https://img.shields.io/badge/License-BSD--2--Clause--Patent-blue.svg)](LICENSE.md)
+[![Built on: DGD](https://img.shields.io/badge/Built_on-DGD-green.svg)](https://github.com/dworkin/dgd)
+[![Tested against: DGD 1.7.9](https://img.shields.io/badge/Tested_against-DGD_1.7.9-brightgreen.svg)](#quickstart)
+
 # eOS-kernellib
 
 Build applications where:
@@ -68,7 +72,16 @@ The platform's text-MUD heritage shows in some implementation details — the co
 
 ## Contributing
 
-Contributions are welcome. A formal `CONTRIBUTING.md` is in progress; until it lands, the practical guidance is: open an issue describing the change before submitting a pull request, keep commits atomic and signed (`git commit -S -s`), and follow the conventions visible in recent history (declarative-topic doc openers, lowercase doc filenames, ASCII commit messages). The doc set's authoring conventions are exercised across every doc in `docs/`; new content should match the established shape.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions: branch naming, atomic-commit discipline, signed commits, documentation shape, code style, and the pull-request flow. The [PR template](.github/PULL_REQUEST_TEMPLATE.md) and [issue templates](.github/ISSUE_TEMPLATE/) shape the surfaces for bug reports, feature requests, and questions.
+
+## Community
+
+eOS-kernellib participates in the [eOSContinuum](https://github.com/eOSContinuum) organization on GitHub alongside [`dgd`](https://github.com/eOSContinuum/dgd) (the DGD fork that tracks `dworkin/dgd` upstream) and the [eOS-DeepContext](https://github.com/eOSContinuum/eOS-DeepContext) graph (the cross-repository architectural commitments that span the organization's projects).
+
+- **Bug reports, feature requests, and questions**: [Issues on this repository](https://github.com/eOSContinuum/eOS-kernellib/issues). Use the template that matches your shape.
+- **Security reports**: see [SECURITY.md](SECURITY.md) for private vulnerability reporting.
+- **Code of Conduct**: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). The conventions are minimal and trust-based; we treat contributors as capable collaborators.
+- **Cross-repository discussion**: the [eOS-DeepContext](https://github.com/eOSContinuum/eOS-DeepContext) graph carries the cross-repository architectural commitments and decisions; the [`dworkin/dgd` discussion](https://github.com/dworkin/dgd/discussions) and the [DGD mailing list](https://mail.dworkin.nl/mailman/listinfo/dgd) cover driver-layer topics.
 
 ## License
 
