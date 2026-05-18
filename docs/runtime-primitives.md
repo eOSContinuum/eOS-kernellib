@@ -24,9 +24,11 @@ Operations commit wholly or roll back wholly. Partial effects do not escape on f
 
 **Foundation**: DGD atomic-function semantics. A function declared `atomic` (or invoked through `call_limited` with an atomic envelope) that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point; the application carries no roll-back code. The property is older than this repository — Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
-**Demonstration**: HTTP/1 platform startup, observed in the bootstrap log. An HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the `[atomic]` annotation in the log marks the rollback firing; the platform continues accepting subsequent connections from clean state.
+**Demonstration**: a deliberate-failure probe in `examples/atomic-demo/`. The counter master declares `atomic void increment_with_failure()` whose body mutates `counter` and then `error()`s. The HTTP route catches the error and reports it in the response body; the next `GET /counter` returns the pre-call value, evidence of rollback. The `[atomic]` annotation in the boot log on the error trace is the runtime's own marker of the atomic envelope. The smoke script (`examples/atomic-demo/smoke.sh`) exercises the three-step probe and asserts the rollback.
 
-**Status**: Partial. Foundation present; rollback observed in failure mode; a deliberate-failure demonstration with a user-authored handler is pending.
+The platform's own startup also exercises the primitive: an HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the rollback fires, and the platform continues accepting subsequent connections from clean state.
+
+**Status**: Validated. Foundation present; rollback demonstrated empirically by `examples/atomic-demo/` and observed in platform startup.
 
 **Extensions**: None at the platform level. Atomicity is a host-runtime property; eOS-kernellib does not extend it beyond the host's contract.
 
