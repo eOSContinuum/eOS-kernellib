@@ -112,7 +112,7 @@ Key guarantees and limits:
 
 The object manager receives a `compile` event (or `compile_lib` for libraries) with the inherited path list, allowing it to track the dependency graph for downstream cascade decisions.
 
-Hot reload is the operator-facing form (`compile` verb in `admin_console`); the platform-internal form is the same kfun called from any LPC code with sufficient access.
+Hot reload is the operator-facing form (`compile` verb in `admin_console`); the platform-internal form is the same kfun called from any LPC code with sufficient access. The `examples/hot-reload-demo/` reference application exposes the platform-internal form through an HTTP route: `POST /compile` with new LPC source as the request body calls `compile_object(target_path, body)`, and the next `GET /greet` returns the recompiled program's output.
 
 ## Touch: lazy upgrade via call_touch
 
