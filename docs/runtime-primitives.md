@@ -24,9 +24,11 @@ Operations commit wholly or roll back wholly. Partial effects do not escape on f
 
 **Foundation**: DGD atomic-function semantics. A function declared `atomic` (or invoked through `call_limited` with an atomic envelope) that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point; the application carries no roll-back code. The property is older than this repository — Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
-**Demonstration**: HTTP/1 platform startup, observed in the bootstrap log. An HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the `[atomic]` annotation in the log marks the rollback firing; the platform continues accepting subsequent connections from clean state.
+**Demonstration**: a deliberate-failure probe in `examples/atomic-demo/`. The counter master declares `atomic void increment_with_failure()` whose body mutates `counter` and then `error()`s. The HTTP route catches the error and reports it in the response body; the next `GET /counter` returns the pre-call value, evidence of rollback. The `[atomic]` annotation in the boot log on the error trace is the runtime's own marker of the atomic envelope. The smoke script (`examples/atomic-demo/smoke.sh`) exercises the three-step probe and asserts the rollback.
 
-**Status**: Partial. Foundation present; rollback observed in failure mode; a deliberate-failure demonstration with a user-authored handler is pending.
+The platform's own startup also exercises the primitive: an HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the rollback fires, and the platform continues accepting subsequent connections from clean state.
+
+**Status**: Validated. Foundation present; rollback demonstrated empirically by `examples/atomic-demo/` and observed in platform startup.
 
 **Extensions**: None at the platform level. Atomicity is a host-runtime property; eOS-kernellib does not extend it beyond the host's contract.
 
@@ -90,9 +92,9 @@ Code recompiles into the live runtime; existing objects update in place.
 
 **Foundation**: Host-runtime `compile_object` kfun. Passing a path that already has a master in memory replaces the master with the recompiled version. Existing references to the old master continue to function for the in-flight call; subsequent calls dispatch to the new version. No deploy step.
 
-**Demonstration**: An HTTP application exposing a baseline `GET` route and a `POST /compile` route that calls `compile_object` on the route handler's source path. Sequence: baseline `GET` returns the cold-boot string; `POST /compile` with revised LPC source on the same path returns `200 OK`; immediate `GET` returns the new string. No DGD restart, no application-layer reload mechanism — `compile_object` is the platform mechanism, exercised through the HTTP application surface.
+**Demonstration**: the `examples/hot-reload-demo/` reference application. A greeting master exposes a `greet()` method; an HTTP server routes `GET /greet` to the method and `POST /compile` to `compile_object` on the greeting's path. The smoke script (`examples/hot-reload-demo/smoke.sh`) exercises the three-step probe: cold-boot `GET /greet` returns the on-disk string; `POST /compile` with new LPC source returns `200 OK Compiled /usr/WWW/greeting`; immediate `GET /greet` returns the new string. No DGD restart, no application-layer reload mechanism — `compile_object` is the platform mechanism, exercised through the HTTP application surface.
 
-**Status**: Validated for single-object replacement. Library-inheritance cascade (recompiling a parent library and observing dependents pick up the new parent) is not yet addressed.
+**Status**: Validated for single-object replacement. Library-inheritance cascade (recompiling a parent library and observing dependents pick up the new parent) is not yet addressed. Concurrent-in-flight behavior (the guarantee that calls already dispatched against the old master finish on the old program) is asserted by the host runtime but not exercised by the sequential smoke; a concurrent-request probe would close that half.
 
 **Extensions**:
 - LPC self-compiler at `/usr/LPC/`: full LPC parser, AST classes, and compiler implemented in LPC. Tier D, compiled at boot, currently unconsumed. Enables AST-level transformation passes during the compile path — useful for safety transforms (see §5), authorship-time validation, or code analysis applied as part of hot-reload rather than as a separate deploy step.
