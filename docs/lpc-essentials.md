@@ -16,7 +16,7 @@ Five properties make LPC behave differently from most other languages a builder 
 
 **Objects live in a persistent in-memory database.** Every "object" in LPC is a value in the host driver's persistent store. When the platform restarts, the object graph is reconstituted from a snapshot file and resumes where it left off. There is no separate "save to disk" step in normal operation; persistence is the default. This is called *orthogonal persistence* in the systems literature.
 
-**Every function call is its own atomic context by default.** If the function body errors, every dataspace mutation it performed is rolled back as if the call had never happened. A function declared with the `atomic` modifier extends that atomic context across nested calls within the same call stack. The application author writes no `BEGIN TRANSACTION` / `ROLLBACK`; the host runtime enforces it.
+**The `atomic` modifier binds a function body into a transactional unit.** A function declared `atomic` either runs to completion (its dataspace mutations commit) or errors (its mutations are rolled back as if the call had never happened). Nested calls run inside the caller's atomic context. The application author writes no `BEGIN TRANSACTION` / `ROLLBACK`; the host runtime enforces it. Functions declared without the modifier do not get function-body rollback — a caught error anywhere up the stack absorbs the mutations the failing call performed. The `examples/atomic-demo/` reference application demonstrates the rollback empirically; the runtime's `[atomic]` annotation in the error trace marks the rollback firing.
 
 **Source files are recompiled into the live runtime.** Calling `compile_object("/usr/MyApp/obj/widget", new_source)` replaces the master object's program with the new source. Existing references to the old master continue to function for the in-flight call; subsequent calls dispatch to the new version. There is no separate "deploy" step.
 
@@ -55,7 +55,7 @@ LPC.md §3.4.3 defines four modifiers that prefix a function or variable declara
 | `private` | Only callable from within the same object |
 | `static` | On a function: callable only from this object and its inheriting children. On a variable: not saved to the snapshot |
 | `nomask` | On a function: cannot be redefined by a subclass |
-| `atomic` | On a function: extends the per-call atomic context across nested calls; the function body either commits wholly or rolls back wholly |
+| `atomic` | On a function: the body either commits wholly or rolls back wholly. Required for function-body rollback; nested calls run inside the caller's atomic context |
 
 `varargs` is also a keyword (LPC.md §3.1.4) prefixing a function whose parameter list is variable-length.
 
@@ -127,11 +127,11 @@ For deeper platform dispatch (how the kernel auto handles master vs clone, how o
 
 ## Atomicity
 
-Every function call is its own atomic context by default. The function either runs to completion (its dataspace mutations survive) or errors (its dataspace mutations are rolled back as if the call had never happened). Christopher Allen's [2000 description of DGD][allen-dgd-2000] frames the property historically: "atomic function calls allow full system-state rollback in the event of a run-time error."
+A function declared `atomic` runs as one transactional unit: the body either runs to completion (its dataspace mutations commit) or errors (its mutations are rolled back as if the call had never happened). Nested calls execute inside the caller's atomic context, so the rollback covers them too. Christopher Allen's [2000 description of DGD][allen-dgd-2000] frames the property historically: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
 
-The `atomic` modifier extends this across nested calls:
+A typical pattern:
 
 ```c
 atomic void transfer(object src, object dst, int amount)
@@ -141,7 +141,11 @@ atomic void transfer(object src, object dst, int amount)
 }
 ```
 
-Without the modifier each `->` call commits independently; with the modifier the whole `transfer` body is one transactional unit. The eOS-kernellib LPC source uses the implicit per-call atomicity throughout and rarely declares functions `atomic` explicitly because the default already covers the common case.
+The `atomic` modifier makes the whole `transfer` body one transactional unit. If `dst->deposit` errors, `src->withdraw`'s mutation is rolled back as part of the same envelope.
+
+Functions declared without `atomic` do not get function-body rollback. If such a function mutates dataspace and then errors, and a caller anywhere up the stack catches the error, the mutation persists. The rollback fires only when the call stack hits an `atomic` ancestor — without one, the mutation is committed at the point of mutation, not the point of return.
+
+The host runtime annotates the boot log with `[atomic]` on the error trace when the rollback fires. The absence of the annotation on an error trace tells the operator the rollback did not engage. The `examples/atomic-demo/` reference application demonstrates both the rollback annotation and the empirical evidence: a counter declared with `atomic void increment_with_failure()` whose mutation rolls back across a deliberate-failure POST, observable through a three-step HTTP probe.
 
 For the platform-level guarantee and its open empirical questions under host-driver extensions, see `docs/runtime-primitives.md` §1.
 
@@ -165,7 +169,7 @@ A call_out fired from inside an `atomic` function does not extend the caller's a
 
 ## Error handling
 
-A function errors by calling `error("message")` (an LPC.md-listed kfun) or by triggering a runtime fault (type mismatch, divide-by-zero, missing object). The atomic-context rollback fires on either path. Callers can capture an error with `catch`:
+A function errors by calling `error("message")` (an LPC.md-listed kfun) or by triggering a runtime fault (type mismatch, divide-by-zero, missing object). The atomic-context rollback fires on either path *when an `atomic` ancestor is on the call stack*. Callers can capture an error with `catch`:
 
 ```c
 mixed result;
@@ -175,7 +179,9 @@ if (result) {
 }
 ```
 
-`catch` lets the caller observe the failure without propagating it. The inner call's dataspace mutations still roll back. The platform's own LPC code rarely uses `catch` (errors propagate to the caller of the kfun, which is what callers usually want); use it sparingly in application code, since silently absorbing an error in a deeply atomic context defeats the rollback's protective purpose.
+`catch` lets the caller observe the failure without propagating it. If `some_call` was declared `atomic` (or runs inside an atomic ancestor that has not yet returned), its dataspace mutations roll back before the `catch` block runs. If `some_call` was not atomic and no atomic ancestor is on the stack, `catch` absorbs the error and the mutations persist — the call left dataspace in whatever intermediate state it reached before erroring.
+
+The platform's own LPC code rarely uses `catch` (errors propagate to the caller of the kfun, which is what callers usually want); use it sparingly in application code, since silently absorbing an error in a deeply atomic context defeats the rollback's protective purpose.
 
 ## A short worked example
 
@@ -194,14 +200,18 @@ static void create()
 
 int query() { return counter; }
 
-void increment_with_failure()
+atomic void increment_with_failure()
 {
     counter += 1;
     error("deliberate failure");
 }
 ```
 
-Calling `query()` returns the current counter. Calling `increment_with_failure()` enters the atomic context, mutates `counter` to the next value, then errors. The host runtime rolls back the mutation; the next `query()` returns the same value as before. No application code participates in the rollback; the platform's per-call atomicity does the work.
+The `atomic` modifier on `increment_with_failure` is what makes the rollback work. Calling `query()` returns the current counter. Calling `increment_with_failure()` enters the atomic envelope, mutates `counter` to the next value, then errors. The host runtime rolls back the mutation; the next `query()` returns the same value as before. No application code participates in the rollback.
+
+Drop the modifier and the same probe shows the mutation persisting past the error: the function runs without an atomic envelope, the mutation lands on dataspace, the error fires, and any catch up the stack absorbs the error without triggering a rollback.
+
+The `examples/atomic-demo/` reference application wraps this counter in an HTTP/1 application server with a smoke script that exercises the three-step probe (`GET /counter` → `POST /increment-with-failure` → `GET /counter`) and asserts the rollback end-to-end.
 
 ## Where to next
 
