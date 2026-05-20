@@ -67,6 +67,8 @@ static void create()
 
     /* global access */
     set_global_access("System", TRUE);
+    set_global_access("XML", TRUE);
+    set_global_access("Schema", TRUE);
 
     /* server objects */
     load("sys/errord");
@@ -106,6 +108,8 @@ static void create()
     /* Domain stuff */
     domains = ({ "TLS", "HTTP", "LPC" });
     domains += get_dir("/usr/[A-Z]*")[0] - (domains + ({ "System" }));
+    /* Two-pass: register all domain owners first so cross-domain inherits
+     * resolve regardless of alphabetical-iteration order. */
     for (i = 0, sz = sizeof(domains); i < sz; i++) {
 	domain = domains[i];
 	add_owner(domain);
@@ -113,6 +117,9 @@ static void create()
 
 	rsrc_incr(domain, "fileblocks",
 		  DRIVER->file_size("/usr/" + domain, TRUE));
+    }
+    for (i = 0, sz = sizeof(domains); i < sz; i++) {
+	domain = domains[i];
 	if (file_info("/usr/" + domain + "/initd.c")) {
 	    load("/usr/" + domain + "/initd");
 	}
