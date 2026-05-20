@@ -65,6 +65,70 @@ static string stringify(string str)
 }
 
 /*
+ * strip ASCII whitespace from the left of a string.
+ * When leave_newlines is non-zero, newlines and carriage returns are preserved.
+ */
+static string strip_left(string str, varargs int leave_newlines)
+{
+    int i, len;
+
+    len = strlen(str);
+    for (i = 0; i < len; i++) {
+	switch (str[i]) {
+	case ' ': case '\t':
+	    break;
+	case '\n': case '\r':
+	    if (!leave_newlines) {
+		break;
+	    }
+	    /* fall through */
+	default:
+	    if (i == 0) {
+		return str;
+	    }
+	    return str[i ..];
+	}
+    }
+    return "";
+}
+
+/*
+ * strip ASCII whitespace from the right of a string.
+ * When leave_newlines is non-zero, newlines and carriage returns are preserved.
+ */
+static string strip_right(string str, varargs int leave_newlines)
+{
+    int i, end;
+
+    end = strlen(str) - 1;
+    for (i = end; i >= 0; i--) {
+	switch (str[i]) {
+	case ' ': case '\t':
+	    break;
+	case '\n': case '\r':
+	    if (!leave_newlines) {
+		break;
+	    }
+	    /* fall through */
+	default:
+	    if (i == end) {
+		return str;
+	    }
+	    return str[.. i];
+	}
+    }
+    return "";
+}
+
+/*
+ * strip ASCII whitespace from both ends of a string.
+ */
+static string strip(string str, varargs int leave_newlines)
+{
+    return strip_right(strip_left(str, leave_newlines), leave_newlines);
+}
+
+/*
  * float to string, with full accuracy
  */
 static string float2string(float flt)
