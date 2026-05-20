@@ -174,3 +174,32 @@ static string float2string(float flt)
 
     return str;
 }
+
+/*
+ * single-character int to 1-char string
+ */
+static string char_to_string(int c)
+{
+    string res;
+
+    res = " ";
+    res[0] = c;
+    return res;
+}
+
+/*
+ * pairwise substring replacement: replace_strings(s, a, b, c, d) returns s
+ * with all occurrences of a replaced by b, then all occurrences of c by d
+ */
+static string replace_strings(string str, string swaps...)
+{
+    int i;
+
+    if (sizeof(swaps) % 2) {
+	error("uneven swap arguments");
+    }
+    for (i = 0; i < sizeof(swaps); i += 2) {
+	str = implode(explode(swaps[i] + str + swaps[i], swaps[i]), swaps[i+1]);
+    }
+    return str;
+}
