@@ -116,6 +116,60 @@ static int member(mixed item, mixed *arr)
 }
 
 /*
+ * return ob's logical name: query_object_name() if defined, else the LPC
+ * object_name kfun. SkotOS's richer name() falls back through query_ur_object
+ * for unnamed clones with an ur parent; that path doesn't arise for objects
+ * created via vault_node.c's spawn_create_one (every clone gets set_object_name
+ * at create time), so the simpler two-step fallback suffices for the cohesive
+ * lift's MVA. Revise when an unnamed-ur-clone case is discovered.
+ */
+static string name(object ob)
+{
+    string oname;
+
+    oname = ob->query_object_name();
+    return oname ? oname : object_name(ob);
+}
+
+/*
+ * find an object by LPC path; compile_object if not present.
+ */
+static object findOrLoad(string path)
+{
+    object ob;
+
+    ob = find_object(path);
+    if (!ob) {
+	ob = compile_object(path);
+    }
+    return ob;
+}
+
+/*
+ * unwrap XML data wrapper objects to their underlying values. Used by
+ * stateimpex callers (spawn_create_one, spawn_configure_one) to peek
+ * inside parse_xml's typed-tree output.
+ *
+ * SkotOS's query_colour_value also unwrapped /base/data/nref and
+ * /usr/XML/data/samref (SAM-ref wrappers) — those drop with Note 3
+ * distribution-layer strip. The XML element + pcdata wrappers
+ * remain; their LPC paths preserve from SkotOS layout (~XML/data/...).
+ */
+static mixed queryColourValue(mixed value)
+{
+    if (typeof(value) == T_OBJECT) {
+	switch (object_name(value)) {
+	case "/usr/XML/data/element#-1":
+	case "/usr/XML/data/pcdata#-1":
+	    return value->query_data();
+	default:
+	    break;
+	}
+    }
+    return value;
+}
+
+/*
  * logging stubs (no-op pending a kernel-layer log facility)
  *
  * Call sites preserved at lift time so SkotOS-shape trace structure
