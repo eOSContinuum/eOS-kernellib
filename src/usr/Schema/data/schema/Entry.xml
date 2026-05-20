@@ -1,0 +1,12 @@
+<object program="/usr/Schema/obj/schema_node">
+  <Element type="lpc_str" ns="Core" tag="Entry" recpoint="false" delitem="clear_property(key)" query="query_ascii_property(key)">
+    <Children/>
+    <Attributes>
+      <Attribute id="key" atype="lpc_str" areadonly="false"/>
+    </Attributes>
+    <Iterator var="key" call="query_property_indices(#0)"/>
+    <Callbacks>
+      <Callback call="set_ascii_property(key,CONTENT,#1)"/>
+    </Callbacks>
+  </Element>
+</object>

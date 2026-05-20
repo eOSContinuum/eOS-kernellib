@@ -1,0 +1,10 @@
+<object program="/usr/Schema/obj/schema_node">
+  <Element ns="Ur" tag="Children" recpoint="true" transient="true">
+    <Children>
+      <Child node="OBJ(Schema:Ur:Child)"/>
+    </Children>
+    <Attributes/>
+    <Iterator/>
+    <Callbacks/>
+  </Element>
+</object>
