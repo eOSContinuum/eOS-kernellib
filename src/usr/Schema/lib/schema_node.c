@@ -26,6 +26,8 @@
 private inherit "/lib/util/ascii";
 private inherit "/usr/Schema/lib/dtd";
 
+inherit "/lib/util/named";
+
 string	space;
 string	tag;
 string	type;
@@ -468,4 +470,4 @@ static string *break_call(string call)
     return ({ call });
 }
 
-void die() { destruct_object(); }
+void die() { destruct_object(this_object()); }
