@@ -46,6 +46,8 @@ private inherit "/usr/Schema/lib/dtd";
 # define LPC_INT		"lpc_int"
 # define LPC_FLT		"lpc_flt"
 
+# define INDEX			"/usr/Index/sys/index_daemon"
+
 mapping enumerations;
 mapping type_handlers;
 mapping colour_handlers;
@@ -258,7 +260,13 @@ mixed ascii_to_typed(string ascii, string type)
 	    return nil;
 	}
 	if (sscanf(ascii, "OBJ(%s)", str)) {
+	    /* path lookup first (legacy / file-backed OBJ refs), then
+	     * logical-name lookup via Index for OBJ(Schema:Foo:Bar)-style
+	     * literals carried in lifted XML schemas. */
 	    ob = find_object(str);
+	    if (!ob) {
+		ob = INDEX->query_object(str);
+	    }
 	    if (!ob) {
 		error("no object: " + ascii);
 	    }

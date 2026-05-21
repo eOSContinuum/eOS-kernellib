@@ -15,14 +15,10 @@ mixed data;
 
 int is_samref() { return TRUE; }
 
-static void configure(mixed d)
+/* LV-4.5d: See element.c for the create-vs-configure rationale. */
+static void create(mixed d)
 {
     data = d;
-}
-
-mixed query_configuration()
-{
-    return data;
 }
 
 void set_data(mixed d)

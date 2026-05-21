@@ -7,12 +7,18 @@
  * "Schema:Element:Hierarchy") inherit this lib and call
  * set_object_name() at create() time.
  *
- * Stub stage: name is stored privately and returned by
- * query_object_name(). LV-4.5d lifts Index (IDD) and rewires
- * set_object_name() to maintain a global name -> object map for
- * O(1) inverse lookup. The API surface defined here is stable
- * across that transition; consumers will not need to change.
+ * LV-4.5d wires set_object_name() through to ~Index/sys/index_daemon
+ * so the name -> object map is global and O(1)-invertible via
+ * find_named(). The local _logical_name slot is kept as a cheap cache
+ * for query_object_name() callers (avoids a daemon round-trip on every
+ * read) and as a sentinel for the inheriting object's own
+ * destruct-time bookkeeping; the index-side registration is cleared
+ * from the kernel destruct hook (/kernel/lib/auto.c::destruct_object)
+ * via Index->clear_name_for_object(), so consumers don't have to do
+ * anything new.
  */
+
+# define INDEX		"/usr/Index/sys/index_daemon"
 
 private string _logical_name;
 
@@ -23,5 +29,23 @@ nomask string query_object_name()
 
 void set_object_name(string lname)
 {
+    if (_logical_name && _logical_name != lname) {
+	INDEX->clear_name(_logical_name);
+    }
+    if (lname) {
+	INDEX->set_name(this_object(), lname);
+    }
     _logical_name = lname;
+}
+
+/*
+ * NAME:	find_named()
+ * DESCRIPTION:	logical-name -> object lookup. Returns nil if the name
+ *		is not registered. Wraps Index->query_object so consumers
+ *		that already inherit this lib don't need to know about the
+ *		Index daemon path.
+ */
+object find_named(string lname)
+{
+    return INDEX->query_object(lname);
 }

@@ -95,7 +95,13 @@ static mixed ascii_to_untyped(string ascii)
     object ob;
 
     if (sscanf(ascii, "OBJ(%s)", o)) {
+	/* path lookup first (file-backed OBJ refs), then Index logical-name
+	 * lookup for OBJ(Schema:Foo:Bar)-style literals in lifted schema
+	 * XML (closes OQ-17). */
 	if (ob = find_object(o)) {
+	    return ob;
+	}
+	if (ob = "/usr/Index/sys/index_daemon"->query_object(o)) {
 	    return ob;
 	}
 	error("no object: " + o);
