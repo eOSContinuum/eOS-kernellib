@@ -180,6 +180,7 @@ For the question of how extension-loaded codepaths interact with the platform's 
 - **`docs/operations.md`** — `.dgd` configuration fields (`dump_file`, `dump_interval`, `swap_file`, `hotboot` tuple), boot modes, failure-mode table.
 - **`docs/lpc-essentials.md`** Type modifiers — language semantics for `static` and how it interacts with persistence.
 - **`docs/architecture.md`** Boot sequence — the three boot modes (cold, statedump-restore, hot boot) at the platform level.
+- **`docs/vault-applications.md`** — Vault subsystem for per-domain typed-property persistence on top of the snapshot cycle: participating-domain contract, on-disk XML shape, round-trip cycle.
 - **`src/kernel/sys/driver.c`** — the `restored(int hotboot)` hook implementation.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html

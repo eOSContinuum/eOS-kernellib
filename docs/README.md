@@ -26,15 +26,17 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [kernel-libraries.md](kernel-libraries.md) — inheritable libraries under `src/lib/` (strings, persistent collections, iteration, asynchronous control, time, utilities).
 - [application-authoring.md](application-authoring.md) — general tier-E application patterns; owner/access conventions; `call_touch` upgrade model; non-HTTP transports.
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
+- [vault-applications.md](vault-applications.md) — Vault-specific patterns: participating-domain contract, property-bearing clonables, per-application schema registration, on-disk XML shape, round-trip cycle, cross-domain access requirements.
 
 ### Operations
 
 - [operations.md](operations.md) — the `.dgd` configuration, boot modes, state persistence, logging and diagnostics, resource limits, host-driver extension loading. The deployment surface.
 - [admin-console.md](admin-console.md) — the operator's console (verb-based REPL on `telnet_port`): connecting, security posture, per-task operational reference, verb appendix.
 
-### Working example
+### Working examples
 
 - `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
+- `../examples/vault-app/` — minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
 
 ### Reference
 
@@ -49,6 +51,7 @@ Common goals and the docs that serve them.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
+- **Write a Vault-persisted application** — [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
 - **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md).
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
