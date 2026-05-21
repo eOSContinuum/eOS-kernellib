@@ -113,9 +113,9 @@ void spawn_one_by_path(string path) {
 }
 
 string store(object ob) {
-   string program, name, file, *bits, xml_text;
+   string program, root_elem, name, file, *bits, xml_text;
    mixed state;
-   int i;
+   int i, is_clone;
 
    name = ob->query_object_name();
    if (!name) {
@@ -125,9 +125,17 @@ string store(object ob) {
    state = export_state(ob, nil, nil, nil, TRUE); /* vaultflag TRUE */
 
    program = object_name(ob);
-   sscanf(program, "%s#", program);
+   /* Note 1 (LV-5 closure): emit <clone> for instances, <object> for
+    * singletons. vault_node::spawn_create_one discriminates on the root
+    * element name (clone_object path vs findOrLoad path). SkotOS's
+    * /usr/SID/sys/vault.c stored only itself (the Vault daemon) and
+    * thus always emitted <object>; that pattern survived through
+    * LV-3 / LV-4 / LV-4.5c because vault.c::store was never exercised
+    * at runtime against a clone. */
+   is_clone = sscanf(program, "%s#", program);
+   root_elem = is_clone ? "clone" : "object";
 
-   state = xmdElts("object",
+   state = xmdElts(root_elem,
 		    ({ "program", program }),
 		    state);
 

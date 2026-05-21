@@ -25,6 +25,7 @@
  */
 
 # include <type.h>
+# include <String.h>
 # include <XML.h>
 
 # define DTD		"/usr/Schema/sys/dtd_daemon"
@@ -70,13 +71,18 @@ string gen_xml(mixed xml)
     mixed chunk;
     string out;
 
-    res = clone_object("/lib/StringBuffer");
+    /* LV-5 L8 closure: System/lib/auto::clone_object requires /obj/ in the
+     * path; /lib/StringBuffer fails that check. Every other StringBuffer
+     * use in the codebase is `new StringBuffer(...)` (a non-persistent
+     * LWO via new_object). gen_xml never ran at runtime through LV-4.5c
+     * (vault.c::store was not exercised until LV-5's round-trip), so the
+     * mismatch surfaced here. */
+    res = new StringBuffer();
     ::generate_xml(xml, res);
     out = "";
     while ((chunk = res->chunk()) != nil) {
 	out += chunk;
     }
-    destruct_object(res);
     return out;
 }
 

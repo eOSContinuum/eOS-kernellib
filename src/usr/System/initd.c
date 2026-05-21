@@ -71,6 +71,7 @@ static void create()
     set_global_access("Schema", TRUE);
     set_global_access("Marshal", TRUE);
     set_global_access("Index", TRUE);
+    set_global_access("Vault", TRUE);
 
     /* server objects */
     load("sys/errord");

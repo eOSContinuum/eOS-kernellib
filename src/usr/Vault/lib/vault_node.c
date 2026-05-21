@@ -48,6 +48,22 @@ private inherit "~XML/lib/xmd";
 inherit "~XML/lib/xmlparse";
 
 # define VAULT		"/usr/Vault/sys/vault"
+# define INDEX		"/usr/Index/sys/index_daemon"
+
+/* LV-5 L8 closure: vault_node tests whether an object already exists.
+ * find_object is a path-lookup kfun; logical names registered via
+ * set_object_name (set_name on Index after LV-4.5d) do not resolve
+ * through it. This helper tries path lookup first, then falls back to
+ * Index->query_object. */
+private object find_by_path_or_name(string name)
+{
+    object ob;
+
+    if (ob = find_object(name)) {
+	return ob;
+    }
+    return INDEX->query_object(name);
+}
 
 mapping initializers;
 
@@ -102,7 +118,7 @@ int spawn_create_one(string name, string path, string source) {
    }
    program = xmdAttributes(state)[1];
 
-   if (!find_object(name)) {
+   if (!find_by_path_or_name(name)) {
       if (root_elem == "clone") {
 	 /* cloneable path */
 	 string before, after;
@@ -115,7 +131,7 @@ int spawn_create_one(string name, string path, string source) {
 	 /* for clones only, see if this is an initializer object */
 	 if (sscanf(name, "%s:Initial:%s", before, after)) {
 	    name = before + ":" + after;
-	    if (!find_object(name)) {
+	    if (!find_by_path_or_name(name)) {
 	       /* only create if does not already exist */
 	       ob = clone_object(program);
 	       ob->set_object_name(name);
@@ -142,7 +158,7 @@ int spawn_create_one(string name, string path, string source) {
 
 	 if (sscanf(name, "%s:Initial:%s", before, after)) {
 	    name = before + ":" + after;
-	    if (!find_object(name)) {
+	    if (!find_by_path_or_name(name)) {
 	       /* only create if does not already exist */
 	       ob = clone_object(program);
 	       ob->set_object_name(name);
@@ -166,7 +182,7 @@ int spawn_configure_one(string name, string path, string source) {
    object ob;
    mixed state;
 
-   if (ob = find_object(name)) {
+   if (ob = find_by_path_or_name(name)) {
       string before, after;
 
       state = parse_xml(source, path, FALSE, TRUE);
@@ -185,7 +201,7 @@ int spawn_configure_one(string name, string path, string source) {
       if (sscanf(name, "%s:Initial:%s", before, after)) {
 	 name = before + ":" + after;
 	 if (initializers[name]) {
-	    if (ob = find_object(name)) {
+	    if (ob = find_by_path_or_name(name)) {
 	       import_state(ob, state[0]);
 	       return 2;
 	    }
