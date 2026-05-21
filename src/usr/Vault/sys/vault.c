@@ -44,12 +44,15 @@
  */
 
 # include <type.h>
+# include <XML.h>
 
 inherit "/lib/util/url";
 
 private inherit "/lib/util/ascii";
 private inherit "/lib/util/file";
 private inherit "/lib/util/lpc";
+
+inherit "/lib/util/named";
 
 private inherit "~Marshal/XmlBinding/lib/stateimpex";
 private inherit "~XML/lib/xmd";
@@ -110,8 +113,7 @@ void spawn_one_by_path(string path) {
 }
 
 string store(object ob) {
-   string program, name, file, *bits;
-   object result;
+   string program, name, file, *bits, xml_text;
    mixed state;
    int i;
 
@@ -125,12 +127,15 @@ string store(object ob) {
    program = object_name(ob);
    sscanf(program, "%s#", program);
 
-   state = xmd_elts("object",
+   state = xmdElts("object",
 		    ({ "program", program }),
 		    state);
 
-   result = new_object("/data/data");
-   generate_xml(state, result);
+   /* LV-4.5c refactor: SkotOS used new_object("/data/data") + generate_xml
+    * (a chunked-data wrapper). eOS-kernellib's XML daemon exposes
+    * gen_xml(xml) returning a string (uses StringBuffer internally per
+    * LV-4.5a Decision). write_file accepts a string directly. */
+   xml_text = XML->gen_xml(state);
 
    /* create a safe (for unix paths) representation of the name */
    bits = explode(name, ":");
@@ -143,7 +148,7 @@ string store(object ob) {
 
    paveWay(file);
    catch {
-      writeDataToFile(file + ".writing", result);
+      write_file(file + ".writing", xml_text);
    } : {
       remove_file(file + ".writing");
       error("failed to write file");
