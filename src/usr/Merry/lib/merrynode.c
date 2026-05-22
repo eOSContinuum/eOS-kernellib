@@ -289,7 +289,10 @@ object Spawn(object ur) {
       error("argument 1 to Spawn() is not an object");
    }
    if (sscanf(object_name(ur), "%s#", clonable)) {
-      newobj = clone_object(clonable);
+      /* :: escape past the local SANDBOX(clone_object) shadow.
+       * Same idiom as the ::call_other / ::destruct_object / ::new_object
+       * escapes elsewhere in this file. */
+      newobj = ::clone_object(clonable);
       newobj->set_ur_object(ur);
       return newobj;
    }
@@ -342,7 +345,9 @@ object Duplicate(object ob) {
    }
    if (sscanf(object_name(ob), "%s#%*d", clonable)) {
       state = export_state(ob);
-      clone = clone_object(clonable);
+      /* :: escape past the local SANDBOX(clone_object) shadow.
+       * See Spawn() above. */
+      clone = ::clone_object(clonable);
       import_state(clone, state);
       return clone;
    }
