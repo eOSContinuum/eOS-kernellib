@@ -4,7 +4,7 @@ A Merry application on eOS-kernellib runs sandboxed scripts against an object hi
 
 **Audience**: an application author who wants to add scripted, sandboxed behavior to a persistent object surface on eOS-kernellib; comfortable with LPC (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
 
-`docs/architecture.md` covers the capability tiers and where the Merry subsystem sits. `docs/runtime-primitives.md` covers sandboxed code-load and the ur-hierarchy as platform properties. `docs/vault-applications.md` covers persistent-state participation; this document covers invocation.
+`docs/architecture.md` covers the capability tiers and where the Merry subsystem sits. `docs/runtime-primitives.md` covers sandboxed code-load and the ur-hierarchy as platform properties. `docs/vault-applications.md` covers persistent-state participation; this document covers invocation. For writing Merry source itself (dialect restrictions, the four extensions over LPC, the compile pipeline, AST nodes, the full sandbox surface, the merryfun catalog), see `docs/merry-language.md`.
 
 ## The script-bearing-object contract
 
