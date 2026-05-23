@@ -12,6 +12,7 @@ A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the 
 - A fourth Merry script issues `$delay(1, FALSE); Set($this, "delay_fired", 1);`. The first call schedules a continuation via the binding host's `delayed_call`; one second later, `perform_delayed_call` fires `merry_continuation` on the mcontext LWO, which calls `run_merries` to resume execution and set the marker property. A `verify_delay` call_out polls the property at t=+2.
 - A fifth Merry script invokes `testspace::greet($who: "world");`. The test driver registers itself as the "testspace" script-space handler (exposing `query_method` / `call_method`); `LabelCall` walks the registry, finds the handler, and dispatches the named method with the inline locals overlaid on the merry-source `args` mapping.
 - The DI-2 batching surface adds four more phases. Phase 6 calls `MERRY->batched_set(child, ([ "k1": 100, "k2": 200 ]))` from LPC and verifies both values land. Phase 7 exercises the DD-4 (d) atomic-mode opt-in via `MERRY->batched_set(child, mapping, ([ "atomic": 1 ]))`. Phase 8 runs `BatchedSet($this, ([ ... ]))` from a Merry-compiled script to confirm the merrynode.c surface is reachable from observer source. Phase 9 invokes `MERRY->batch(this_object(), "_throw_for_test", ({}))` against a callable that errors and verifies the catch'd-error default per DD-2 (d) propagates the error AND that the daemon-local batch-status stub records a `main-aborted` entry per DD-3 (c).
+- The DI-3 dispatcher adds six more phases against the same `child` host. Phase 10 (DISPATCH MAIN) registers a main-timing observer and confirms it fires on the next `set_property`. Phase 11 (DISPATCH ORDER) registers pre + main + post observers that append to a trace string, asserting `pre|main|post` after the write per DD-4 (b). Phase 12 (DISPATCH VETO) registers a pre observer that throws and verifies the propagated error AND that the underlying value did not land (DD-4 (a) pre-veto contract). Phase 13 (DISPATCH CYCLE) registers a main observer that writes the same property and verifies the cycle detector (DD-2 (b) per-execution chain) catches the recursive dispatch. Phase 14 (DISPATCH ANCESTRY) registers an observer on the parent and writes the property on the child; find_observers walks the ur chain and fires the parent's observer with `$this` bound to the child host (DD-5 (a)). Phase 15 (DISPATCH IMPLICIT) confirms an unbatched `set_property` enters and exits an implicit batch cleanly and records a `completed` status entry (DD-3 (b)).
 
 ## Deployment
 
@@ -41,6 +42,12 @@ cat .runtime/src/usr/MerryApp/data/test-result.log
 #   MerryApp:test: BATCH ATOMIC OK
 #   MerryApp:test: BATCH SOURCE OK
 #   MerryApp:test: BATCH ABORT OK
+#   MerryApp:test: DISPATCH MAIN OK
+#   MerryApp:test: DISPATCH ORDER OK
+#   MerryApp:test: DISPATCH VETO OK
+#   MerryApp:test: DISPATCH CYCLE OK
+#   MerryApp:test: DISPATCH ANCESTRY OK
+#   MerryApp:test: DISPATCH IMPLICIT OK
 #   MerryApp:test: DELAY OK
 ```
 
