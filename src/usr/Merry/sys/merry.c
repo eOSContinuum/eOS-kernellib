@@ -107,12 +107,19 @@ void create() {
  * approved_registrars, OR caller's domain matches target_name's domain.
  * The domain-match path lets each daemon register on its own objects
  * without needing to be in the approved set.
+ *
+ * caller_program MUST be captured at the public-LFUN entry via
+ * previous_program() and threaded in; calling previous_program() inside
+ * this helper would return "/usr/Merry/sys/merry" (the daemon program
+ * containing the public LFUN), not the true caller program.
  */
 private
-void _check_registrar(string target_name) {
-   string caller_program, caller_domain, target_domain;
+void _check_registrar(string caller_program, string target_name) {
+   string caller_domain, target_domain;
 
-   caller_program = previous_program();
+   if (!caller_program) {
+      error("MERRY: nil caller_program in _check_registrar (call from interactive?)");
+   }
    if (sscanf(caller_program, "/kernel/%*s") != 0) {
       return;
    }
@@ -127,7 +134,7 @@ void _check_registrar(string target_name) {
       return;
    }
    error("MERRY: caller domain " + caller_domain +
-         " not authorized to register on " + target_name);
+         " not authorized to register on " + (target_name ? target_name : "(nil)"));
 }
 
 /*
@@ -150,16 +157,21 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
  * by find_observers per DI-1 (b) MVP choice.
  */
 void register_observer(object ob, string path, string timing, string source) {
-   string prop_name, low_timing;
+   string caller_program, prop_name, low_timing;
    mixed existing;
    string *list;
 
+   caller_program = previous_program();
    if (!ob) {
       error("register_observer: nil host object");
    }
-   _check_registrar(::object_name(ob));
+   _check_registrar(caller_program, ::object_name(ob));
 
    low_timing = timing ? lower_case(timing) : "main";
+   if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {
+      error("register_observer: timing must be one of {pre, main, post}; got \"" +
+            low_timing + "\"");
+   }
    prop_name = "merry:on:" + path + ":" + low_timing;
 
    existing = ob->query_raw_property(prop_name);
@@ -201,11 +213,14 @@ string *query_approved_registrars() {
 }
 
 void register_script_space(string space, object ob) {
+   string caller_program;
+
+   caller_program = previous_program();
    space = lower_case(space);
    if (space == "merry") {
       error("cannot register the merry script space");
    }
-   _check_registrar(::object_name(ob));
+   _check_registrar(caller_program, ::object_name(ob));
    if (!script_spaces) {
       script_spaces = ([ ]);
    }
@@ -213,8 +228,10 @@ void register_script_space(string space, object ob) {
 }
 
 void unregister_script_space(string space) {
+   string caller_program;
    object existing;
 
+   caller_program = previous_program();
    space = lower_case(space);
    if (space == "merry") {
       error("cannot unregister the merry script space");
@@ -226,7 +243,7 @@ void unregister_script_space(string space) {
    if (existing == nil) {
       error("no such script space registered");
    }
-   _check_registrar(::object_name(existing));
+   _check_registrar(caller_program, ::object_name(existing));
    script_spaces[space] = nil;
 }
 
