@@ -285,6 +285,144 @@ static void run_tests()
     }
 
     log_line("MerryApp:test: LABELCALL OK");
+
+    /* phase 6: DI-2 batched_set (non-atomic) per DD-1 (c) -- writes a
+     * multi-key mapping under one batch-id with sequential seq starting
+     * at 0 (DD-3 (b)). Verifies the public LFUN compiles and that both
+     * properties land; the batch-id and seq are daemon-internal and not
+     * surfaced through a public API at DI-2 scope (DI-5's
+     * query_changes_since exposes them). */
+
+    catch {
+	if (MERRY_DAEMON->_current_batch_id() != 0) {
+	    log_line("MerryApp:test: FAIL: batched_set non-zero current_batch_id pre-call");
+	    return;
+	}
+	MERRY_DAEMON->batched_set(child, ([
+	    "test:batch:k1": 100,
+	    "test:batch:k2": 200,
+	]));
+	if (child->query_raw_property("test:batch:k1") != 100 ||
+	    child->query_raw_property("test:batch:k2") != 200) {
+	    log_line("MerryApp:test: FAIL: batched_set values did not land");
+	    return;
+	}
+	if (MERRY_DAEMON->_current_batch_id() != 0) {
+	    log_line("MerryApp:test: FAIL: batched_set left batch active");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: batched_set non-atomic threw");
+	return;
+    }
+
+    log_line("MerryApp:test: BATCH OK");
+
+    /* phase 7: DI-2 atomic-mode opt-in per DD-4 (d) -- body + status
+     * entry write run inside DGD atomic{}; on success the writes commit
+     * normally. The abort-rollback branch is DI-8's scope; phase 7
+     * verifies the success branch and that the opts-mapping is
+     * accepted on the varargs slot. */
+
+    catch {
+	MERRY_DAEMON->batched_set(child,
+				  ([ "test:batch:atomic": 42 ]),
+				  ([ "atomic": 1 ]));
+	if (child->query_raw_property("test:batch:atomic") != 42) {
+	    log_line("MerryApp:test: FAIL: atomic batched_set value did not land");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: atomic batched_set threw");
+	return;
+    }
+
+    log_line("MerryApp:test: BATCH ATOMIC OK");
+
+    /* phase 8: DI-2 BatchedSet from Merry source -- verifies the
+     * merrynode.c surface is reachable from compiled scripts; the
+     * mapping-arg signature composes inline per L14 #15. */
+
+    catch {
+	object batch_source_script;
+
+	batch_source_script = new_object(MERRY_DATA,
+					 "BatchedSet($this, ([ "
+					 + "\"test:batch:src1\": 11, "
+					 + "\"test:batch:src2\": 22 "
+					 + "])); return TRUE;");
+	parent->set_property("merry:lib:batch_test", batch_source_script);
+
+	result = run_merry(child, "batch_test", "lib", ([ ]));
+	if (!result) {
+	    log_line("MerryApp:test: FAIL: BatchedSet source returned false");
+	    return;
+	}
+	if (child->query_raw_property("test:batch:src1") != 11 ||
+	    child->query_raw_property("test:batch:src2") != 22) {
+	    log_line("MerryApp:test: FAIL: BatchedSet source values did not land");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: BatchedSet from Merry source threw");
+	return;
+    }
+
+    log_line("MerryApp:test: BATCH SOURCE OK");
+
+    /* phase 9: DI-2 non-atomic batch() abort path per DD-2 (d) +
+     * DD-3 (c) -- the callable throws; status entry must persist as
+     * "main-aborted" and the error must propagate to caller's catch{}. */
+
+    catch {
+	int err_caught, i;
+	mixed *status_after;
+
+	err_caught = 0;
+	catch {
+	    MERRY_DAEMON->batch(this_object(), "_throw_for_test", ({ }));
+	} : {
+	    err_caught = 1;
+	}
+	if (!err_caught) {
+	    log_line("MerryApp:test: FAIL: batch() did not propagate throw");
+	    return;
+	}
+	/* Scan a small batch-id window looking for the main-aborted
+	 * entry; the exact id isn't surfaced through a public API at
+	 * DI-2 scope (DI-5's query_changes_since covers that). */
+	status_after = nil;
+	for (i = 1; i <= 200 && !status_after; i ++) {
+	    mixed *s;
+	    s = MERRY_DAEMON->_query_batch_status(i);
+	    if (s && s[0] == "main-aborted") {
+		status_after = s;
+	    }
+	}
+	if (!status_after) {
+	    log_line("MerryApp:test: FAIL: no main-aborted status entry found");
+	    return;
+	}
+	if (MERRY_DAEMON->_current_batch_id() != 0) {
+	    log_line("MerryApp:test: FAIL: batch() abort left batch active");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: batch() abort path setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: BATCH ABORT OK");
+}
+
+
+/* Helper for phase 9: a public LFUN that always throws so batch() can
+ * exercise the abort path. Named with underscore prefix to mark it as
+ * internal/test-only; deliberately not static so call_other can reach
+ * it from MERRY's batch() implementation. */
+void _throw_for_test()
+{
+    error("MerryApp:test: deliberate throw for batch abort verification");
 }
 
 

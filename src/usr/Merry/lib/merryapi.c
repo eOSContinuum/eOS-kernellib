@@ -275,6 +275,7 @@ string categorize_merry_word(string word) {
    case "varargs":
    case "while":
       return "keyword";
+   case "BatchedSet":
    case "Call":
    case "Duplicate":
    case "Error":
