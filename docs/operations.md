@@ -91,11 +91,15 @@ For runtime errors, the driver dispatches through three hooks before falling bac
 
 `errord` is registered via `driver->set_error_manager()`. eOS-kernellib ships an errord at `src/usr/System/sys/errord.c` that formats the trace into a readable form and sends it via `send_message` to the relevant operator. If no errord is registered or its handler raises, the driver falls back to a built-in formatter that walks the trace and emits via the same default channel; errors never silently disappear.
 
+The property-change dispatcher writes a per-failure audit line to `/usr/Merry/log/dispatch.log` on observer-cycle detection, cascade-depth overflow, and observer-source compile failures. Volume is low under normal operation (writes only on detected failures); the log is rotated by ordinary log-management tooling — the dispatcher does not build in a rotation policy. See `docs/dispatcher.md` Audit log.
+
 ## Resource limits
 
 Platform-wide caps live in the `.dgd` file: `users`, `editors`, `objects`, `call_outs`, `array_size`. These are hard ceilings; the platform refuses operations that would exceed them.
 
 Per-owner limits are managed by the resource daemon at `/kernel/sys/resource_daemon` (registered as `resource_daemon` in the driver). Each owner has a quota covering object count, call_out count, ticks consumed per call, and stack depth. The admin_console `quota` and `rsrc` verbs read and write these. Per-owner ticks are charged on the owner's account when their code runs; an owner that exhausts ticks gets a runtime error and rollback rather than a hung platform.
+
+The property-change dispatcher (`docs/dispatcher.md`) exposes a runtime-configurable cascade-depth bound via `MERRY->set_max_cascade_depth(int n)` (KERNEL-gated) and `MERRY->query_max_cascade_depth()` (public read-only). Default is `32`. The bound counts depth, not breadth — a flat batched write with many keys does not increment the counter; an observer-triggered chain of further writes does. Hitting the bound throws `merry: cascade depth N exceeded ...` and records `cascade-aborted` in the dispatcher's batch-status log.
 
 ## Loading host-driver extensions
 
