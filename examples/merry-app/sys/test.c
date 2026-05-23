@@ -227,7 +227,11 @@ static void run_tests()
      * synchronously; one second later, perform_delayed_call fires
      * merry_continuation on the mcontext LWO, which calls run_merries
      * to resume execution and Set delay_fired to 1. verify_delay
-     * call_out below polls the property at t=2. */
+     * call_out below polls the property at t=2. NOTE: with phase 16
+     * triggering dump_state + shutdown at t<2, the verify_delay
+     * call_out is in the snapshot at first-boot exit; it fires after
+     * restore (along with phase17_verify), so DELAY OK lands on the
+     * second boot. */
 
     catch {
 	delay_script = new_object(MERRY_DATA,

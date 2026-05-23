@@ -40,8 +40,10 @@ scripts/setup-runtime.sh
 sleep 5
 cat .runtime/src/usr/MerryApp/data/test-result.log
 kill %1
-# Expect (in order; DELAY OK lands after DISPATCH IMPLICIT OK on the
-# first boot; PERSIST VERIFY OK lands after the restore):
+# Expect (in order; DELAY OK and PERSIST VERIFY OK both land on the
+# second boot from pre-snapshot call_outs whose scheduled times have
+# elapsed -- DELAY OK fires first because phase 4's verify_delay was
+# scheduled before phase 16's phase17_verify):
 #   MerryApp:test: starting
 #   MerryApp:test: ANCESTRY OK
 #   MerryApp:test: SANDBOX OK
@@ -58,6 +60,7 @@ kill %1
 #   MerryApp:test: DISPATCH ANCESTRY OK
 #   MerryApp:test: DISPATCH IMPLICIT OK
 #   MerryApp:test: PERSIST SETUP OK
+#   --- (driver exits; restart against snapshot) ---
 #   MerryApp:test: DELAY OK
 #   MerryApp:test: PERSIST VERIFY OK
 ```
