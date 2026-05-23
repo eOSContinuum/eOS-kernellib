@@ -191,6 +191,58 @@ mixed run_merries(object ob, string signal, string mode, mapping args,
 }
 
 
+/*
+ * find_observers: DD-5 (a) declarative-dominant lookup for the property-
+ * change dispatcher. Walks query_ur_object() ancestry. At each level:
+ *   - local present + no re-enable marker -> return accumulated; terminate.
+ *   - local present + re-enable marker -> accumulate, continue walk.
+ *   - local absent -> continue walk without accumulating.
+ *
+ * Per DD-5 (b), each (path, timing) slot resolves independently. Per
+ * DI-1 (b) MVP choice, both property-name forms are accepted on read:
+ * `merry:on:<path>` aliases `merry:on:<path>:main`; the explicit form is
+ * tried first, then the alias form for main timing. Single-string property
+ * values are normalized to one-element lists per DI-6 (b).
+ *
+ * Returns an empty array when no observers are found anywhere in the
+ * chain (callers treat ({}) as "no observers" without distinguishing
+ * "no host" from "host without observers").
+ */
+static
+string *find_observers(object ob, string path, string timing) {
+   string dprop, iprop, alias_dprop;
+   string *out;
+
+   timing = timing ? lower_case(timing) : "main";
+   dprop = "merry:on:" + path + ":" + timing;
+   iprop = "merry:on-inherit:" + path + ":" + timing;
+   alias_dprop = (timing == "main") ? "merry:on:" + path : nil;
+
+   out = ({ });
+   while (ob) {
+      mixed local, marker;
+
+      local = ob->query_raw_property(dprop);
+      if (!local && alias_dprop) {
+         local = ob->query_raw_property(alias_dprop);
+      }
+      marker = ob->query_raw_property(iprop);
+
+      if (local) {
+         if (typeof(local) == T_ARRAY) {
+            out += local;
+         } else if (typeof(local) == T_STRING) {
+            out += ({ local });
+         }
+         if (!marker) {
+            return out;
+         }
+      }
+      ob = ob->query_ur_object();
+   }
+   return out;
+}
+
 static
 string categorize_merry_word(string word) {
    switch(lower_case(word)) {
