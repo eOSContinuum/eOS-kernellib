@@ -13,6 +13,7 @@ A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the 
 - A fifth Merry script invokes `testspace::greet($who: "world");`. The test driver registers itself as the "testspace" script-space handler (exposing `query_method` / `call_method`); `LabelCall` walks the registry, finds the handler, and dispatches the named method with the inline locals overlaid on the merry-source `args` mapping.
 - The DI-2 batching surface adds four more phases. Phase 6 calls `MERRY->batched_set(child, ([ "k1": 100, "k2": 200 ]))` from LPC and verifies both values land. Phase 7 exercises the DD-4 (d) atomic-mode opt-in via `MERRY->batched_set(child, mapping, ([ "atomic": 1 ]))`. Phase 8 runs `BatchedSet($this, ([ ... ]))` from a Merry-compiled script to confirm the merrynode.c surface is reachable from observer source. Phase 9 invokes `MERRY->batch(this_object(), "_throw_for_test", ({}))` against a callable that errors and verifies the catch'd-error default per DD-2 (d) propagates the error AND that the daemon-local batch-status stub records a `main-aborted` entry per DD-3 (c).
 - The DI-3 dispatcher adds six more phases against the same `child` host. Phase 10 (DISPATCH MAIN) registers a main-timing observer and confirms it fires on the next `set_property`. Phase 11 (DISPATCH ORDER) registers pre + main + post observers that append to a trace string, asserting `pre|main|post` after the write per DD-4 (b). Phase 12 (DISPATCH VETO) registers a pre observer that throws and verifies the propagated error AND that the underlying value did not land (DD-4 (a) pre-veto contract). Phase 13 (DISPATCH CYCLE) registers a main observer that writes the same property and verifies the cycle detector (DD-2 (b) per-execution chain) catches the recursive dispatch. Phase 14 (DISPATCH ANCESTRY) registers an observer on the parent and writes the property on the child; find_observers walks the ur chain and fires the parent's observer with `$this` bound to the child host (DD-5 (a)). Phase 15 (DISPATCH IMPLICIT) confirms an unbatched `set_property` enters and exits an implicit batch cleanly and records a `completed` status entry (DD-3 (b)).
+- Phases 16 and 17 verify observer-state survival across a snapshot + restore cycle. Phase 16 (PERSIST SETUP) clones a fresh parent/child pair, registers a main observer on the child for `test:persist:val`, saves the host as a `static` global on the test driver, schedules a `phase17_verify` `call_out`, then calls a System-tier helper to `dump_state(FALSE)` and `shutdown()`. The verify script restarts DGD against the snapshot. Phase 17 (PERSIST VERIFY) fires from the surviving `call_out` after restore: writes `42` to the observed path on the restored host and asserts both that the write landed (property storage survived) and that the observer fired (the compiled merry-script object reference survived and `_resolve_observer` rebound correctly). The cycle exercises five orthogonal-persistence guarantees end-to-end: LPC global variables, property storage, object references to per-app data clones (`/usr/Merry/merry/<md5>`), the dispatcher's observer-source contract, and the scheduled-`call_out` queue.
 
 ## Deployment
 
@@ -27,12 +28,20 @@ System/initd's `/usr/[A-Z]*/initd.c` iteration picks up the new domain automatic
 ## Verify
 
 ```sh
+# Cold boot: phases 1-16 run; phase 16 dumps a snapshot and the driver exits.
 rm -f .runtime/state/snapshot .runtime/state/snapshot.old
 scripts/setup-runtime.sh
-.runtime/bin/dgd mva.dgd &
+.runtime/bin/dgd mva.dgd
+# (driver exits on its own after PERSIST SETUP OK)
+
+# Restore: restart against the snapshot; phase 17 fires from the surviving
+# call_out and writes PERSIST VERIFY OK.
+.runtime/bin/dgd mva.dgd .runtime/state/snapshot &
 sleep 5
 cat .runtime/src/usr/MerryApp/data/test-result.log
-# Expect (in order; DELAY OK arrives ~2 seconds after the others):
+kill %1
+# Expect (in order; DELAY OK lands after DISPATCH IMPLICIT OK on the
+# first boot; PERSIST VERIFY OK lands after the restore):
 #   MerryApp:test: starting
 #   MerryApp:test: ANCESTRY OK
 #   MerryApp:test: SANDBOX OK
@@ -48,7 +57,9 @@ cat .runtime/src/usr/MerryApp/data/test-result.log
 #   MerryApp:test: DISPATCH CYCLE OK
 #   MerryApp:test: DISPATCH ANCESTRY OK
 #   MerryApp:test: DISPATCH IMPLICIT OK
+#   MerryApp:test: PERSIST SETUP OK
 #   MerryApp:test: DELAY OK
+#   MerryApp:test: PERSIST VERIFY OK
 ```
 
 The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result.log`, which lands at `<directory>/usr/MerryApp/data/test-result.log` on the host filesystem (`<directory>` is the DGD config's `directory` setting; `.runtime/src/` in the standard layout).
@@ -58,10 +69,10 @@ The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result
 - `initd.c` -- domain initd; compiles `obj/thing` + `sys/test` at boot.
 - `lib/app.c` -- marker lib paralleling `examples/vault-app/lib/app.c`. Daemons under `sys/` inherit it so future shared daemon-side state has a place to land.
 - `obj/thing.c` -- property + ur-bearing clonable. Inherits `/lib/util/properties`, `/lib/util/ur`, `/lib/util/named` with labeled inherits to disambiguate the shared `create()` between properties and ur. Also defines the `delayed_call` / `perform_delayed_call` pair every script-bearing object must expose for Merry's `$delay()` to schedule continuations.
-- `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers Merry scripts for phases 1-3+5+8, runs eight synchronous assertions via `call_out("setup_and_run", 0)`, and one asynchronous `$delay()` assertion verified via a second `call_out` at t=+2. Doubles as the "testspace" script-space handler for phase 5 and exposes `_throw_for_test` as the callable phase 9's `MERRY->batch()` exercises against the catch'd-error abort path; in production both auxiliary roles would typically live on distinct objects.
+- `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers Merry scripts for phases 1-3+5+8, runs the synchronous assertions via `call_out("setup_and_run", 0)`, and the `$delay()` assertion verified via a second `call_out` at t=+2. Phase 16 schedules `phase17_verify` and dumps a snapshot via `/usr/System/sys/persist_helper`; phase 17 fires from the surviving `call_out` after the snapshot restore and verifies observer-state survival. Doubles as the "testspace" script-space handler for phase 5 and exposes `_throw_for_test` as the callable phase 9's `MERRY->batch()` exercises against the catch'd-error abort path; in production both auxiliary roles would typically live on distinct objects.
 
 ## Notes
 
-- The example exercises invocation only -- no Schema registration, no on-disk Vault round-trip. A Merry script is a runtime object (a `/usr/Merry/data/merry` clone) carrying parsed AST + cached compiled program; statedump survival of bound scripts requires Schema + Marshal participation that this example deliberately omits to keep the test focused on the runtime path.
+- The example exercises invocation and observer-survival across snapshot+restore -- no Schema registration, no on-disk Vault round-trip. A Merry script is a runtime object (a `/usr/Merry/data/merry` clone) carrying parsed AST + cached compiled program; the cached compile artifact lives on-disk under `/usr/Merry/merry/<md5>` and DGD's object-reference resurrection re-attaches the property's stored reference on restore. Phases 16 and 17 verify this end-to-end at the dispatcher layer; Schema + Marshal round-trips are out of scope and demonstrated by `examples/vault-app/`.
 - `Duplicate` shares the `::clone_object` escape with `Spawn` (both fixed in merrynode at LM-6) but `export_state` requires a Schema-registered state model (`SID->get_root_node(ob)`). A Schema registration on `MerryApp:Thing` would unblock Duplicate; that work pairs with whichever phase first introduces Schema-bound Merry hosts.
 - Observer-property naming (e.g., `merry:on:<property-path>[:<timing>]` storage for property-change observers) is deferred to the DD phase per the LM-5 Decision. The runtime mechanism find_merry uses (ancestry walk + prefix fan-out + `merry:inherit:` delegation) is unchanged; only the storage-key convention is unsettled.
