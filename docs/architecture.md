@@ -61,7 +61,9 @@ The administrative shell `admin_console` (`src/kernel/lib/admin_console.c` and `
 - **upgraded** (`src/usr/System/sys/upgraded.c`) — live code upgrade coordination. Drives `compile_object` cascades when a parent is recompiled.
 - **http_server** (`src/usr/System/sys/http_server.c`) — registers as the binary-port manager; clones an application server at the kernel-defined mount point `/usr/WWW/obj/server` on each incoming HTTP/1 connection.
 
-Adding tier-D or tier-E daemons follows the same pattern: a singleton under `/usr/<Domain>/sys/`, compiled by the domain's initd at boot.
+Adding tier-D or tier-E daemons follows the same pattern: a singleton under `/usr/<Domain>/sys/`, compiled by the domain's initd at boot. The shipped tier-D daemon that integrates structurally with the property primitive every user-tier object inherits is:
+
+- **`/usr/Merry/sys/merry`** — the property-change dispatcher. Every `set_property` write on a host that inherits `/lib/util/properties` routes through `MERRY->dispatch_set` for pre/main/post observer firing, cascade-depth bounding, cycle detection, and implicit batching. The dispatcher reuses the Merry script-binding mechanism for observer source. See `docs/merry-applications.md` for the script-binding mechanism and `docs/dispatcher.md` for the dispatcher's full surface.
 
 ## Boot sequence
 
@@ -77,6 +79,8 @@ The host driver starts, reads the `.dgd` configuration file, and compiles the pa
 4. For each discovered domain, calls `add_owner(<Domain>)` and compiles the domain's `initd.c`.
 
 The boot completes when the System initd's `create()` returns. The host driver then accepts external connections on the ports declared in the config.
+
+The property-layer hook in `/lib/util/properties` checks at every `set_property` call whether `/usr/Merry/sys/merry` is loaded; if so, the write routes through `MERRY->dispatch_set`, otherwise it falls through to `set_raw_property` directly. The check is per-call, so early-bootstrap code that runs before the Merry domain's initd compiles (the System-tier daemons in step 2, the alphabetically-prior tier-D domains in step 3) sees direct writes; once Merry's initd has compiled the dispatcher daemon, subsequent writes flow through it. Hosts that need to bypass the dispatcher post-boot (raw schema initialization, fixture seeding) call `set_raw_property` directly.
 
 ### Statedump-restore boot
 
@@ -145,6 +149,7 @@ The kernel layer ships platform domains (tier D) under `src/usr/`:
 - **`src/usr/HTTP/`** — HTTP/1 client and server library objects (`api/obj/server1.c`, `api/obj/client1.c`) and their TLS variants. The kernel ships these as libraries; binding the HTTP/1 server on the binary port is handled by `src/usr/System/sys/http_server.c`.
 - **`src/usr/TLS/`** — TLS 1.3 record layer, handshake, and extension support. Gated on the host being built with `KF_SECURE_RANDOM`; otherwise compiled-but-inert.
 - **`src/usr/LPC/`** — shared LPC utilities (parsers, AST helpers, and a full LPC compiler in LPC, currently unconsumed) used by other modules and available for application-side use.
+- **`src/usr/Merry/`** — the Merry script-binding subsystem and property-change dispatcher. The compile pipeline turns Merry source strings into `/usr/Merry/data/merry` clones with MD5-named programs at `/usr/Merry/merry/<md5>`; the `find_merry` / `run_merry` family in `/usr/Merry/lib/merryapi` looks scripts up by ancestry walk over `query_ur_object()`; the dispatcher daemon at `/usr/Merry/sys/merry` routes `set_property` writes through registered observers at pre/main/post timings. See `docs/merry-applications.md` for the application surface and `docs/dispatcher.md` for the dispatcher.
 
 `src/usr/System/` (tier C) is the kernel-tier-adjacent privileged domain described under Daemons above.
 

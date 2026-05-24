@@ -41,7 +41,7 @@ A Merry script binds to its target via a property key of the form `merry:<mode>:
 
 `find_merry` walks `query_ur_object()` from the target upward, looking for an exact match at each level. The first hit wins. If no level has the property, `find_merry` returns nil and `run_merry` returns `TRUE` (the conservative no-op).
 
-`mode` is an application-defined namespace -- `lib` is the SkotOS convention for callable libraries; an application can introduce its own (`on`, `pre`, `validate`, ...) without touching the runtime. The dispatcher work in the upcoming `DD-*` phase will settle a property-change-observer convention layered on top of this same lookup mechanism.
+`mode` is an application-defined namespace -- `lib` is the SkotOS convention for callable libraries; an application can introduce its own (`pre`, `validate`, ...) without touching the runtime. The property-change dispatcher uses `on` as its mode and the composite `<path>:<timing>` as its signal; the storage convention, ancestry walk, batching surface, and observer-source contract are documented in `docs/dispatcher.md`.
 
 ## Invocation surface
 
@@ -226,11 +226,9 @@ Script-space handlers are independent of the ancestry-walk lookup. `LabelCall` i
 
 ## What this example does NOT exercise
 
-The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now exercised; the remaining gaps are:
+The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now exercised, and snapshot+restore survival of property-bound script clones is exercised by the dispatcher's own example (`examples/merry-app/sys/test.c` phases 16 and 17, walked in `docs/dispatcher.md` Persistence). The remaining gap is:
 
 - **Duplicate full path**. The `::clone_object` escape applies to Duplicate as well, but `export_state` requires a Schema-registered state model (`SID->get_root_node(ob)`). Adding a per-app Schema registration to `obj/thing.c` and exercising Duplicate is follow-on work tied to whichever phase first introduces Schema-bound merry hosts.
-- **Statedump survival of bound merry-property scripts**. Scripts bound via `set_property("merry:<mode>:<signal>", script_object)` are runtime objects; the binding survives in-memory but a snapshot/restore cycle is not exercised here.
-- **Observer-property naming convention** (`merry:on:<path>[:<timing>]`-style storage for property-change observers). The runtime mechanism for find_merry's ancestry walk + prefix fan-out is settled; the storage-name convention is deferred to the DD phase per the LM-5 Decision.
 
 ## Storage and round-trip
 

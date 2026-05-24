@@ -24,6 +24,10 @@ For the LPC mechanics that make these libraries work (inherit syntax, type modif
 
 `KVstore` is the supported backing for application-level persistent collections beyond the host's built-in `mapping`. The structural-sharing layout means insertions and deletions share unchanged subtrees with prior versions, useful when an application keeps versioned snapshots of a collection in memory. The shipped `obj/kvnode.c` is the cloneable instantiation; the `KVNODE` macro in `<KVstore.h>` resolves to its path.
 
+## Property storage
+
+`/lib/util/properties.c` is an inheritable library exposing a keyed property store on a host object. Inheriting hosts gain raw-key (case-preserving) and downcased-key access via `set_property` / `query_property` / `query_raw_property` / `query_prefixed_properties` / `set_raw_property`. The default `set_property` routes through the Merry daemon when loaded — `find_object("/usr/Merry/sys/merry")` returning non-nil triggers `MERRY->dispatch_set(this_object(), path, val)` for pre/main/post observer fan-out, cascade-depth bounding, and cycle detection; otherwise the call falls through to `set_raw_property` directly (the storage-only path used during early bootstrap and by callers that need to bypass the dispatcher). The dispatcher integration is documented in `docs/dispatcher.md`; the inheritance pattern combined with `/lib/util/ur` and `/lib/util/named` for script-bearing objects is shown in `docs/merry-applications.md`.
+
 ## Iteration
 
 | Class | File | Header | Role |
