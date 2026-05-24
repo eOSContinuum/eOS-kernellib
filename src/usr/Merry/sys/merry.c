@@ -27,6 +27,7 @@
 
 # include <status.h>
 # include <type.h>
+# include <kernel/kernel.h>
 # include <Merry.h>
 
 private inherit "/lib/util/ascii";
@@ -47,6 +48,23 @@ mapping node_map;
 mapping script_spaces;
 int     cleanup_stamp;
 
+/*
+ * DD-1 (e) capability gate state. `approved_registrars` is the daemon-wide
+ * allowlist of caller domains that may register observers / script-spaces
+ * on objects outside their own domain; KERNEL programs always pass and
+ * domain-match is the default allow path. Seeded with "System" +
+ * "admin_console" at create(); extended via add_approved_registrar /
+ * remove_approved_registrar (KERNEL-gated). Per-domain rather than
+ * per-program — matches the cloud-server /usr/<domain>/ ownership model.
+ *
+ * `observer_cache` caches resolved observer lists per DI-1 (g). Broad
+ * invalidation (clear the whole cache on any registration write) is the
+ * MVA strategy; descendant-chain tracking is deferred per the DI-1 (g)
+ * "implementation choice" framing.
+ */
+mapping approved_registrars;
+mapping observer_cache;
+
 /* merry code begins 5 lines into the generated LPC file */
 int query_line_offset() { return 5; }
 
@@ -59,6 +77,8 @@ void create() {
    tick_usage = ([ ]);
 
    script_spaces = ([ ]);
+   approved_registrars = ([ "System": 1, "admin_console": 1 ]);
+   observer_cache = ([ ]);
 
    node_map = ([ ]);
    compile_object("/usr/Merry/data/merry");
@@ -80,11 +100,112 @@ void create() {
    parse :: create("/usr/Merry/tmp/merry", "/usr/Merry/grammar/merry.y");
 }
 
+/*
+ * _check_registrar: DD-1 (e) capability gate. Called by register_script_space,
+ * unregister_script_space, and register_observer. Throws unless caller is
+ * /kernel/* (KERNEL programs always trusted), OR caller's domain is in
+ * approved_registrars, OR caller's domain matches target_name's domain.
+ * The domain-match path lets each daemon register on its own objects
+ * without needing to be in the approved set.
+ */
+private
+void _check_registrar(string target_name) {
+   string caller_program, caller_domain, target_domain;
+
+   caller_program = previous_program();
+   if (sscanf(caller_program, "/kernel/%*s") != 0) {
+      return;
+   }
+   if (sscanf(caller_program, "/usr/%s/", caller_domain) == 0) {
+      error("MERRY: unrecognized caller program " + caller_program);
+   }
+   if (approved_registrars[caller_domain]) {
+      return;
+   }
+   if (target_name && sscanf(target_name, "/usr/%s/", target_domain) != 0 &&
+       target_domain == caller_domain) {
+      return;
+   }
+   error("MERRY: caller domain " + caller_domain +
+         " not authorized to register on " + target_name);
+}
+
+/*
+ * _invalidate_observer_cache: broad invalidation per DI-1 (g) MVA choice.
+ * Any observer-property write clears the whole cache. Args carried for
+ * future descendant-chain-tracking switch; currently unused.
+ */
+private
+void _invalidate_observer_cache(object ob, string path, string timing) {
+   observer_cache = ([ ]);
+}
+
+/*
+ * register_observer: DD-1 (d) procedural sugar for declarative observer
+ * writes. Reads the existing list (per DI-6 (b) normalizes string and
+ * array forms), appends new source, writes back via host's set_property.
+ * Capability-gated per DD-1 (e); per-timing independent per DD-5 (b).
+ * Writes the explicit form `merry:on:<path>:<timing>`; the alias form
+ * `merry:on:<path>` (timing-less = implicit main) is accepted on read
+ * by find_observers per DI-1 (b) MVP choice.
+ */
+void register_observer(object ob, string path, string timing, string source) {
+   string prop_name, low_timing;
+   mixed existing;
+   string *list;
+
+   if (!ob) {
+      error("register_observer: nil host object");
+   }
+   _check_registrar(::object_name(ob));
+
+   low_timing = timing ? lower_case(timing) : "main";
+   prop_name = "merry:on:" + path + ":" + low_timing;
+
+   existing = ob->query_raw_property(prop_name);
+   if (typeof(existing) == T_ARRAY) {
+      list = existing;
+   } else if (typeof(existing) == T_STRING) {
+      list = ({ existing });
+   } else {
+      list = ({ });
+   }
+   list += ({ source });
+   ob->set_property(prop_name, list);
+
+   _invalidate_observer_cache(ob, path, low_timing);
+}
+
+/*
+ * Capability-set extension trio per DD-1 (e) amendment 2026-05-22. add and
+ * remove are KERNEL-gated; query is public read-only. Pattern mirrors
+ * /kernel/sys/access_daemon.c set_global_access -- daemon-local mapping,
+ * statedump-persistent, gated at the entry point.
+ */
+void add_approved_registrar(string domain) {
+   if (!KERNEL()) {
+      error("add_approved_registrar: not callable from outside /kernel");
+   }
+   approved_registrars[domain] = 1;
+}
+
+void remove_approved_registrar(string domain) {
+   if (!KERNEL()) {
+      error("remove_approved_registrar: not callable from outside /kernel");
+   }
+   approved_registrars[domain] = nil;
+}
+
+string *query_approved_registrars() {
+   return map_indices(approved_registrars);
+}
+
 void register_script_space(string space, object ob) {
    space = lower_case(space);
    if (space == "merry") {
       error("cannot register the merry script space");
    }
+   _check_registrar(::object_name(ob));
    if (!script_spaces) {
       script_spaces = ([ ]);
    }
@@ -92,6 +213,8 @@ void register_script_space(string space, object ob) {
 }
 
 void unregister_script_space(string space) {
+   object existing;
+
    space = lower_case(space);
    if (space == "merry") {
       error("cannot unregister the merry script space");
@@ -99,9 +222,11 @@ void unregister_script_space(string space) {
    if (!script_spaces) {
       script_spaces = ([ ]);
    }
-   if (script_spaces[space] == nil) {
+   existing = script_spaces[space];
+   if (existing == nil) {
       error("no such script space registered");
    }
+   _check_registrar(::object_name(existing));
    script_spaces[space] = nil;
 }
 
