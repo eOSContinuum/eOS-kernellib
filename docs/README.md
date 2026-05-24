@@ -27,6 +27,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [application-authoring.md](application-authoring.md) — general tier-E application patterns; owner/access conventions; `call_touch` upgrade model; non-HTTP transports.
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
 - [vault-applications.md](vault-applications.md) — Vault-specific patterns: participating-domain contract, property-bearing clonables, per-application schema registration, on-disk XML shape, round-trip cycle, cross-domain access requirements.
+- [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
 
 ### Operations
 
@@ -37,6 +38,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
 - `../examples/vault-app/` — minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
+- `../examples/merry-app/` — minimal Merry application: a property + ur-bearing clonable, an ancestry-walk assertion through `run_merry`, and a sandbox-firing assertion. Read alongside [merry-applications.md](merry-applications.md).
 
 ### Reference
 
@@ -52,6 +54,7 @@ Common goals and the docs that serve them.
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
 - **Write a Vault-persisted application** — [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
+- **Add scripted, sandboxed behavior to an object** — [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
 - **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md).
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).

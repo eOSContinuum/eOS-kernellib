@@ -66,6 +66,17 @@ void create() {
 
    set_object_name("Merry");
 
+   /* /usr/Merry/{tmp,merry,merry/cleaned} are lazy-write targets.
+    * /tmp/merry holds the yacc-generated parser scratch object;
+    * /merry/<md5>.c holds the compiled wrapper objects produced by
+    * data/merry::create(); /merry/cleaned/ catches files renamed
+    * by merrynode::do_suicide during LRU eviction. None exist in
+    * a fresh runtime tree, so create them here -- catch the EEXIST
+    * shape so warm restarts don't error. */
+   catch(make_dir("/usr/Merry/tmp"));
+   catch(make_dir("/usr/Merry/merry"));
+   catch(make_dir("/usr/Merry/merry/cleaned"));
+
    parse :: create("/usr/Merry/tmp/merry", "/usr/Merry/grammar/merry.y");
 }
 

@@ -18,6 +18,11 @@
  * SAM surface dropped: samref(), samarr, set_sam_array().
  * Spawn inlined as clone_object + set_ur_object (SkotOS spawn_thing was
  * game-content "thing" predicated).
+ *
+ * /lib/womble inherit + womble_merry() callback dropped at LM-4 (was the
+ * last surviving SAM-cleanup hook; never invoked under cloud-server -- the
+ * SkotOS caller was data/merry's womble_merry which itself was removed at
+ * LM-3 when samarr was dropped per LM-2 sub-decision (c)).
  */
 
 # include <type.h>
@@ -35,9 +40,6 @@ private inherit "/usr/Merry/lib/merryapi";
 
 /* state export/import for Duplicate */
 private inherit "/usr/Marshal/XmlBinding/lib/stateimpex";
-
-/* womble for args cleanup */
-inherit "/lib/womble";
 
 private int mru_stamp;
 private object *obarr;
@@ -93,10 +95,6 @@ void set_object_array(object *arr) {
    obarr = arr;
 }
 
-void womble_merry() {
-   args = womble(args);
-}
-
 static
 object obref(int i) {
    return obarr[i];
@@ -126,7 +124,9 @@ void do_suicide() {
 	 rename_file(path + ".c", "/usr/Merry/merry/cleaned/" + name + ".c");
       }
    }
-   :: destruct_object();
+   /* cloud-server destruct_object takes an explicit object arg; SkotOS
+    * had a no-arg shorthand that destructed this_object(). */
+   :: destruct_object(this_object());
 }
 
 static
@@ -139,7 +139,7 @@ void do_delay(string mode, string signal, mixed delay, string label) {
 			      signal,
 			      mode,
 			      label,
-			      copy(args)),
+			      args + ([ ])),
 		 "merry_continuation",
 		 delay, this);
 }
