@@ -15,6 +15,7 @@
  */
 
 # include <type.h>
+# include <XML.h>
 
 
 /*
@@ -150,10 +151,11 @@ static object findOrLoad(string path)
  * stateimpex callers (spawn_create_one, spawn_configure_one) to peek
  * inside parse_xml's typed-tree output.
  *
- * SkotOS's query_colour_value also unwrapped /base/data/nref and
- * /usr/XML/data/samref (SAM-ref wrappers) — those drop with Note 3
- * distribution-layer strip. The XML element + pcdata wrappers
- * remain; their LPC paths preserve from SkotOS layout (~XML/data/...).
+ * The /base/data/nref wrapper drops with Note 3 distribution-layer strip.
+ * The XML element + pcdata + samref wrappers remain; samref is preserved
+ * as a structural primitive at LV-4.5a (SAM-side game-content interpretation
+ * is excluded, but the LWO carries XML data with no semantic interpretation
+ * here — removing it would force xmd.c / xmlparse.c rewrite).
  */
 static mixed queryColourValue(mixed value)
 {
@@ -161,12 +163,55 @@ static mixed queryColourValue(mixed value)
 	switch (object_name(value)) {
 	case "/usr/XML/data/element#-1":
 	case "/usr/XML/data/pcdata#-1":
+	case "/usr/XML/data/samref#-1":
 	    return value->query_data();
 	default:
 	    break;
 	}
     }
     return value;
+}
+
+/*
+ * return the colour constant for an XML data wrapper LWO, or 0 if
+ * value is not one of the recognized XML data wrappers. Used by
+ * xmlgen.c::generate_xml to dispatch on element / pcdata / samref kind.
+ * Mirrors SkotOS sys_auto.c::query_colour.
+ */
+static int queryColour(mixed value)
+{
+    if (typeof(value) == T_OBJECT) {
+	switch (object_name(value)) {
+	case "/usr/XML/data/element#-1":
+	    return COL_ELEMENT;
+	case "/usr/XML/data/pcdata#-1":
+	    return COL_PCDATA;
+	case "/usr/XML/data/samref#-1":
+	    return COL_SAMREF;
+	}
+    }
+    return 0;
+}
+
+/*
+ * invert a mapping: swap each (key, value) pair so values become keys
+ * and keys become values. Used by entities.c to build the reverse
+ * entity-name lookup at module load time.
+ */
+static mapping reverseMapping(mapping m)
+{
+    mapping result;
+    mixed *indices, *values;
+    int i, sz;
+
+    sz = map_sizeof(m);
+    indices = map_indices(m);
+    values = map_values(m);
+    result = ([ ]);
+    for (i = 0; i < sz; i++) {
+	result[values[i]] = indices[i];
+    }
+    return result;
 }
 
 /*
