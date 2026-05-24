@@ -11,6 +11,8 @@
 # define DEFAULT_ADMIN_CONSOLE	"/kernel/obj/admin_console"
 # define DEFAULT_USER_DIR	"/kernel/data"
 
+# define ADMIN_CONSOLE_REGISTRY	"/kernel/sys/admin_console_registry"
+
 # define MODE_DISCONNECT	0
 # define MODE_NOECHO		1	/* telnet */
 # define MODE_LINE		1	/* binary */

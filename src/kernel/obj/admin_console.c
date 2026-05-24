@@ -100,7 +100,45 @@ static void process(string str)
 	break;
 
     default:
-	message("No command: " + str + "\n");
+	{
+	    /*
+	     * EX-3 selective extension. Unknown verbs route through the
+	     * KERNEL-tier registry, which holds the verb -> (ext_path,
+	     * method) dispatch table populated for /usr/-tier domains
+	     * (Merry today; Vault/Schema/HTTP as future workstreams
+	     * extend the registry's create()). If the registry has no
+	     * entry, or the registered extension is not loaded, the
+	     * "No command" fallback fires.
+	     *
+	     * The registry is lazy-loaded -- DGD's string-form call_other
+	     * does not auto-compile, so find_object + compile_object on
+	     * first dispatch keeps the boot path free of an explicit
+	     * registry compile in driver.c. Subsequent dispatches find
+	     * the loaded master.
+	     */
+	    object reg;
+	    mapping entry;
+	    object ext;
+
+	    reg = find_object(ADMIN_CONSOLE_REGISTRY);
+	    if (!reg) {
+		reg = compile_object(ADMIN_CONSOLE_REGISTRY);
+	    }
+	    if (reg) {
+		entry = reg->query_dispatch(str);
+		if (entry) {
+		    ext = find_object(entry["path"]);
+		    if (!ext) {
+			ext = compile_object(entry["path"]);
+		    }
+		    if (ext) {
+			call_other(ext, entry["method"], user, str, arg);
+			break;
+		    }
+		}
+	    }
+	    message("No command: " + str + "\n");
+	}
 	break;
     }
 }

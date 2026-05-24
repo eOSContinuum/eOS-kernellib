@@ -19,4 +19,12 @@ void create()
     compile_object("data/mcontext");
 
     compile_object("sys/merry");
+
+    /* EX-3 admin_console extension. The library carries the verb
+     * implementations; the obj master inheriting it is what
+     * /kernel/sys/admin_console_registry stores by path and what
+     * /kernel/obj/admin_console::process() find_object's at unknown-
+     * verb dispatch time. The master must be resident before the
+     * first dispatch routes here. */
+    compile_object("obj/admin_console_ext");
 }
