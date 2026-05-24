@@ -18,10 +18,11 @@ inherit "/usr/Schema/lib/schema_node";
 
 string query_state_root() { return "Schema:Element"; }
 
-static void create(int clone)
+static void create()
 {
     ::create();
-    if (!clone) {
+    if (sscanf(object_name(this_object()), "%*s#") == 0) {
+	/* master: not a clone, set its logical name */
 	::set_object_name("Schema:UrNode");
     }
 }

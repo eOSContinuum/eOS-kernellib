@@ -49,6 +49,7 @@
 private inherit "/lib/util/ascii";
 private inherit "/lib/util/lpc";
 
+inherit "/lib/util/named";
 inherit "/usr/Schema/lib/dtd";
 
 mapping namespaces;
