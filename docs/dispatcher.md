@@ -145,6 +145,20 @@ Configure the depth-shaped cascade bound. Default is `32`. `set_max_cascade_dept
 
 The bound counts depth, not breadth -- a flat batch with many legitimate writes does not increment the counter; a recursive observer chain does. When the counter equals the bound at dispatch entry, the dispatcher throws `merry: cascade depth N exceeded at <object_name>:<path>`, records `cascade-aborted` in the batch-status, and unwinds the implicit batch if it entered one.
 
+### `unregister_observer(object ob, string path, string timing)`
+
+Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`. Asymmetric with `register_observer`'s add-one semantics; finer-grained removal (by source string or by compiled-object identity) is a future-work item (see eos-harness BACKLOG `#FH-14`).
+
+The MVA-scope coarse granularity is sufficient for the common operator scenario (clear all observers at a triple to start fresh, e.g., for an in-flight troubleshooting session). For surgical removal in a multi-observer-on-one-triple host, current options are (a) read the property value list, remove one entry by index, write back via `set_raw_property` (operator-tier surgery; admin verb `register-observer` / `unregister-observer` in `admin-console.md` does not yet expose this), or (b) clear all and re-register the keepers.
+
+### `set_dispatch_trace(int flag)` and `query_dispatch_trace()`
+
+Toggle the optional verbose dispatcher trace logging. `set_dispatch_trace` is `KERNEL()`-gated; `query_dispatch_trace` is public read-only. Default is `0` (off). When `1`, the `_trace_dispatch` private helper writes per-entry trace events to `/usr/Merry/log/dispatch.log` alongside the always-on cycle and cascade events from `_log_dispatch`. The flag is statedump-persistent.
+
+Current trace coverage is the `dispatch_set` entry site only (MVA demonstration). Additional trace sites (batch-entry/exit, observer-fire, cascade-depth-increment, cycle-chain mutation, observer-cache hit/miss) are future-work (see eos-harness BACKLOG `#FH-15`). The flag-gating contract is established; site additions are mechanical.
+
+The `dispatch-trace on|off|status` admin verb (see `admin-console.md`) is the operator-facing surface; it routes through `ADMIN_CONSOLE_REGISTRY->verb_set_dispatch_trace` for the KERNEL elevation since the underlying setter is gated.
+
 ### Batch status
 
 `_record_batch_status` writes a status entry for each batch; `_query_batch_status(int batch_id)` reads it back. Status values per `DD-3 (c)`:
@@ -301,12 +315,15 @@ Each documented signature is exercised by at least one phase of the 17-phase Mer
 | Observer-source contract -- `Set` from observer source | 10, 11, 13, 14, 16 | various |
 | `BatchedSet` from observer source | 8 | `BATCH SOURCE OK` |
 | Observer-state survival across snapshot + restore | 16 + 17 | `PERSIST SETUP OK` + `PERSIST VERIFY OK` |
+| `unregister_observer` (clears all observers at triple) | telnet-drive | admin verb `unregister-observer` end-to-end against MerryApp |
+| `set_dispatch_trace` / `query_dispatch_trace` | telnet-drive | admin verb `dispatch-trace on|off|status` end-to-end against MerryApp |
 
-A test phase that does not appear above is from the pre-dispatcher lift (phases 1-5 cover the Merry script-binding primitive itself; phase 4's `DELAY OK` covers the `$delay()` continuation path documented in `merry-applications.md`).
+A test phase that does not appear above is from the pre-dispatcher lift (phases 1-5 cover the Merry script-binding primitive itself; phase 4's `DELAY OK` covers the `$delay()` continuation path documented in `merry-applications.md`). The two telnet-drive rows reference operator-tier verification rather than smoke-phase markers: the verbs were exercised via direct telnet session against the restore-boot MerryApp; see `admin-console.md` "Dispatcher operator surface" for the full session and the verb-by-verb output format.
 
 ## See also
 
 - `merry-applications.md` -- the script-binding mechanism the dispatcher is layered on top of (ancestry walk, find_merry / find_merries, the merry property convention, sandbox semantics).
-- `operations.md` -- operator surface for `set_max_cascade_depth` and the dispatch audit log.
+- `operations.md` -- operator surface for `set_max_cascade_depth`, `set_dispatch_trace`, and the dispatch audit log.
+- `admin-console.md` -- "Dispatcher operator surface" section: the nine operator verbs that expose the dispatcher's runtime surface from the kernel admin console (`observers`, `cascade-depth`, `batch-status`, `dispatch-trace`, `register-observer`, `unregister-observer`, `query-approved-registrars`, `approve-registrar`, `unapprove-registrar`).
 - `runtime-primitives.md` -- the architectural framing (the dispatcher is the substrate that makes richer persistent state and async events first-class in the kernel layer).
 - `examples/merry-app/` -- the executable verification anchor; each documented signature is exercised by a phase marker.
