@@ -69,6 +69,7 @@ static void create()
     set_global_access("System", TRUE);
     set_global_access("XML", TRUE);
     set_global_access("Schema", TRUE);
+    set_global_access("Marshal", TRUE);
 
     /* server objects */
     load("sys/errord");

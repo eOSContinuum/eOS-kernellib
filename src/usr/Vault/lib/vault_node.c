@@ -87,20 +87,20 @@ int spawn_create_one(string name, string path, string source) {
    mixed state;
 
    state = parse_xml(source, path, TRUE);	/* PEEK flag set */
-   state = queryColourValue(xmd_force_to_data(state));
+   state = queryColourValue(xmdForceToData(state));
    if (sizeof(state) == 0) {
       error("XML missing root element");
    }
-   root_elem = xmd_element(state[0]);
+   root_elem = xmdElement(state[0]);
    if (root_elem != "object" && root_elem != "clone") {
       error("root element must be 'object' or 'clone', not " +
 	    dumpValue(root_elem));
    }
    state = state[0];
-   if (xmd_attributes(state)[0] != "program") {
+   if (xmdAttributes(state)[0] != "program") {
       error("bad or missing 'program' attribute to root element");
    }
-   program = xmd_attributes(state)[1];
+   program = xmdAttributes(state)[1];
 
    if (!find_object(name)) {
       if (root_elem == "clone") {
@@ -174,8 +174,8 @@ int spawn_configure_one(string name, string path, string source) {
        * Assumption here is that the content of the source hasn't changed
        * since spawn_create_one() looked at it.
        */
-      state = queryColourValue(xmd_force_to_data(state))[0];
-      state = queryColourValue(xmd_force_to_data(xmd_content(state)));
+      state = queryColourValue(xmdForceToData(state))[0];
+      state = queryColourValue(xmdForceToData(xmdContent(state)));
       if (sizeof(state) > 1) {
 	 error("root element has more than one child");
       }

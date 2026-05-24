@@ -49,12 +49,23 @@
 private inherit "/lib/util/ascii";
 private inherit "/lib/util/lpc";
 
+private inherit "~XML/lib/xmd";
+
 inherit "/lib/util/named";
 inherit "/usr/Schema/lib/dtd";
+
+/* LV-4.5c re-adds the stateimpex inherit so load_core_schemas() can call
+ * import_state() directly to dispatch parsed XML schema files through
+ * the marshaler. SkotOS's /usr/SID/sys/sid.c originally inherited
+ * stateimpex; LV-4.5b dropped it because Marshal had not lifted yet.
+ * stateimpex is `private inherit "~Marshal/XmlBinding/lib/stateimpex"`
+ * via the LV-2 path-rename. */
+inherit "~Marshal/XmlBinding/lib/stateimpex";
 
 mapping namespaces;
 
 private void configure_initial_nodes();
+object query_node(string nm, varargs string extra);
 
 static void create()
 {
@@ -64,6 +75,13 @@ static void create()
     compile_object(SCHEMA_NODE);
 
     configure_initial_nodes();
+
+    /* Defer load_core_schemas() until the next driver tick so that
+     * /usr/XML/sys/xml_daemon is loaded and available for parse_xml.
+     * System/initd loads domains alphabetically: Marshal < Schema < XML,
+     * so XML's initd runs after Schema's create() returns. call_out 0
+     * fires when System/initd::create() has finished the load loop. */
+    call_out("load_core_schemas", 0);
 }
 
 int boot(int block)
@@ -220,16 +238,89 @@ private void configure_initial_nodes()
 }
 
 
-/* schema-loading scaffolding (deferred to LV-4.5c stateimpex lift) */
+/* schema-loading: cross-checks code-defined primitives against XML schema
+ * files in data/schema/. Each file declares <object program="schema_node">
+ * wrapping a single <Element ns="..." tag="..."> with the same structure
+ * that configure_initial_nodes() produces in code. Loading via the lifted
+ * stateimpex round-trips the file through schema_daemon's own structural
+ * primitives -- the Element / Children / Attributes / Iterator / Callbacks
+ * schema-for-schemas tree -- which validates that the XML files and the
+ * code definitions agree. import_state is idempotent on a matching node:
+ * re-applying the same state produces the same state. Mismatches surface
+ * as load errors in boot.log. */
 
-private void load_core_schemas()
+void load_core_schemas()
 {
-    /* When stateimpex lifts at LV-4.5c, this iterates the data/schema/
-     * directory and dispatches each XML file through stateimpex's
-     * import_state to instantiate a schema_node clone. For now the
-     * core primitives are code-defined in configure_initial_nodes()
-     * above and this function is a placeholder. The XML files in
-     * data/schema/ carry the on-disk format reference. */
+    string *files;
+    int i;
+
+    if (!find_object(XML)) {
+	sysLog("Schema:Daemon: XML daemon not loaded; skipping load_core_schemas");
+	return;
+    }
+
+    files = get_dir("/usr/Schema/data/schema/*.xml")[0];
+    for (i = 0; i < sizeof(files); i++) {
+	string path, source, ns, tag;
+	mixed root, element, *attrs;
+	object node;
+	int j;
+
+	path = "/usr/Schema/data/schema/" + files[i];
+	source = read_file(path);
+	if (!source) {
+	    sysLog("Schema:Daemon: cannot read " + path);
+	    continue;
+	}
+
+	catch {
+	    root = XML->parse(source);
+	} : {
+	    sysLog("Schema:Daemon: parse failed for " + path);
+	    continue;
+	}
+
+	root = queryColourValue(xmdForceToData(root));
+	if (sizeof(root) == 0 || xmdElement(root[0]) != "object") {
+	    sysLog("Schema:Daemon: " + path + " root is not <object>");
+	    continue;
+	}
+
+	element = queryColourValue(xmdForceToData(xmdContent(root[0])));
+	if (sizeof(element) == 0) {
+	    sysLog("Schema:Daemon: " + path + " <object> has no content");
+	    continue;
+	}
+	element = element[0];
+
+	attrs = xmdAttributes(element);
+	ns = tag = nil;
+	for (j = 0; j < sizeof(attrs); j += 2) {
+	    if (attrs[j] == "ns")  ns  = attrs[j+1];
+	    if (attrs[j] == "tag") tag = attrs[j+1];
+	}
+	if (!ns || !tag) {
+	    sysLog("Schema:Daemon: " + path + " <" + xmdElement(element)
+		   + "> missing ns/tag attributes");
+	    continue;
+	}
+
+	node = query_node(ns, tag);
+	if (!node) {
+	    sysLog("Schema:Daemon: " + path + " no code-defined node for "
+		   + ns + ":" + tag + " (cannot cross-check)");
+	    continue;
+	}
+
+	catch {
+	    import_state(node, element);
+	    sysLog("Schema:Daemon: cross-checked " + ns + ":" + tag
+		   + " from " + files[i]);
+	} : {
+	    sysLog("Schema:Daemon: import_state FAILED for " + ns + ":"
+		   + tag + " from " + files[i]);
+	}
+    }
 }
 
 
