@@ -223,6 +223,19 @@ static int destruct_object(mixed obj)
     }
 
     rlimits (-1; -1) {
+	/*
+	 * clear any Index registration for this object before destruct.
+	 * catch'd because Index may not be loaded during early boot and
+	 * /lib/util/named consumers may not have registered a name.
+	 */
+	catch {
+	    object idx;
+
+	    idx = ::find_object("/usr/Index/sys/index_daemon");
+	    if (idx) {
+		idx->clear_name_for_object(obj);
+	    }
+	}
 	if (clone) {
 	    /*
 	     * non-clones are handled by driver->remove_program()
