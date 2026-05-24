@@ -65,6 +65,31 @@ int     cleanup_stamp;
 mapping approved_registrars;
 mapping observer_cache;
 
+/*
+ * DI-2 batching surface state. `next_batch_id` is the daemon-wide
+ * monotonically-increasing counter advanced at every batch boundary
+ * (explicit and implicit) per DD-3 (b); statedump-persistent so batch
+ * identity survives restart. `batch_status` is a DI-2 stub for the
+ * batch-status entries DD-3 (c) calls for; keyed by batch-id, value is
+ * ({ status, reason }). DI-5 will subsume this into the full change-log
+ * surface (`query_changes_since`, retention pruning, etc.); the daemon-
+ * local mapping here is enough for DI-2 smoke verification and for the
+ * DI-3 dispatcher hooks to record outcomes against.
+ */
+int     next_batch_id;
+mapping batch_status;
+
+/*
+ * TLS slot for the per-execution batch-context stack. Each entry is a
+ * mapping { batch_id, atomic, opts, seq, cascade_depth } describing
+ * one active batch frame; nested batches push/pop. Stack lifetime is
+ * tied to the outermost call_limited frame (TLS reaps when that frame
+ * returns), which gives "no batch active" the natural nil reading on
+ * a fresh execution. Per-execution cycle-chain storage (DD-2 (b)
+ * amendment) is a separate TLS slot DI-3 will manage.
+ */
+# define TLS_BATCH_STACK	"merry_batch_stack"
+
 /* merry code begins 5 lines into the generated LPC file */
 int query_line_offset() { return 5; }
 
@@ -79,6 +104,9 @@ void create() {
    script_spaces = ([ ]);
    approved_registrars = ([ "System": 1, "admin_console": 1 ]);
    observer_cache = ([ ]);
+
+   next_batch_id = 1;
+   batch_status = ([ ]);
 
    node_map = ([ ]);
    compile_object("/usr/Merry/data/merry");
@@ -210,6 +238,292 @@ void remove_approved_registrar(string domain) {
 
 string *query_approved_registrars() {
    return map_indices(approved_registrars);
+}
+
+/*
+ * DI-2 batching surface. Implements DD-1 (c) hybrid batching with the
+ * DD-4 (d) atomic-mode opt-in. Two public LFUNs (`batch`, `batched_set`)
+ * and a small set of internal helpers exposed for DI-3 (dispatcher) and
+ * DI-5 (change-log) to weave into. Per DD-1 (e) Amendment 2026-05-22 the
+ * capability gate is LFUN-only at registration entry points -- batching
+ * writes through `set_property` and is not gated here.
+ *
+ * Per-execution context lives in TLS under TLS_BATCH_STACK as a stack of
+ * { batch_id, atomic, opts, seq, cascade_depth } mappings. Nested batches
+ * push; exit pops. The DD-2 (b) amendment puts the cycle-chain at a
+ * separate TLS slot (DI-3 owns); the batch-stack here tracks only what
+ * a batch needs to identify and account for itself.
+ */
+
+private
+mapping _make_batch_context(int batch_id, int atomic_mode, mapping opts) {
+   return ([
+      "batch_id":      batch_id,
+      "atomic":        atomic_mode,
+      "opts":          opts ? opts : ([ ]),
+      "seq":           0,
+      "cascade_depth": 0,
+   ]);
+}
+
+private
+int _push_batch_context(int atomic_mode, mapping opts) {
+   mapping *stack;
+   int batch_id;
+
+   stack = tls_get(TLS_BATCH_STACK);
+   if (!stack) {
+      stack = ({ });
+   }
+   batch_id = next_batch_id ++;
+   stack += ({ _make_batch_context(batch_id, atomic_mode, opts) });
+   tls_set(TLS_BATCH_STACK, stack);
+   return batch_id;
+}
+
+private
+void _pop_batch_context() {
+   mapping *stack;
+   int n;
+
+   stack = tls_get(TLS_BATCH_STACK);
+   n = stack ? sizeof(stack) : 0;
+   if (n == 0) {
+      error("MERRY: _pop_batch_context called with empty batch stack");
+   }
+   if (n == 1) {
+      tls_set(TLS_BATCH_STACK, nil);
+   } else {
+      tls_set(TLS_BATCH_STACK, stack[.. n - 2]);
+   }
+}
+
+/*
+ * Records the batch-status entry per DD-3 (c). DI-2 stub: writes to the
+ * daemon-local `batch_status` mapping. DI-5 will replace this with the
+ * full change-log surface (`query_changes_since` + retention + per-host
+ * pruning). The seven-status enum lands here -- DI-2 only emits
+ * "completed" and "main-aborted" since pre/main/post timing dispatch and
+ * cascade-depth / cycle-detection live in DI-3.
+ */
+private
+void _record_batch_status(int batch_id, string status, mixed reason) {
+   batch_status[batch_id] = ({ status, reason });
+}
+
+/*
+ * Public read-only accessors over the batch-stack TLS slot. DI-3 calls
+ * _current_batch_id() to decide whether to allocate an implicit batch on
+ * an unbatched property write; DI-3 + DI-5 read _current_batch_context()
+ * to track cascade-depth and to fetch the active batch-id when writing
+ * change-log tuples; DI-5 calls _current_batch_seq_advance() per tuple.
+ */
+int _current_batch_id() {
+   mapping *stack;
+   int n;
+
+   stack = tls_get(TLS_BATCH_STACK);
+   n = stack ? sizeof(stack) : 0;
+   return n ? stack[n - 1]["batch_id"] : 0;
+}
+
+mapping _current_batch_context() {
+   mapping *stack;
+   int n;
+
+   stack = tls_get(TLS_BATCH_STACK);
+   n = stack ? sizeof(stack) : 0;
+   return n ? stack[n - 1] : nil;
+}
+
+int _current_batch_seq_advance() {
+   mapping ctx;
+   int seq;
+
+   ctx = _current_batch_context();
+   if (!ctx) {
+      error("MERRY: _current_batch_seq_advance with no active batch");
+   }
+   seq = ctx["seq"];
+   ctx["seq"] = seq + 1;
+   return seq;
+}
+
+mixed *_query_batch_status(int batch_id) {
+   return batch_status[batch_id];
+}
+
+/*
+ * DI-2 hooks for the DI-3 implicit-single-mutation path per
+ * sub-deliverable (e) and DD-3 (b). DI-3's dispatcher calls
+ * _enter_implicit_batch() at the top of `set_property` when no batch is
+ * already active: a fresh non-atomic batch-id is allocated so the
+ * unbatched mutation lands in the change-log with seq=0 under its own
+ * batch identity. When nested inside an existing batch (explicit or
+ * implicit), returns 0 to signal the dispatcher should re-use the
+ * already-active batch.
+ *
+ * _exit_implicit_batch must be called with the returned batch-id; a 0
+ * argument is a no-op so the dispatcher's exit path is uniform across
+ * outermost-vs-nested cases.
+ */
+int _enter_implicit_batch() {
+   if (_current_batch_id() != 0) {
+      return 0;
+   }
+   return _push_batch_context(0, nil);
+}
+
+void _exit_implicit_batch(int batch_id, string status, mixed reason) {
+   if (batch_id == 0) {
+      return;
+   }
+   _record_batch_status(batch_id, status, reason);
+   _pop_batch_context();
+}
+
+/*
+ * Body helpers. The non-atomic pair runs the batch body directly; the
+ * atomic pair runs inside DGD's atomic{} via the function-level `atomic`
+ * modifier so a throw rolls back all mutations made during the body
+ * (per DD-4 (d) opt-in semantics). The atomic-mode status-entry write
+ * happens INSIDE the atomic function so a rollback also erases it,
+ * matching the "atomic batches that abort leave no trace" contract.
+ */
+
+private
+mixed _run_callable(object obj, string func, mixed *args) {
+   return ::call_other(obj, func, args...);
+}
+
+private
+void _run_kv_writes(object obj, mapping kv_map) {
+   string *keys;
+   int i, n;
+
+   keys = map_indices(kv_map);
+   n = sizeof(keys);
+   for (i = 0; i < n; i ++) {
+      /*
+       * Per DD-3 (b) seq increments per write under the active batch-id.
+       * DI-5 will read this seq when writing tuples; DI-3 will fire
+       * pre/main/post observers around the set_property call. For DI-2
+       * scope, just advance the counter and perform the property write.
+       */
+      _current_batch_seq_advance();
+      ::call_other(obj, "set_property", keys[i], kv_map[keys[i]]);
+   }
+}
+
+private atomic
+mixed _atomic_run_callable(object obj, string func, mixed *args, int batch_id) {
+   mixed result;
+
+   result = _run_callable(obj, func, args);
+   _record_batch_status(batch_id, "completed", nil);
+   return result;
+}
+
+private atomic
+void _atomic_run_kv_writes(object obj, mapping kv_map, int batch_id) {
+   _run_kv_writes(obj, kv_map);
+   _record_batch_status(batch_id, "completed", nil);
+}
+
+/*
+ * batch: DD-1 (c) function-reference batching API. Invokes
+ * obj->func(args...) inside a fresh batch context; atomic-mode opt-in
+ * via opts mapping per DD-4 (d) (`([ "atomic": 1 ])`). Non-atomic is
+ * the DD-2 (d) catch'd-error default: on throw, a "main-aborted" status
+ * entry persists per DD-3 (c) and the error propagates to the caller's
+ * catch{}. In atomic-mode, DGD rolls back both mutations and the status
+ * entry (the atomic batch leaves no trace per DD-4 (d)).
+ *
+ * Not callable from Merry observer source per DD-1 (c) -- the SANDBOX
+ * whitelist in merrynode.c does not expose this verb because L14 #15
+ * forbids function-reference syntax in Merry.
+ */
+mixed batch(object obj, string func, mixed *args, varargs mapping opts) {
+   int batch_id, atomic_mode;
+   mixed result, err;
+
+   if (!obj) {
+      error("batch: nil object");
+   }
+   if (!func) {
+      error("batch: nil function name");
+   }
+   if (typeof(args) != T_ARRAY) {
+      error("batch: args must be an array");
+   }
+   atomic_mode = (opts && opts["atomic"]) ? 1 : 0;
+
+   batch_id = _push_batch_context(atomic_mode, opts);
+
+   if (atomic_mode) {
+      err = catch(result = _atomic_run_callable(obj, func, args, batch_id));
+   } else {
+      err = catch(result = _run_callable(obj, func, args));
+   }
+
+   if (err) {
+      if (!atomic_mode) {
+         _record_batch_status(batch_id, "main-aborted", err);
+      }
+      _pop_batch_context();
+      error(err);
+   }
+
+   if (!atomic_mode) {
+      _record_batch_status(batch_id, "completed", nil);
+   }
+   _pop_batch_context();
+   return result;
+}
+
+/*
+ * batched_set: DD-1 (c) mapping-write batching API. Writes the kv_map's
+ * key/value pairs to obj via set_property; all writes share a single
+ * batch-id with sequential seq values starting at 0 (per DD-3 (b)).
+ * Atomic-mode opt-in identical to batch() per DD-4 (d).
+ *
+ * Callable from Merry observer source (via the BatchedSet merryfun in
+ * merrynode.c) because the mapping-arg signature satisfies L14 #15
+ * (no function-reference required; arguments compose inline).
+ */
+mixed batched_set(object obj, mapping kv_map, varargs mapping opts) {
+   int batch_id, atomic_mode;
+   mixed err;
+
+   if (!obj) {
+      error("batched_set: nil object");
+   }
+   if (typeof(kv_map) != T_MAPPING) {
+      error("batched_set: kv_map must be a mapping");
+   }
+   atomic_mode = (opts && opts["atomic"]) ? 1 : 0;
+
+   batch_id = _push_batch_context(atomic_mode, opts);
+
+   if (atomic_mode) {
+      err = catch(_atomic_run_kv_writes(obj, kv_map, batch_id));
+   } else {
+      err = catch(_run_kv_writes(obj, kv_map));
+   }
+
+   if (err) {
+      if (!atomic_mode) {
+         _record_batch_status(batch_id, "main-aborted", err);
+      }
+      _pop_batch_context();
+      error(err);
+   }
+
+   if (!atomic_mode) {
+      _record_batch_status(batch_id, "completed", nil);
+   }
+   _pop_batch_context();
+   return nil;
 }
 
 void register_script_space(string space, object ob) {

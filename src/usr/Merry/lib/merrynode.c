@@ -181,6 +181,31 @@ mixed Get(object o, string p) {
    return ::call_other(o, "query_property", p);
 }
 
+/*
+ * BatchedSet: DD-1 (c) multi-key batching surface for Merry observer
+ * source. Composes inline per L14 #15: the mapping-arg signature carries
+ * all mutation values without requiring a local handle variable. The
+ * opts mapping is the DD-4 (d) atomic-mode opt-in carrier
+ * (`BatchedSet($this, ([ ... ]), ([ "atomic": 1 ]))`); absent or nil
+ * runs non-atomic per the DD-2 (d) default. The function-reference
+ * batch (`MERRY->batch(fn)`) is intentionally NOT exposed to Merry
+ * source per DD-1 (c) -- L14 #15 forbids the function-reference syntax
+ * the LPC-side surface would need.
+ */
+nomask static
+mixed BatchedSet(object o, mapping kv_map, varargs mapping opts) {
+   if (!o) {
+      error("Missing object for BatchedSet");
+   }
+   if (typeof(kv_map) != T_MAPPING) {
+      error("BatchedSet: second argument must be a mapping");
+   }
+   if (opts) {
+      return MERRY->batched_set(o, kv_map, opts);
+   }
+   return MERRY->batched_set(o, kv_map);
+}
+
 nomask static
 mixed SetVar(string n, mixed v) {
    if (n) {

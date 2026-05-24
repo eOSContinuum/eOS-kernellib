@@ -11,6 +11,7 @@ A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the 
 - A third Merry script calls `Spawn($this)` on the binding host. `Spawn` uses `::clone_object` to escape the local SANDBOX shadow, clones the binding host's clonable, and sets the new clone's ur-object to the binding host. The test verifies the spawned name matches the binding host's clonable path.
 - A fourth Merry script issues `$delay(1, FALSE); Set($this, "delay_fired", 1);`. The first call schedules a continuation via the binding host's `delayed_call`; one second later, `perform_delayed_call` fires `merry_continuation` on the mcontext LWO, which calls `run_merries` to resume execution and set the marker property. A `verify_delay` call_out polls the property at t=+2.
 - A fifth Merry script invokes `testspace::greet($who: "world");`. The test driver registers itself as the "testspace" script-space handler (exposing `query_method` / `call_method`); `LabelCall` walks the registry, finds the handler, and dispatches the named method with the inline locals overlaid on the merry-source `args` mapping.
+- The DI-2 batching surface adds four more phases. Phase 6 calls `MERRY->batched_set(child, ([ "k1": 100, "k2": 200 ]))` from LPC and verifies both values land. Phase 7 exercises the DD-4 (d) atomic-mode opt-in via `MERRY->batched_set(child, mapping, ([ "atomic": 1 ]))`. Phase 8 runs `BatchedSet($this, ([ ... ]))` from a Merry-compiled script to confirm the merrynode.c surface is reachable from observer source. Phase 9 invokes `MERRY->batch(this_object(), "_throw_for_test", ({}))` against a callable that errors and verifies the catch'd-error default per DD-2 (d) propagates the error AND that the daemon-local batch-status stub records a `main-aborted` entry per DD-3 (c).
 
 ## Deployment
 
@@ -36,6 +37,10 @@ cat .runtime/src/usr/MerryApp/data/test-result.log
 #   MerryApp:test: SANDBOX OK
 #   MerryApp:test: SPAWN OK
 #   MerryApp:test: LABELCALL OK
+#   MerryApp:test: BATCH OK
+#   MerryApp:test: BATCH ATOMIC OK
+#   MerryApp:test: BATCH SOURCE OK
+#   MerryApp:test: BATCH ABORT OK
 #   MerryApp:test: DELAY OK
 ```
 
@@ -46,7 +51,7 @@ The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result
 - `initd.c` -- domain initd; compiles `obj/thing` + `sys/test` at boot.
 - `lib/app.c` -- marker lib paralleling `examples/vault-app/lib/app.c`. Daemons under `sys/` inherit it so future shared daemon-side state has a place to land.
 - `obj/thing.c` -- property + ur-bearing clonable. Inherits `/lib/util/properties`, `/lib/util/ur`, `/lib/util/named` with labeled inherits to disambiguate the shared `create()` between properties and ur. Also defines the `delayed_call` / `perform_delayed_call` pair every script-bearing object must expose for Merry's `$delay()` to schedule continuations.
-- `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers five Merry scripts, runs four synchronous assertions via `call_out("setup_and_run", 0)`, and one asynchronous `$delay()` assertion verified via a second `call_out` at t=+2. Doubles as the "testspace" script-space handler for phase 5; in production a handler would typically be a distinct object.
+- `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers Merry scripts for phases 1-3+5+8, runs eight synchronous assertions via `call_out("setup_and_run", 0)`, and one asynchronous `$delay()` assertion verified via a second `call_out` at t=+2. Doubles as the "testspace" script-space handler for phase 5 and exposes `_throw_for_test` as the callable phase 9's `MERRY->batch()` exercises against the catch'd-error abort path; in production both auxiliary roles would typically live on distinct objects.
 
 ## Notes
 
