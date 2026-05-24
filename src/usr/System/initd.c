@@ -78,6 +78,7 @@ static void create()
     load("sys/errord");
     load("sys/upgraded");
     load("sys/userd");
+    load("sys/persist_helper");
 
     /* clonables */
     compile_object("obj/user");

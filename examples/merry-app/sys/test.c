@@ -84,13 +84,16 @@ inherit "/usr/Merry/lib/merryapi";
 # define MERRY_DAEMON	"/usr/Merry/sys/merry"
 # define MERRY_DATA	"/usr/Merry/data/merry"
 # define THING_PROG	"/usr/MerryApp/obj/thing"
+# define PERSIST_HELPER	"/usr/System/sys/persist_helper"
 # define RESULT_FILE	"/usr/MerryApp/data/test-result.log"
 
 static void run_tests();
 static void verify_delay(object child);
+static void phase17_verify();
 private void log_line(string msg);
 
 object delay_target;	/* binding host for phase 4; checked by verify_delay */
+object persist_host;	/* binding host for phase 16/17; survives hotboot */
 
 
 static void create()
@@ -606,6 +609,78 @@ static void run_tests()
     }
 
     log_line("MerryApp:test: DISPATCH IMPLICIT OK");
+
+    /* phase 16: PERSIST SETUP -- register a persistent observer on a
+     * fresh binding host, save the host so phase17_verify can find it
+     * after restore, schedule the verify call_out, then trigger a
+     * hotboot cycle via the System helper. dump_state() captures all
+     * application state (this object's globals, the persist_host
+     * clone, the observer property on it, the merry-script object
+     * referenced by the observer, the scheduled phase17_verify
+     * call_out); shutdown() exits the driver. The external smoke
+     * harness restarts DGD against the snapshot; the surviving
+     * phase17_verify call_out fires after restore and writes either
+     * PERSIST VERIFY OK or a failure sentinel to the result log. */
+
+    catch {
+	object pparent, pchild;
+
+	pparent = clone_object(THING_PROG);
+	pparent->set_object_name("MerryApp:demo:persist-parent");
+	pchild = clone_object(THING_PROG);
+	pchild->set_object_name("MerryApp:demo:persist-child");
+	pchild->set_ur_object(pparent);
+
+	persist_host = pchild;
+
+	MERRY_DAEMON->register_observer(pchild, "test:persist:val", "main",
+	    "Set($this, \"test:persist:fired\", 1); return TRUE;");
+
+	/* Schedule verification with a small delay so the call_out is
+	 * in the snapshot (and so it does not race the hotboot's own
+	 * dump+shutdown call_out). After restore, its scheduled time
+	 * has long passed and DGD fires it as soon as the system is
+	 * back up. */
+	call_out("phase17_verify", 3);
+
+	log_line("MerryApp:test: PERSIST SETUP OK");
+
+	PERSIST_HELPER->trigger_dump_and_exit();
+    } : {
+	log_line("MerryApp:test: FAIL: PERSIST SETUP threw");
+	return;
+    }
+}
+
+
+/* phase 17: PERSIST VERIFY -- fires from a pre-snapshot call_out after
+ * the hotboot cycle. Writes to the persistent observed path; the
+ * observer's source must execute against the restored merry-script
+ * object reference and the marker property must land. */
+static void phase17_verify()
+{
+    if (!persist_host) {
+	log_line("MerryApp:test: FAIL: PERSIST VERIFY persist_host nil after restore");
+	return;
+    }
+
+    catch {
+	persist_host->set_property("test:persist:val", 42);
+
+	if (persist_host->query_raw_property("test:persist:val") != 42) {
+	    log_line("MerryApp:test: FAIL: PERSIST VERIFY value did not land after restore");
+	    return;
+	}
+	if (persist_host->query_raw_property("test:persist:fired") != 1) {
+	    log_line("MerryApp:test: FAIL: PERSIST VERIFY observer did not fire after restore");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: PERSIST VERIFY threw");
+	return;
+    }
+
+    log_line("MerryApp:test: PERSIST VERIFY OK");
 }
 
 
