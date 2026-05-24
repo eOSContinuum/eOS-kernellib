@@ -109,6 +109,16 @@ mapping batch_status;
 int max_cascade_depth;
 
 /*
+ * EX-3 verbose dispatch tracing. dispatch_trace is a daemon-wide flag
+ * toggled by admin_console_ext's `dispatch-trace on|off` verb (routed
+ * through ADMIN_CONSOLE_REGISTRY's KERNEL-tier helper) or set directly
+ * via set_dispatch_trace (KERNEL-gated). When non-zero, _trace_dispatch
+ * appends entry events to MERRY_LOG_FILE alongside the always-logged
+ * cycle/cascade events from _log_dispatch. Statedump-persistent.
+ */
+int dispatch_trace;
+
+/*
  * Dispatcher log path. DI-3 (f) calls for sysLog growth so the cycle
  * chain is recoverable post-mortem; rather than wire the global
  * sysLog stub (cross-cutting beyond DI-3 scope), DI-3 adds a Merry-
@@ -137,6 +147,7 @@ void create() {
    batch_status = ([ ]);
 
    max_cascade_depth = DEFAULT_MAX_CASCADE_DEPTH;
+   dispatch_trace = 0;
 
    node_map = ([ ]);
    compile_object("/usr/Merry/data/merry");
@@ -259,6 +270,37 @@ void register_observer(object ob, string path, string timing, string source) {
    }
    list += ({ compiled });
    ob->set_raw_property(prop_name, list);
+
+   _invalidate_observer_cache(ob, path, low_timing);
+}
+
+/*
+ * unregister_observer: EX-3 mutation surface paired with register_observer
+ * for the admin_console_ext `unregister-observer` verb. Removes ALL
+ * observers at (ob, path, timing) by clearing the merry:on:<path>:<timing>
+ * property. Finer-grained removal (by source string or by compiled-object
+ * identity) is left to a future workstream -- the compiled-object identity
+ * path is the more tractable shape (source strings don't survive compile)
+ * but adds API surface beyond the diagnostic-tier needs of #EX-3.
+ * Capability-gated identically to register_observer via _check_registrar.
+ */
+void unregister_observer(object ob, string path, string timing) {
+   string caller_program, prop_name, low_timing;
+
+   caller_program = previous_program();
+   if (!ob) {
+      error("unregister_observer: nil host object");
+   }
+   _check_registrar(caller_program, ::object_name(ob));
+
+   low_timing = timing ? lower_case(timing) : "main";
+   if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {
+      error("unregister_observer: timing must be one of {pre, main, post}; got \"" +
+            low_timing + "\"");
+   }
+   prop_name = "merry:on:" + path + ":" + low_timing;
+
+   ob->set_raw_property(prop_name, nil);
 
    _invalidate_observer_cache(ob, path, low_timing);
 }
@@ -609,6 +651,26 @@ int query_max_cascade_depth() {
 }
 
 /*
+ * EX-3 dispatch-trace accessors. set is KERNEL-gated for symmetry with
+ * set_max_cascade_depth; query is public read-only. The flag is non-zero
+ * to enable verbose trace logging; _trace_dispatch consults this flag
+ * and emits an entry-event line per dispatch_set call. The cycle and
+ * cascade events go through _log_dispatch unconditionally (they're
+ * always informative); _trace_dispatch is the optional fine-grain
+ * surface for operator-driven troubleshooting.
+ */
+void set_dispatch_trace(int flag) {
+   if (!KERNEL()) {
+      error("set_dispatch_trace: not callable from outside /kernel");
+   }
+   dispatch_trace = flag ? 1 : 0;
+}
+
+int query_dispatch_trace() {
+   return dispatch_trace;
+}
+
+/*
  * DI-3 dispatcher helpers. _cycle_chain_get / _cycle_chain_set manage
  * the per-execution cycle chain at TLS_CYCLE_CHAIN; the chain is an
  * array of string keys of the form `<object_name>:<path>` so
@@ -709,6 +771,21 @@ void _log_dispatch(string msg) {
 }
 
 /*
+ * _trace_dispatch is the optional fine-grain trace surface gated by
+ * dispatch_trace. Identical write path to _log_dispatch but elides the
+ * file I/O entirely when the flag is unset (the common case). EX-3
+ * threads this into dispatch_set entry; future workstreams may add
+ * batch-entry, observer-fire, and cascade-depth-increment trace sites.
+ */
+private
+void _trace_dispatch(string msg) {
+   if (!dispatch_trace) {
+      return;
+   }
+   _log_dispatch("trace: " + msg);
+}
+
+/*
  * _fire_timing_slot: iterates the observers for a (obj, path, timing)
  * triple per DD-4 (c) "LPC list order"; each evaluate is wrapped in
  * catch so the first throw halts the slot and propagates per DD-4 (a).
@@ -772,6 +849,8 @@ mixed dispatch_set(object obj, string path, mixed val) {
    if (!path) {
       error("dispatch_set: nil path");
    }
+
+   _trace_dispatch("dispatch_set " + ::object_name(obj) + ":" + path);
 
    implicit_batch_id = _enter_implicit_batch();
 
