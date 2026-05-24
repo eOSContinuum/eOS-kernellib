@@ -2,14 +2,14 @@
  * XML subsystem initialization daemon.
  *
  * LV-4.5a source-lifts the XML transport layer (xmd / xmlgen / xmlparse
- * libs, xml_daemon, LWO data wrappers, entities, headers). compile_object
- * of "sys/xml_daemon" is deferred until LV-4.5b lifts the Schema subsystem
- * — xmlgen.c and xmlparse.c inherit /usr/Schema/lib/dtd, and xml_daemon.c
- * calls DTD->register_type / DTD->register_colour at create() time, both
- * unresolved until LV-4.5b lands. Same LV-3 -> LV-4 deferral pattern.
+ * libs, xml_daemon, LWO data wrappers, entities, headers). LV-4.5b enables
+ * the compile by lifting Schema -- xml_daemon.c calls
+ * DTD->register_type / DTD->register_colour at create() time, and Schema
+ * (S) loads before XML (X) in the alphabetical domain-boot order driven
+ * by /usr/System/initd.c.
  */
 
 void create()
 {
-    /* compile_object("sys/xml_daemon"); -- deferred until LV-4.5b */
+    compile_object("sys/xml_daemon");
 }

@@ -1,0 +1,12 @@
+<object program="/usr/Schema/obj/schema_node">
+  <Element ns="Core" tag="Entries" recpoint="true" newitem="set_property(#New Property Name, #New Property Value, #1)">
+    <Children>
+      <Child node="OBJ(Schema:Core:Entry)"/>
+    </Children>
+    <Attributes/>
+    <Iterator/>
+    <Callbacks>
+      <Callback call="clear_all_properties"/>
+    </Callbacks>
+  </Element>
+</object>
