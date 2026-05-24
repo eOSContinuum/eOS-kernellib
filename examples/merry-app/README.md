@@ -1,13 +1,16 @@
 # Reference Merry application
 
-A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the platform contracts a property-bearing object honors when it participates in Merry's sublanguage-runtime invocation surface: the property store, the ur-hierarchy ancestry walk, and the find_merry / run_merry script-lookup convention. The full walkthrough lives in `docs/merry-applications.md`.
+A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the platform contracts a property-bearing object honors when it participates in Merry's sublanguage-runtime invocation surface: the property store, the ur-hierarchy ancestry walk, the find_merry / run_merry script-lookup convention, the `Spawn` merryfun, the `$delay()` continuation path, and the LabelCall / LabelRef script-space dispatch. The full walkthrough lives in `docs/merry-applications.md`.
 
 ## Operations
 
-- A `MerryApp:Thing` clonable inherits `/lib/util/properties` (storage for `merry:<mode>:<signal>` keys), `/lib/util/ur` (ur-parent + ur-child tracking), and `/lib/util/named` (logical-name registration via Index).
+- A `MerryApp:Thing` clonable inherits `/lib/util/properties` (storage for `merry:<mode>:<signal>` keys), `/lib/util/ur` (ur-parent + ur-child tracking), and `/lib/util/named` (logical-name registration via Index). It also exposes a `delayed_call` / `perform_delayed_call` pair so Merry's `$delay()` continuation can schedule against it.
 - The boot-time test driver builds a 2-generation Hierarchy: a parent clone and a child clone whose ur-parent is the parent. A Merry script returning a literal string is bound to the parent under `merry:lib:greet`.
 - `MERRY->run_merry(child, "greet", "lib", ([]))` walks the child's ancestry via `query_ur_object()`, finds the script on the parent, evaluates it, and returns the literal.
 - A second Merry script attempts `clone_object("/foo/bar")` from inside Merry source. The SANDBOX(f) deny list in `merrynode.c` shadows `clone_object` with an error-throwing local; the call surfaces as "function 'clone_object' not allowed in merry code" and the test driver logs the sandbox firing.
+- A third Merry script calls `Spawn($this)` on the binding host. `Spawn` uses `::clone_object` to escape the local SANDBOX shadow, clones the binding host's clonable, and sets the new clone's ur-object to the binding host. The test verifies the spawned name matches the binding host's clonable path.
+- A fourth Merry script issues `$delay(1, FALSE); Set($this, "delay_fired", 1);`. The first call schedules a continuation via the binding host's `delayed_call`; one second later, `perform_delayed_call` fires `merry_continuation` on the mcontext LWO, which calls `run_merries` to resume execution and set the marker property. A `verify_delay` call_out polls the property at t=+2.
+- A fifth Merry script invokes `testspace::greet($who: "world");`. The test driver registers itself as the "testspace" script-space handler (exposing `query_method` / `call_method`); `LabelCall` walks the registry, finds the handler, and dispatches the named method with the inline locals overlaid on the merry-source `args` mapping.
 
 ## Deployment
 
@@ -27,10 +30,13 @@ scripts/setup-runtime.sh
 .runtime/bin/dgd mva.dgd &
 sleep 5
 cat .runtime/src/usr/MerryApp/data/test-result.log
-# Expect (in order):
+# Expect (in order; DELAY OK arrives ~2 seconds after the others):
 #   MerryApp:test: starting
 #   MerryApp:test: ANCESTRY OK
 #   MerryApp:test: SANDBOX OK
+#   MerryApp:test: SPAWN OK
+#   MerryApp:test: LABELCALL OK
+#   MerryApp:test: DELAY OK
 ```
 
 The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result.log`, which lands at `<directory>/usr/MerryApp/data/test-result.log` on the host filesystem (`<directory>` is the DGD config's `directory` setting; `.runtime/src/` in the standard layout).
@@ -39,12 +45,11 @@ The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result
 
 - `initd.c` -- domain initd; compiles `obj/thing` + `sys/test` at boot.
 - `lib/app.c` -- marker lib paralleling `examples/vault-app/lib/app.c`. Daemons under `sys/` inherit it so future shared daemon-side state has a place to land.
-- `obj/thing.c` -- property + ur-bearing clonable. Inherits `/lib/util/properties`, `/lib/util/ur`, `/lib/util/named` with labeled inherits to disambiguate the shared `create()` between properties and ur.
-- `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers two Merry scripts, runs both assertions via `call_out("setup_and_run", 0)`.
+- `obj/thing.c` -- property + ur-bearing clonable. Inherits `/lib/util/properties`, `/lib/util/ur`, `/lib/util/named` with labeled inherits to disambiguate the shared `create()` between properties and ur. Also defines the `delayed_call` / `perform_delayed_call` pair every script-bearing object must expose for Merry's `$delay()` to schedule continuations.
+- `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers five Merry scripts, runs four synchronous assertions via `call_out("setup_and_run", 0)`, and one asynchronous `$delay()` assertion verified via a second `call_out` at t=+2. Doubles as the "testspace" script-space handler for phase 5; in production a handler would typically be a distinct object.
 
 ## Notes
 
 - The example exercises invocation only -- no Schema registration, no on-disk Vault round-trip. A Merry script is a runtime object (a `/usr/Merry/data/merry` clone) carrying parsed AST + cached compiled program; statedump survival of bound scripts requires Schema + Marshal participation that this example deliberately omits to keep the test focused on the runtime path.
-- `Duplicate` (merrynode's deep-clone via `export_state` + `clone_object` + `import_state`) and `Spawn` (merrynode's clone + `set_ur_object`) both call `clone_object` from inside merrynode -- the same SANDBOX shadow that this example's phase 2 demonstrates. They will need an `::clone_object` escape (or a separately-inherited library) before a Merry source can use them. That fix is L8 cascade work paired with a richer test in LM-6.
-- `$delay()` (`do_delay` -> `mcontext.c::create(4-arg)`) is not exercised here. The wrapper is in place; first exercise will validate cloud-server's `new_object(path, args...)` -> `_F_init` -> `create(args...)` dispatch for the 4-arg case.
-- LabelCall / LabelRef (script-space resolution via `space::method()` syntax) is not exercised here. A separate test driver that registers a script-space handler with `MERRY->register_script_space` will cover it.
+- `Duplicate` shares the `::clone_object` escape with `Spawn` (both fixed in merrynode at LM-6) but `export_state` requires a Schema-registered state model (`SID->get_root_node(ob)`). A Schema registration on `MerryApp:Thing` would unblock Duplicate; that work pairs with whichever phase first introduces Schema-bound Merry hosts.
+- Observer-property naming (e.g., `merry:on:<property-path>[:<timing>]` storage for property-change observers) is deferred to the DD phase per the LM-5 Decision. The runtime mechanism find_merry uses (ancestry walk + prefix fan-out + `merry:inherit:` delegation) is unchanged; only the storage-key convention is unsettled.
