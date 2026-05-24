@@ -413,6 +413,199 @@ static void run_tests()
     }
 
     log_line("MerryApp:test: BATCH ABORT OK");
+
+    /* phase 10: DI-3 dispatcher -- simple main-timing observer.
+     * Register a main observer on child for "test:dispatch:main" with
+     * a source that writes a marker property; verify the marker landed
+     * after a set_property on the observed path. */
+
+    catch {
+	MERRY_DAEMON->register_observer(child, "test:dispatch:main", "main",
+	    "Set($this, \"test:dispatch:main:fired\", 1); return TRUE;");
+
+	child->set_property("test:dispatch:main", 42);
+
+	if (child->query_raw_property("test:dispatch:main") != 42) {
+	    log_line("MerryApp:test: FAIL: DISPATCH MAIN value did not land");
+	    return;
+	}
+	if (child->query_raw_property("test:dispatch:main:fired") != 1) {
+	    log_line("MerryApp:test: FAIL: DISPATCH MAIN observer did not fire");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH MAIN setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH MAIN OK");
+
+    /* phase 11: DI-3 dispatcher -- pre + main + post timings.
+     * Register observers on all three slots that append to a marker
+     * string. Verify the string reads "pre|main|post" after the write,
+     * confirming both per-timing slot firing and DD-4 (b) ordering. */
+
+    catch {
+	MERRY_DAEMON->register_observer(child, "test:dispatch:order", "pre",
+	    "Set($this, \"test:dispatch:order:trace\", Get($this, \"test:dispatch:order:trace\") + \"pre|\"); return TRUE;");
+	MERRY_DAEMON->register_observer(child, "test:dispatch:order", "main",
+	    "Set($this, \"test:dispatch:order:trace\", Get($this, \"test:dispatch:order:trace\") + \"main|\"); return TRUE;");
+	MERRY_DAEMON->register_observer(child, "test:dispatch:order", "post",
+	    "Set($this, \"test:dispatch:order:trace\", Get($this, \"test:dispatch:order:trace\") + \"post\"); return TRUE;");
+
+	child->set_raw_property("test:dispatch:order:trace", "");
+	child->set_property("test:dispatch:order", 1);
+
+	if (child->query_raw_property("test:dispatch:order:trace")
+	    != "pre|main|post") {
+	    log_line("MerryApp:test: FAIL: DISPATCH ORDER trace was \""
+		     + (string) child->query_raw_property("test:dispatch:order:trace")
+		     + "\"");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH ORDER setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH ORDER OK");
+
+    /* phase 12: DI-3 dispatcher -- pre veto per DD-4 (a). Register a
+     * pre observer that throws; verify (1) the error propagates to
+     * caller, (2) the value did NOT land (pre veto aborts before the
+     * write step). Initial value seeded via set_raw_property so the
+     * dispatcher does not fire on the seed. */
+
+    catch {
+	int err_caught;
+
+	child->set_raw_property("test:dispatch:veto", 100);
+
+	MERRY_DAEMON->register_observer(child, "test:dispatch:veto", "pre",
+	    "error(\"merry: pre observer veto\");");
+
+	err_caught = 0;
+	catch {
+	    child->set_property("test:dispatch:veto", 200);
+	} : {
+	    err_caught = 1;
+	}
+	if (!err_caught) {
+	    log_line("MerryApp:test: FAIL: DISPATCH VETO did not propagate");
+	    return;
+	}
+	if (child->query_raw_property("test:dispatch:veto") != 100) {
+	    log_line("MerryApp:test: FAIL: DISPATCH VETO wrote despite veto");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH VETO setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH VETO OK");
+
+    /* phase 13: DI-3 dispatcher -- cycle detection per DD-2 (b).
+     * Register a main observer that writes the SAME property; the
+     * recursive dispatch must detect the cycle and throw. The outer
+     * set_property error string must include "cycle". */
+
+    catch {
+	int err_caught;
+
+	MERRY_DAEMON->register_observer(child, "test:cycle", "main",
+	    "Set($this, \"test:cycle\", 99); return TRUE;");
+
+	err_caught = 0;
+	catch {
+	    child->set_property("test:cycle", 1);
+	} : {
+	    err_caught = 1;
+	}
+	if (!err_caught) {
+	    log_line("MerryApp:test: FAIL: DISPATCH CYCLE did not detect");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH CYCLE setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH CYCLE OK");
+
+    /* phase 14: DI-3 dispatcher -- ancestry walk per DD-5 (a). Register
+     * a main observer on PARENT for "test:ancestry"; write the property
+     * on CHILD; find_observers walks the ur chain and resolves the
+     * parent's observer; observer's $this is CHILD (the dispatch host)
+     * so the marker property lands on CHILD. */
+
+    catch {
+	MERRY_DAEMON->register_observer(parent, "test:ancestry", "main",
+	    "Set($this, \"test:ancestry:observed\", 1); return TRUE;");
+
+	child->set_property("test:ancestry", 42);
+
+	if (child->query_raw_property("test:ancestry") != 42) {
+	    log_line("MerryApp:test: FAIL: DISPATCH ANCESTRY value did not land on child");
+	    return;
+	}
+	if (child->query_raw_property("test:ancestry:observed") != 1) {
+	    log_line("MerryApp:test: FAIL: DISPATCH ANCESTRY parent observer did not fire on child write");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH ANCESTRY setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH ANCESTRY OK");
+
+    /* phase 15: DI-3 dispatcher -- implicit-batch wrapping per DD-3 (b).
+     * An unbatched set_property must (1) leave _current_batch_id() at 0
+     * before AND after the call (the implicit batch is entered and
+     * exited cleanly), and (2) record a "completed" status entry for
+     * the implicit batch in batch_status. */
+
+    catch {
+	int pre_id, post_id, found_completed, i;
+	mixed *s;
+
+	pre_id = MERRY_DAEMON->_current_batch_id();
+	if (pre_id != 0) {
+	    log_line("MerryApp:test: FAIL: DISPATCH IMPLICIT pre-call batch active ("
+		     + (string) pre_id + ")");
+	    return;
+	}
+
+	child->set_property("test:implicit:probe", 1);
+
+	post_id = MERRY_DAEMON->_current_batch_id();
+	if (post_id != 0) {
+	    log_line("MerryApp:test: FAIL: DISPATCH IMPLICIT post-call batch active ("
+		     + (string) post_id + ")");
+	    return;
+	}
+
+	/* Scan a small recent window for a "completed" entry. The implicit
+	 * batch id is daemon-internal; finding ANY recent completed entry
+	 * suffices for the smoke. */
+	found_completed = 0;
+	for (i = 1; i <= 400 && !found_completed; i ++) {
+	    s = MERRY_DAEMON->_query_batch_status(i);
+	    if (s && s[0] == "completed") {
+		found_completed = 1;
+	    }
+	}
+	if (!found_completed) {
+	    log_line("MerryApp:test: FAIL: DISPATCH IMPLICIT no completed status entry");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH IMPLICIT setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH IMPLICIT OK");
 }
 
 

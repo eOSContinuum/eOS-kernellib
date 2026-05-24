@@ -21,6 +21,16 @@ private inherit "/lib/util/ascii";
 
 private mapping properties;
 
+/*
+ * MERRY dispatcher hook. set_property routes through MERRY->dispatch_set
+ * when the daemon is loaded so observers (DI-1 registrations) fire around
+ * the actual write. set_raw_property is the bypass path used by the
+ * dispatcher itself to perform the write step without re-entering
+ * dispatch; it is also available to callers that need to skip dispatch
+ * for performance-sensitive paths.
+ */
+# define MERRY_DAEMON	"/usr/Merry/sys/merry"
+
 
 /*
  * Sub-mapping with keys starting with `prefix` (and lexicographically
@@ -65,10 +75,36 @@ mixed set_downcased_property(string prop, mixed val, varargs mixed extra...)
     properties[prop] = val;
 }
 
+/*
+ * Bypass dispatch and write directly. The dispatcher itself uses this
+ * to perform the actual write between pre and main observer phases;
+ * callers that need to skip dispatch (capability-gated infrastructure,
+ * performance-sensitive paths) may also use it.
+ */
+nomask
+void set_raw_property(string prop, mixed val)
+{
+    properties[lower_case(prop)] = val;
+}
+
+/*
+ * Public property write. Routes through MERRY->dispatch_set when the
+ * daemon is loaded so observers fire pre/main/post around the write;
+ * falls back to direct write before MERRY is compiled (early bootstrap)
+ * and inside MERRY's own dispatcher (which calls set_raw_property to
+ * avoid re-entry).
+ */
 nomask
 mixed set_property(string prop, mixed val, varargs mixed extra...)
 {
-    return set_downcased_property(lower_case(prop), val, extra...);
+    object merry;
+
+    prop = lower_case(prop);
+    merry = find_object(MERRY_DAEMON);
+    if (merry) {
+	return merry->dispatch_set(this_object(), prop, val);
+    }
+    return set_downcased_property(prop, val, extra...);
 }
 
 mixed query_downcased_property(string prop)

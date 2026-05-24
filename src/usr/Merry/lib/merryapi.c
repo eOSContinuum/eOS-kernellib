@@ -201,17 +201,23 @@ mixed run_merries(object ob, string signal, string mode, mapping args,
  * Per DD-5 (b), each (path, timing) slot resolves independently. Per
  * DI-1 (b) MVP choice, both property-name forms are accepted on read:
  * `merry:on:<path>` aliases `merry:on:<path>:main`; the explicit form is
- * tried first, then the alias form for main timing. Single-string property
- * values are normalized to one-element lists per DI-6 (b).
+ * tried first, then the alias form for main timing.
+ *
+ * Returns mixed* because DI-3 amended register_observer to store
+ * compiled merry-script OBJECTS rather than source strings; the
+ * dispatcher's _resolve_observer helper normalizes both shapes
+ * (T_OBJECT pass-through, T_STRING lazy-compile) so legacy DI-1-era
+ * registrations still work. Single-value property forms (T_STRING or
+ * T_OBJECT) are normalized to one-element lists per DI-6 (b).
  *
  * Returns an empty array when no observers are found anywhere in the
  * chain (callers treat ({}) as "no observers" without distinguishing
  * "no host" from "host without observers").
  */
 static
-string *find_observers(object ob, string path, string timing) {
+mixed *find_observers(object ob, string path, string timing) {
    string dprop, iprop, alias_dprop;
-   string *out;
+   mixed *out;
 
    timing = timing ? lower_case(timing) : "main";
    dprop = "merry:on:" + path + ":" + timing;
@@ -231,7 +237,7 @@ string *find_observers(object ob, string path, string timing) {
       if (local) {
          if (typeof(local) == T_ARRAY) {
             out += local;
-         } else if (typeof(local) == T_STRING) {
+         } else if (typeof(local) == T_STRING || typeof(local) == T_OBJECT) {
             out += ({ local });
          }
          if (!marker) {

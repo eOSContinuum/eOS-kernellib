@@ -85,10 +85,38 @@ mapping batch_status;
  * one active batch frame; nested batches push/pop. Stack lifetime is
  * tied to the outermost call_limited frame (TLS reaps when that frame
  * returns), which gives "no batch active" the natural nil reading on
- * a fresh execution. Per-execution cycle-chain storage (DD-2 (b)
- * amendment) is a separate TLS slot DI-3 will manage.
+ * a fresh execution.
+ *
+ * DI-3 adds TLS_CYCLE_CHAIN per DD-2 (b) amendment: a per-EXECUTION
+ * stack of (object_name + ":" + path) keys appended at dispatch_set
+ * entry and popped on exit. Persists across nested batches; resets
+ * only when the outermost call_limited frame returns. String-keyed
+ * (not (obj, path) tuple) so the `member()` predicate (from
+ * /lib/util/lpc; LPC array intersection) is well-defined on string
+ * equality. DGD has no `member_array` kfun in this build; the static
+ * `member(item, arr)` helper from /lib/util/lpc is the equivalent.
  */
 # define TLS_BATCH_STACK	"merry_batch_stack"
+# define TLS_CYCLE_CHAIN	"merry_cycle_chain"
+
+/*
+ * DI-3 dispatcher state. max_cascade_depth caps total successful
+ * property writes within a single batch per DD-2 (b); seeded to 32 at
+ * create(), configurable via set_max_cascade_depth (KERNEL-gated).
+ * Statedump-persistent.
+ */
+# define DEFAULT_MAX_CASCADE_DEPTH	32
+int max_cascade_depth;
+
+/*
+ * Dispatcher log path. DI-3 (f) calls for sysLog growth so the cycle
+ * chain is recoverable post-mortem; rather than wire the global
+ * sysLog stub (cross-cutting beyond DI-3 scope), DI-3 adds a Merry-
+ * local file logger used only by the dispatcher for cycle and cascade
+ * events. Future workstreams can grow sysLog wholesale.
+ */
+# define MERRY_LOG_DIR	"/usr/Merry/log"
+# define MERRY_LOG_FILE	"/usr/Merry/log/dispatch.log"
 
 /* merry code begins 5 lines into the generated LPC file */
 int query_line_offset() { return 5; }
@@ -108,22 +136,26 @@ void create() {
    next_batch_id = 1;
    batch_status = ([ ]);
 
+   max_cascade_depth = DEFAULT_MAX_CASCADE_DEPTH;
+
    node_map = ([ ]);
    compile_object("/usr/Merry/data/merry");
    compile_object("/usr/Merry/data/mcontext");
 
    set_object_name("Merry");
 
-   /* /usr/Merry/{tmp,merry,merry/cleaned} are lazy-write targets.
+   /* /usr/Merry/{tmp,merry,merry/cleaned,log} are lazy-write targets.
     * /tmp/merry holds the yacc-generated parser scratch object;
     * /merry/<md5>.c holds the compiled wrapper objects produced by
     * data/merry::create(); /merry/cleaned/ catches files renamed
-    * by merrynode::do_suicide during LRU eviction. None exist in
-    * a fresh runtime tree, so create them here -- catch the EEXIST
-    * shape so warm restarts don't error. */
+    * by merrynode::do_suicide during LRU eviction; /log/ holds the
+    * DI-3 dispatcher log. None exist in a fresh runtime tree, so
+    * create them here -- catch the EEXIST shape so warm restarts
+    * don't error. */
    catch(make_dir("/usr/Merry/tmp"));
    catch(make_dir("/usr/Merry/merry"));
    catch(make_dir("/usr/Merry/merry/cleaned"));
+   catch(make_dir(MERRY_LOG_DIR));
 
    parse :: create("/usr/Merry/tmp/merry", "/usr/Merry/grammar/merry.y");
 }
@@ -177,8 +209,20 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
 
 /*
  * register_observer: DD-1 (d) procedural sugar for declarative observer
- * writes. Reads the existing list (per DI-6 (b) normalizes string and
- * array forms), appends new source, writes back via host's set_property.
+ * writes. Compiles the source at registration time (DI-3 amendment to
+ * DI-1: store compiled merry-script OBJECTS, not source strings, so
+ * the dispatcher's per-fire path avoids recompilation and syntax
+ * errors surface at registration rather than first-fire). Reads the
+ * existing list, normalizes string + array + object forms, appends
+ * the new compiled object, writes back via host's set_raw_property.
+ *
+ * set_raw_property is used (not set_property) so the registration
+ * write does not itself trigger the dispatcher on the merry:on:* path
+ * -- the dispatcher would find no observers and recurse harmlessly,
+ * but the explicit raw write keeps the registration path independent
+ * of dispatch infrastructure and avoids spurious batch-context entries
+ * during boot when many registrations land in sequence.
+ *
  * Capability-gated per DD-1 (e); per-timing independent per DD-5 (b).
  * Writes the explicit form `merry:on:<path>:<timing>`; the alias form
  * `merry:on:<path>` (timing-less = implicit main) is accepted on read
@@ -186,8 +230,9 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
  */
 void register_observer(object ob, string path, string timing, string source) {
    string caller_program, prop_name, low_timing;
+   object compiled;
    mixed existing;
-   string *list;
+   mixed *list;
 
    caller_program = previous_program();
    if (!ob) {
@@ -202,16 +247,18 @@ void register_observer(object ob, string path, string timing, string source) {
    }
    prop_name = "merry:on:" + path + ":" + low_timing;
 
+   compiled = ::new_object("/usr/Merry/data/merry", source);
+
    existing = ob->query_raw_property(prop_name);
    if (typeof(existing) == T_ARRAY) {
       list = existing;
-   } else if (typeof(existing) == T_STRING) {
+   } else if (typeof(existing) == T_STRING || typeof(existing) == T_OBJECT) {
       list = ({ existing });
    } else {
       list = ({ });
    }
-   list += ({ source });
-   ob->set_property(prop_name, list);
+   list += ({ compiled });
+   ob->set_raw_property(prop_name, list);
 
    _invalidate_observer_cache(ob, path, low_timing);
 }
@@ -302,12 +349,22 @@ void _pop_batch_context() {
  * Records the batch-status entry per DD-3 (c). DI-2 stub: writes to the
  * daemon-local `batch_status` mapping. DI-5 will replace this with the
  * full change-log surface (`query_changes_since` + retention + per-host
- * pruning). The seven-status enum lands here -- DI-2 only emits
- * "completed" and "main-aborted" since pre/main/post timing dispatch and
- * cascade-depth / cycle-detection live in DI-3.
+ * pruning). The six-status enum (DI-3 extension): completed,
+ * cascade-aborted, cycle-detected, pre-vetoed, main-aborted, post-aborted.
+ *
+ * Check-before-overwrite per DI-3: the dispatcher records a specific
+ * abort category (e.g., "pre-vetoed") inside dispatch_set when an
+ * observer throws; the outer batch() / batched_set() then catches the
+ * propagated error and calls _record_batch_status again with a less-
+ * specific "main-aborted" -- without the guard, the dispatcher's
+ * category would be clobbered. First-write-wins preserves the
+ * dispatcher's specific category through the propagation.
  */
 private
 void _record_batch_status(int batch_id, string status, mixed reason) {
+   if (batch_status[batch_id]) {
+      return;
+   }
    batch_status[batch_id] = ({ status, reason });
 }
 
@@ -405,12 +462,12 @@ void _run_kv_writes(object obj, mapping kv_map) {
    n = sizeof(keys);
    for (i = 0; i < n; i ++) {
       /*
-       * Per DD-3 (b) seq increments per write under the active batch-id.
-       * DI-5 will read this seq when writing tuples; DI-3 will fire
-       * pre/main/post observers around the set_property call. For DI-2
-       * scope, just advance the counter and perform the property write.
+       * set_property routes through dispatch_set per DI-3, which owns
+       * seq-advance and observer firing around the actual write. The
+       * DI-2 explicit _current_batch_seq_advance call was removed at
+       * DI-3 so seq advances exactly once per dispatched write whether
+       * the path is batched or unbatched.
        */
-      _current_batch_seq_advance();
       ::call_other(obj, "set_property", keys[i], kv_map[keys[i]]);
    }
 }
@@ -524,6 +581,339 @@ mixed batched_set(object obj, mapping kv_map, varargs mapping opts) {
    }
    _pop_batch_context();
    return nil;
+}
+
+/*
+ * DI-3 dispatcher. dispatch_set wraps each property write with
+ * pre/main/post observer firing per DD-4 (b), cascade-depth bound per
+ * DD-2 (b), cycle detection per DD-2 (b) amendment, and implicit
+ * batch wrapping per DD-3 (b). Called from /lib/util/properties.c
+ * set_property when MERRY is loaded; the raw write step uses
+ * obj->set_raw_property to bypass re-entry.
+ *
+ * Configuration accessors per DI-3 (c). set is KERNEL-gated like the
+ * approved-registrar mutators; query is public read-only.
+ */
+void set_max_cascade_depth(int n) {
+   if (!KERNEL()) {
+      error("set_max_cascade_depth: not callable from outside /kernel");
+   }
+   if (n < 1) {
+      error("set_max_cascade_depth: bound must be >= 1");
+   }
+   max_cascade_depth = n;
+}
+
+int query_max_cascade_depth() {
+   return max_cascade_depth;
+}
+
+/*
+ * DI-3 dispatcher helpers. _cycle_chain_get / _cycle_chain_set manage
+ * the per-execution cycle chain at TLS_CYCLE_CHAIN; the chain is an
+ * array of string keys of the form `<object_name>:<path>` so
+ * the static `member()` predicate (from /lib/util/lpc; LPC array-
+ * intersection on strings) is well-defined.
+ *
+ * _resolve_observer normalizes find_observers' return values to
+ * compiled merry-script objects: T_OBJECT passes through; T_STRING
+ * (legacy DI-1-era property values) is compiled lazily. Future
+ * registrations always store compiled objects via the DI-3 amendment
+ * to register_observer, but the dispatcher remains tolerant.
+ *
+ * _find_observers_cached is the DI-3 (l) cache-population helper.
+ * Cache key is `<object_name>:<path>:<timing>`; on miss it calls
+ * the static find_observers from merryapi and stores the resolved
+ * list. The existing _invalidate_observer_cache (DI-1) clears the
+ * whole map on observer-property writes, so the cache key shape
+ * does not need to be partition-friendly.
+ *
+ * _log_dispatch is the DI-3 (f) Merry-local file logger for cycle
+ * and cascade events. Appends one line per event to MERRY_LOG_FILE;
+ * catch'd so log-write failures do not propagate into dispatch.
+ */
+private
+string _cycle_key(object obj, string path) {
+   return ::object_name(obj) + ":" + path;
+}
+
+private
+string *_cycle_chain_get() {
+   string *chain;
+
+   chain = tls_get(TLS_CYCLE_CHAIN);
+   return chain ? chain : ({ });
+}
+
+private
+void _cycle_chain_push(string key) {
+   string *chain;
+
+   chain = _cycle_chain_get();
+   tls_set(TLS_CYCLE_CHAIN, chain + ({ key }));
+}
+
+private
+void _cycle_chain_pop() {
+   string *chain;
+   int n;
+
+   chain = _cycle_chain_get();
+   n = sizeof(chain);
+   if (n == 0) {
+      error("MERRY: _cycle_chain_pop with empty chain");
+   }
+   if (n == 1) {
+      tls_set(TLS_CYCLE_CHAIN, nil);
+   } else {
+      tls_set(TLS_CYCLE_CHAIN, chain[.. n - 2]);
+   }
+}
+
+private
+object _resolve_observer(mixed val) {
+   if (typeof(val) == T_OBJECT) {
+      return val;
+   }
+   if (typeof(val) == T_STRING) {
+      return ::new_object("/usr/Merry/data/merry", val);
+   }
+   error("MERRY: observer entry has unexpected type " + (string) typeof(val));
+}
+
+private
+mixed *_find_observers_cached(object obj, string path, string timing) {
+   string key;
+   mixed *cached;
+
+   key = ::object_name(obj) + ":" + path + ":" + timing;
+   cached = observer_cache[key];
+   if (cached) {
+      return cached;
+   }
+   cached = find_observers(obj, path, timing);
+   observer_cache[key] = cached;
+   return cached;
+}
+
+private
+void _log_dispatch(string msg) {
+   catch {
+      mixed *info;
+      int size;
+
+      info = ::file_info(MERRY_LOG_FILE);
+      size = info ? info[0] : 0;
+      ::write_file(MERRY_LOG_FILE, msg + "\n", size);
+   }
+}
+
+/*
+ * _fire_timing_slot: iterates the observers for a (obj, path, timing)
+ * triple per DD-4 (c) "LPC list order"; each evaluate is wrapped in
+ * catch so the first throw halts the slot and propagates per DD-4 (a).
+ * The args mapping carries the change context (path, new value, old
+ * value, timing, host) into the merry-script's args TLS, accessible
+ * from the source as $path / $new / $old / $timing / $this.
+ */
+private
+void _fire_timing_slot(object obj, string path, string timing,
+                       mapping args) {
+   mixed *raw;
+   object compiled;
+   int i, n;
+   mixed err;
+
+   raw = _find_observers_cached(obj, path, timing);
+   n = sizeof(raw);
+   for (i = 0; i < n; i ++) {
+      compiled = _resolve_observer(raw[i]);
+      /*
+       * The compiled merry script's `merry(mode, signal, label)` LFUN
+       * is a switch-on-label; only the "virgin" case carries the
+       * source body (other labels are resume-after-$delay entry
+       * points). Pass nil so evaluate defaults the label to "virgin"
+       * and the source executes from the top.
+       */
+      err = catch(compiled->evaluate(obj, path, timing, args, nil));
+      if (err) {
+         error(err);
+      }
+   }
+}
+
+/*
+ * dispatch_set: DD-4 (b) pre->write->main->post sequencing around a
+ * property write. Bounded by DD-2 (b) cascade depth (per-batch
+ * counter) and cycle detection (per-execution chain). Wraps unbatched
+ * mutations in an implicit batch per DD-3 (b). Records batch-status
+ * per DD-3 (c) + DD-4 (d) on abort categories; check-before-overwrite
+ * so the dispatcher's specific category survives if batch() / batched_set
+ * subsequently catches the same error.
+ *
+ * Args carried into observer source: $path (string), $new (mixed),
+ * $old (mixed), $timing (string), $this (object). The merry source
+ * can mutate further state via Set/BatchedSet; those recursive writes
+ * re-enter dispatch_set bounded by cascade + cycle checks.
+ */
+mixed dispatch_set(object obj, string path, mixed val) {
+   int implicit_batch_id;
+   mapping ctx;
+   string cycle_key;
+   string *chain;
+   mapping args;
+   mixed old_val;
+   mixed err;
+   int local_seq;
+
+   if (!obj) {
+      error("dispatch_set: nil host object");
+   }
+   if (!path) {
+      error("dispatch_set: nil path");
+   }
+
+   implicit_batch_id = _enter_implicit_batch();
+
+   ctx = _current_batch_context();
+   if (!ctx) {
+      error("MERRY: dispatch_set with no batch context after implicit-enter");
+   }
+
+   /*
+    * DD-2 (b) cascade-depth bound. Counter is depth-shaped (incremented
+    * at dispatch entry after the bound check, decremented at exit on
+    * BOTH success and failure paths) so a flat batch with many
+    * legitimate writes does not hit the cap, but a deep recursive
+    * chain does. The check compares the CURRENT depth (before this
+    * dispatch's increment) against max -- if the parent's depth has
+    * already reached max, this nested dispatch refuses. The DI-3 (k)
+    * note "increments only on successful completion" is reconciled by
+    * decrementing on failure too: vetoed mutations roll the counter
+    * back rather than leave it artificially inflated.
+    */
+   if (ctx["cascade_depth"] >= max_cascade_depth) {
+      string emsg;
+
+      emsg = "merry: cascade depth " + max_cascade_depth +
+             " exceeded at " + ::object_name(obj) + ":" + path;
+      _log_dispatch(emsg);
+      _record_batch_status(ctx["batch_id"], "cascade-aborted", emsg);
+      if (implicit_batch_id) {
+         _exit_implicit_batch(implicit_batch_id, "cascade-aborted", emsg);
+      }
+      error(emsg);
+   }
+
+   /*
+    * DD-2 (b) cycle detection. Check before push so the firing
+    * (obj, path) is not its own first-occurrence false-positive.
+    */
+   cycle_key = _cycle_key(obj, path);
+   chain = _cycle_chain_get();
+   if (member(cycle_key, chain)) {
+      string emsg;
+
+      emsg = "merry: observer cycle detected at " + cycle_key;
+      _log_dispatch("cycle-detected: " + cycle_key +
+                    " already in chain " + implode(chain, " -> "));
+      _record_batch_status(ctx["batch_id"], "cycle-detected", emsg);
+      if (implicit_batch_id) {
+         _exit_implicit_batch(implicit_batch_id, "cycle-detected", emsg);
+      }
+      error(emsg);
+   }
+
+   ctx["cascade_depth"] = ctx["cascade_depth"] + 1;
+   _cycle_chain_push(cycle_key);
+
+   /*
+    * Capture old value before write; observers see both. seq advances
+    * once per dispatched write (the DI-2 _run_kv_writes seq advance
+    * is removed in this commit -- seq now lives entirely in dispatch_set
+    * so batched + unbatched mutations both advance through the same
+    * counter).
+    */
+   old_val = obj->query_raw_property(path);
+   local_seq = _current_batch_seq_advance();
+
+   args = ([
+      "path":   path,
+      "new":    val,
+      "old":    old_val,
+      "timing": nil,
+      "seq":    local_seq,
+   ]);
+
+   /*
+    * pre -> write -> main -> post per DD-4 (b). Per DD-4 (a) + (d):
+    * any throw halts the current slot, records the timing-specific
+    * abort category, and re-raises. Post-write slots do not retry
+    * the failed slot; the contract is halt-and-propagate.
+    */
+   args["timing"] = "pre";
+   err = catch(_fire_timing_slot(obj, path, "pre", args));
+   if (err) {
+      ctx["cascade_depth"] = ctx["cascade_depth"] - 1;
+      _record_batch_status(ctx["batch_id"], "pre-vetoed", err);
+      _cycle_chain_pop();
+      if (implicit_batch_id) {
+         _exit_implicit_batch(implicit_batch_id, "pre-vetoed", err);
+      }
+      error(err);
+   }
+
+   obj->set_raw_property(path, val);
+
+   /*
+    * Observer-property writes invalidate the cache so the next
+    * dispatch sees the new registration. The DI-1 _invalidate_observer_cache
+    * is broad (clears the whole map); a dispatch on a non-observer
+    * property does not invalidate.
+    */
+   if (sscanf(path, "merry:on:%*s") != 0 ||
+       sscanf(path, "merry:on-inherit:%*s") != 0) {
+      _invalidate_observer_cache(obj, path, nil);
+   }
+
+   args["timing"] = "main";
+   err = catch(_fire_timing_slot(obj, path, "main", args));
+   if (err) {
+      ctx["cascade_depth"] = ctx["cascade_depth"] - 1;
+      _record_batch_status(ctx["batch_id"], "main-aborted", err);
+      _cycle_chain_pop();
+      if (implicit_batch_id) {
+         _exit_implicit_batch(implicit_batch_id, "main-aborted", err);
+      }
+      error(err);
+   }
+
+   args["timing"] = "post";
+   err = catch(_fire_timing_slot(obj, path, "post", args));
+   if (err) {
+      ctx["cascade_depth"] = ctx["cascade_depth"] - 1;
+      _record_batch_status(ctx["batch_id"], "post-aborted", err);
+      _cycle_chain_pop();
+      if (implicit_batch_id) {
+         _exit_implicit_batch(implicit_batch_id, "post-aborted", err);
+      }
+      error(err);
+   }
+
+   /*
+    * Successful completion: pop cascade-depth (decrement matches the
+    * pre-pre-fire increment so the counter is depth-shaped), pop
+    * cycle chain, exit implicit batch with "completed". For explicit
+    * batches the outer batch() / batched_set() owns the batch-status
+    * entry; the check-before-overwrite guard in _record_batch_status
+    * preserves any specific abort category an inner dispatch set.
+    */
+   ctx["cascade_depth"] = ctx["cascade_depth"] - 1;
+   _cycle_chain_pop();
+   if (implicit_batch_id) {
+      _exit_implicit_batch(implicit_batch_id, "completed", nil);
+   }
+   return val;
 }
 
 void register_script_space(string space, object ob) {
