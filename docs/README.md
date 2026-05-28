@@ -28,6 +28,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
 - [vault-applications.md](vault-applications.md) — Vault-specific patterns: participating-domain contract, property-bearing clonables, per-application schema registration, on-disk XML shape, round-trip cycle, cross-domain access requirements.
 - [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
+- [chat-applications.md](chat-applications.md) — multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, the planned growth path across capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
 - [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fourteen merryfuns. Read this when writing Merry source, not just binding it.
 
 ### Operations
@@ -40,6 +41,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
 - `../examples/vault-app/` — minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
 - `../examples/merry-app/` — minimal Merry application: a property + ur-bearing clonable, an ancestry-walk assertion through `run_merry`, and a sandbox-firing assertion. Read alongside [merry-applications.md](merry-applications.md).
+- `../examples/chat-app/` — multi-user chat application: Room and User clonables, an admin-token LWO, capability-gated admin verbs, an 11-phase boot-time test driver that grows across the runtime-primitive demonstrations. Read alongside [chat-applications.md](chat-applications.md).
 
 ### Reference
 
@@ -54,6 +56,7 @@ Common goals and the docs that serve them.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
+- **Write a multi-user chat application** — [lpc-essentials.md](lpc-essentials.md), [chat-applications.md](chat-applications.md), `../examples/chat-app/`.
 - **Write a Vault-persisted application** — [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
 - **Add scripted, sandboxed behavior to an object** — [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Write Merry source** — [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.
