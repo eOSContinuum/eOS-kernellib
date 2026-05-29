@@ -5,9 +5,9 @@
  * name, presence, room subscriptions, mention-tracker, and the
  * admin-token list that backs the capability check inside sys/admin.
  *
- * query_state_root() returns "ChatApp:User" -- forward-compat for the
- * PD-2 persistence demonstration. PD-1 exercises only the in-memory
- * admin-token surface.
+ * query_state_root() returns "ChatApp:User" -- forward-compat for a
+ * future revision's persistence demonstration. The first revision
+ * exercises only the in-memory admin-token surface.
  *
  * Per architecture.md: clonables live under obj/, LWOs under data/.
  */

@@ -6,10 +6,10 @@
  * "chat-room." prefix to namespace them off the room ancestry.
  *
  * query_state_root() returns "ChatApp:Room" -- a future Schema
- * registration could bind this clonable into the marshaler (PD-2
- * exercises the persistence path explicitly). PD-1's scope is the
- * capability-gated admin verbs; property-storage round-tripping
- * exercises at PD-2.
+ * registration could bind this clonable into the marshaler when a
+ * later revision exercises the persistence path. The first
+ * revision's scope is the capability-gated admin verbs;
+ * property-storage round-tripping exercises subsequently.
  *
  * Per architecture.md: clonables live under obj/, LWOs under data/,
  * daemons under sys/.

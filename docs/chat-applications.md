@@ -4,7 +4,7 @@ A chat application on eOS-kernellib presents multi-user messaging as a thin laye
 
 **Audience**: an application author building a multi-user service on eOS-kernellib; comfortable with LPC syntax (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
 
-`docs/architecture.md` covers the capability tiers, the daemon contracts, and the auto-inheritance chain that any application picks up. `docs/runtime-primitives.md` enumerates the eight platform-owned guarantees that this example exercises (capability separation, richer persistent state, sandboxed code load, async events, multi-agent coherence). `docs/dispatcher.md` covers the property-change dispatcher; later phases of this walkthrough register observers against it.
+`docs/architecture.md` covers the capability tiers, the daemon contracts, and the auto-inheritance chain that any application picks up. `docs/runtime-primitives.md` enumerates the eight platform-owned guarantees this example exercises. `docs/dispatcher.md` covers the property-change dispatcher; later phases of this walkthrough register observers against it.
 
 ## Reference application
 
@@ -35,7 +35,7 @@ src/usr/Chat/
   sys/
     chat.c            - chat dispatcher daemon
     admin.c           - admin daemon (capability-gated verbs)
-    test.c            - boot-time test driver (11 phases across PD-1..PD-5)
+    test.c            - boot-time test driver
 ```
 
 The `obj/` / `sys/` / `data/` / `lib/` discipline matches `docs/architecture.md`: clonables under `obj/`, daemons under `sys/`, Light-Weight Objects under `data/`, inheritable libraries under `lib/`.
@@ -46,22 +46,22 @@ The `obj/` / `sys/` / `data/` / `lib/` discipline matches `docs/architecture.md`
 
 The chat and admin daemons themselves do not call into other domains during their `create()`. They are inert until the test driver invokes them (or, in a real deployment, until a transport-layer handler routes a request to them).
 
-## The capability primitive (PD-1)
+## Capability separation
 
-PD-1 demonstrates **FX-2b capability separation** by gating each admin verb on a per-room capability token attached to the actor's user object. The two halves are observable in `sys/admin.c`:
+The first revision of the example demonstrates capability separation by gating each admin verb on a per-room capability token attached to the actor's user object. The two halves are observable in `sys/admin.c`:
 
 - **Verification**: `_check_admin_token(actor, room, action)` walks `actor->query_admin_tokens()`, matches the first token whose `query_room()` is the target room (or `nil` for realm-wide), and confirms `action` appears in `query_actions()`. No matching token surfaces an `error()` that the verb's caller must `catch{}`.
 - **Issuance**: `grant_admin(grantor, subject, room, actions)` mints an `admin_token` LWO via `new_object(TOKEN_LWO)`, sets its fields from the arguments, and attaches it to `subject->add_admin_token(token)`. A non-`nil` grantor must itself hold a `"grant"` action for the same room; a `nil` grantor is reserved for the test driver's bootstrap path and is gated by the domain-isolation discipline (only the Chat domain can call `Chat:admin::grant_admin` with a `nil` grantor).
 
-The shape mirrors `/usr/Merry/sys/merry::_check_registrar` (DD-1 (e) capability gate for observer registration): a private helper that takes inputs the public LFUN captured at entry and throws on rejection. The error message names the actor and the requested action so failures in a smoke transcript or admin-console log have enough context to diagnose.
+The shape mirrors `/usr/Merry/sys/merry::_check_registrar` (the capability gate for observer registration): a private helper that takes inputs the public LFUN captured at entry and throws on rejection. The error message names the actor and the requested action so failures in a smoke transcript or admin-console log have enough context to diagnose.
 
-### Phase 1 -- PD1-CAP-REJECT
+### Phase 1 -- rejected kick
 
-The driver clones three users (alice, bob, carol) and one room. None of them carry an admin token at this point. bob calls `admin->kick(alice, room_a)`; the capability check finds no matching token and throws. The test driver's `catch{}` converts the throw into a `PD1-CAP-REJECT OK` sentinel and asserts that the membership of `room_a` did not mutate.
+The driver clones three users (alice, bob, carol) and one room. None of them carry an admin token at this point. bob calls `admin->kick(alice, room_a)`; the capability check finds no matching token and throws. The test driver's `catch{}` converts the throw into a `CAP-REJECT OK` sentinel and asserts that the membership of `room_a` did not mutate.
 
 ```text
 ChatApp:test: starting
-ChatApp:test: PD1-CAP-REJECT OK
+ChatApp:test: CAP-REJECT OK
 ```
 
 The boot.log carries the `[caught]` annotation that DGD writes for any error-that-was-caught:
@@ -78,45 +78,45 @@ The boot.log carries the `[caught]` annotation that DGD writes for any error-tha
 
 The `[caught]` suffix confirms the error did not propagate to the runtime -- the test driver's `catch{}` swallowed it. DGD's convention is to log every error regardless of `catch{}` so the platform retains a trace; the caught/uncaught distinction is in the suffix.
 
-### Phase 2 -- PD1-CAP-ACCEPT
+### Phase 2 -- accepted kick
 
 carol receives a per-room `"kick"` token via `admin->grant_admin(nil, carol, room_a, ({ "kick" }))`. The same `admin->kick(carol, alice, room_a)` call now passes the capability check; the verb removes alice from `room_a`'s member list and removes `room_a` from alice's subscription list. The test driver asserts both removals.
 
 ```text
-ChatApp:test: PD1-CAP-ACCEPT OK
+ChatApp:test: CAP-ACCEPT OK
 ```
 
 The two phases together demonstrate that the capability mechanism is the gate, not the verb's identity or the caller's program. The same `kick` LFUN rejects bob and accepts carol because the gate is parameterized on the actor's token holdings, not on the program performing the call.
 
-## Persistence (PD-2)
+## Persistence
 
-PD-2 will demonstrate **FX-2c richer persistent state** by establishing a chat session, persisting the runtime to a snapshot via `/usr/System/sys/persist_helper::trigger_dump_and_exit`, restarting DGD against the snapshot, and asserting that a third user can join the restored room and observe all prior messages plus the prior member set. The test driver's phases 10 (PD2-PERSIST SETUP) and 11 (PD2-PERSIST VERIFY) follow the same two-boot pattern as `examples/merry-app/sys/test.c` phases 16/17.
+A future revision demonstrates richer persistent state by establishing a chat session, persisting the runtime to a snapshot via `/usr/System/sys/persist_helper::trigger_dump_and_exit`, restarting DGD against the snapshot, and asserting that a third user can join the restored room and observe all prior messages plus the prior member set. The test driver's persistence phases follow the same two-boot pattern as `examples/merry-app/sys/test.c` phases 16/17.
 
-The walkthrough for this section grows when PD-2 closes.
+The walkthrough for this section grows when the persistence phases land.
 
-## Sandboxed reactions (PD-3)
+## Sandboxed reactions
 
-PD-3 will demonstrate **FX-2e sandboxed code load** by registering a Merry script as a per-room reaction on the `chat-room.message-log` property. An in-sandbox script (Merry source that calls only kfuns inside Merry's 51-entry deny-list permission set) compiles and fires on each message post. A sibling out-of-sandbox script (Merry source that calls a forbidden kfun like `write_file`) compiles successfully but errors on its first fire because the SANDBOX shadow inside `merrynode.c` raises a "function not allowed in merry code" error.
+A future revision demonstrates sandboxed code load by registering a Merry script as a per-room reaction on the `chat-room.message-log` property. An in-sandbox script (Merry source that calls only kfuns inside Merry's deny-list permission set) compiles and fires on each message post. A sibling out-of-sandbox script (Merry source that calls a forbidden kfun like `write_file`) compiles successfully but errors on its first fire because the SANDBOX shadow inside `merrynode.c` raises a "function not allowed in merry code" error.
 
-The walkthrough for this section grows when PD-3 closes.
+The walkthrough for this section grows when the sandboxed-reaction phases land.
 
-## Async events (PD-4)
+## Async events
 
-PD-4 will demonstrate **FX-2f async events** by routing a `post_message` through the property-change dispatcher: the main timing fires the room's append-to-log observer, the post timing fires a mention-scan observer that walks the message content, and the mention-scan observer fires a cross-user notification observer on each mentioned user's mention-tracker property. The `[task-id]` annotation in the boot.log surfaces the async decoupling -- the caller's task returns before the post-timing observers fire.
+A future revision demonstrates async event delivery by routing a `post_message` through the property-change dispatcher: the main timing fires the room's append-to-log observer, the post timing fires a mention-scan observer that walks the message content, and the mention-scan observer fires a cross-user notification observer on each mentioned user's mention-tracker property. The `[task-id]` annotation in the boot.log surfaces the async decoupling -- the caller's task returns before the post-timing observers fire.
 
-The walkthrough for this section grows when PD-4 closes.
+The walkthrough for this section grows when the async-event phases land.
 
-## Multi-agent coherence (PD-5)
+## Multi-agent coherence
 
-PD-5 will demonstrate **FX-2g multi-agent coherence** in three sub-phases. Multi-user same-room ordering: three users in one room each query `query_messages_since(t)` and observe identical message orderings. Atomic cross-room writes: `MERRY->batch(fn, atomic: true)` wraps three writes (append to source room, append to target user's mention-tracker, fire notification observer); a deliberate-failure variant rolls all three back. Ancestry-walk multi-agent: a room-base observer registered on the Room ancestor fires for all three Room clones.
+A future revision demonstrates multi-agent coherence in three sub-phases. Multi-user same-room ordering: three users in one room each query `query_messages_since(t)` and observe identical message orderings. Atomic cross-room writes: `MERRY->batch(fn, atomic: true)` wraps three writes (append to source room, append to target user's mention-tracker, fire notification observer); a deliberate-failure variant rolls all three back. Ancestry-walk multi-agent: a room-base observer registered on the Room ancestor fires for all three Room clones.
 
-The walkthrough for this section grows when PD-5 closes.
+The walkthrough for this section grows when the multi-agent-coherence phases land.
 
 ## What this example does not exercise
 
-The chat-app reference is the multi-user messaging surface, not a MUD. The following adjacent concerns are deliberately out of scope at MVA:
+The chat-app reference is the multi-user messaging surface, not a MUD. The following adjacent concerns are deliberately out of scope:
 
-- **Transport layer**: no telnet listener, no HTTP route handler, no WebSocket upgrade path. The test driver `IS` the client -- it simulates user sessions via direct LFUN calls. A future workstream may add HTTP/WebSocket transport on top.
+- **Transport layer**: no telnet listener, no HTTP route handler, no WebSocket upgrade path. The test driver `IS` the client -- it simulates user sessions via direct LFUN calls. A future revision may add HTTP/WebSocket transport on top.
 - **Multi-realm presence**: rooms and users live in a single realm. Presence is per-room, not per-realm-per-room.
 - **Game content**: no SAM markup, no body/avatar layer, no light/bulk/proximity machinery, no stance/move/social verbs, no theme system, no voice/video chrome.
 - **Message retention policies**: messages append to `chat-room.message-log` without bound. A real deployment would enforce per-room retention via a policy daemon.
@@ -125,7 +125,7 @@ The chat-app reference is the multi-user messaging surface, not a MUD. The follo
 ## Where to next
 
 - `examples/chat-app/sys/test.c` -- the canonical boot-time test driver.
-- `docs/dispatcher.md` -- the property-change dispatcher (PD-3, PD-4, PD-5).
-- `docs/persistence.md` -- the durable-state primitives (PD-2).
+- `docs/dispatcher.md` -- the property-change dispatcher (referenced by sandboxed-reaction and async-event phases).
+- `docs/persistence.md` -- the durable-state primitives.
 - `docs/architecture.md` -- the capability tiers and daemon contracts that frame this application.
-- `docs/runtime-primitives.md` -- the eight runtime primitives the chat application exercises.
+- `docs/runtime-primitives.md` -- the runtime primitives the chat application exercises.

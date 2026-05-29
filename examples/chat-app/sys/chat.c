@@ -2,10 +2,11 @@
  * Chat dispatcher daemon.
  *
  * Application-tier daemon that drives room join/leave + message
- * posting. PD-1 exercises join_room (used by the test driver to set
- * up the membership state that admin->kick will modify). post_message
- * is defined for completeness but its dispatcher hookup lands at
- * PD-4 when async-event semantics enter scope.
+ * posting. The first revision exercises join_room (used by the test
+ * driver to set up the membership state that admin->kick will
+ * modify). post_message is defined for completeness; its dispatcher
+ * hookup lands when async-event semantics enter scope in a future
+ * revision.
  *
  * Lives at /usr/Chat/sys/chat. One master, no clones.
  */
@@ -51,9 +52,10 @@ void post_message(object sender, object room, string content)
     ]);
 
     log = room->query_messages();
-    /* Direct property write -- PD-4 will route this through the
-     * dispatcher so post-timing observers can fire mention-scan and
-     * cross-user notifications. At PD-1 the property is set
-     * directly; no observers are registered yet. */
+    /* Direct property write -- a future revision will route this
+     * through the dispatcher so post-timing observers can fire
+     * mention-scan and cross-user notifications. At this revision
+     * the property is set directly; no observers are registered
+     * yet. */
     room->set_property("chat-room.message-log", log + ({ msg }));
 }

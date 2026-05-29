@@ -1,17 +1,17 @@
 # Reference Chat application
 
-A minimal multi-user chat application that runs on top of eOS-kernellib. The runtime primitives the platform provides (property storage, ur-hierarchy, capability separation, the Merry dispatcher, orthogonal persistence) are exercised in turn by an 11-phase boot-time test driver. Each phase produces a sentinel line in the result log so the smoke harness can verify the expected outcomes ran. The full walkthrough lives in `docs/chat-applications.md`.
+A minimal multi-user chat application that runs on top of eOS-kernellib. The runtime primitives the platform provides (property storage, ur-hierarchy, capability separation, the Merry dispatcher, orthogonal persistence) are exercised in turn by a boot-time test driver. Each phase produces a sentinel line in the result log so the smoke harness can verify the expected outcomes ran. The full walkthrough lives in `docs/chat-applications.md`.
 
-The example is grown incrementally across the FX-2 primitive demonstrations: PD-1 wires phases 1 and 2 (capability separation); subsequent primitive demonstrations (FX-2c persistence, FX-2e sandboxed code load, FX-2f async events, FX-2g multi-agent coherence) add the remaining phases. At any point in the growth the existing phases continue to pass; the smoke harness counts " OK" sentinels.
+The example is grown incrementally: the first revision wires the capability-separation phases; subsequent revisions add persistence, sandboxed reactions, async events, and multi-agent coherence. At any point in the growth the existing phases continue to pass; the smoke harness counts " OK" sentinels.
 
 ## Operations
 
-- A `ChatApp:Room` clonable inherits `/lib/util/properties` (Vault-style property storage), `/lib/util/ur` (ur-parent / ur-child tracking; per-room Merry scripts ride this surface at PD-3 / PD-4), and `/lib/util/named` (logical-name registration via Index). It holds `chat-room.member-list`, `chat-room.message-log`, `chat-room.config`, and (when populated) `chat-room.banned`.
+- A `ChatApp:Room` clonable inherits `/lib/util/properties` (Vault-style property storage), `/lib/util/ur` (ur-parent / ur-child tracking; per-room Merry scripts ride this surface in later revisions), and `/lib/util/named` (logical-name registration via Index). It holds `chat-room.member-list`, `chat-room.message-log`, `chat-room.config`, and (when populated) `chat-room.banned`.
 - A `ChatApp:User` clonable inherits the same three libs. It holds `chat-user.name`, `chat-user.room-subscriptions`, `chat-user.presence`, `chat-user.mention-tracker`, and the capability-bearing `chat-user.admin-tokens` list.
 - An `admin_token` LWO under `/usr/Chat/data/admin_token` carries (grantor, subject, room, granted_at, actions). The capability check inside `sys/admin` walks the actor's `chat-user.admin-tokens` list and matches by room + action. Tokens are issued by `sys/admin::grant_admin` and attached to the subject's user object.
 - The boot-time test driver `sys/test.c` runs in an order-independent fashion via a `call_out` from `create()`. Phases live in `run_tests`; each is wrapped in `catch{}` so a failure in one does not mask a different failure in another.
-- **Phase 1 (PD1-CAP-REJECT)**: a regular user (no admin token) calls `admin->kick`. The capability check throws; the test driver records the rejection and asserts the target user's membership did not change.
-- **Phase 2 (PD1-CAP-ACCEPT)**: a third user receives a per-room "kick" admin token via `admin->grant_admin(nil, carol, room_a, ({ "kick" }))`. The same `admin->kick` call now succeeds; the target is removed from the room's member list and the room is removed from the target's subscription list.
+- **Phase 1 (CAP-REJECT)**: a regular user (no admin token) calls `admin->kick`. The capability check throws; the test driver records the rejection and asserts the target user's membership did not change.
+- **Phase 2 (CAP-ACCEPT)**: a third user receives a per-room "kick" admin token via `admin->grant_admin(nil, carol, room_a, ({ "kick" }))`. The same `admin->kick` call now succeeds; the target is removed from the room's member list and the room is removed from the target's subscription list.
 
 ## Deployment
 
@@ -35,15 +35,15 @@ cat .runtime/src/usr/Chat/data/test-result.log
 kill %1
 ```
 
-At PD-1 the expected result-log contents:
+At this revision the expected result-log contents:
 
 ```text
 ChatApp:test: starting
-ChatApp:test: PD1-CAP-REJECT OK
-ChatApp:test: PD1-CAP-ACCEPT OK
+ChatApp:test: CAP-REJECT OK
+ChatApp:test: CAP-ACCEPT OK
 ```
 
-Phases 3-11 land as PD-2..PD-5 close.
+Additional phases land as subsequent revisions add primitives.
 
 ## Layout
 
@@ -61,5 +61,5 @@ examples/chat-app/
 +- sys/
    +- chat.c            -- chat dispatcher daemon (join_room / leave_room / post_message)
    +- admin.c           -- admin daemon (capability-gated kick / ban / set_room_config)
-   +- test.c            -- 11-phase boot-time test driver (PD-1 wires phases 1+2)
+   +- test.c            -- boot-time test driver (capability phases wired)
 ```

@@ -1,12 +1,12 @@
 /*
  * Admin daemon -- capability-gated chat-room moderation.
  *
- * PD-1 demonstrates FX-2b capability separation via the per-user
- * admin-token LWO at /usr/Chat/data/admin_token. Each admin verb
- * (kick / ban / set_room_config) calls _check_admin_token(actor,
- * room, action) at entry; the check walks the actor's
- * chat-user.admin-tokens property and matches by (room, action). No
- * matching token -> the verb errors before any state mutation.
+ * Demonstrates capability separation via the per-user admin-token
+ * LWO at /usr/Chat/data/admin_token. Each admin verb (kick / ban /
+ * set_room_config) calls _check_admin_token(actor, room, action) at
+ * entry; the check walks the actor's chat-user.admin-tokens property
+ * and matches by (room, action). No matching token -> the verb
+ * errors before any state mutation.
  *
  * grant_admin issues a new admin-token LWO and attaches it to the
  * subject user's admin-tokens list. The grantor must itself hold a
@@ -15,11 +15,12 @@
  * test driver's bootstrap mint and is gated by the caller-program
  * convention rather than a token check (the test driver lives under
  * /usr/Chat/sys/, the same domain as this daemon, so the existing
- * domain-isolation discipline is sufficient at MVA scope).
+ * domain-isolation discipline is sufficient as a first-revision
+ * scope).
  *
  * _check_admin_token mirrors the shape of /usr/Merry/sys/merry's
- * _check_registrar capability gate (DD-1 (e)): private helper, takes
- * the inputs the public LFUN captured at entry, throws on rejection.
+ * _check_registrar capability gate: a private helper that takes the
+ * inputs the public LFUN captured at entry, throws on rejection.
  *
  * Lives at /usr/Chat/sys/admin. One master, no clones.
  */
@@ -57,9 +58,9 @@ void kick(object actor, object target, object room)
 
 /*
  * Public LFUN: ban a target user from a room. Same shape as kick
- * but the target also gets the room added to a ban list. At PD-1 the
- * ban list is stored as a per-room property; future demonstrations
- * may extend the gate so a banned user cannot re-join.
+ * but the target also gets the room added to a ban list. The ban
+ * list is stored as a per-room property; future demonstrations may
+ * extend the gate so a banned user cannot re-join.
  */
 void ban(object actor, object target, object room)
 {

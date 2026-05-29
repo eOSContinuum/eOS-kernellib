@@ -1,20 +1,21 @@
 /*
  * Boot-time test driver for the Chat application example.
  *
- * Exercises the FX-2 primitives via 11 phases mapped across
- * PD-1..PD-5. Each phase writes a sentinel line to the result file
- * at /usr/Chat/data/test-result.log on success; failures write a
+ * Exercises the runtime primitives via boot-time phases. Each phase
+ * writes a sentinel line to the result file at
+ * /usr/Chat/data/test-result.log on success; failures write a
  * distinct FAIL sentinel. Phases are wrapped in catch{} so a failure
- * in one does not mask a different failure in another.
+ * in one does not mask a different failure in another. The driver
+ * grows with each primitive added; the first revision wires the
+ * capability-separation phases.
  *
- * PD-1 scope: phases 1 + 2 (capability separation via admin-token).
- * Phases 3-11 are wired in as later PD-N tasks close (PD-2..PD-5).
+ * Phases in this revision:
  *
- *   1. PD1-CAP-REJECT OK  -- regular user calls admin->kick without
- *                            an admin-token; capability check throws.
- *   2. PD1-CAP-ACCEPT OK  -- admin user holding a per-room kick
- *                            token calls admin->kick; target leaves
- *                            the room.
+ *   1. CAP-REJECT OK  -- regular user calls admin->kick without
+ *                        an admin-token; capability check throws.
+ *   2. CAP-ACCEPT OK  -- admin user holding a per-room kick
+ *                        token calls admin->kick; target leaves
+ *                        the room.
  *
  * Pass/fail is observable via the sentinel file. The README's verify
  * command counts " OK" lines after the smoke harness completes.
@@ -84,12 +85,12 @@ static void run_tests()
 	return;
     }
 
-    /* phase 1: PD1-CAP-REJECT
+    /* phase 1: CAP-REJECT
      *
      * bob (no admin token) calls admin->kick. The capability check
      * walks bob's admin-tokens list, finds nothing matching room_a +
      * "kick", and throws. The catch{} below converts the throw into
-     * a PD1-CAP-REJECT OK sentinel.
+     * a CAP-REJECT OK sentinel.
      */
     rejected = 0;
     catch {
@@ -98,17 +99,17 @@ static void run_tests()
 	rejected = 1;
     }
     if (!rejected) {
-	log_line("ChatApp:test: FAIL: PD1-CAP-REJECT kick did not throw");
+	log_line("ChatApp:test: FAIL: CAP-REJECT kick did not throw");
 	return;
     }
     /* The reject must not have removed alice from the room. */
     if (!member(alice, room_a->query_members())) {
-	log_line("ChatApp:test: FAIL: PD1-CAP-REJECT membership mutated");
+	log_line("ChatApp:test: FAIL: CAP-REJECT membership mutated");
 	return;
     }
-    log_line("ChatApp:test: PD1-CAP-REJECT OK");
+    log_line("ChatApp:test: CAP-REJECT OK");
 
-    /* phase 2: PD1-CAP-ACCEPT
+    /* phase 2: CAP-ACCEPT
      *
      * carol receives a per-room "kick" admin token. carol calls
      * admin->kick; the capability check matches and the verb removes
@@ -118,31 +119,33 @@ static void run_tests()
     catch {
 	token = ADMIN_DAEMON->grant_admin(nil, carol, room_a, ({ "kick" }));
     } : {
-	log_line("ChatApp:test: FAIL: PD1-CAP-ACCEPT grant_admin threw");
+	log_line("ChatApp:test: FAIL: CAP-ACCEPT grant_admin threw");
 	return;
     }
     if (!token) {
-	log_line("ChatApp:test: FAIL: PD1-CAP-ACCEPT grant_admin returned nil");
+	log_line("ChatApp:test: FAIL: CAP-ACCEPT grant_admin returned nil");
 	return;
     }
 
     catch {
 	ADMIN_DAEMON->kick(carol, alice, room_a);
     } : {
-	log_line("ChatApp:test: FAIL: PD1-CAP-ACCEPT kick threw");
+	log_line("ChatApp:test: FAIL: CAP-ACCEPT kick threw");
 	return;
     }
     if (member(alice, room_a->query_members())) {
-	log_line("ChatApp:test: FAIL: PD1-CAP-ACCEPT alice still member");
+	log_line("ChatApp:test: FAIL: CAP-ACCEPT alice still member");
 	return;
     }
     if (member(room_a, alice->query_subscriptions())) {
-	log_line("ChatApp:test: FAIL: PD1-CAP-ACCEPT subscription persisted");
+	log_line("ChatApp:test: FAIL: CAP-ACCEPT subscription persisted");
 	return;
     }
-    log_line("ChatApp:test: PD1-CAP-ACCEPT OK");
+    log_line("ChatApp:test: CAP-ACCEPT OK");
 
-    /* phase 3-11: filled in by PD-2..PD-5 task closures. */
+    /* Additional phases land in subsequent revisions as the chat
+     * application exercises additional primitives (persistence,
+     * sandboxed reactions, async events, multi-agent coherence). */
 }
 
 
