@@ -129,25 +129,30 @@ The lesson is the boundary of orthogonal persistence. *Snapshot + restore* prese
 
 A room can load and run *untrusted code*. A per-room reaction is a Merry script -- source compiled at runtime via `new_object("/usr/Merry/data/merry", source)` and bound on the room object as a property. The script executes inside the Merry sandbox: a kfun is callable from a Merry script only if no `SANDBOX()` shadow in `/usr/Merry/lib/merrynode.c` masks it. That deny list is the security boundary -- a room can accept a reaction written by an untrusted author and run it, confident that the author cannot reach `write_file`, `clone_object`, `open_port`, `shutdown`, or any of the other entries in the 51-entry `SANDBOX()` deny list (plus the explicit `call_other` and `new_object` shadows; see the deny-list reference in `docs/merry-language.md`).
 
-These two phases load both sides of that boundary: an in-sandbox reaction that runs, and a sandbox-denied reaction that compiles but is stopped at its first fire. They fire the reactions directly via `run_merry` to demonstrate sandboxed code load in isolation; wiring a reaction to fire *automatically* off the dispatcher's post-timing observers when a message is posted is the async-event phase's scope.
+These two phases load both sides of that boundary: an in-sandbox reaction that runs, and a sandbox-denied reaction that compiles but is stopped at its first fire. Phase 3's accepted reaction fires *automatically* off the dispatcher when a message is posted -- sandboxed code load and dispatcher auto-fire demonstrated together. Phase 4's rejected reaction is fired directly via `run_merry` on a distinct property path, so its sandbox-deny boundary is isolated from the message-arrival cascade.
 
-The reaction-property key follows the `merry:on:<path>:<timing>` convention the property-change dispatcher reads (`docs/dispatcher.md`); here the test driver invokes `run_merry(room, "<path>:<timing>", "on", args)` to fire it explicitly.
+The reaction-property key follows the `merry:on:<path>:<timing>` convention the property-change dispatcher reads (`docs/dispatcher.md`).
 
 ### Phase 3 -- accepted reaction
 
-The driver compiles an in-sandbox reaction whose source calls only the `Set` merryfun (which is not shadowed -- it routes to `merrynode.c::Set`, which forwards to the host's `set_property`):
+The driver registers two in-sandbox observers on the room's `chat-room.message` arrival signal at main timing, each calling only unshadowed merryfuns (`Set` / `Get` / `sizeof`, all routing through `merrynode.c`) -- an append-to-history observer and a message-count marker observer:
 
 ```c
-Set($this, "chat-room.message-count", $count);
+MERRY->register_observer(room_a, "chat-room.message", "main",
+    "Set($this, \"chat-room.message-log\", " +
+    "Get($this, \"chat-room.message-log\") + ({ $new })); return TRUE;");
+MERRY->register_observer(room_a, "chat-room.message", "main",
+    "Set($this, \"chat-room.message-count\", " +
+    "sizeof(Get($this, \"chat-room.message-log\"))); return TRUE;");
 ```
 
-It binds the script on `room_a` under `merry:on:chat-room.message:main`, posts a message (bob is still a member after the phase-2 kick removed alice), then fires the reaction with the new message count as the `$count` argument. `$this` resolves to the binding host (`room_a`); the reaction sets the room's `chat-room.message-count` marker property to `$count`. The driver reads the marker back and writes the sentinel:
+Registration order is firing order, so the marker observes the already-appended log. bob posts a message (he is still a member after the phase-2 kick removed alice); `post_message` writes `chat-room.message`, and the dispatcher fires both observers with **no manual `run_merry`**. The driver reads the appended log and the marker back and writes the sentinel:
 
 ```text
 ChatApp:test: SANDBOX-ACCEPT OK
 ```
 
-This is sandboxed code load: a script authored as a string, compiled at runtime, bound on a room, and executed against that room's property storage -- all within the sandbox surface.
+This is sandboxed code load *as a registered reaction*: scripts authored as strings, compiled at runtime, bound on a room, and executed against that room's property storage automatically on a real state change -- all within the sandbox surface.
 
 ### Phase 4 -- rejected reaction
 
@@ -173,9 +178,36 @@ The deny-by-shadow mechanism is *implicit whitelist by presence*: there is no al
 
 ## Async events
 
-A future revision demonstrates async event delivery by routing a `post_message` through the property-change dispatcher: the main timing fires the room's append-to-log observer, the post timing fires a mention-scan observer that walks the message content, and the mention-scan observer fires a cross-user notification observer on each mentioned user's mention-tracker property. The `[task-id]` annotation in the boot.log surfaces the async decoupling -- the caller's task returns before the post-timing observers fire.
+`post_message` does not append to the message log itself. It resolves the message's `@name` mentions against the room roster, then writes a single `chat-room.message` arrival signal via `set_property`. That one write is what the dispatcher fans out: a room's main-timing append-to-history observer records the message, and (where registered) a post-timing mention-notify observer delivers a cross-user notification. The sender's code contains no notification logic -- message arrival is a first-class dispatched event, not a daemon side effect.
 
-The walkthrough for this section grows when the async-event phases land.
+### Phase 5 -- decoupled cross-user notification
+
+A room carries an append-to-history main observer and a mention-notify post observer. alice posts a message mentioning dave; `scan_mentions` resolves `@dave` and carries him in the message's `mentions` list. The dispatcher fires the main append synchronously, then the post observer:
+
+```c
+$delay(2, FALSE);
+Set($new["mentions"][0], "chat-user.mention-tracker",
+    Get($new["mentions"][0], "chat-user.mention-tracker") + ({ $this }));
+return TRUE;
+```
+
+`$delay(2, FALSE)` returns `FALSE` to the dispatcher immediately, so `post_message` returns with dave's mention-tracker still empty -- the notification is *decoupled* from the sender's call. Two seconds later the continuation resumes (a fresh tick, a fresh dispatch batch) and writes dave's tracker. A `call_out` at t+4 confirms it populated:
+
+```text
+ChatApp:test: ASYNC-DECOUPLED OK
+```
+
+This is the runtime's temporal-decoupling primitive at the observer layer. `$delay` composing with a dispatcher-fired observer rests on the substrate carrying the compiled observer through the continuation (`docs/dispatcher.md`, "Deferred observer continuations"); the room exposes the standard `delayed_call` / `perform_delayed_call` glue. The observer stays pure Merry -- no application LPC is involved in the deferral.
+
+### Phase 6 -- no observer, no reaction
+
+The same mention post, on a room with the append observer but **no** mention-notify observer registered. The dispatcher has nothing to fire at post timing, so no notification is scheduled; the target's mention-tracker stays empty even after the same delay window:
+
+```text
+ChatApp:test: NO-REACT OK
+```
+
+Reactions happen only where observers are registered -- a property write on an un-observed timing slot is inert. The negative isolates this to the missing post observer: the append observer *is* registered, so the message is still recorded.
 
 ## Multi-agent coherence
 

@@ -64,3 +64,21 @@ void set_config(mapping config)
 {
     set_property("chat-room.config", config);
 }
+
+/* $delay() continuation glue. A post-timing mention-notify observer
+ * registered on this room uses $delay() to push its cross-user
+ * notification onto a later tick. merrynode.c::do_delay invokes
+ * ::call_other($this, "delayed_call", mcontext, "merry_continuation",
+ * delay, $this), so the dispatch host -- this room -- must expose the
+ * pair. The shape is lifted verbatim from examples/merry-app/obj/thing.c
+ * (which lifts it from SkotOS /core/lib/core_scripts.c); promote to a
+ * /lib/util helper once a third application surfaces the same need. */
+static void perform_delayed_call(object ob, string fun, mixed *args)
+{
+    call_other(ob, fun, args...);
+}
+
+void delayed_call(object ob, string fun, mixed delay, mixed args...)
+{
+    call_out("perform_delayed_call", delay, ob, fun, args);
+}

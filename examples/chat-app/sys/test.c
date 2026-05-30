@@ -11,41 +11,56 @@
  *
  * Phases in this revision:
  *
- *   1.  CAP-REJECT OK     -- regular user calls admin->kick without
- *                            an admin-token; capability check throws.
- *   2.  CAP-ACCEPT OK     -- admin user holding a per-room kick
- *                            token calls admin->kick; target leaves
- *                            the room.
- *   3.  SANDBOX-ACCEPT OK -- a per-room Merry reaction whose source
- *                            calls only in-sandbox kfuns compiles,
- *                            binds on the room under
- *                            merry:on:chat-room.message:main, fires
- *                            via run_merry after a message post, and
- *                            the marker property it sets lands.
- *   4.  SANDBOX-REJECT OK -- a sibling reaction whose source calls a
- *                            sandbox-denied kfun (write_file) compiles
- *                            (registration succeeds) but errors on its
- *                            first fire with the merrynode SANDBOX
- *                            shadow's "function not allowed in merry
- *                            code"; no file is created.
- *  10.  PERSIST-SETUP OK  -- establish a chat session (2 users, 3
- *                            messages, a cross-clone mention-tracker
- *                            reference) on a fresh room, record the
- *                            session shape to an on-disk marker, then
- *                            dump a snapshot and exit.
- *  11.  PERSIST-VERIFY OK -- fires from a surviving call_out after the
- *                            snapshot is restored; the whole session
- *                            survived and a third user joining the
- *                            restored room observes all prior state.
- *      COLDBOOT-LOST OK   -- negative case. On a cold boot taken
- *                            WITHOUT loading the snapshot, the on-disk
- *                            marker survived but the in-memory session
- *                            did not; in-memory-only state does not
- *                            survive a cold boot without a snapshot.
+ *   1.  CAP-REJECT OK      -- regular user calls admin->kick without
+ *                             an admin-token; capability check throws.
+ *   2.  CAP-ACCEPT OK      -- admin user holding a per-room kick
+ *                             token calls admin->kick; target leaves
+ *                             the room.
+ *   3.  SANDBOX-ACCEPT OK  -- two sandboxed Merry observers (append-to-
+ *                             history + a message-count marker) are
+ *                             registered on the room's chat-room.message
+ *                             arrival signal at main timing; a message
+ *                             post fires them automatically via the
+ *                             dispatcher (no manual run_merry) and the
+ *                             marker lands -- sandboxed code load and
+ *                             dispatcher auto-fire demonstrated together.
+ *   4.  SANDBOX-REJECT OK  -- a sibling reaction whose source calls a
+ *                             sandbox-denied kfun (write_file) compiles
+ *                             (registration succeeds) but errors on its
+ *                             first fire with the merrynode SANDBOX
+ *                             shadow's "function not allowed in merry
+ *                             code"; no file is created.
+ *   5.  ASYNC-DECOUPLED OK -- async events. A mention post fires a
+ *                             post-timing mention-notify observer that
+ *                             uses $delay() to push its cross-user write
+ *                             onto a later tick; the sender returns with
+ *                             the target's mention-tracker still empty,
+ *                             and a t+4 call_out confirms it populated
+ *                             after the delayed continuation ran.
+ *   6.  NO-REACT OK        -- async-events negative. The same mention post on a
+ *                             room with no mention-notify observer fires
+ *                             no reaction; the target's mention-tracker
+ *                             stays empty -- reactions happen only where
+ *                             observers are registered.
+ *  10.  PERSIST-SETUP OK   -- establish a chat session (2 users, 3
+ *                             messages via the append observer, a cross-
+ *                             clone mention-tracker reference) on a fresh
+ *                             room, record the session shape to an
+ *                             on-disk marker, then dump a snapshot.
+ *  11.  PERSIST-VERIFY OK  -- fires from a surviving call_out after the
+ *                             snapshot is restored; the whole session
+ *                             survived and a third user joining the
+ *                             restored room observes all prior state.
+ *      COLDBOOT-LOST OK    -- negative case. On a cold boot taken
+ *                             WITHOUT loading the snapshot, the on-disk
+ *                             marker survived but the in-memory session
+ *                             did not; in-memory-only state does not
+ *                             survive a cold boot without a snapshot.
  *
- * The persistence phases follow the two-boot pattern of
- * examples/merry-app/sys/test.c phases 16/17, plus a third (cold,
- * no-snapshot) boot for the negative case.
+ * The async phases (5/6) fire their assertions from a t+4 call_out on
+ * boot 1, before the t+5 snapshot dump. The persistence phases follow
+ * the two-boot pattern of examples/merry-app/sys/test.c phases 16/17,
+ * plus a third (cold, no-snapshot) boot for the negative case.
  *
  * Pass/fail is observable via the sentinel file. The README's verify
  * command counts " OK" lines after the smoke harness completes.
@@ -81,9 +96,39 @@ inherit "/usr/Merry/lib/merryapi";
 # define MARKER_FILE    "/usr/Chat/data/persist-marker.log"
 # define PERSIST_HELPER "/usr/System/sys/persist_helper"
 # define MERRY_DATA     "/usr/Merry/data/merry"
+# define MERRY_DAEMON   "/usr/Merry/sys/merry"
 # define HACK_FILE      "/usr/Chat/data/hack.txt"
 
+/* Observer source strings, compiled into the merrynode sandbox by
+ * register_observer. Each is a thin Merry reaction over the dispatcher's
+ * change context ($this = dispatch host, $new = the value written). */
+
+/* main timing: append the arriving message mapping to the room's log.
+ * (LPC has no adjacent-string-literal concatenation, so the fragments
+ * are joined with + the same way examples/merry-app/sys/test.c builds
+ * its observer sources.) */
+# define SRC_APPEND \
+    "Set($this, \"chat-room.message-log\", " + \
+    "Get($this, \"chat-room.message-log\") + ({ $new })); return TRUE;"
+
+/* main timing: record the message count off the (now-appended) log --
+ * the sandboxed-marker reaction, auto-fired by the dispatcher. */
+# define SRC_MARKER \
+    "Set($this, \"chat-room.message-count\", " + \
+    "sizeof(Get($this, \"chat-room.message-log\"))); return TRUE;"
+
+/* post timing: notify the first mentioned user on a LATER tick. $delay
+ * returns control synchronously (the sender is not blocked) and resumes
+ * the cross-user Set after the delay -- the async-decoupling. */
+# define SRC_NOTIFY \
+    "$delay(2, FALSE); " + \
+    "Set($new[\"mentions\"][0], \"chat-user.mention-tracker\", " + \
+    "Get($new[\"mentions\"][0], \"chat-user.mention-tracker\") + ({ $this })); " + \
+    "return TRUE;"
+
 static void run_tests();
+static void async_verify();
+static void finalize_dump();
 static void persist_verify();
 private void log_line(string msg);
 private object spawn_user(string name);
@@ -97,6 +142,15 @@ private void coldboot_loss_verify();
 object persist_room;    /* the chat-session room; survives the snapshot */
 object persist_alice;   /* a member account; holds the mention-tracker  */
 object persist_bob;     /* a member account; the mention-tracker target */
+
+/* Phase 5/6 async-event handles. Set during run_tests on boot 1 and
+ * read by async_verify (call_out at t+4, before the snapshot dump) to
+ * assert the decoupled notification landed (dave) and the no-observer
+ * negative stayed inert (dave2). */
+object async_room5;     /* phase 5 room: append + mention-notify observers */
+object async_dave;      /* phase 5 mention target; tracker set on a later tick */
+object async_room6;     /* phase 6 room: append observer only */
+object async_dave2;     /* phase 6 mention target; tracker stays empty */
 
 
 static void create()
@@ -207,43 +261,40 @@ static void run_tests()
     }
     log_line("ChatApp:test: CAP-ACCEPT OK");
 
-    /* phase 3: SANDBOX-ACCEPT
+    /* phase 3: SANDBOX-ACCEPT -- sandboxed reaction auto-fired by the
+     * dispatcher (merged with the message-arrival path).
      *
-     * Load a per-room reaction as Merry code. The source calls only
-     * the in-sandbox Set() merryfun -- no kfun in merrynode.c's
-     * SANDBOX() deny list -- so it both compiles and fires cleanly.
-     * The script is bound on room_a under the reaction-property key
-     * merry:on:chat-room.message:main (the merry:on:<path>:<timing>
-     * convention the property-change dispatcher reads); here it is
-     * fired directly via run_merry to demonstrate sandboxed code load
-     * in isolation. Wiring the same reaction to fire automatically off
-     * the dispatcher's post-timing observers on a message post is the
-     * async-event phase's scope; this phase proves only that loaded
-     * Merry code executes within the sandbox surface and mutates room
-     * state.
+     * Two sandboxed Merry observers are registered on room_a's
+     * chat-room.message arrival signal at main timing: an append-to-
+     * history observer (SRC_APPEND) and a message-count marker observer
+     * (SRC_MARKER). Registration order is firing order, so the marker
+     * observes the already-appended log. Both sources call only
+     * in-sandbox merryfuns (Set / Get / sizeof) -- nothing in
+     * merrynode.c's SANDBOX() deny list -- so they compile into the
+     * sandbox and execute cleanly.
      *
-     * bob posts a message to room_a (he is still a member after the
-     * phase-2 kick removed alice). The reaction is fired with the new
-     * message count as the $count argument; it sets the room's
-     * chat-room.message-count marker property to that value. The
-     * assertion reads the marker back.
+     * bob posts a message (he is still a member after the phase-2 kick
+     * removed alice); post_message writes chat-room.message; the
+     * dispatcher fires both observers with NO manual run_merry. The
+     * marker landing is the sandboxed-code-load claim (loaded Merry code
+     * executes in the sandbox and mutates room state) AND the auto-fire claim (the
+     * reaction fires automatically off a real property change),
+     * demonstrated together. The assertions read the appended log and
+     * the marker back.
      */
     catch {
-	object accept_script;
-	int count;
-
-	accept_script = new_object(MERRY_DATA,
-		"Set($this, \"chat-room.message-count\", $count);");
-	room_a->set_property("merry:on:chat-room.message:main",
-			     accept_script);
+	MERRY_DAEMON->register_observer(room_a, "chat-room.message", "main",
+					SRC_APPEND);
+	MERRY_DAEMON->register_observer(room_a, "chat-room.message", "main",
+					SRC_MARKER);
 
 	CHAT_DAEMON->post_message(bob, room_a, "first post");
-	count = sizeof(room_a->query_messages());
 
-	run_merry(room_a, "chat-room.message:main", "on",
-		  ([ "count": count ]));
-
-	if (room_a->query_raw_property("chat-room.message-count") != count) {
+	if (sizeof(room_a->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: SANDBOX-ACCEPT append observer did not record message");
+	    return;
+	}
+	if (room_a->query_raw_property("chat-room.message-count") != 1) {
 	    log_line("ChatApp:test: FAIL: SANDBOX-ACCEPT marker property did not land");
 	    return;
 	}
@@ -299,6 +350,79 @@ static void run_tests()
     }
     log_line("ChatApp:test: SANDBOX-REJECT OK");
 
+    /* phase 5: ASYNC-DECOUPLED -- setup.
+     *
+     * A fresh room with an append-to-history main observer AND a
+     * mention-notify post observer. dave joins; alice posts a message
+     * mentioning him. post_message resolves "@dave" against the roster
+     * and carries dave in msg["mentions"]. The dispatcher fires the main
+     * append synchronously, then the post mention-notify observer --
+     * whose source calls $delay(2, FALSE), returning control to the
+     * sender immediately and resuming its cross-user Set two seconds
+     * later. So the instant post_message returns, dave's mention-tracker
+     * is still empty: the notification is decoupled from the sender's
+     * call. async_verify (call_out at t+4) asserts the tracker IS
+     * populated once the delayed continuation has run. The append, by
+     * contrast, lands synchronously -- history already holds the message
+     * here. */
+    catch {
+	async_room5 = spawn_room("ChatApp:Room:AsyncP5");
+	async_dave  = spawn_user("dave");
+	CHAT_DAEMON->join_room(alice, async_room5);
+	CHAT_DAEMON->join_room(async_dave, async_room5);
+
+	MERRY_DAEMON->register_observer(async_room5, "chat-room.message", "main",
+					SRC_APPEND);
+	MERRY_DAEMON->register_observer(async_room5, "chat-room.message", "post",
+					SRC_NOTIFY);
+
+	CHAT_DAEMON->post_message(alice, async_room5, "@dave hi");
+
+	if (sizeof(async_dave->query_mention_tracker()) != 0) {
+	    log_line("ChatApp:test: FAIL: ASYNC notification fired synchronously (not decoupled)");
+	    return;
+	}
+	if (sizeof(async_room5->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: ASYNC append observer did not record message");
+	    return;
+	}
+    } : {
+	log_line("ChatApp:test: FAIL: ASYNC-DECOUPLED setup threw");
+	return;
+    }
+
+    /* phase 6: NO-REACT (negative) -- setup.
+     *
+     * The same action as phase 5 -- a mention post -- but on a room with
+     * NO mention-notify observer registered. Without a post-timing
+     * observer the dispatcher has nothing to fire after the write, so no
+     * cross-user notification is ever scheduled. async_verify asserts
+     * dave2's mention-tracker stays empty even after the same delay
+     * window: a direct property write without observer registration
+     * fires no reaction. The append observer IS registered, so the
+     * message is still recorded -- isolating the negative to the missing
+     * post observer, not a broken post path. */
+    catch {
+	async_room6 = spawn_room("ChatApp:Room:NoReactP6");
+	async_dave2 = spawn_user("dave2");
+	CHAT_DAEMON->join_room(bob, async_room6);
+	CHAT_DAEMON->join_room(async_dave2, async_room6);
+
+	MERRY_DAEMON->register_observer(async_room6, "chat-room.message", "main",
+					SRC_APPEND);
+	/* deliberately NO mention-notify post observer registered. */
+
+	CHAT_DAEMON->post_message(bob, async_room6, "@dave2 yo");
+
+	if (sizeof(async_room6->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: NO-REACT append observer did not record message");
+	    return;
+	}
+    } : {
+	log_line("ChatApp:test: FAIL: NO-REACT setup threw");
+	return;
+    }
+
     /* phase 10: PERSIST SETUP
      *
      * Establish a chat session on a fresh room: alice and bob join,
@@ -324,6 +448,14 @@ static void run_tests()
 	persist_room  = spawn_room("ChatApp:Room:PersistD");
 	persist_alice = alice;
 	persist_bob   = bob;
+
+	/* post_message routes the append through an observer, so the
+	 * persist room needs the append-to-history observer registered
+	 * before its messages post. No mention-notify observer here -- the
+	 * persistence session does not exercise async notification, and the
+	 * "@bob ping" message stays a plain logged message. */
+	MERRY_DAEMON->register_observer(persist_room, "chat-room.message", "main",
+					SRC_APPEND);
 
 	CHAT_DAEMON->join_room(alice, persist_room);
 	CHAT_DAEMON->join_room(bob, persist_room);
@@ -353,18 +485,66 @@ static void run_tests()
 	catch(remove_file(MARKER_FILE));
 	write_file(MARKER_FILE, "messages=3 members=2\n");
 
-	/* schedule the verify with a small delay so the call_out is in
-	 * the snapshot. After restore its scheduled time has long passed
-	 * and DGD fires it as soon as the system is back up. */
-	call_out("persist_verify", 3);
-
 	log_line("ChatApp:test: PERSIST-SETUP OK");
-
-	PERSIST_HELPER->trigger_dump_and_exit();
     } : {
 	log_line("ChatApp:test: FAIL: PERSIST-SETUP threw");
 	return;
     }
+
+    /* Boot-1 finalization. Three call_outs, ordered so the async
+     * assertions land on this boot and the persistence assertion lands
+     * on the next:
+     *
+     *   t+4  async_verify   -- phase 5 notification landed (after the
+     *                          t+2 $delay continuation), phase 6 stayed
+     *                          inert; both fire before the dump.
+     *   t+5  finalize_dump  -- trigger_dump_and_exit takes the snapshot.
+     *   t+8  persist_verify -- scheduled but NOT yet fired at dump time,
+     *                          so DGD captures it pending; it fires as
+     *                          soon as the external restore is back up.
+     *
+     * persist_verify's delay must exceed the dump time so it survives
+     * into the snapshot rather than firing on boot 1. */
+    call_out("async_verify", 4);
+    call_out("finalize_dump", 5);
+    call_out("persist_verify", 8);
+}
+
+
+/* Boot-1 async assertions, firing after the phase-5 $delay continuation
+ * has run (t+2) but before the snapshot dump (t+5). Confirms the
+ * mention-notify observer's cross-user write was decoupled to a later
+ * tick (phase 5 positive) and that the observer-less room produced no
+ * reaction (phase 6 negative). */
+static void async_verify()
+{
+    mixed *tracker;
+
+    catch {
+	tracker = async_dave->query_mention_tracker();
+	if (sizeof(tracker) != 1 || tracker[0] != async_room5) {
+	    log_line("ChatApp:test: FAIL: ASYNC-DECOUPLED notification did not land after delay");
+	    return;
+	}
+	log_line("ChatApp:test: ASYNC-DECOUPLED OK");
+
+	if (sizeof(async_dave2->query_mention_tracker()) != 0) {
+	    log_line("ChatApp:test: FAIL: NO-REACT notification fired without an observer");
+	    return;
+	}
+	log_line("ChatApp:test: NO-REACT OK");
+    } : {
+	log_line("ChatApp:test: FAIL: async_verify threw");
+    }
+}
+
+
+/* Snapshot trigger, deferred past async_verify so the boot-1 async
+ * assertions complete before the dump. Routes through the System
+ * persist helper's call_out-deferred dump_state(FALSE) + shutdown(). */
+static void finalize_dump()
+{
+    PERSIST_HELPER->trigger_dump_and_exit();
 }
 
 
