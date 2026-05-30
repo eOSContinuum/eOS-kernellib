@@ -543,6 +543,98 @@ static void run_tests()
 	return;
     }
 
+    /* phase 9: COHERENCE-SERIALIZE -- write coherence (concurrent-mutation
+     * serialization), the platform's load-bearing coherent-multi-agent
+     * guarantee.
+     *
+     * frank and grace both contend for the single open slot in a
+     * capacity-1 room. Each claim_slot re-reads the room's CURRENT member
+     * list at write time, and each call is its own atomic DGD task, so the
+     * two claims serialize: the first task commits and fills the room; the
+     * second task observes the post-commit membership and is refused.
+     * Exactly one wins; the loser sees the updated (full) state and yields.
+     * No lock, no coordination -- the runtime's coherent-state read is the
+     * serialization. */
+    {
+	object room_c, frank, grace;
+	int frank_won, grace_won;
+
+	catch {
+	    room_c = spawn_room("ChatApp:Room:CoherenceC");
+	    frank  = spawn_user("frank");
+	    grace  = spawn_user("grace");
+	    room_c->set_capacity(1);
+
+	    frank_won = room_c->claim_slot(frank);
+	    grace_won = room_c->claim_slot(grace);
+	} : {
+	    log_line("ChatApp:test: FAIL: COHERENCE-SERIALIZE setup threw");
+	    return;
+	}
+	if (frank_won + grace_won != 1) {
+	    log_line("ChatApp:test: FAIL: COHERENCE-SERIALIZE not exactly one winner ("
+		     + (string) frank_won + "/" + (string) grace_won + ")");
+	    return;
+	}
+	if (sizeof(room_c->query_members()) != 1) {
+	    log_line("ChatApp:test: FAIL: COHERENCE-SERIALIZE room not at capacity 1");
+	    return;
+	}
+	/* the loser yielded: it is not a member and its claim returned 0 */
+	if (frank_won && member(grace, room_c->query_members())) {
+	    log_line("ChatApp:test: FAIL: COHERENCE-SERIALIZE loser grace still joined");
+	    return;
+	}
+	if (grace_won && member(frank, room_c->query_members())) {
+	    log_line("ChatApp:test: FAIL: COHERENCE-SERIALIZE loser frank still joined");
+	    return;
+	}
+	log_line("ChatApp:test: COHERENCE-SERIALIZE OK");
+    }
+
+    /* phase 9b: LOST-UPDATE (negative) -- the failure mode the runtime's
+     * coherent-state read removes by construction.
+     *
+     * Both writers compute their new member list from the SAME stale
+     * snapshot, captured before either committed. The second write
+     * (ivan's) overwrites the first (heidi's), so heidi's claim is lost
+     * and only ivan remains. claim_slot above avoids this by reading
+     * current state at write time; claim_slot_stale reproduces the lost
+     * update by writing from the cached snapshot. This is the bug an
+     * external coordination protocol would otherwise have to prevent. */
+    {
+	object room_l, heidi, ivan;
+	object *stale;
+
+	catch {
+	    room_l = spawn_room("ChatApp:Room:LostUpdateL");
+	    heidi  = spawn_user("heidi");
+	    ivan   = spawn_user("ivan");
+
+	    /* capture the member list ONCE, then both writers add themselves
+	     * to that same stale snapshot */
+	    stale = room_l->query_members();
+	    room_l->claim_slot_stale(heidi, stale);
+	    room_l->claim_slot_stale(ivan, stale);
+	} : {
+	    log_line("ChatApp:test: FAIL: LOST-UPDATE setup threw");
+	    return;
+	}
+	if (member(heidi, room_l->query_members())) {
+	    log_line("ChatApp:test: FAIL: LOST-UPDATE heidi survived (no lost update)");
+	    return;
+	}
+	if (!member(ivan, room_l->query_members())) {
+	    log_line("ChatApp:test: FAIL: LOST-UPDATE ivan missing");
+	    return;
+	}
+	if (sizeof(room_l->query_members()) != 1) {
+	    log_line("ChatApp:test: FAIL: LOST-UPDATE room not size 1 (lost update not reproduced)");
+	    return;
+	}
+	log_line("ChatApp:test: LOST-UPDATE OK");
+    }
+
     /* phase 10: PERSIST SETUP
      *
      * Establish a chat session on a fresh room: alice and bob join,

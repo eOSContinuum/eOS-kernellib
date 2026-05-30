@@ -65,6 +65,52 @@ void set_config(mapping config)
     set_property("chat-room.config", config);
 }
 
+void    set_capacity(int n)  { set_property("chat-room.capacity", n); }
+int     query_capacity()     { return query_raw_property("chat-room.capacity"); }
+
+/*
+ * claim_slot: take a slot in a capacity-bounded room, serialized.
+ *
+ * Re-reads the CURRENT member list at call time. Because each call runs
+ * as its own atomic DGD task, a second caller's task observes the first
+ * caller's committed membership and is refused when the room is already
+ * full. Returns 1 if the slot was claimed, 0 if the room was at capacity.
+ * There is no lock and no coordination protocol -- the runtime's
+ * coherent-state read (current members, read at write time) is the
+ * serialization. Capacity <= 0 means unbounded.
+ */
+int claim_slot(object user)
+{
+    object *current;
+    int cap;
+
+    if (!user) error("claim_slot: nil user");
+    cap = query_capacity();
+    current = query_members();
+    if (cap > 0 && sizeof(current) >= cap) {
+	return 0;
+    }
+    if (!member(user, current)) {
+	set_property("chat-room.member-list", current + ({ user }));
+    }
+    return 1;
+}
+
+/*
+ * claim_slot_stale: the lost update claim_slot prevents.
+ *
+ * Writes the member list from a STALE snapshot captured before another
+ * claim committed, so this write overwrites the other caller's addition.
+ * Present only to contrast claim_slot: it makes visible the lost update
+ * that appears when a writer acts on state read BEFORE a concurrent
+ * commit instead of re-reading at write time. Real code uses claim_slot.
+ */
+void claim_slot_stale(object user, object *stale_snapshot)
+{
+    if (!user) error("claim_slot_stale: nil user");
+    set_property("chat-room.member-list", stale_snapshot + ({ user }));
+}
+
 /* $delay() continuation glue. A post-timing mention-notify observer
  * registered on this room uses $delay() to push its cross-user
  * notification onto a later tick. merrynode.c::do_delay invokes

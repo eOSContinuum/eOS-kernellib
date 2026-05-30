@@ -236,9 +236,48 @@ ChatApp:test: DEFERRED-OP OK
 
 ## Multi-agent coherence
 
-A future revision demonstrates multi-agent coherence in three sub-phases. Multi-user same-room ordering: three users in one room each query `query_messages_since(t)` and observe identical message orderings. Atomic cross-room writes: `MERRY->batch(fn, atomic: true)` wraps three writes (append to source room, append to target user's mention-tracker, fire notification observer); a deliberate-failure variant rolls all three back. Ancestry-walk multi-agent: a room-base observer registered on the Room ancestor fires for all three Room clones.
+The load-bearing guarantee is write coherence: when two users contend for the same shared state, the runtime serializes the writes so exactly one succeeds and the other observes the committed result. The platform provides this without locks or a coordination protocol -- it falls out of reading current state at write time inside the runtime's single-threaded atomic-task scheduling.
 
-The walkthrough for this section grows when the multi-agent-coherence phases land.
+### Phase 9 -- write coherence under contention
+
+`obj/room.c` carries a bounded resource: a capacity and a `claim_slot` that takes a slot only while the room is below capacity.
+
+```c
+int claim_slot(object user)
+{
+    object *current;
+    int cap;
+
+    cap = query_capacity();
+    current = query_members();           /* current state, read at write time */
+    if (cap > 0 && sizeof(current) >= cap) {
+        return 0;                        /* room full -- the loser sees the update */
+    }
+    if (!member(user, current)) {
+        set_property("chat-room.member-list", current + ({ user }));
+    }
+    return 1;
+}
+```
+
+The phase sets a room's capacity to 1, then has two users both call `claim_slot`. Each call is its own atomic DGD task, so the runtime runs them one after another: the first reads zero members, takes the slot, and commits; the second reads the post-commit membership (one member, at capacity) and is refused. The driver asserts exactly one claim returned 1, the room holds exactly the winner, and the loser is not a member (sentinel `COHERENCE-SERIALIZE OK`). There is no lock and no retry loop -- the second writer's read at write time already reflects the first writer's commit, which is the coherent-state primitive doing the serialization.
+
+The negative makes the contrast concrete. `claim_slot_stale` writes the member list from a snapshot captured *before* the other writer committed:
+
+```c
+void claim_slot_stale(object user, object *stale_snapshot)
+{
+    set_property("chat-room.member-list", stale_snapshot + ({ user }));
+}
+```
+
+Phase 9b captures one empty snapshot and passes it to both writers. The second write (`stale_snapshot + ({ user })`) overwrites the first, so one writer's addition is lost and only the other remains (sentinel `LOST-UPDATE OK`). This is the lost update that appears when a writer acts on state read before a concurrent commit instead of re-reading at write time -- exactly the bug an external coordination layer would otherwise have to prevent, and the bug `claim_slot` avoids by construction.
+
+The full agent-to-agent conflict scenario -- agents with identity wrappers contending through an inter-agent protocol -- is a downstream concern (the agent-identity workstream). This phase demonstrates the substrate serialization that such a wrapper exposes at the agent-facing surface.
+
+### Forthcoming sub-phases
+
+Additional multi-agent-coherence sub-phases grow this section as they land: multi-user same-room message ordering (three users observe an identical message order); atomic cross-room writes via `MERRY->batch(fn, atomic: true)` with a deliberate-failure rollback variant; and an ancestry-walk multi-agent observer registered on the Room ancestor firing for all Room clones.
 
 ## What this example does not exercise
 

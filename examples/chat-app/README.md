@@ -18,6 +18,8 @@ The example is grown incrementally: the first revision wires the capability-sepa
 - **Phase 6 (NO-REACT)**: the same mention post on a room with the append observer but no mention-notify observer. The dispatcher fires nothing at post timing, so the target's mention-tracker stays empty -- reactions happen only where observers are registered.
 - **Phase 7 (EVENT-ROLLBACK)**: `atomic_post_then_fail` posts a message mentioning eve inside a DGD `atomic` function, then throws. The rollback unwinds every write the task made -- the message-log append and the synchronous mention-notify observer's cross-user Set alike. The driver asserts neither survived: the event is atomic with the state change, so when the change rolls back the event did not fire. (A queued or `$delay`-deferred notification would have escaped the envelope and fired anyway.)
 - **Phase 8 (DEFERRED-OP)**: a distinct capability, kept separate so it is not conflated with phase 5's atomic notification. A post observer schedules a `$delay()` continuation that writes a delivery-receipt marker on a later tick. The driver asserts the receipt is *not* set when `post_message` returns, and a t+4 `call_out` confirms it appears once the continuation has run -- a cross-operation deferred operation that does not share the triggering write's atomic envelope. Exercises the substrate's compiled-observer continuation (`docs/dispatcher.md`).
+- **Phase 9 (COHERENCE-SERIALIZE)**: two users contend for the single open slot in a capacity-1 room. Each `claim_slot` re-reads the room's CURRENT member list at write time, and each call is its own atomic task, so the two claims serialize: the first commits and fills the room; the second observes the post-commit membership and is refused. The driver asserts exactly one claim won, the room holds exactly the winner, and the loser is not a member. No lock and no coordination protocol -- the runtime's coherent-state read at write time is the serialization.
+- **Phase 9b (LOST-UPDATE)**: the failure mode the coherent-state read removes, shown by contrast. Both writers call `claim_slot_stale` with the SAME member-list snapshot, captured before either committed; the second write overwrites the first, so one writer's claim is lost and only the other remains. The driver asserts the lost update appeared. Real code uses `claim_slot` (current read at write time); `claim_slot_stale` exists only to make the bug an external coordination protocol would otherwise have to prevent visible.
 - **Phase 10 (PERSIST-SETUP)**: the driver establishes a chat session on a fresh room -- two users join, exchange three messages (recorded by an append observer registered on the room), and one user's `chat-user.mention-tracker` is set to a cross-clone reference to the other user's object. The room and the two accounts are saved as object globals, the session shape is recorded to an on-disk marker, and the boot-1 finalization schedules an async-verify `call_out` (t+4), a snapshot dump (t+5, via `/usr/System/sys/persist_helper::trigger_dump_and_exit`), and the post-restore persist-verify `call_out` (t+8, captured pending in the snapshot). Follows the two-boot pattern of `examples/merry-app/sys/test.c` phases 16/17.
 - **Phase 11 (PERSIST-VERIFY)**: after the smoke harness restarts DGD against the snapshot, the surviving `call_out` fires. It asserts that all three messages, both member accounts (live clones with intact names), and the cross-clone mention-tracker reference (the same object, not a copy) survived the snapshot cycle, and that a third user joining the restored room observes the full prior session.
 - **Negative case (COLDBOOT-LOST)**: a third boot starts DGD cold WITHOUT loading the snapshot. The on-disk marker (a file) survived, but the in-memory chat session did not -- the saved-as-global room is `nil` on a cold boot. This demonstrates that in-memory-only state does not survive a cold boot without a snapshot; only the on-disk record persists. Durability of structured state *beyond* the image snapshot (surviving a from-scratch boot) is the on-disk Schema/Marshal path that `examples/vault-app/` demonstrates.
@@ -46,7 +48,7 @@ rm -f .runtime/state/snapshot* .runtime/state/swap
 scripts/setup-runtime.sh
 cp -R examples/chat-app .runtime/src/usr/Chat
 
-# Boot 1 (cold): phases 1-8 and 10 run; phase 4 logs a [caught]
+# Boot 1 (cold): phases 1-9b and 10 run; phase 4 logs a [caught]
 # sandbox-rejection error to the boot log; phase 8 asserts from a t+4
 # call_out (after its $delay continuation); a t+5 call_out then dumps a
 # snapshot and the driver exits on its own.
@@ -81,6 +83,8 @@ ChatApp:test: SANDBOX-REJECT OK
 ChatApp:test: EVENT-ATOMIC OK
 ChatApp:test: NO-REACT OK
 ChatApp:test: EVENT-ROLLBACK OK
+ChatApp:test: COHERENCE-SERIALIZE OK
+ChatApp:test: LOST-UPDATE OK
 ChatApp:test: PERSIST-SETUP OK
 ChatApp:test: DEFERRED-OP OK
 ChatApp:test: PERSIST-VERIFY OK
