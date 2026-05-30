@@ -90,9 +90,40 @@ The two phases together demonstrate that the capability mechanism is the gate, n
 
 ## Persistence
 
-A future revision demonstrates richer persistent state by establishing a chat session, persisting the runtime to a snapshot via `/usr/System/sys/persist_helper::trigger_dump_and_exit`, restarting DGD against the snapshot, and asserting that a third user can join the restored room and observe all prior messages plus the prior member set. The test driver's persistence phases follow the same two-boot pattern as `examples/merry-app/sys/test.c` phases 16/17.
+The persistence phases demonstrate richer persistent state: a chat session is established, the runtime is dumped to a snapshot, DGD restarts against the snapshot, and the whole session is shown to have survived. The chat application writes no serialization code, defines no schema, and opens no database connection -- the runtime image *is* the durable store. This is persistent state as a runtime primitive, made concrete at the application layer. The phases follow the two-boot pattern of `examples/merry-app/sys/test.c` phases 16/17, plus a third (cold, no-snapshot) boot for the negative case.
 
-The walkthrough for this section grows when the persistence phases land.
+### Phase 10 -- persist setup
+
+The driver clones a fresh room (`ChatApp:Room:PersistD`), has alice and bob join it, and posts three messages through `chat::post_message`. It then sets alice's `chat-user.mention-tracker` to `({ bob })` -- a *cross-clone* object reference, alice's user object pointing directly at bob's. The room and the two accounts are saved as object globals on the test driver (non-`static` so the state dump captures them), the session shape is recorded to an on-disk marker file, a `persist_verify` `call_out` is scheduled at `t=3`, and the driver calls `/usr/System/sys/persist_helper::trigger_dump_and_exit`. That helper schedules `dump_state(FALSE)` + `shutdown()` on its own `call_out`, so the caller's stack unwinds before the snapshot is taken.
+
+```text
+ChatApp:test: PERSIST-SETUP OK
+```
+
+The snapshot captures everything reachable in the image: the room clone, the two user clones, the three message mappings (each carrying a `sender` object reference), alice's cross-clone mention-tracker reference, and the not-yet-fired `persist_verify` `call_out`. The driver then exits; the boot log records `** System halted.`
+
+### Phase 11 -- persist verify
+
+The smoke harness restarts DGD against the snapshot (`dgd mva.dgd .runtime/state/snapshot`). DGD does not re-run `create()` on restored objects; it resumes the dumped image and fires `call_out`s whose scheduled times have elapsed. The surviving `persist_verify` `call_out` fires immediately and asserts:
+
+- the room still holds three messages and two members;
+- `persist_alice` and `persist_bob` resolve to live clones with their `chat-user.name` values intact (the user accounts survived);
+- alice's mention-tracker resurrected as the *same* bob object (`mention[0] == persist_bob`), not a copy -- DGD's object-reference resurrection rebound the cross-clone reference;
+- a third user (carol) joining the restored room is admitted and observes the full prior session: three messages and a now-three-member roster.
+
+```text
+ChatApp:test: PERSIST-VERIFY OK
+```
+
+### Negative case -- cold boot without a snapshot
+
+A third boot starts DGD cold *without* the snapshot argument. The driver's `setup_and_run` finds the on-disk marker present (a file -- it survives any boot) but `persist_room` `nil` (a cold boot resets all object globals). That combination is the signature of "a session was persisted but the snapshot was not loaded," so the driver writes the negative sentinel rather than re-running setup:
+
+```text
+ChatApp:test: COLDBOOT-LOST OK
+```
+
+The lesson is the boundary of orthogonal persistence. *Snapshot + restore* preserves the entire in-image state -- properties **and** plain LPC globals alike; there is no "globals vs Vault" difference at that granularity (the `merry-app` walkthrough makes the same point, listing "LPC global variables" among the guarantees its phase 16/17 cycle exercises). What in-image state does *not* survive is a *cold boot without a snapshot*: a from-scratch start finds an empty world. Durability beyond the image snapshot -- surviving a from-scratch boot, a lost snapshot, or migration to another host -- is the job of an on-disk store: the Schema-registered Vault Marshal path that `examples/vault-app/` demonstrates. The chat-app room is in-memory-only (it inherits `/lib/util/properties` but is not Schema-registered), so its state rides the snapshot, not the disk.
 
 ## Sandboxed reactions
 

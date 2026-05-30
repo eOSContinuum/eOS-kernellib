@@ -11,11 +11,29 @@
  *
  * Phases in this revision:
  *
- *   1. CAP-REJECT OK  -- regular user calls admin->kick without
- *                        an admin-token; capability check throws.
- *   2. CAP-ACCEPT OK  -- admin user holding a per-room kick
- *                        token calls admin->kick; target leaves
- *                        the room.
+ *   1.  CAP-REJECT OK     -- regular user calls admin->kick without
+ *                            an admin-token; capability check throws.
+ *   2.  CAP-ACCEPT OK     -- admin user holding a per-room kick
+ *                            token calls admin->kick; target leaves
+ *                            the room.
+ *  10.  PERSIST-SETUP OK  -- establish a chat session (2 users, 3
+ *                            messages, a cross-clone mention-tracker
+ *                            reference) on a fresh room, record the
+ *                            session shape to an on-disk marker, then
+ *                            dump a snapshot and exit.
+ *  11.  PERSIST-VERIFY OK -- fires from a surviving call_out after the
+ *                            snapshot is restored; the whole session
+ *                            survived and a third user joining the
+ *                            restored room observes all prior state.
+ *      COLDBOOT-LOST OK   -- negative case. On a cold boot taken
+ *                            WITHOUT loading the snapshot, the on-disk
+ *                            marker survived but the in-memory session
+ *                            did not; in-memory-only state does not
+ *                            survive a cold boot without a snapshot.
+ *
+ * The persistence phases follow the two-boot pattern of
+ * examples/merry-app/sys/test.c phases 16/17, plus a third (cold,
+ * no-snapshot) boot for the negative case.
  *
  * Pass/fail is observable via the sentinel file. The README's verify
  * command counts " OK" lines after the smoke harness completes.
@@ -35,16 +53,28 @@ inherit "/usr/Chat/lib/app";
 inherit "/usr/System/lib/auto";
 inherit "/lib/util/lpc";
 
-# define CHAT_DAEMON  "/usr/Chat/sys/chat"
-# define ADMIN_DAEMON "/usr/Chat/sys/admin"
-# define ROOM_PROG    "/usr/Chat/obj/room"
-# define USER_PROG    "/usr/Chat/obj/user"
-# define RESULT_FILE  "/usr/Chat/data/test-result.log"
+# define CHAT_DAEMON    "/usr/Chat/sys/chat"
+# define ADMIN_DAEMON   "/usr/Chat/sys/admin"
+# define ROOM_PROG      "/usr/Chat/obj/room"
+# define USER_PROG      "/usr/Chat/obj/user"
+# define RESULT_FILE    "/usr/Chat/data/test-result.log"
+# define MARKER_FILE    "/usr/Chat/data/persist-marker.log"
+# define PERSIST_HELPER "/usr/System/sys/persist_helper"
 
 static void run_tests();
+static void persist_verify();
 private void log_line(string msg);
 private object spawn_user(string name);
 private object spawn_room(string id);
+private int marker_present();
+private void coldboot_loss_verify();
+
+/* Phase 10/11 binding hosts. Non-static object variables so DGD's state
+ * dump captures them; phase 11 (persist_verify) resolves the restored
+ * session through these after the snapshot restore. */
+object persist_room;    /* the chat-session room; survives the snapshot */
+object persist_alice;   /* a member account; holds the mention-tracker  */
+object persist_bob;     /* a member account; the mention-tracker target */
 
 
 static void create()
@@ -55,6 +85,18 @@ static void create()
 static void setup_and_run()
 {
     catch(make_dir("/usr/Chat/data"));
+
+    /* Negative-case path. Reached only on a cold boot (no snapshot
+     * loaded) that follows a boot which wrote the marker in phase 10:
+     * the on-disk marker is present, but the in-image chat session it
+     * recorded is gone (persist_room is a fresh nil global on a cold
+     * boot). Append the COLDBOOT-LOST sentinel WITHOUT wiping the
+     * boot-1 / boot-2 transcript, then stop -- do not re-run setup. */
+    if (marker_present() && !persist_room) {
+	coldboot_loss_verify();
+	return;
+    }
+
     catch(remove_file(RESULT_FILE));
     run_tests();
 }
@@ -143,9 +185,144 @@ static void run_tests()
     }
     log_line("ChatApp:test: CAP-ACCEPT OK");
 
-    /* Additional phases land in subsequent revisions as the chat
-     * application exercises additional primitives (persistence,
-     * sandboxed reactions, async events, multi-agent coherence). */
+    /* phase 10: PERSIST SETUP
+     *
+     * Establish a chat session on a fresh room: alice and bob join,
+     * exchange three messages, and alice's mention-tracker is set to a
+     * cross-clone reference to bob's user object. Save the room and the
+     * two accounts as object globals so the post-restore phase 11 can
+     * resolve them, record the session shape to an on-disk marker (the
+     * negative-case path reads this back on a cold boot), schedule the
+     * verify call_out, then dump a snapshot and exit via the System
+     * helper.
+     *
+     * dump_state(FALSE) captures the room clone, the two user clones,
+     * the three message mappings, the cross-clone mention-tracker
+     * reference, and the scheduled persist_verify call_out. The
+     * external smoke harness restarts DGD against the snapshot; the
+     * surviving call_out fires phase 11 as soon as the system is back
+     * up (its scheduled time has elapsed during the restart).
+     */
+    catch {
+	mixed *msgs;
+	object *members;
+
+	persist_room  = spawn_room("ChatApp:Room:PersistD");
+	persist_alice = alice;
+	persist_bob   = bob;
+
+	CHAT_DAEMON->join_room(alice, persist_room);
+	CHAT_DAEMON->join_room(bob, persist_room);
+	CHAT_DAEMON->post_message(alice, persist_room, "hi bob");
+	CHAT_DAEMON->post_message(bob, persist_room, "hey alice");
+	CHAT_DAEMON->post_message(alice, persist_room, "@bob ping");
+
+	/* a cross-clone semantic reference: alice's mention-tracker
+	 * points AT bob's user object. DGD orthogonal persistence must
+	 * resurrect this as the same bob clone (an object reference),
+	 * not a copy, after restore. */
+	alice->set_property("chat-user.mention-tracker", ({ bob }));
+
+	msgs    = persist_room->query_messages();
+	members = persist_room->query_members();
+	if (sizeof(msgs) != 3 || sizeof(members) != 2) {
+	    log_line("ChatApp:test: FAIL: PERSIST-SETUP session shape ("
+		     + (string) sizeof(msgs) + " msgs, "
+		     + (string) sizeof(members) + " members)");
+	    return;
+	}
+
+	/* on-disk marker recording the pre-dump session shape. Files
+	 * survive any boot (they are not in-image state); the cold-boot
+	 * negative path reads this back to prove the session existed
+	 * before it was lost. */
+	catch(remove_file(MARKER_FILE));
+	write_file(MARKER_FILE, "messages=3 members=2\n");
+
+	/* schedule the verify with a small delay so the call_out is in
+	 * the snapshot. After restore its scheduled time has long passed
+	 * and DGD fires it as soon as the system is back up. */
+	call_out("persist_verify", 3);
+
+	log_line("ChatApp:test: PERSIST-SETUP OK");
+
+	PERSIST_HELPER->trigger_dump_and_exit();
+    } : {
+	log_line("ChatApp:test: FAIL: PERSIST-SETUP threw");
+	return;
+    }
+}
+
+
+/* phase 11: PERSIST VERIFY -- fires from the pre-snapshot call_out
+ * after the restore. Confirms the chat session survived the snapshot
+ * cycle: three messages, two member accounts (resolved as live clones
+ * with their names intact), the cross-clone mention-tracker reference
+ * (the same bob object, not a copy), and that a third user (carol)
+ * joining the restored room observes all prior state. */
+static void persist_verify()
+{
+    object carol;
+    mixed *msgs, *mention;
+    object *members;
+
+    if (!persist_room) {
+	log_line("ChatApp:test: FAIL: PERSIST-VERIFY persist_room nil after restore");
+	return;
+    }
+
+    catch {
+	members = persist_room->query_members();
+	msgs    = persist_room->query_messages();
+
+	if (sizeof(msgs) != 3) {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY message count "
+		     + (string) sizeof(msgs) + " after restore");
+	    return;
+	}
+	if (sizeof(members) != 2) {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY member count "
+		     + (string) sizeof(members) + " after restore");
+	    return;
+	}
+
+	/* user accounts survived as live clones with their names. */
+	if (persist_alice->query_chat_name() != "alice" ||
+	    persist_bob->query_chat_name() != "bob") {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY user account names lost");
+	    return;
+	}
+
+	/* the cross-clone mention-tracker reference resurrected as the
+	 * same bob object, not a copy. */
+	mention = persist_alice->query_mention_tracker();
+	if (sizeof(mention) != 1 || mention[0] != persist_bob) {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY mention-tracker cross-clone ref lost");
+	    return;
+	}
+
+	/* a third user joining the restored room observes the full prior
+	 * session: the three messages and the now-three-member roster. */
+	carol = spawn_user("carol-restored");
+	CHAT_DAEMON->join_room(carol, persist_room);
+	if (!member(carol, persist_room->query_members())) {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY carol join failed");
+	    return;
+	}
+	if (sizeof(persist_room->query_messages()) != 3) {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY carol sees wrong message count");
+	    return;
+	}
+	if (sizeof(persist_room->query_members()) != 3) {
+	    log_line("ChatApp:test: FAIL: PERSIST-VERIFY roster not 3 after carol join");
+	    return;
+	}
+    } : {
+	log_line("ChatApp:test: FAIL: PERSIST-VERIFY threw");
+	return;
+    }
+
+    log_line("ChatApp:test: PERSIST-VERIFY OK");
 }
 
 
@@ -168,6 +345,40 @@ private object spawn_room(string id)
     r->set_object_name(id);
     r->set_id(id);
     return r;
+}
+
+
+private int marker_present()
+{
+    return file_info(MARKER_FILE) ? 1 : 0;
+}
+
+
+/* Negative-case verification. Reached from setup_and_run on a cold boot
+ * (no snapshot loaded) that follows the phase-10 boot. The marker file
+ * (on disk) survived the cold boot; the in-image chat session
+ * (persist_room and its clones) did not. This demonstrates that
+ * in-memory-only state does not survive a cold boot without a snapshot,
+ * while on-disk records persist independently of the runtime image. */
+private void coldboot_loss_verify()
+{
+    string marker;
+
+    marker = nil;
+    catch { marker = read_file(MARKER_FILE); }
+    if (!marker) {
+	log_line("ChatApp:test: FAIL: COLDBOOT-LOST marker unreadable");
+	return;
+    }
+    /* The marker proves the session existed before this boot. If the
+     * in-image room were also present, the snapshot would have been
+     * loaded and this path would not have been taken -- so a non-nil
+     * persist_room here is a contradiction. */
+    if (persist_room) {
+	log_line("ChatApp:test: FAIL: COLDBOOT-LOST room unexpectedly present");
+	return;
+    }
+    log_line("ChatApp:test: COLDBOOT-LOST OK");
 }
 
 
