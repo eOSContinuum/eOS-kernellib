@@ -197,15 +197,15 @@ An observer may also write a *different* object: `Set($other, "...", ...)` forwa
 
 ### Deferred observer continuations (`$delay` / `In` / `Every`)
 
-An observer may defer part of its work to a later tick with `$delay(seconds, retval)`. The first call returns `retval` synchronously -- so the `set_property` that triggered the dispatch returns without waiting -- and the rest of the source resumes `seconds` later in a fresh `call_out` (a new task, a new dispatch batch). This is the runtime's temporal-decoupling primitive at the observer layer: a sender posts, the synchronous fan-out completes, and a cross-object notification lands on a subsequent tick decoupled from the sender's call.
+An observer may defer part of its work to a later tick with `$delay(seconds, retval)`. The first call returns `retval` synchronously -- so the `set_property` that triggered the dispatch returns without waiting -- and the rest of the source resumes `seconds` later in a fresh `call_out` (a new task, a new dispatch batch).
+
+This is for a genuinely deferred *operation*, and it is a different thing from event notification. A normal observer reaction fires synchronously, inside the dispatch, sharing the triggering write's atomic envelope -- if the write rolls back, the reaction rolls back with it. A `$delay`-ed continuation runs in a *separate* envelope on a later tick, so it does NOT roll back if the original write fails. Keep the two distinct: notify-on-change belongs in the synchronous body; only genuinely cross-operation work (a timed retry, a deferred cleanup, a delivery receipt) belongs after a `$delay`.
 
 ```c
-/* post-timing observer: notify a mentioned user one tick later */
+/* post-timing observer: write a delivery receipt one tick later */
 MERRY->register_observer(room, "chat-room.message", "post",
     "$delay(2, FALSE); " +
-    "Set($new[\"mentions\"][0], \"chat-user.mention-tracker\", " +
-    "Get($new[\"mentions\"][0], \"chat-user.mention-tracker\") + ({ $this })); " +
-    "return TRUE;");
+    "Set($this, \"chat-room.delivery-receipt\", 1); return TRUE;");
 ```
 
 For this to work the dispatch host must expose the `$delay` glue pair -- `delayed_call(object ob, string fun, mixed delay, mixed args...)` and a `static void perform_delayed_call(object ob, string fun, mixed *args)` companion -- the same six-line shape `examples/merry-app/obj/thing.c` carries (lifted from SkotOS `/core/lib/core_scripts.c`).

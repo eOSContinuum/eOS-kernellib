@@ -180,34 +180,59 @@ The deny-by-shadow mechanism is *implicit whitelist by presence*: there is no al
 
 `post_message` does not append to the message log itself. It resolves the message's `@name` mentions against the room roster, then writes a single `chat-room.message` arrival signal via `set_property`. That one write is what the dispatcher fans out: a room's main-timing append-to-history observer records the message, and (where registered) a post-timing mention-notify observer delivers a cross-user notification. The sender's code contains no notification logic -- message arrival is a first-class dispatched event, not a daemon side effect.
 
-### Phase 5 -- decoupled cross-user notification
+Event notification is **synchronous, inside the same write that caused the state change**. The "asynchronous" part is the agent-side experience: the sender registered a listener and never polled, but the listener fires within the dispatch, not on a later tick. That synchronous-in-envelope mechanism is what makes the notification atomic with the state change -- if the change rolls back, the notification rolls back with it.
 
-A room carries an append-to-history main observer and a mention-notify post observer. alice posts a message mentioning dave; `scan_mentions` resolves `@dave` and carries him in the message's `mentions` list. The dispatcher fires the main append synchronously, then the post observer:
+### Phase 5 -- synchronous cross-user notification
+
+A room carries an append-to-history main observer and a mention-notify post observer. alice posts a message mentioning dave; `scan_mentions` resolves `@dave` and carries him in the message's `mentions` list. The dispatcher fires the main append, then the post observer -- both synchronously:
 
 ```c
-$delay(2, FALSE);
 Set($new["mentions"][0], "chat-user.mention-tracker",
     Get($new["mentions"][0], "chat-user.mention-tracker") + ({ $this }));
 return TRUE;
 ```
 
-`$delay(2, FALSE)` returns `FALSE` to the dispatcher immediately, so `post_message` returns with dave's mention-tracker still empty -- the notification is *decoupled* from the sender's call. Two seconds later the continuation resumes (a fresh tick, a fresh dispatch batch) and writes dave's tracker. A `call_out` at t+4 confirms it populated:
+The instant `post_message` returns, dave's mention-tracker already names the room -- the notification landed inside the same `set_property` that wrote `chat-room.message`. `post_message` itself contains no notification logic:
 
 ```text
-ChatApp:test: ASYNC-DECOUPLED OK
+ChatApp:test: EVENT-ATOMIC OK
 ```
-
-This is the runtime's temporal-decoupling primitive at the observer layer. `$delay` composing with a dispatcher-fired observer rests on the substrate carrying the compiled observer through the continuation (`docs/dispatcher.md`, "Deferred observer continuations"); the room exposes the standard `delayed_call` / `perform_delayed_call` glue. The observer stays pure Merry -- no application LPC is involved in the deferral.
 
 ### Phase 6 -- no observer, no reaction
 
-The same mention post, on a room with the append observer but **no** mention-notify observer registered. The dispatcher has nothing to fire at post timing, so no notification is scheduled; the target's mention-tracker stays empty even after the same delay window:
+The same mention post, on a room with the append observer but **no** mention-notify observer registered. The dispatcher has nothing to fire at post timing, so the target's mention-tracker stays empty:
 
 ```text
 ChatApp:test: NO-REACT OK
 ```
 
 Reactions happen only where observers are registered -- a property write on an un-observed timing slot is inert. The negative isolates this to the missing post observer: the append observer *is* registered, so the message is still recorded.
+
+### Phase 7 -- event atomic with state change
+
+Because the notification is synchronous-in-envelope, it shares the atomic fate of the write. `atomic_post_then_fail` posts a message mentioning eve inside a DGD `atomic` function, then throws. The rollback unwinds every write the task made -- the message-log append *and* the observer's cross-user mention-tracker Set:
+
+```text
+ChatApp:test: EVENT-ROLLBACK OK
+```
+
+After the caught throw, the room has no message and eve has no notification: the event "did not fire" in the same sense the state change "did not occur". A queued or `$delay`-deferred notification would have escaped the envelope and fired anyway -- which is precisely why the platform's event notification is synchronous, not queued.
+
+### Phase 8 -- a deferred operation, kept distinct
+
+Deferring work to a later tick is a *different* capability, and the example keeps it separate so the two are not conflated. A post observer schedules a `$delay()` continuation that writes a delivery-receipt marker on a subsequent tick:
+
+```c
+$delay(2, FALSE);
+Set($this, "chat-room.delivery-receipt", 1);
+return TRUE;
+```
+
+`$delay(2, FALSE)` returns `FALSE` to the dispatcher immediately, so the receipt is not set when `post_message` returns; a `call_out` at t+4 confirms it appears once the continuation has run. This is a cross-operation deferred *operation*, not atomic event notification -- it does not share the triggering write's atomic envelope. It exercises the substrate's compiled-observer continuation (a `$delay` inside a dispatcher-fired observer; see `docs/dispatcher.md`, "Deferred observer continuations"), with the room exposing the standard `delayed_call` / `perform_delayed_call` glue. The observer stays pure Merry.
+
+```text
+ChatApp:test: DEFERRED-OP OK
+```
 
 ## Multi-agent coherence
 

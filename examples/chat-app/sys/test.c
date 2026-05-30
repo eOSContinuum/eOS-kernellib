@@ -30,18 +30,30 @@
  *                             first fire with the merrynode SANDBOX
  *                             shadow's "function not allowed in merry
  *                             code"; no file is created.
- *   5.  ASYNC-DECOUPLED OK -- async events. A mention post fires a
- *                             post-timing mention-notify observer that
- *                             uses $delay() to push its cross-user write
- *                             onto a later tick; the sender returns with
- *                             the target's mention-tracker still empty,
- *                             and a t+4 call_out confirms it populated
- *                             after the delayed continuation ran.
- *   6.  NO-REACT OK        -- async-events negative. The same mention post on a
- *                             room with no mention-notify observer fires
- *                             no reaction; the target's mention-tracker
- *                             stays empty -- reactions happen only where
- *                             observers are registered.
+ *   5.  EVENT-ATOMIC OK    -- async events. A mention post fires a
+ *                             post-timing mention-notify observer
+ *                             synchronously, within the same write: the
+ *                             target's mention-tracker is populated the
+ *                             instant post_message returns. The sender
+ *                             carries no notification logic -- the
+ *                             "asynchronous" experience is agent-side;
+ *                             the mechanism is synchronous-in-envelope.
+ *   6.  NO-REACT OK        -- async-events negative. The same mention
+ *                             post on a room with no mention-notify
+ *                             observer fires no reaction -- reactions
+ *                             happen only where observers are registered.
+ *   7.  EVENT-ROLLBACK OK  -- event/state atomicity. A mention post
+ *                             wrapped in an atomic envelope that throws
+ *                             rolls BOTH back: neither the message nor
+ *                             the notification lands. The event is atomic
+ *                             with the state change -- if the change
+ *                             rolls back, the event did not fire.
+ *   8.  DEFERRED-OP OK     -- a distinct capability. A post observer
+ *                             schedules a $delay() continuation that runs
+ *                             on a later tick (a delivery receipt). This
+ *                             is a deferred OPERATION, explicitly not the
+ *                             atomic event notification of phase 5 --
+ *                             surfacing the boundary between the two.
  *  10.  PERSIST-SETUP OK   -- establish a chat session (2 users, 3
  *                             messages via the append observer, a cross-
  *                             clone mention-tracker reference) on a fresh
@@ -57,10 +69,12 @@
  *                             did not; in-memory-only state does not
  *                             survive a cold boot without a snapshot.
  *
- * The async phases (5/6) fire their assertions from a t+4 call_out on
- * boot 1, before the t+5 snapshot dump. The persistence phases follow
- * the two-boot pattern of examples/merry-app/sys/test.c phases 16/17,
- * plus a third (cold, no-snapshot) boot for the negative case.
+ * Phases 5-7 assert inline (the notification is synchronous, so it has
+ * landed or rolled back by the time post_message returns). Phase 8's
+ * deferred operation asserts from a t+4 call_out on boot 1, before the
+ * t+5 snapshot dump. The persistence phases follow the two-boot pattern
+ * of examples/merry-app/sys/test.c phases 16/17, plus a third (cold,
+ * no-snapshot) boot for the negative case.
  *
  * Pass/fail is observable via the sentinel file. The README's verify
  * command counts " OK" lines after the smoke harness completes.
@@ -117,17 +131,30 @@ inherit "/usr/Merry/lib/merryapi";
     "Set($this, \"chat-room.message-count\", " + \
     "sizeof(Get($this, \"chat-room.message-log\"))); return TRUE;"
 
-/* post timing: notify the first mentioned user on a LATER tick. $delay
- * returns control synchronously (the sender is not blocked) and resumes
- * the cross-user Set after the delay -- the async-decoupling. */
+/* post timing: notify the first mentioned user synchronously, within the
+ * same write that triggered the dispatch. The cross-user Set lands before
+ * post_message returns -- event notification atomic with state change.
+ * The sender carries no notification logic; the "asynchronous" part is
+ * the agent-side experience (it registered a listener; it did not poll). */
 # define SRC_NOTIFY \
-    "$delay(2, FALSE); " + \
     "Set($new[\"mentions\"][0], \"chat-user.mention-tracker\", " + \
     "Get($new[\"mentions\"][0], \"chat-user.mention-tracker\") + ({ $this })); " + \
     "return TRUE;"
 
+/* post timing: a DEFERRED OPERATION, distinct from the synchronous event
+ * notification above. $delay() returns control to the sender immediately
+ * and resumes on a later tick to write a delivery-receipt marker. This is
+ * not atomic event notification -- it is a cross-operation deferred call,
+ * the boundary the platform asks consumers to keep distinct. It exercises
+ * the substrate's compiled-observer continuation (a $delay inside a
+ * dispatcher-fired observer; see docs/dispatcher.md). */
+# define SRC_DEFERRED \
+    "$delay(2, FALSE); " + \
+    "Set($this, \"chat-room.delivery-receipt\", 1); return TRUE;"
+
 static void run_tests();
-static void async_verify();
+static atomic void atomic_post_then_fail(object sender, object room, string content);
+static void deferred_verify();
 static void finalize_dump();
 static void persist_verify();
 private void log_line(string msg);
@@ -143,14 +170,12 @@ object persist_room;    /* the chat-session room; survives the snapshot */
 object persist_alice;   /* a member account; holds the mention-tracker  */
 object persist_bob;     /* a member account; the mention-tracker target */
 
-/* Phase 5/6 async-event handles. Set during run_tests on boot 1 and
- * read by async_verify (call_out at t+4, before the snapshot dump) to
- * assert the decoupled notification landed (dave) and the no-observer
- * negative stayed inert (dave2). */
-object async_room5;     /* phase 5 room: append + mention-notify observers */
-object async_dave;      /* phase 5 mention target; tracker set on a later tick */
-object async_room6;     /* phase 6 room: append observer only */
-object async_dave2;     /* phase 6 mention target; tracker stays empty */
+/* Phase 8 deferred-operation handle. Set during run_tests on boot 1 and
+ * read by deferred_verify (call_out at t+4, before the snapshot dump) to
+ * assert the $delay continuation wrote the delivery receipt on a later
+ * tick. Phases 5-7 assert inline (their notification is synchronous), so
+ * they need no global. */
+object deferred_room;   /* phase 8 room: append + a $delay deferred observer */
 
 
 static void create()
@@ -350,76 +375,171 @@ static void run_tests()
     }
     log_line("ChatApp:test: SANDBOX-REJECT OK");
 
-    /* phase 5: ASYNC-DECOUPLED -- setup.
+    /* phase 5: EVENT-ATOMIC
      *
      * A fresh room with an append-to-history main observer AND a
      * mention-notify post observer. dave joins; alice posts a message
-     * mentioning him. post_message resolves "@dave" against the roster
-     * and carries dave in msg["mentions"]. The dispatcher fires the main
-     * append synchronously, then the post mention-notify observer --
-     * whose source calls $delay(2, FALSE), returning control to the
-     * sender immediately and resuming its cross-user Set two seconds
-     * later. So the instant post_message returns, dave's mention-tracker
-     * is still empty: the notification is decoupled from the sender's
-     * call. async_verify (call_out at t+4) asserts the tracker IS
-     * populated once the delayed continuation has run. The append, by
-     * contrast, lands synchronously -- history already holds the message
-     * here. */
-    catch {
-	async_room5 = spawn_room("ChatApp:Room:AsyncP5");
-	async_dave  = spawn_user("dave");
-	CHAT_DAEMON->join_room(alice, async_room5);
-	CHAT_DAEMON->join_room(async_dave, async_room5);
+     * mentioning him. post_message resolves "@dave" against the roster and
+     * carries dave in msg["mentions"]. The dispatcher fires the main
+     * append, then the post mention-notify observer -- both synchronously,
+     * inside the same set_property that wrote chat-room.message. So the
+     * instant post_message returns, dave's mention-tracker already names
+     * the room: the notification is atomic with the state change. The
+     * sender (alice's post_message) carries no notification logic -- the
+     * "asynchronous" experience is agent-side; the mechanism is
+     * synchronous-within-the-write. */
+    {
+	object room_p5, dave;
 
-	MERRY_DAEMON->register_observer(async_room5, "chat-room.message", "main",
-					SRC_APPEND);
-	MERRY_DAEMON->register_observer(async_room5, "chat-room.message", "post",
-					SRC_NOTIFY);
+	catch {
+	    room_p5 = spawn_room("ChatApp:Room:EventP5");
+	    dave    = spawn_user("dave");
+	    CHAT_DAEMON->join_room(alice, room_p5);
+	    CHAT_DAEMON->join_room(dave, room_p5);
 
-	CHAT_DAEMON->post_message(alice, async_room5, "@dave hi");
+	    MERRY_DAEMON->register_observer(room_p5, "chat-room.message", "main",
+					    SRC_APPEND);
+	    MERRY_DAEMON->register_observer(room_p5, "chat-room.message", "post",
+					    SRC_NOTIFY);
 
-	if (sizeof(async_dave->query_mention_tracker()) != 0) {
-	    log_line("ChatApp:test: FAIL: ASYNC notification fired synchronously (not decoupled)");
+	    CHAT_DAEMON->post_message(alice, room_p5, "@dave hi");
+
+	    if (sizeof(dave->query_mention_tracker()) != 1 ||
+		dave->query_mention_tracker()[0] != room_p5) {
+		log_line("ChatApp:test: FAIL: EVENT-ATOMIC notification not landed synchronously");
+		return;
+	    }
+	    if (sizeof(room_p5->query_messages()) != 1) {
+		log_line("ChatApp:test: FAIL: EVENT-ATOMIC append observer did not record message");
+		return;
+	    }
+	} : {
+	    log_line("ChatApp:test: FAIL: EVENT-ATOMIC threw");
 	    return;
 	}
-	if (sizeof(async_room5->query_messages()) != 1) {
-	    log_line("ChatApp:test: FAIL: ASYNC append observer did not record message");
-	    return;
-	}
-    } : {
-	log_line("ChatApp:test: FAIL: ASYNC-DECOUPLED setup threw");
-	return;
+	log_line("ChatApp:test: EVENT-ATOMIC OK");
     }
 
-    /* phase 6: NO-REACT (negative) -- setup.
+    /* phase 6: NO-REACT (negative)
      *
-     * The same action as phase 5 -- a mention post -- but on a room with
-     * NO mention-notify observer registered. Without a post-timing
-     * observer the dispatcher has nothing to fire after the write, so no
-     * cross-user notification is ever scheduled. async_verify asserts
-     * dave2's mention-tracker stays empty even after the same delay
-     * window: a direct property write without observer registration
-     * fires no reaction. The append observer IS registered, so the
+     * The same mention post on a room with NO mention-notify observer.
+     * Without a post-timing observer the dispatcher has nothing to fire
+     * after the write, so no cross-user notification happens. The target's
+     * mention-tracker stays empty -- a property write on an un-observed
+     * timing slot is inert. The append observer IS registered, so the
      * message is still recorded -- isolating the negative to the missing
      * post observer, not a broken post path. */
+    {
+	object room_p6, dave2;
+
+	catch {
+	    room_p6 = spawn_room("ChatApp:Room:NoReactP6");
+	    dave2   = spawn_user("dave2");
+	    CHAT_DAEMON->join_room(bob, room_p6);
+	    CHAT_DAEMON->join_room(dave2, room_p6);
+
+	    MERRY_DAEMON->register_observer(room_p6, "chat-room.message", "main",
+					    SRC_APPEND);
+	    /* deliberately NO mention-notify post observer registered. */
+
+	    CHAT_DAEMON->post_message(bob, room_p6, "@dave2 yo");
+
+	    if (sizeof(dave2->query_mention_tracker()) != 0) {
+		log_line("ChatApp:test: FAIL: NO-REACT notification fired without an observer");
+		return;
+	    }
+	    if (sizeof(room_p6->query_messages()) != 1) {
+		log_line("ChatApp:test: FAIL: NO-REACT append observer did not record message");
+		return;
+	    }
+	} : {
+	    log_line("ChatApp:test: FAIL: NO-REACT setup threw");
+	    return;
+	}
+	log_line("ChatApp:test: NO-REACT OK");
+    }
+
+    /* phase 7: EVENT-ROLLBACK
+     *
+     * Event notification is atomic with the state change: if the change
+     * rolls back, the event did not fire. eve joins a room with the same
+     * append + synchronous mention-notify observers. atomic_post_then_fail
+     * posts a message mentioning eve (firing both observers inside the
+     * atomic envelope) and then throws. DGD's atomic{} rolls back EVERY
+     * write the task made: the message-log append AND the observer's
+     * cross-user mention-tracker Set. After the caught throw, neither
+     * landed -- the room has no message and eve has no notification. A
+     * queued / $delay-deferred notification would have escaped the
+     * envelope and fired anyway; the synchronous-in-envelope notification
+     * is what makes the rollback total. */
+    {
+	object room_p7, eve;
+	int threw;
+
+	catch {
+	    room_p7 = spawn_room("ChatApp:Room:RollbackP7");
+	    eve     = spawn_user("eve");
+	    CHAT_DAEMON->join_room(alice, room_p7);
+	    CHAT_DAEMON->join_room(eve, room_p7);
+
+	    MERRY_DAEMON->register_observer(room_p7, "chat-room.message", "main",
+					    SRC_APPEND);
+	    MERRY_DAEMON->register_observer(room_p7, "chat-room.message", "post",
+					    SRC_NOTIFY);
+	} : {
+	    log_line("ChatApp:test: FAIL: EVENT-ROLLBACK setup threw");
+	    return;
+	}
+
+	threw = 0;
+	catch {
+	    atomic_post_then_fail(alice, room_p7, "@eve hi");
+	} : {
+	    threw = 1;
+	}
+	if (!threw) {
+	    log_line("ChatApp:test: FAIL: EVENT-ROLLBACK atomic post did not throw");
+	    return;
+	}
+	if (sizeof(room_p7->query_messages()) != 0) {
+	    log_line("ChatApp:test: FAIL: EVENT-ROLLBACK message survived the rollback");
+	    return;
+	}
+	if (sizeof(eve->query_mention_tracker()) != 0) {
+	    log_line("ChatApp:test: FAIL: EVENT-ROLLBACK notification survived the rollback");
+	    return;
+	}
+	log_line("ChatApp:test: EVENT-ROLLBACK OK");
+    }
+
+    /* phase 8: DEFERRED-OP -- setup.
+     *
+     * A distinct capability from the atomic notification above: a deferred
+     * OPERATION. A post observer schedules a $delay() continuation that
+     * runs on a later tick, writing a delivery-receipt marker on the room.
+     * The receipt is NOT set the instant post_message returns (the work is
+     * deferred); deferred_verify (call_out at t+4) confirms it appears once
+     * the continuation has run. This exercises the substrate's
+     * compiled-observer continuation -- a $delay inside a dispatcher-fired
+     * observer -- and is kept distinct from phase 5's atomic notification
+     * precisely because the two must not be conflated. */
     catch {
-	async_room6 = spawn_room("ChatApp:Room:NoReactP6");
-	async_dave2 = spawn_user("dave2");
-	CHAT_DAEMON->join_room(bob, async_room6);
-	CHAT_DAEMON->join_room(async_dave2, async_room6);
+	deferred_room = spawn_room("ChatApp:Room:DeferredP8");
+	CHAT_DAEMON->join_room(alice, deferred_room);
 
-	MERRY_DAEMON->register_observer(async_room6, "chat-room.message", "main",
+	MERRY_DAEMON->register_observer(deferred_room, "chat-room.message", "main",
 					SRC_APPEND);
-	/* deliberately NO mention-notify post observer registered. */
+	MERRY_DAEMON->register_observer(deferred_room, "chat-room.message", "post",
+					SRC_DEFERRED);
 
-	CHAT_DAEMON->post_message(bob, async_room6, "@dave2 yo");
+	CHAT_DAEMON->post_message(alice, deferred_room, "deferred please");
 
-	if (sizeof(async_room6->query_messages()) != 1) {
-	    log_line("ChatApp:test: FAIL: NO-REACT append observer did not record message");
+	if (deferred_room->query_raw_property("chat-room.delivery-receipt")) {
+	    log_line("ChatApp:test: FAIL: DEFERRED-OP receipt landed synchronously (not deferred)");
 	    return;
 	}
     } : {
-	log_line("ChatApp:test: FAIL: NO-REACT setup threw");
+	log_line("ChatApp:test: FAIL: DEFERRED-OP setup threw");
 	return;
     }
 
@@ -491,57 +611,59 @@ static void run_tests()
 	return;
     }
 
-    /* Boot-1 finalization. Three call_outs, ordered so the async
-     * assertions land on this boot and the persistence assertion lands
-     * on the next:
+    /* Boot-1 finalization. Three call_outs, ordered so phase 8's deferred
+     * operation lands on this boot and the persistence assertion lands on
+     * the next:
      *
-     *   t+4  async_verify   -- phase 5 notification landed (after the
-     *                          t+2 $delay continuation), phase 6 stayed
-     *                          inert; both fire before the dump.
-     *   t+5  finalize_dump  -- trigger_dump_and_exit takes the snapshot.
-     *   t+8  persist_verify -- scheduled but NOT yet fired at dump time,
-     *                          so DGD captures it pending; it fires as
-     *                          soon as the external restore is back up.
+     *   t+4  deferred_verify -- phase 8's $delay continuation (t+2) has run
+     *                           and written the delivery receipt; fires
+     *                           before the dump.
+     *   t+5  finalize_dump   -- trigger_dump_and_exit takes the snapshot.
+     *   t+8  persist_verify  -- scheduled but NOT yet fired at dump time,
+     *                           so DGD captures it pending; it fires as
+     *                           soon as the external restore is back up.
      *
-     * persist_verify's delay must exceed the dump time so it survives
-     * into the snapshot rather than firing on boot 1. */
-    call_out("async_verify", 4);
+     * persist_verify's delay must exceed the dump time so it survives into
+     * the snapshot rather than firing on boot 1. */
+    call_out("deferred_verify", 4);
     call_out("finalize_dump", 5);
     call_out("persist_verify", 8);
 }
 
 
-/* Boot-1 async assertions, firing after the phase-5 $delay continuation
- * has run (t+2) but before the snapshot dump (t+5). Confirms the
- * mention-notify observer's cross-user write was decoupled to a later
- * tick (phase 5 positive) and that the observer-less room produced no
- * reaction (phase 6 negative). */
-static void async_verify()
+/* phase 7 helper: post a message inside a DGD atomic envelope, then throw.
+ * The atomic modifier wraps the whole body; the error rolls back every
+ * write the task made -- the message-log append and the synchronous
+ * mention-notify observer's cross-user Set alike. The caller catches the
+ * throw and asserts neither write survived. */
+static atomic void atomic_post_then_fail(object sender, object room,
+					 string content)
 {
-    mixed *tracker;
+    CHAT_DAEMON->post_message(sender, room, content);
+    error("EVENT-ROLLBACK deliberate failure");
+}
 
+
+/* phase 8 verification, firing after the $delay continuation (t+2) but
+ * before the snapshot dump (t+5). Confirms the deferred operation's
+ * delivery receipt appeared on the later tick. */
+static void deferred_verify()
+{
     catch {
-	tracker = async_dave->query_mention_tracker();
-	if (sizeof(tracker) != 1 || tracker[0] != async_room5) {
-	    log_line("ChatApp:test: FAIL: ASYNC-DECOUPLED notification did not land after delay");
+	if (!deferred_room->query_raw_property("chat-room.delivery-receipt")) {
+	    log_line("ChatApp:test: FAIL: DEFERRED-OP receipt did not land after delay");
 	    return;
 	}
-	log_line("ChatApp:test: ASYNC-DECOUPLED OK");
-
-	if (sizeof(async_dave2->query_mention_tracker()) != 0) {
-	    log_line("ChatApp:test: FAIL: NO-REACT notification fired without an observer");
-	    return;
-	}
-	log_line("ChatApp:test: NO-REACT OK");
+	log_line("ChatApp:test: DEFERRED-OP OK");
     } : {
-	log_line("ChatApp:test: FAIL: async_verify threw");
+	log_line("ChatApp:test: FAIL: deferred_verify threw");
     }
 }
 
 
-/* Snapshot trigger, deferred past async_verify so the boot-1 async
- * assertions complete before the dump. Routes through the System
- * persist helper's call_out-deferred dump_state(FALSE) + shutdown(). */
+/* Snapshot trigger, deferred past deferred_verify so the boot-1
+ * assertions complete before the dump. Routes through the System persist
+ * helper's call_out-deferred dump_state(FALSE) + shutdown(). */
 static void finalize_dump()
 {
     PERSIST_HELPER->trigger_dump_and_exit();
