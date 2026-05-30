@@ -134,12 +134,20 @@ void do_delay(string mode, string signal, mixed delay, string label) {
    if (!this || !signal || !mode) {
       error("this merry node cannot perform delays");
    }
+   /* Capture the running compiled merry object (::this_object()) into the
+    * mcontext so the continuation can resume THIS script directly. The
+    * dispatcher invokes observers by compiled-object reference rather
+    * than the find_merry convention, so a convention-only resume
+    * (run_merries -> find_merries on merry:<mode>:<signal>) misses the
+    * observer's merry:on:<path>:<timing> storage. Carrying the compiled
+    * object lets mcontext resume either kind of $delay uniformly. */
    :: call_other(this, "delayed_call",
 		 ::new_object("/usr/Merry/data/mcontext",
 			      signal,
 			      mode,
 			      label,
-			      args + ([ ])),
+			      args + ([ ]),
+			      ::this_object()),
 		 "merry_continuation",
 		 delay, this);
 }

@@ -193,6 +193,25 @@ A `pre` observer that wants to veto the write throws via `error(...)`. The dispa
 
 A `main` or `post` observer that wants to record state on the host calls `Set($this, "...", ...)` (which re-enters `set_property` and recurses through `dispatch_set`, bounded by cascade + cycle checks). Calls to `Set` from observer source on the same `(obj, path)` that triggered the dispatch are caught by the cycle detector.
 
+An observer may also write a *different* object: `Set($other, "...", ...)` forwards to `$other->set_property(...)` (the `Set` merryfun takes an explicit object), so a post-timing reaction can fan an event out to other objects -- a mention-notify observer writing each mentioned user's tracker, for instance. The cross-object write is a fresh dispatch on the target, independent of the host's.
+
+### Deferred observer continuations (`$delay` / `In` / `Every`)
+
+An observer may defer part of its work to a later tick with `$delay(seconds, retval)`. The first call returns `retval` synchronously -- so the `set_property` that triggered the dispatch returns without waiting -- and the rest of the source resumes `seconds` later in a fresh `call_out` (a new task, a new dispatch batch). This is the runtime's temporal-decoupling primitive at the observer layer: a sender posts, the synchronous fan-out completes, and a cross-object notification lands on a subsequent tick decoupled from the sender's call.
+
+```c
+/* post-timing observer: notify a mentioned user one tick later */
+MERRY->register_observer(room, "chat-room.message", "post",
+    "$delay(2, FALSE); " +
+    "Set($new[\"mentions\"][0], \"chat-user.mention-tracker\", " +
+    "Get($new[\"mentions\"][0], \"chat-user.mention-tracker\") + ({ $this })); " +
+    "return TRUE;");
+```
+
+For this to work the dispatch host must expose the `$delay` glue pair -- `delayed_call(object ob, string fun, mixed delay, mixed args...)` and a `static void perform_delayed_call(object ob, string fun, mixed *args)` companion -- the same six-line shape `examples/merry-app/obj/thing.c` carries (lifted from SkotOS `/core/lib/core_scripts.c`).
+
+The continuation resumes the **same compiled observer object** rather than re-locating a script by the `merry:<mode>:<signal>` find-convention: `merrynode.c::do_delay` captures `this_object()` (the running compiled observer) into the `mcontext`, and `mcontext::merry_continuation` resumes it via `code->evaluate(host, signal, mode, args, label)`. This is what lets `$delay` compose with dispatcher observers at all -- the dispatcher stores observers under `merry:on:<path>:<timing>` and fires them by direct compiled-object reference, so a convention-only resume (`run_merries` -> `find_merries`) would find nothing. Convention-invoked scripts (e.g. the merry-app `$delay` example) keep working because `merry_continuation` falls back to `run_merries` when no compiled object was captured. The change-context bindings (`$this`, `$new`, ...) survive the delay because `do_delay` copies the args mapping into the `mcontext`.
+
 ## Relationship to Merry script binding
 
 The dispatcher is layered on top of the Merry script-binding mechanism documented in `merry-applications.md` -- observers are merry scripts, and `register_observer` writes to a property that `find_merry` / `find_merries` semantics can read.
