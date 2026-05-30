@@ -127,9 +127,49 @@ The lesson is the boundary of orthogonal persistence. *Snapshot + restore* prese
 
 ## Sandboxed reactions
 
-A future revision demonstrates sandboxed code load by registering a Merry script as a per-room reaction on the `chat-room.message-log` property. An in-sandbox script (Merry source that calls only kfuns inside Merry's deny-list permission set) compiles and fires on each message post. A sibling out-of-sandbox script (Merry source that calls a forbidden kfun like `write_file`) compiles successfully but errors on its first fire because the SANDBOX shadow inside `merrynode.c` raises a "function not allowed in merry code" error.
+A room can load and run *untrusted code*. A per-room reaction is a Merry script -- source compiled at runtime via `new_object("/usr/Merry/data/merry", source)` and bound on the room object as a property. The script executes inside the Merry sandbox: a kfun is callable from a Merry script only if no `SANDBOX()` shadow in `/usr/Merry/lib/merrynode.c` masks it. That deny list is the security boundary -- a room can accept a reaction written by an untrusted author and run it, confident that the author cannot reach `write_file`, `clone_object`, `open_port`, `shutdown`, or any of the other entries in the 51-entry `SANDBOX()` deny list (plus the explicit `call_other` and `new_object` shadows; see the deny-list reference in `docs/merry-language.md`).
 
-The walkthrough for this section grows when the sandboxed-reaction phases land.
+These two phases load both sides of that boundary: an in-sandbox reaction that runs, and a sandbox-denied reaction that compiles but is stopped at its first fire. They fire the reactions directly via `run_merry` to demonstrate sandboxed code load in isolation; wiring a reaction to fire *automatically* off the dispatcher's post-timing observers when a message is posted is the async-event phase's scope.
+
+The reaction-property key follows the `merry:on:<path>:<timing>` convention the property-change dispatcher reads (`docs/dispatcher.md`); here the test driver invokes `run_merry(room, "<path>:<timing>", "on", args)` to fire it explicitly.
+
+### Phase 3 -- accepted reaction
+
+The driver compiles an in-sandbox reaction whose source calls only the `Set` merryfun (which is not shadowed -- it routes to `merrynode.c::Set`, which forwards to the host's `set_property`):
+
+```c
+Set($this, "chat-room.message-count", $count);
+```
+
+It binds the script on `room_a` under `merry:on:chat-room.message:main`, posts a message (bob is still a member after the phase-2 kick removed alice), then fires the reaction with the new message count as the `$count` argument. `$this` resolves to the binding host (`room_a`); the reaction sets the room's `chat-room.message-count` marker property to `$count`. The driver reads the marker back and writes the sentinel:
+
+```text
+ChatApp:test: SANDBOX-ACCEPT OK
+```
+
+This is sandboxed code load: a script authored as a string, compiled at runtime, bound on a room, and executed against that room's property storage -- all within the sandbox surface.
+
+### Phase 4 -- rejected reaction
+
+The driver compiles a sibling reaction whose source calls `write_file`, a kfun in the `SANDBOX()` deny list:
+
+```c
+write_file("/usr/Chat/data/hack.txt", "pwned");
+```
+
+Registration **succeeds**: the Merry compiler resolves `write_file` to the local `SANDBOX(write_file)` shadow method, which exists, so compilation finds the symbol and binds the script. The error fires only on the *first invocation*, when the shadow body runs and raises:
+
+```text
+** function 'write_file' not allowed in merry code [caught]
+```
+
+The boot log carries the full call stack down to `merrynode.c` line 448 (the `SANDBOX(write_file)` shadow). The driver's `catch{}` converts the throw into a `SANDBOX-REJECT OK` sentinel and asserts that no `hack.txt` was created:
+
+```text
+ChatApp:test: SANDBOX-REJECT OK
+```
+
+The deny-by-shadow mechanism is *implicit whitelist by presence*: there is no allow list to maintain. A kfun is reachable from a Merry script only if no `SANDBOX()` shadow masks it; adding a new shadow line denies a kfun, removing one permits it. The compile/fire split matters for the security model -- an untrusted author cannot tell at registration time whether their reaction will be stopped, because the boundary is enforced at execution, not at load.
 
 ## Async events
 

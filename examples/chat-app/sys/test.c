@@ -16,6 +16,18 @@
  *   2.  CAP-ACCEPT OK     -- admin user holding a per-room kick
  *                            token calls admin->kick; target leaves
  *                            the room.
+ *   3.  SANDBOX-ACCEPT OK -- a per-room Merry reaction whose source
+ *                            calls only in-sandbox kfuns compiles,
+ *                            binds on the room under
+ *                            merry:on:chat-room.message:main, fires
+ *                            via run_merry after a message post, and
+ *                            the marker property it sets lands.
+ *   4.  SANDBOX-REJECT OK -- a sibling reaction whose source calls a
+ *                            sandbox-denied kfun (write_file) compiles
+ *                            (registration succeeds) but errors on its
+ *                            first fire with the merrynode SANDBOX
+ *                            shadow's "function not allowed in merry
+ *                            code"; no file is created.
  *  10.  PERSIST-SETUP OK  -- establish a chat session (2 users, 3
  *                            messages, a cross-clone mention-tracker
  *                            reference) on a fresh room, record the
@@ -53,6 +65,14 @@ inherit "/usr/Chat/lib/app";
 inherit "/usr/System/lib/auto";
 inherit "/lib/util/lpc";
 
+/* Merry's invocation API is a static surface (find_merry / run_merry).
+ * Inherited rather than called via the SYS_MERRY daemon so the static
+ * methods resolve at compile time -- the SkotOS convention merryapi.c
+ * was authored against, mirrored by examples/merry-app/sys/test.c. The
+ * cross-domain inherit + the cross-domain clone of ~Merry/data/merry
+ * below ride the global-access grants set in src/usr/System/initd.c. */
+inherit "/usr/Merry/lib/merryapi";
+
 # define CHAT_DAEMON    "/usr/Chat/sys/chat"
 # define ADMIN_DAEMON   "/usr/Chat/sys/admin"
 # define ROOM_PROG      "/usr/Chat/obj/room"
@@ -60,6 +80,8 @@ inherit "/lib/util/lpc";
 # define RESULT_FILE    "/usr/Chat/data/test-result.log"
 # define MARKER_FILE    "/usr/Chat/data/persist-marker.log"
 # define PERSIST_HELPER "/usr/System/sys/persist_helper"
+# define MERRY_DATA     "/usr/Merry/data/merry"
+# define HACK_FILE      "/usr/Chat/data/hack.txt"
 
 static void run_tests();
 static void persist_verify();
@@ -184,6 +206,98 @@ static void run_tests()
 	return;
     }
     log_line("ChatApp:test: CAP-ACCEPT OK");
+
+    /* phase 3: SANDBOX-ACCEPT
+     *
+     * Load a per-room reaction as Merry code. The source calls only
+     * the in-sandbox Set() merryfun -- no kfun in merrynode.c's
+     * SANDBOX() deny list -- so it both compiles and fires cleanly.
+     * The script is bound on room_a under the reaction-property key
+     * merry:on:chat-room.message:main (the merry:on:<path>:<timing>
+     * convention the property-change dispatcher reads); here it is
+     * fired directly via run_merry to demonstrate sandboxed code load
+     * in isolation. Wiring the same reaction to fire automatically off
+     * the dispatcher's post-timing observers on a message post is the
+     * async-event phase's scope; this phase proves only that loaded
+     * Merry code executes within the sandbox surface and mutates room
+     * state.
+     *
+     * bob posts a message to room_a (he is still a member after the
+     * phase-2 kick removed alice). The reaction is fired with the new
+     * message count as the $count argument; it sets the room's
+     * chat-room.message-count marker property to that value. The
+     * assertion reads the marker back.
+     */
+    catch {
+	object accept_script;
+	int count;
+
+	accept_script = new_object(MERRY_DATA,
+		"Set($this, \"chat-room.message-count\", $count);");
+	room_a->set_property("merry:on:chat-room.message:main",
+			     accept_script);
+
+	CHAT_DAEMON->post_message(bob, room_a, "first post");
+	count = sizeof(room_a->query_messages());
+
+	run_merry(room_a, "chat-room.message:main", "on",
+		  ([ "count": count ]));
+
+	if (room_a->query_raw_property("chat-room.message-count") != count) {
+	    log_line("ChatApp:test: FAIL: SANDBOX-ACCEPT marker property did not land");
+	    return;
+	}
+    } : {
+	log_line("ChatApp:test: FAIL: SANDBOX-ACCEPT threw");
+	return;
+    }
+    log_line("ChatApp:test: SANDBOX-ACCEPT OK");
+
+    /* phase 4: SANDBOX-REJECT
+     *
+     * Load a sibling reaction whose source calls write_file -- a kfun
+     * in merrynode.c's SANDBOX() deny list. Compilation (registration)
+     * SUCCEEDS: the Merry compiler resolves write_file to the local
+     * SANDBOX(write_file) shadow method, which exists. The error fires
+     * only on the FIRST invocation, when the shadow raises "function
+     * 'write_file' not allowed in merry code". The deny-by-shadow
+     * mechanism is the implicit-whitelist-by-presence model: a kfun is
+     * callable from Merry only if no SANDBOX() shadow masks it.
+     *
+     * The compile is in its own catch{} (a throw there is a FAIL --
+     * the registration is supposed to succeed). The fire is in a
+     * separate catch{} that EXPECTS the throw; reaching the line after
+     * run_merry without a throw is the FAIL. A final guard confirms
+     * the forbidden write produced no file.
+     */
+    catch {
+	object reject_script;
+
+	reject_script = new_object(MERRY_DATA,
+		"write_file(\"" + HACK_FILE + "\", \"pwned\");");
+	room_a->set_property("merry:on:chat-room.intrusion:main",
+			     reject_script);
+    } : {
+	log_line("ChatApp:test: FAIL: SANDBOX-REJECT compile/register threw");
+	return;
+    }
+
+    catch(remove_file(HACK_FILE));
+    rejected = 0;
+    catch {
+	run_merry(room_a, "chat-room.intrusion:main", "on", ([ ]));
+    } : {
+	rejected = 1;
+    }
+    if (!rejected) {
+	log_line("ChatApp:test: FAIL: SANDBOX-REJECT denied kfun did not throw");
+	return;
+    }
+    if (file_info(HACK_FILE)) {
+	log_line("ChatApp:test: FAIL: SANDBOX-REJECT forbidden write created a file");
+	return;
+    }
+    log_line("ChatApp:test: SANDBOX-REJECT OK");
 
     /* phase 10: PERSIST SETUP
      *

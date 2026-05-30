@@ -12,6 +12,8 @@ The example is grown incrementally: the first revision wires the capability-sepa
 - The boot-time test driver `sys/test.c` runs in an order-independent fashion via a `call_out` from `create()`. Phases live in `run_tests`; each is wrapped in `catch{}` so a failure in one does not mask a different failure in another.
 - **Phase 1 (CAP-REJECT)**: a regular user (no admin token) calls `admin->kick`. The capability check throws; the test driver records the rejection and asserts the target user's membership did not change.
 - **Phase 2 (CAP-ACCEPT)**: a third user receives a per-room "kick" admin token via `admin->grant_admin(nil, carol, room_a, ({ "kick" }))`. The same `admin->kick` call now succeeds; the target is removed from the room's member list and the room is removed from the target's subscription list.
+- **Phase 3 (SANDBOX-ACCEPT)**: a per-room reaction is loaded as Merry source (`Set($this, "chat-room.message-count", $count);`) and bound on the room under `merry:on:chat-room.message:main`. The source calls only the in-sandbox `Set` merryfun -- no kfun in `merrynode.c`'s `SANDBOX()` deny list -- so it compiles and fires cleanly. The driver posts a message, fires the reaction via `run_merry` with the new message count, and asserts the room's `chat-room.message-count` marker property landed. (Firing the reaction automatically off the dispatcher's post-timing observers is the async-event phase's scope; this phase proves loaded Merry code executes within the sandbox surface.)
+- **Phase 4 (SANDBOX-REJECT)**: a sibling reaction whose source calls `write_file` -- a kfun in the `SANDBOX()` deny list -- is loaded. Registration (compile) SUCCEEDS, because the Merry compiler resolves `write_file` to the local `SANDBOX(write_file)` shadow method, which exists. The first invocation errors with `function 'write_file' not allowed in merry code` (logged `[caught]`); the driver asserts the throw fired and that no file was created. The deny-by-shadow model is implicit-whitelist-by-presence: a kfun is callable from Merry only if no `SANDBOX()` shadow masks it.
 - **Phase 10 (PERSIST-SETUP)**: the driver establishes a chat session on a fresh room -- two users join, exchange three messages, and one user's `chat-user.mention-tracker` is set to a cross-clone reference to the other user's object. The room and the two accounts are saved as object globals, the session shape is recorded to an on-disk marker, a verify `call_out` is scheduled, and the driver dumps a snapshot and exits via `/usr/System/sys/persist_helper::trigger_dump_and_exit`. Follows the two-boot pattern of `examples/merry-app/sys/test.c` phases 16/17.
 - **Phase 11 (PERSIST-VERIFY)**: after the smoke harness restarts DGD against the snapshot, the surviving `call_out` fires. It asserts that all three messages, both member accounts (live clones with intact names), and the cross-clone mention-tracker reference (the same object, not a copy) survived the snapshot cycle, and that a third user joining the restored room observes the full prior session.
 - **Negative case (COLDBOOT-LOST)**: a third boot starts DGD cold WITHOUT loading the snapshot. The on-disk marker (a file) survived, but the in-memory chat session did not -- the saved-as-global room is `nil` on a cold boot. This demonstrates that in-memory-only state does not survive a cold boot without a snapshot; only the on-disk record persists. Durability of structured state *beyond* the image snapshot (surviving a from-scratch boot) is the on-disk Schema/Marshal path that `examples/vault-app/` demonstrates.
@@ -40,8 +42,9 @@ rm -f .runtime/state/snapshot* .runtime/state/swap
 scripts/setup-runtime.sh
 cp -R examples/chat-app .runtime/src/usr/Chat
 
-# Boot 1 (cold): phases 1, 2, 10 run; phase 10 dumps a snapshot and the
-# driver exits on its own.
+# Boot 1 (cold): phases 1, 2, 3, 4, 10 run; phase 4 logs a [caught]
+# sandbox-rejection error to the boot log; phase 10 dumps a snapshot and
+# the driver exits on its own.
 .runtime/bin/dgd mva.dgd
 
 # Boot 2 (restore): restart against the snapshot; phase 11 fires from the
@@ -59,13 +62,15 @@ kill %1
 cat .runtime/src/usr/Chat/data/test-result.log
 ```
 
-Expected result-log contents (boot 1 writes the first four lines and
+Expected result-log contents (boot 1 writes the first six lines and
 exits; boot 2 appends PERSIST-VERIFY OK; boot 3 appends COLDBOOT-LOST OK):
 
 ```text
 ChatApp:test: starting
 ChatApp:test: CAP-REJECT OK
 ChatApp:test: CAP-ACCEPT OK
+ChatApp:test: SANDBOX-ACCEPT OK
+ChatApp:test: SANDBOX-REJECT OK
 ChatApp:test: PERSIST-SETUP OK
 ChatApp:test: PERSIST-VERIFY OK
 ChatApp:test: COLDBOOT-LOST OK
@@ -89,5 +94,5 @@ examples/chat-app/
 +- sys/
    +- chat.c            -- chat dispatcher daemon (join_room / leave_room / post_message)
    +- admin.c           -- admin daemon (capability-gated kick / ban / set_room_config)
-   +- test.c            -- boot-time test driver (capability + persistence phases wired)
+   +- test.c            -- boot-time test driver (capability + sandbox + persistence phases wired)
 ```
