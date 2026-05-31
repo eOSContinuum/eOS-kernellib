@@ -275,9 +275,38 @@ Phase 9b captures one empty snapshot and passes it to both writers. The second w
 
 The full agent-to-agent conflict scenario -- agents with identity wrappers contending through an inter-agent protocol -- is a downstream concern (the agent-identity workstream). This phase demonstrates the substrate serialization that such a wrapper exposes at the agent-facing surface.
 
-### Forthcoming sub-phases
+### Phase 9c -- read coherence and the cached-snapshot drift
 
-Additional multi-agent-coherence sub-phases grow this section as they land: multi-user same-room message ordering (three users observe an identical message order); atomic cross-room writes via `MERRY->batch(fn, atomic: true)` with a deliberate-failure rollback variant; and an ancestry-walk multi-agent observer registered on the Room ancestor firing for all Room clones.
+Write coherence's read-side companion: when all readers read the same runtime property, they see the same state at the same time. Three users in one room each read the message log after three messages have posted. The log is one property on the room clone, not a per-user copy, so the three reads return identical content in identical order -- the readers reconcile nothing (sentinel `COHERENCE OK`).
+
+The negative shows where divergence would come from: an application that caches state the runtime already keeps coherent. One user captures the log, a fourth message posts, and the cached copy now disagrees with the live log -- three entries against four (sentinel `CACHED-DIVERGE OK`). This is the read-side analogue of the phase-9b lost update: the divergence is the cost of holding a private snapshot instead of reading the shared property at use time.
+
+### Phase 9d -- atomic cross-room writes
+
+The atomic primitive composes with coherent multi-agent state across more than one object. `cross_write` appends one message to two separate rooms:
+
+```c
+void cross_write(object room_a, object room_b, string content)
+{
+    mapping msg;
+
+    msg = ([ "content": content, "timestamp": time() ]);
+    room_a->set_property("chat-room.message-log",
+			 room_a->query_messages() + ({ msg }));
+    room_b->set_property("chat-room.message-log",
+			 room_b->query_messages() + ({ msg }));
+}
+```
+
+Run through `MERRY->batch(this_object(), "cross_write", args, ([ "atomic": 1 ]))`, the two appends are one atomic unit: the commit path lands both rooms (sentinel `ATOMIC-COMMIT OK`). A sibling `cross_write_then_fail` appends to the first room and then throws; under the atomic batch the throw rolls both writes back, so neither room retains the message (sentinel `ATOMIC-ROLLBACK OK`). This extends phase 7's single-room rollback across two room objects with no application-level transaction code.
+
+The negative is the same failing writer run through a NON-atomic batch (`([ ])`, no `atomic` opt). Without the envelope the first room's append commits before the throw and survives, while the second room is never written -- partial state on error (sentinel `PARTIAL-STATE OK`). The all-or-nothing boundary the atomic batch provides is exactly what the non-atomic path leaves to the application to clean up.
+
+### Phase 9e -- ancestry-walk multi-agent observer
+
+UrHierarchy makes coherent reactive behavior something the platform provides to a cohort once, rather than something each member arranges. A base room carries the append observer; three child rooms set the base as their ur-object (`set_ur_object`) but register nothing themselves. A message posting in each child writes `chat-room.message`, and the dispatcher's ancestry walk resolves the base's observer -- with `$this` bound to the child, so the append lands on the child's own log. All three children record their message from the single ancestor registration (sentinel `ANCESTRY OK`). This re-exercises the dispatcher ancestry walk (cf. the merry-app DISPATCH ANCESTRY phase) at the application tier.
+
+The negative is a room with neither its own observer nor an ancestor carrying one. Its message posts, the ancestry walk finds no append observer at any level, and nothing records it -- the log stays empty (sentinel `NO-INHERIT OK`). Absent the inherited registration, every room would need its own: the inheritance is what lets one registration serve the cohort coherently.
 
 ## What this example does not exercise
 

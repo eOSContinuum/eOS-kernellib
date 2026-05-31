@@ -635,6 +635,249 @@ static void run_tests()
 	log_line("ChatApp:test: LOST-UPDATE OK");
     }
 
+    /* phase 9c: COHERENCE -- read coherence (all agents see the same state
+     * at the same time), plus the cached-snapshot drift it removes.
+     *
+     * judy, kevin, and leo share one room with an append observer. Three
+     * messages post in a known order. Each user reads the message log;
+     * because the log is one runtime property -- not a per-user cached copy
+     * -- all three reads return identical content in identical order. The
+     * runtime carries the single coherent log; the readers reconcile
+     * nothing.
+     *
+     * The CACHED-DIVERGE half is the read-side analogue of the phase-9b
+     * lost update: judy caches the log, a fourth message posts, and her
+     * cached copy now disagrees with the live shared log. The divergence is
+     * the cost an application pays for caching state the runtime already
+     * keeps coherent -- the failure mode the shared-state read removes. */
+    {
+	object room_r, judy, kevin, leo;
+	mixed *seen_j, *seen_k, *seen_l;
+	mixed *cached, *live;
+
+	catch {
+	    room_r = spawn_room("ChatApp:Room:ReadOrderR");
+	    judy   = spawn_user("judy");
+	    kevin  = spawn_user("kevin");
+	    leo    = spawn_user("leo");
+	    CHAT_DAEMON->join_room(judy, room_r);
+	    CHAT_DAEMON->join_room(kevin, room_r);
+	    CHAT_DAEMON->join_room(leo, room_r);
+
+	    MERRY_DAEMON->register_observer(room_r, "chat-room.message", "main",
+					    SRC_APPEND);
+
+	    CHAT_DAEMON->post_message(judy, room_r, "one");
+	    CHAT_DAEMON->post_message(kevin, room_r, "two");
+	    CHAT_DAEMON->post_message(leo, room_r, "three");
+
+	    /* three independent reads of the one shared log */
+	    seen_j = room_r->query_messages();
+	    seen_k = room_r->query_messages();
+	    seen_l = room_r->query_messages();
+	} : {
+	    log_line("ChatApp:test: FAIL: COHERENCE setup threw");
+	    return;
+	}
+	if (sizeof(seen_j) != 3 || sizeof(seen_k) != 3 || sizeof(seen_l) != 3) {
+	    log_line("ChatApp:test: FAIL: COHERENCE reader saw wrong message count");
+	    return;
+	}
+	if (seen_j[0]["content"] != "one" || seen_j[1]["content"] != "two" ||
+	    seen_j[2]["content"] != "three") {
+	    log_line("ChatApp:test: FAIL: COHERENCE message order not preserved");
+	    return;
+	}
+	if (seen_j[0]["content"] != seen_k[0]["content"] ||
+	    seen_k[0]["content"] != seen_l[0]["content"] ||
+	    seen_j[2]["content"] != seen_k[2]["content"] ||
+	    seen_k[2]["content"] != seen_l[2]["content"]) {
+	    log_line("ChatApp:test: FAIL: COHERENCE readers disagree on order");
+	    return;
+	}
+	log_line("ChatApp:test: COHERENCE OK");
+
+	/* cached-snapshot drift: capture the log, post once more, compare */
+	catch {
+	    cached = room_r->query_messages();
+	    CHAT_DAEMON->post_message(judy, room_r, "four");
+	    live = room_r->query_messages();
+	} : {
+	    log_line("ChatApp:test: FAIL: CACHED-DIVERGE post threw");
+	    return;
+	}
+	if (sizeof(cached) != 3) {
+	    log_line("ChatApp:test: FAIL: CACHED-DIVERGE cached snapshot mutated");
+	    return;
+	}
+	if (sizeof(live) != 4) {
+	    log_line("ChatApp:test: FAIL: CACHED-DIVERGE live log did not advance");
+	    return;
+	}
+	log_line("ChatApp:test: CACHED-DIVERGE OK");
+    }
+
+    /* phase 9d: ATOMIC-COMMIT / ATOMIC-ROLLBACK -- atomic cross-room writes
+     * through the MERRY batch surface, composed with DGD atomicity.
+     *
+     * cross_write appends one message to TWO rooms; wrapped in
+     * MERRY->batch(..., atomic: 1) the two appends are one atomic unit. The
+     * commit path lands both. The deliberate-failure path
+     * (cross_write_then_fail appends to the first room, then throws) rolls
+     * BOTH writes back -- cross-room, where phase 7 showed single-room. The
+     * runtime carries the all-or-nothing boundary across two separate room
+     * objects with no application-level transaction code. */
+    {
+	object room_ba, room_bb;
+	int threw;
+
+	catch {
+	    room_ba = spawn_room("ChatApp:Room:BatchA");
+	    room_bb = spawn_room("ChatApp:Room:BatchB");
+
+	    MERRY_DAEMON->batch(this_object(), "cross_write",
+				({ room_ba, room_bb, "commit" }),
+				([ "atomic": 1 ]));
+	} : {
+	    log_line("ChatApp:test: FAIL: ATOMIC-COMMIT batch threw");
+	    return;
+	}
+	if (sizeof(room_ba->query_messages()) != 1 ||
+	    sizeof(room_bb->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: ATOMIC-COMMIT both rooms not written");
+	    return;
+	}
+	log_line("ChatApp:test: ATOMIC-COMMIT OK");
+
+	threw = 0;
+	catch {
+	    MERRY_DAEMON->batch(this_object(), "cross_write_then_fail",
+				({ room_ba, room_bb, "rollback" }),
+				([ "atomic": 1 ]));
+	} : {
+	    threw = 1;
+	}
+	if (!threw) {
+	    log_line("ChatApp:test: FAIL: ATOMIC-ROLLBACK batch did not throw");
+	    return;
+	}
+	/* both rooms still hold only the committed message; the failed
+	 * batch's partial write to room_ba rolled back with the throw. */
+	if (sizeof(room_ba->query_messages()) != 1 ||
+	    sizeof(room_bb->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: ATOMIC-ROLLBACK partial write survived");
+	    return;
+	}
+	log_line("ChatApp:test: ATOMIC-ROLLBACK OK");
+    }
+
+    /* phase 9d (negative): PARTIAL-STATE -- the same cross-room writer run
+     * through a NON-atomic batch. Without the atomic envelope, the first
+     * room's append commits before the throw, so it survives while the
+     * second room is never written: partial state on error. This is what
+     * the atomic batch above removes -- the contrast that shows why the
+     * all-or-nothing boundary matters. Fresh rooms so the partial write is
+     * unambiguous (one ends with a message, the other empty). */
+    {
+	object room_pa, room_pb;
+	int threw;
+
+	threw = 0;
+	catch {
+	    room_pa = spawn_room("ChatApp:Room:PartialA");
+	    room_pb = spawn_room("ChatApp:Room:PartialB");
+
+	    /* no "atomic" opt: a plain batch run, throw is not rolled back */
+	    MERRY_DAEMON->batch(this_object(), "cross_write_then_fail",
+				({ room_pa, room_pb, "partial" }),
+				([ ]));
+	} : {
+	    threw = 1;
+	}
+	if (!threw) {
+	    log_line("ChatApp:test: FAIL: PARTIAL-STATE non-atomic batch did not throw");
+	    return;
+	}
+	/* the first write survived (no rollback); the second never ran */
+	if (sizeof(room_pa->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: PARTIAL-STATE first write did not survive");
+	    return;
+	}
+	if (sizeof(room_pb->query_messages()) != 0) {
+	    log_line("ChatApp:test: FAIL: PARTIAL-STATE second room unexpectedly written");
+	    return;
+	}
+	log_line("ChatApp:test: PARTIAL-STATE OK");
+    }
+
+    /* phase 9e: ANCESTRY / NO-INHERIT -- one observer registered on a room
+     * ancestor fans out to every room in the cohort via the UrHierarchy
+     * walk.
+     *
+     * A base room carries the append observer; three child rooms set the
+     * base as their ur-object but register NOTHING themselves. A message
+     * posting in each child resolves the base's observer through the
+     * ancestry walk -- $this is the child, so the append lands on the
+     * child's own log. The coherent reactive behavior is provided once, at
+     * the ancestor, to every cohort member: no per-room registration. This
+     * re-exercises the dispatcher ancestry walk at the application
+     * tier (cf. the merry-app DISPATCH ANCESTRY phase).
+     *
+     * The NO-INHERIT half is the contrast: a room with neither its own
+     * observer NOR an ancestor carrying one. The message posts, the
+     * ancestry walk finds no append observer at any level, and nothing
+     * records it -- the log stays empty. This is what every room would
+     * require absent the inherited observer: its own registration. */
+    {
+	object base, child_x, child_y, child_z, niaj;
+	object lone, olivia;
+
+	catch {
+	    base    = spawn_room("ChatApp:Room:AncestryBase");
+	    child_x = spawn_room("ChatApp:Room:AncestryX");
+	    child_y = spawn_room("ChatApp:Room:AncestryY");
+	    child_z = spawn_room("ChatApp:Room:AncestryZ");
+	    niaj    = spawn_user("niaj");
+
+	    /* register the append observer ONCE, on the ancestor */
+	    MERRY_DAEMON->register_observer(base, "chat-room.message", "main",
+					    SRC_APPEND);
+
+	    child_x->set_ur_object(base);
+	    child_y->set_ur_object(base);
+	    child_z->set_ur_object(base);
+
+	    CHAT_DAEMON->post_message(niaj, child_x, "x");
+	    CHAT_DAEMON->post_message(niaj, child_y, "y");
+	    CHAT_DAEMON->post_message(niaj, child_z, "z");
+	} : {
+	    log_line("ChatApp:test: FAIL: ANCESTRY setup threw");
+	    return;
+	}
+	if (sizeof(child_x->query_messages()) != 1 ||
+	    sizeof(child_y->query_messages()) != 1 ||
+	    sizeof(child_z->query_messages()) != 1) {
+	    log_line("ChatApp:test: FAIL: ANCESTRY inherited observer did not fire on all clones");
+	    return;
+	}
+	log_line("ChatApp:test: ANCESTRY OK");
+
+	catch {
+	    lone   = spawn_room("ChatApp:Room:NoInheritL");
+	    olivia = spawn_user("olivia");
+	    /* no ur-object, no observer registered */
+	    CHAT_DAEMON->post_message(olivia, lone, "unheard");
+	} : {
+	    log_line("ChatApp:test: FAIL: NO-INHERIT setup threw");
+	    return;
+	}
+	if (sizeof(lone->query_messages()) != 0) {
+	    log_line("ChatApp:test: FAIL: NO-INHERIT message recorded without an observer");
+	    return;
+	}
+	log_line("ChatApp:test: NO-INHERIT OK");
+    }
+
     /* phase 10: PERSIST SETUP
      *
      * Establish a chat session on a fresh room: alice and bob join,
@@ -733,6 +976,36 @@ static atomic void atomic_post_then_fail(object sender, object room,
 {
     CHAT_DAEMON->post_message(sender, room, content);
     error("EVENT-ROLLBACK deliberate failure");
+}
+
+
+/* phase 9d helpers: append one message to TWO rooms. cross_write is the
+ * commit path; cross_write_then_fail appends to the first room then throws,
+ * so the MERRY batch's atomic mode must roll back the partial first write
+ * (the second is never reached). Public and non-static so MERRY's batch()
+ * can reach them via call_other (mirrors the merry-app _throw_for_test
+ * helper). The append is a direct message-log write, not a dispatched post,
+ * so the demonstration isolates the atomic batch boundary rather than the
+ * observer fan-out. */
+void cross_write(object room_a, object room_b, string content)
+{
+    mapping msg;
+
+    msg = ([ "content": content, "timestamp": time() ]);
+    room_a->set_property("chat-room.message-log",
+			 room_a->query_messages() + ({ msg }));
+    room_b->set_property("chat-room.message-log",
+			 room_b->query_messages() + ({ msg }));
+}
+
+void cross_write_then_fail(object room_a, object room_b, string content)
+{
+    mapping msg;
+
+    msg = ([ "content": content, "timestamp": time() ]);
+    room_a->set_property("chat-room.message-log",
+			 room_a->query_messages() + ({ msg }));
+    error("ATOMIC-ROLLBACK deliberate failure");
 }
 
 
