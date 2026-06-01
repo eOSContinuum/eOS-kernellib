@@ -36,7 +36,7 @@ Four extensions over plain LPC carry Merry's semantics for property-bound script
 
 **`${name}`** — object reference. Resolved at parse time by the `MOB_CONST` rule (`grammar/merry.y` line 262): the parser calls `find_object(name)` immediately, captures the returned object reference into the per-script `obarr`, and emits a `VAL_OBJREF` AST node carrying an index into `obarr`. The compiled LPC reads `obarr[index]` at runtime; the resolution is done once at compile, not per invocation.
 
-**`$delay(seconds, retval, label?)`** — schedules a continuation. The Merry source `$delay(1, FALSE); Set($this, "delay_fired", 1); return TRUE;` evaluates the body synchronously (Set fires immediately), the `$delay` statement returns control to the binding host's `delayed_call` LFUN with a `merry_continuation` callback. `delay` seconds later, `perform_delayed_call` re-enters the same Merry source at a labeled resume point. The host-side glue (`delayed_call` + `perform_delayed_call`) currently lives inline as application-layer code at `examples/merry-app/obj/thing.c` lines 24-50; once a second application needs the same pair, the natural home is a shared library under `src/lib/util/`. The first call returns the `retval` synchronously; the resume continues from after the `$delay()`.
+**`$delay(seconds, retval, label?)`** — schedules a continuation. The Merry source `$delay(1, FALSE); Set($this, "delay_fired", 1); return TRUE;` evaluates the body synchronously (Set fires immediately), the `$delay` statement returns control to the binding host's `delayed_call` LFUN with a `merry_continuation` callback. `delay` seconds later, `perform_delayed_call` re-enters the same Merry source at a labeled resume point. The host-side glue (`delayed_call` + `perform_delayed_call`) lives in `/lib/util/delayed`, which any script-bearing object inherits. The first call returns the `retval` synchronously; the resume continues from after the `$delay()`.
 
 **`space::method($arg: value, ...)` and `space::`** — cross-namespace invocation. Compiles to a `VAL_LABELCALL` (with explicit method-style args) or `VAL_LABELREF` (without). At runtime, `merrynode::LabelCall` consults the script-space registry on the Merry daemon (registered via `MERRY->register_script_space("space", handler)`), looks up the handler object, and dispatches to its `query_method` / `call_method` LFUN pair. The structured argument form `$who: "world"` lowers to a mapping passed as the second argument to `call_method`. This is the mechanism for runtime-extensible namespaces and external bridges (a future MCP-style integration would register itself as a script space).
 
@@ -181,7 +181,7 @@ result = run_merry(child, "label_test", "lib", ([ ]));
 /* result == "Hello world", returned by this object's call_method LFUN */
 ```
 
-The application-layer LFUNs that make these examples work (the binding host's `delayed_call` and `perform_delayed_call` pair, the handler's `query_method` and `call_method` pair) live alongside the Merry source in `examples/merry-app/`. See [merry-applications.md](merry-applications.md) for the application-author walkthrough of the same example.
+The LFUNs that make these examples work split by home: the binding host's `delayed_call` and `perform_delayed_call` pair comes from `/lib/util/delayed`, while the handler's `query_method` and `call_method` pair lives alongside the Merry source in `examples/merry-app/`. See [merry-applications.md](merry-applications.md) for the application-author walkthrough of the same example.
 
 ## Where to next
 

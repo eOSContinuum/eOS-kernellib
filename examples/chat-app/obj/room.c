@@ -21,6 +21,7 @@ inherit "/lib/util/named";
 inherit "/lib/util/lpc";
 inherit properties "/lib/util/properties";
 inherit ur "/lib/util/ur";
+inherit "/lib/util/delayed";
 
 string query_state_root() { return "ChatApp:Room"; }
 
@@ -111,20 +112,7 @@ void claim_slot_stale(object user, object *stale_snapshot)
     set_property("chat-room.member-list", stale_snapshot + ({ user }));
 }
 
-/* $delay() continuation glue. A post-timing mention-notify observer
- * registered on this room uses $delay() to push its cross-user
- * notification onto a later tick. merrynode.c::do_delay invokes
- * ::call_other($this, "delayed_call", mcontext, "merry_continuation",
- * delay, $this), so the dispatch host -- this room -- must expose the
- * pair. The shape is lifted verbatim from examples/merry-app/obj/thing.c
- * (which lifts it from SkotOS /core/lib/core_scripts.c); promote to a
- * /lib/util helper once a third application surfaces the same need. */
-static void perform_delayed_call(object ob, string fun, mixed *args)
-{
-    call_other(ob, fun, args...);
-}
-
-void delayed_call(object ob, string fun, mixed delay, mixed args...)
-{
-    call_out("perform_delayed_call", delay, ob, fun, args);
-}
+/* A post-timing mention-notify observer registered on this room uses
+ * $delay() to push its cross-user notification onto a later tick. The
+ * delayed_call / perform_delayed_call pair Merry's do_delay requires of
+ * the dispatch host lives in /lib/util/delayed, inherited above. */

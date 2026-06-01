@@ -208,7 +208,7 @@ MERRY->register_observer(room, "chat-room.message", "post",
     "Set($this, \"chat-room.delivery-receipt\", 1); return TRUE;");
 ```
 
-For this to work the dispatch host must expose the `$delay` glue pair -- `delayed_call(object ob, string fun, mixed delay, mixed args...)` and a `static void perform_delayed_call(object ob, string fun, mixed *args)` companion -- the same six-line shape `examples/merry-app/obj/thing.c` carries (lifted from SkotOS `/core/lib/core_scripts.c`).
+For this to work the dispatch host must expose the `$delay` glue pair -- `delayed_call(object ob, string fun, mixed delay, mixed args...)` and a `static void perform_delayed_call(object ob, string fun, mixed *args)` companion -- both provided by `/lib/util/delayed`, which the host inherits.
 
 The continuation resumes the **same compiled observer object** rather than re-locating a script by the `merry:<mode>:<signal>` find-convention: `merrynode.c::do_delay` captures `this_object()` (the running compiled observer) into the `mcontext`, and `mcontext::merry_continuation` resumes it via `code->evaluate(host, signal, mode, args, label)`. This is what lets `$delay` compose with dispatcher observers at all -- the dispatcher stores observers under `merry:on:<path>:<timing>` and fires them by direct compiled-object reference, so a convention-only resume (`run_merries` -> `find_merries`) would find nothing. Convention-invoked scripts (e.g. the merry-app `$delay` example) keep working because `merry_continuation` falls back to `run_merries` when no compiled object was captured. The change-context bindings (`$this`, `$new`, ...) survive the delay because `do_delay` copies the args mapping into the `mcontext`.
 

@@ -24,14 +24,8 @@
  * runtime invocation path, not on-disk persistence. The application's
  * structure stays compatible with adding a Schema registration later.
  *
- * delayed_call / perform_delayed_call below are required by Merry's
- * $delay() statement. merrynode.c::do_delay invokes
- * `::call_other(this, "delayed_call", mcontext_LWO, "merry_continuation",
- * delay, this)`, so every script-bearing object (the type passed as
- * `this` at run_merry / run_merries) must expose this pair. The shape
- * is lifted from SkotOS /core/lib/core_scripts.c lines 47-54; this
- * inline copy keeps the demonstration self-contained. Promote to a
- * /lib/util helper if a second application surfaces the same need.
+ * The $delay() continuation glue Merry requires of every
+ * script-bearing object lives in /lib/util/delayed, inherited below.
  */
 
 # include <type.h>
@@ -39,6 +33,7 @@
 inherit "/lib/util/named";
 inherit properties "/lib/util/properties";
 inherit ur "/lib/util/ur";
+inherit "/lib/util/delayed";
 
 string query_state_root() { return "MerryApp:Thing"; }
 
@@ -46,14 +41,4 @@ static void create()
 {
     properties::create();
     ur::create();
-}
-
-static void perform_delayed_call(object ob, string fun, mixed *args)
-{
-    call_other(ob, fun, args...);
-}
-
-void delayed_call(object ob, string fun, mixed delay, mixed args...)
-{
-    call_out("perform_delayed_call", delay, ob, fun, args);
 }

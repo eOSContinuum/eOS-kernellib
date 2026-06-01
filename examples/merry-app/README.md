@@ -4,7 +4,7 @@ A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the 
 
 ## Operations
 
-- A `MerryApp:Thing` clonable inherits `/lib/util/properties` (storage for `merry:<mode>:<signal>` keys), `/lib/util/ur` (ur-parent + ur-child tracking), and `/lib/util/named` (logical-name registration via Index). It also exposes a `delayed_call` / `perform_delayed_call` pair so Merry's `$delay()` continuation can schedule against it.
+- A `MerryApp:Thing` clonable inherits `/lib/util/properties` (storage for `merry:<mode>:<signal>` keys), `/lib/util/ur` (ur-parent + ur-child tracking), `/lib/util/named` (logical-name registration via Index), and `/lib/util/delayed` (the `delayed_call` / `perform_delayed_call` pair so Merry's `$delay()` continuation can schedule against it).
 - The boot-time test driver builds a 2-generation Hierarchy: a parent clone and a child clone whose ur-parent is the parent. A Merry script returning a literal string is bound to the parent under `merry:lib:greet`.
 - `MERRY->run_merry(child, "greet", "lib", ([]))` walks the child's ancestry via `query_ur_object()`, finds the script on the parent, evaluates it, and returns the literal.
 - A second Merry script attempts `clone_object("/foo/bar")` from inside Merry source. The SANDBOX(f) deny list in `merrynode.c` shadows `clone_object` with an error-throwing local; the call surfaces as "function 'clone_object' not allowed in merry code" and the test driver logs the sandbox firing.
@@ -71,7 +71,7 @@ The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result
 
 - `initd.c` -- domain initd; compiles `obj/thing` + `sys/test` at boot.
 - `lib/app.c` -- marker lib paralleling `examples/vault-app/lib/app.c`. Daemons under `sys/` inherit it so future shared daemon-side state has a place to land.
-- `obj/thing.c` -- property + ur-bearing clonable. Inherits `/lib/util/properties`, `/lib/util/ur`, `/lib/util/named` with labeled inherits to disambiguate the shared `create()` between properties and ur. Also defines the `delayed_call` / `perform_delayed_call` pair every script-bearing object must expose for Merry's `$delay()` to schedule continuations.
+- `obj/thing.c` -- property + ur-bearing clonable. Inherits `/lib/util/properties`, `/lib/util/ur`, `/lib/util/named` with labeled inherits to disambiguate the shared `create()` between properties and ur. Also inherits `/lib/util/delayed` for the `delayed_call` / `perform_delayed_call` pair every script-bearing object must expose for Merry's `$delay()` to schedule continuations.
 - `sys/test.c` -- boot-time test driver; clones two things, ties them via `set_ur_object`, registers Merry scripts for phases 1-3+5+8, runs the synchronous assertions via `call_out("setup_and_run", 0)`, and the `$delay()` assertion verified via a second `call_out` at t=+2. Phase 16 schedules `phase17_verify` and dumps a snapshot via `/usr/System/sys/persist_helper`; phase 17 fires from the surviving `call_out` after the snapshot restore and verifies observer-state survival. Doubles as the "testspace" script-space handler for phase 5 and exposes `_throw_for_test` as the callable phase 9's `MERRY->batch()` exercises against the catch'd-error abort path; in production both auxiliary roles would typically live on distinct objects.
 
 ## Notes
