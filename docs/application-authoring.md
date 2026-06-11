@@ -150,6 +150,42 @@ The application code is short: the daemon itself is roughly 30 lines of LPC, plu
 
 A counter-with-deliberate-failure variant (the canonical atomicity demonstration) is similar shape: a single counter object with `increment_and_fail()` exercises the rollback path; the post-failure read confirms the counter is unchanged.
 
+## Reference applications
+
+Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat .runtime/.../test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
+
+| Example | Primitive demonstrated | Walkthrough |
+|---|---|---|
+| `examples/http-app/` | Transport (HTTP/1 server with `GET /health`, `POST /echo`, 404 fallback) | `docs/http-applications.md` |
+| `examples/vault-app/` | Persistent state (XML round-trip via stateimpex; restart-survival) | `docs/vault-applications.md` |
+| `examples/merry-app/` | Sandboxed code load (Merry source bound to a property; ancestry walk; five-phase exercise of sandbox firing, Spawn, $delay, LabelCall) | `docs/merry-applications.md` |
+
+All three share a layout shape:
+
+```text
+examples/<name>/
+    README.md           — what the example demonstrates; deploy + run instructions
+    initd.c             — domain bootstrap; compiles lib/app, obj/thing, sys/test
+    lib/app.c           — domain-level library inherited by clones
+    obj/thing.c         — the demonstrated object surface (script-bearing, persistent, transport-bound)
+    sys/test.c          — boot-time test driver; writes sentinel to test-result.log
+```
+
+The shape is **intentional and minimal**, not canonical for all applications. The reference examples each demonstrate one primitive; they do not show what an application looks like when several primitives compose. A composite application — say, a multi-user persistent service that accepts connections, persists user and message state via Vault, dispatches scripted reactions via Merry, and serves history over HTTP — has a different shape: multiple sys/ daemons (one per concern), multiple lib/ files (one per inherited surface), a connection-handling object distinct from the persistent-data object, often a transport-specific subdirectory alongside `obj/`. The `obj/<thing>.c` + `sys/<daemon>.c` split widens into a family of files coordinating around the application's persistent surface.
+
+When to copy the reference shape directly:
+
+- The application demonstrates or exercises **one** primitive at a time (a test fixture, a debug harness, a per-primitive smoke test in CI).
+- The application is genuinely simple: one daemon, one cloneable kind, no transport, sentinel-file or log-line is the natural assertion surface.
+
+When to adapt the shape:
+
+- Multiple primitives compose. Add files; do not force everything into the four-file skeleton.
+- Production-style application with users, sessions, transport, persisted state across multiple object kinds, scripted behavior. The example pattern is a starting point for boot-up wiring and access posture, not a layout template.
+- The application needs a long-running operator surface (admin console verbs, configuration daemons, monitoring hooks). These are System-tier or co-tier additions that the reference examples deliberately omit.
+
+The shape is a teaching surface for the platform's individual primitives, not the recommended posture for a tier-E application that means to do useful work. Read `docs/runtime-primitives.md` for what each example assumes about the runtime; read this document's earlier sections (`Domain layout`, `The initd's role`, `Owner and access`, `Live code upgrade through call_touch`) for the patterns that apply regardless of primitive count.
+
 ## Where to next
 
 - `docs/architecture.md` — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.

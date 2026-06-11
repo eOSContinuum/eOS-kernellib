@@ -65,6 +65,70 @@ static string stringify(string str)
 }
 
 /*
+ * strip ASCII whitespace from the left of a string.
+ * When leave_newlines is non-zero, newlines and carriage returns are preserved.
+ */
+static string strip_left(string str, varargs int leave_newlines)
+{
+    int i, len;
+
+    len = strlen(str);
+    for (i = 0; i < len; i++) {
+	switch (str[i]) {
+	case ' ': case '\t':
+	    break;
+	case '\n': case '\r':
+	    if (!leave_newlines) {
+		break;
+	    }
+	    /* fall through */
+	default:
+	    if (i == 0) {
+		return str;
+	    }
+	    return str[i ..];
+	}
+    }
+    return "";
+}
+
+/*
+ * strip ASCII whitespace from the right of a string.
+ * When leave_newlines is non-zero, newlines and carriage returns are preserved.
+ */
+static string strip_right(string str, varargs int leave_newlines)
+{
+    int i, end;
+
+    end = strlen(str) - 1;
+    for (i = end; i >= 0; i--) {
+	switch (str[i]) {
+	case ' ': case '\t':
+	    break;
+	case '\n': case '\r':
+	    if (!leave_newlines) {
+		break;
+	    }
+	    /* fall through */
+	default:
+	    if (i == end) {
+		return str;
+	    }
+	    return str[.. i];
+	}
+    }
+    return "";
+}
+
+/*
+ * strip ASCII whitespace from both ends of a string.
+ */
+static string strip(string str, varargs int leave_newlines)
+{
+    return strip_right(strip_left(str, leave_newlines), leave_newlines);
+}
+
+/*
  * float to string, with full accuracy
  */
 static string float2string(float flt)
@@ -108,5 +172,34 @@ static string float2string(float flt)
 	str += ".0";
     }
 
+    return str;
+}
+
+/*
+ * single-character int to 1-char string
+ */
+static string char_to_string(int c)
+{
+    string res;
+
+    res = " ";
+    res[0] = c;
+    return res;
+}
+
+/*
+ * pairwise substring replacement: replace_strings(s, a, b, c, d) returns s
+ * with all occurrences of a replaced by b, then all occurrences of c by d
+ */
+static string replace_strings(string str, string swaps...)
+{
+    int i;
+
+    if (sizeof(swaps) % 2) {
+	error("uneven swap arguments");
+    }
+    for (i = 0; i < sizeof(swaps); i += 2) {
+	str = implode(explode(swaps[i] + str + swaps[i], swaps[i]), swaps[i+1]);
+    }
     return str;
 }

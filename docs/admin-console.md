@@ -105,7 +105,7 @@ The verb categories below are organized around the operational situation an oper
   - Destruct each child (`destruct /usr/MyApp/obj/foo`) and recompile (`compile /usr/MyApp/obj/foo.c`). Loses clone state.
   - Use `call_touch` (via `code`) to mark every dependent for lazy upgrade through `_F_touch()`. Preserves state.
 
-  Platform-level recompile-with-dependents (the `upgrade` verb in SkotOS Wiztool; the `progdb` daemon pattern) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
+  Platform-level recompile-with-dependents (an `upgrade` verb backed by a `progdb`-style dependency daemon) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
 - **Recover from a wedged daemon**: `destruct /usr/MyApp/sys/router` then `clone /usr/MyApp/sys/router` would re-instantiate from the master — except `sys/` daemons are singletons that compile at boot, not on demand. The recovery is `destruct` followed by `compile` of the daemon source.
 - **A/B testing**: keep the canonical handler at `/usr/MyApp/obj/handler.c`; copy it to `handler_b.c`; compile the variant; route a percentage of traffic to the variant; compile the winner back as `handler.c` when results are in.
 
@@ -228,6 +228,54 @@ For substantial edits, prefer a host-side editor. The `ed` verb is for cases whe
 - **Capacity check**: connection count against the `users` cap in `.dgd`.
 - **Audit**: combine with `status` for full snapshot of who-is-on plus what-is-going-on.
 
+## Dispatcher operator surface
+
+**Verbs**: `observers`, `cascade-depth`, `batch-status`, `dispatch-trace`, `register-observer`, `unregister-observer`, `query-approved-registrars`, `approve-registrar`, `unapprove-registrar`
+
+**Why**: the Merry dispatcher (`docs/dispatcher.md`) routes every property-change observation through a substrate that maintains observer registrations, cascade-depth bounds, cycle detection, and batch-status accounting. Operators investigating dispatcher behavior at runtime — debugging a deep cascade, auditing observer registrations after a deploy, toggling verbose trace for a session — need first-class verbs rather than long-form `code MERRY->_query_batch_status(7)` invocations.
+
+**How**: these verbs are not built into the kernel admin console (its built-in set is the kernel-tier categories enumerated above). They live in `src/usr/Merry/lib/admin_console_ext.c` and reach the console via the selective-extension model:
+
+- A KERNEL-tier registry at `/kernel/sys/admin_console_registry` holds a `verb -> (extension_path, method_name)` dispatch table. Merry's nine verbs are hardcoded into the registry's `create()`.
+- The console's unknown-verb switch default consults the registry; if it finds an entry and the extension master is loaded, it dispatches there.
+- Mutation verbs whose underlying daemon LFUNs are KERNEL-gated (`approve-registrar`, `unapprove-registrar`, `cascade-depth N`, `dispatch-trace on|off`) or capability-gated by caller-domain (`register-observer`, `unregister-observer`) route through the registry's `verb_*` elevation helpers. The registry is KERNEL-tier, so the daemon's gates pass; the registry's own caller-program whitelist constrains which extensions may use the elevation surface.
+
+The kernel admin console itself remains MERRY-unaware. Future operator surfaces for Vault, Schema, or HTTP extend the registry's hardcoded list the same way. (When a cross-subsystem capability model lands, dynamic registration replaces the hardcoded table; the dispatch shape is unchanged.)
+
+**What for**:
+
+- **Observer audit**: `observers <obj_path> <path>` shows every compiled observer registered for a property on the target, grouped by timing. Useful before a Merry-script redeploy to confirm what the substrate believes about the current registration state. See the target-resolution note below for which objects the `<obj_path>` argument can reach.
+- **Cascade-depth tuning**: `cascade-depth` reads the current bound; `cascade-depth 64` raises it after a legitimately-deep cascade scenario has been verified safe. Statedump-persistent.
+- **Batch forensics**: `batch-status 7` shows whether batch 7 completed, was atomically aborted, cycle-aborted, or vetoed by a pre-observer; the reason field carries the propagated error for aborted batches. Useful when a dispatcher event surfaces in the application log and the batch-id is the only pointer back to the substrate's view.
+- **Tracing**: `dispatch-trace on` enables per-`dispatch_set` entry logging to `/usr/Merry/log/dispatch.log` alongside the always-on cycle and cascade events; `dispatch-trace off` returns to the silent default. Useful for one-off troubleshooting; leaving the trace on accumulates log volume.
+- **Observer mutation**: `register-observer <obj_path> <path> <timing> <source...>` and `unregister-observer <obj_path> <path> <timing>` bypass application-tier registration paths when an operator needs to install or remove a diagnostic observer at runtime without redeploying a Merry-script-bearing application. The source argument is captured verbatim through end-of-line.
+- **Target resolution**: the `<obj_path>` argument resolves through `find_object` under the System auto layer, which deliberately does not resolve clone masters (`*/obj/*` paths) or generated leaf objects -- a clone master is a template, not an addressable runtime object. Reachable targets are therefore singleton programs (`sys/` daemons and the like); clones are not addressable by LPC path, and these verbs do not resolve Index logical names. Since the example applications host their observers on clones (rooms, things), the operator verbs audit and mutate observers on singleton hosts only; clone-hosted observer state is exercised and asserted by the applications' own test phases. `register-observer` / `unregister-observer` additionally require the target to carry the property API (`/lib/util/properties`); the daemon refuses otherwise, since the observer store is the target's property table.
+- **Approved-registrar set**: `query-approved-registrars` lists the domains permitted to register observers across object boundaries; `approve-registrar Foo` / `unapprove-registrar Foo` mutates the set. The set seeds with `System` and `admin_console` at boot; adding `Merry` would also let the dispatcher's own /usr/-tier code register on arbitrary hosts (consequence: weaker layering boundary; appropriate for diagnostic scenarios, not for steady-state policy).
+
+A worked example: an application's property write fails with a `cascade-aborted` error after a deploy of new observer scripts. The operator session:
+
+```text
+# cascade-depth
+cascade-depth: 32
+# batch-status 14
+batch-status 14: cascade-aborted (merry: cascade depth 32 exceeded at /usr/App/sys/orders:total)
+# observers /usr/App/sys/orders total
+/usr/App/sys/orders total:
+  pre:
+    (none)
+  main:
+    /usr/Merry/merry/a1b2c3d4e5f6
+    /usr/Merry/merry/9876543210ab
+  post:
+    /usr/Merry/merry/cdef01234567
+# dispatch-trace on
+dispatch-trace on
+```
+
+(The console prompt is `# `, and the console does not echo commands; a response can therefore read identically to the command typed, as `dispatch-trace on` does above.)
+
+The combination identifies which timing slots have observers, gives runtime visibility into the next cascade, and bounds further investigation to the three compiled scripts named — all without restarting the platform or modifying application code.
+
 ## Bootstrap and authentication
 
 On first cold boot with no persisted admin password:
@@ -244,6 +292,9 @@ To reset the admin password from outside the console: the kernel's auth state li
 | Verb | Category | Brief |
 |---|---|---|
 | `access [<user>\|<directory>\|global]` | Permissions | Inspect access bits for a user, a directory, or globally |
+| `approve-registrar <domain>` | Dispatcher | Add a caller domain to MERRY's approved-registrars set (extension) |
+| `batch-status <batch_id>` | Dispatcher | Query a batch's status + reason (extension) |
+| `cascade-depth [N]` | Dispatcher | Read or set the max cascade depth bound (extension) |
 | `cd <dir>` | Filesystem | Change session directory |
 | `clear` | REPL | Empty the code-history ring buffer |
 | `clone <obj>\|$N` | Code lifecycle | Clone a master; stores clone in history |
@@ -251,6 +302,7 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `compile <file.c> [...]` | Code lifecycle | Compile one or more LPC source files |
 | `cp <src> <dst>` | Filesystem | Copy file (access-checked at each side) |
 | `destruct <obj>\|$N` | Code lifecycle | Destruct an object |
+| `dispatch-trace on\|off\|status` | Dispatcher | Toggle or report verbose dispatch-entry tracing (extension) |
 | `ed <file>` | Editor | Open the platform's line editor on a file |
 | `grant <user> <dir> <mode>` | Permissions | Grant access at the given mode |
 | `history [N]` | REPL | Show last N values from the code-history ring |
@@ -258,10 +310,13 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `mkdir <path>` | Filesystem | Create directory |
 | `mv <src> <dst>` | Filesystem | Rename / move file |
 | `new <obj>\|$N` | Code lifecycle | Instantiate an LWO from a `data/` master |
+| `observers <obj_path> <path> [timing]` | Dispatcher | List registered observers per timing slot (extension) |
 | `people` | Connections | List active connections |
 | `pwd` | Filesystem | Print session directory |
+| `query-approved-registrars` | Dispatcher | List MERRY's approved-registrars set (extension) |
 | `quota [<user> [<rsrc> [<limit>]]]` | Resources | Read or set per-owner resource limits |
 | `reboot` | Lifecycle | Incremental snapshot + cold shutdown (recovers from snapshot on next boot) |
+| `register-observer <obj_path> <path> <timing> <source...>` | Dispatcher | Install a runtime observer (extension) |
 | `rm <path>` | Filesystem | Remove file |
 | `rmdir <path>` | Filesystem | Remove empty directory |
 | `rsrc [<resource> [<limit>]]` | Resources | Read or set platform-wide resource caps |
@@ -269,7 +324,9 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `snapshot` | Persistence | Write a full statedump to `dump_file` |
 | `status [<obj>]` | State inspection | System-wide health vector, or per-object status |
 | `swapout` | Persistence | Swap all in-memory objects to the swap file |
+| `unapprove-registrar <domain>` | Dispatcher | Remove a caller domain from MERRY's approved-registrars set (extension) |
 | `ungrant <user> <dir>` | Permissions | Remove an access grant |
+| `unregister-observer <obj_path> <path> <timing>` | Dispatcher | Clear all observers at (obj, path, timing) (extension) |
 
 ## Where to next
 

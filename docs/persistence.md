@@ -163,6 +163,18 @@ The platform's persistence model has explicit boundaries. Each requires applicat
 
 For operator-level recovery procedures when any of these boundaries are hit, see `docs/operations.md` Common failure modes (table of symptoms and diagnoses) and `docs/admin-console.md` for the `snapshot`, `reboot`, and `shutdown` verbs that manage the persistence cycle.
 
+## Substrate verification
+
+The platform's persistence contract is exercised by the bundled examples. The richer-state composition that lands with the property-change dispatcher (`docs/dispatcher.md` Persistence; `docs/runtime-primitives.md` §3 Extensions) is verified end-to-end by `examples/merry-app/sys/test.c` phases 16 and 17:
+
+- Phase 16 sets up a parent / child pair with a property-bound Merry-script observer on the child, stashes the child as an LPC global on the test driver, schedules a `call_out` for the verification phase, and triggers a snapshot via `/usr/System/sys/persist_helper->trigger_dump_and_exit()` — the helper calls `dump_state(0)` followed by `shutdown()`.
+- An external restart against the snapshot (`dgd mva.dgd state/snapshot`) restores the image; the pre-snapshot `call_out` fires after restore.
+- Phase 17 reads the saved LPC global, writes the observed property, and asserts that the value landed and that the observer's compiled source ran against the resurrected host.
+
+Five orthogonal-persistence guarantees compose in the same verification: LPC global variables, property storage on host objects, references to compiled Merry-script clones at `/usr/Merry/merry/<md5>`, the observer-source contract (`$this` binding to the dispatch host, `Set` re-entry), and the scheduled call_out queue. Any future regression in those guarantees surfaces here as a `PERSIST VERIFY FAIL:` sentinel on the second-boot run.
+
+`/usr/System/sys/persist_helper` is reusable: any future kernel-layer subsystem (Vault, schema, marshal) needing the same snapshot+restore verification harness calls `trigger_dump_and_exit()` from a test driver and follows the same two-boot pattern.
+
 ## Persistence under host-driver extensions
 
 Loading a host-driver extension (`docs/operations.md` Loading host-driver extensions; `docs/architecture.md` Host-driver extensions) binds the platform's snapshot to that extension's presence: a snapshot taken with the extension active requires the same extension to restore. This is documented in [Felix Croes' 2010 Hydra mailing-list note][croes-hydra-2010] and is a durable architectural commitment, not an opt-in convenience.
@@ -180,6 +192,7 @@ For the question of how extension-loaded codepaths interact with the platform's 
 - **`docs/operations.md`** — `.dgd` configuration fields (`dump_file`, `dump_interval`, `swap_file`, `hotboot` tuple), boot modes, failure-mode table.
 - **`docs/lpc-essentials.md`** Type modifiers — language semantics for `static` and how it interacts with persistence.
 - **`docs/architecture.md`** Boot sequence — the three boot modes (cold, statedump-restore, hot boot) at the platform level.
+- **`docs/vault-applications.md`** — Vault subsystem for per-domain typed-property persistence on top of the snapshot cycle: participating-domain contract, on-disk XML shape, round-trip cycle.
 - **`src/kernel/sys/driver.c`** — the `restored(int hotboot)` hook implementation.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html

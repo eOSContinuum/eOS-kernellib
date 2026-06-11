@@ -1,0 +1,10 @@
+<object program="/usr/Schema/obj/schema_node">
+  <Element ns="Ur" tag="Child" recpoint="false">
+    <Children/>
+    <Attributes>
+      <Attribute id="urchild" atype="lpc_obj" areadonly="false"/>
+    </Attributes>
+    <Iterator var="urchild" call="query_ur_children()"/>
+    <Callbacks/>
+  </Element>
+</object>

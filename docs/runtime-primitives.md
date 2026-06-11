@@ -73,12 +73,13 @@ The in-memory object graph survives restart without explicit serialization.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
 
-**Demonstration**: Admin authentication credentials persist across restarts. Bootstrap writes the password hash; subsequent boots find the hash without an explicit save call from the admin_console object.
+**Demonstration**: Admin authentication credentials persist across restarts. Bootstrap writes the password hash; subsequent boots find the hash without an explicit save call from the admin_console object. The `examples/merry-app` smoke verifies a richer composition: a property-stored reference to a compiled Merry-script clone, the host's LPC global referencing that host, and a scheduled `call_out` against the host all survive a `dump_state` / `shutdown` / restart cycle, and the observer's compiled source fires correctly against the restored host (phases 16 and 17). `docs/dispatcher.md` Persistence and `docs/persistence.md` Substrate verification walk the composition.
 
-**Status**: Validated. Mechanism present; demonstrated empirically in the bootstrap and across reboot.
+**Status**: Validated. Mechanism present; demonstrated empirically in the bootstrap, across reboot, and in the dispatcher's snapshot+restore verification.
 
 **Extensions**:
 - `KVstore` at `/lib/KVstore.c` and `KVnode` at `/obj/kvnode.c`: persistent keyed-tree structure built on the persistence primitive. Compiled at boot; provides a structured collection suitable as backing storage for higher-level data primitives.
+- **Property-change dispatcher** (`/usr/Merry/sys/merry` + `/lib/util/properties::set_property` hook): observer-state-bearing composition with DGD's orthogonal persistence. Observers stored as property-bound script references; the on-disk compile artifacts at `/usr/Merry/merry/<md5>.c` reload on demand after restore; pre/main/post observer firing resumes against restored hosts. See `docs/dispatcher.md`.
 - Two-level mapping (port candidate, `bigmap` / `bigmap_iterator`): bypasses the host runtime's per-mapping size limit, with iterator pattern for subclass masking. Useful when a persistent collection grows past the host-language ceiling.
 
 **Open**:
@@ -148,11 +149,12 @@ Event delivery is atomic with the state change that produced it.
 - Atomic function semantics (§1) bound each call_out's execution slice. A failed deferred call rolls back its own mutations, not the dispatching state change.
 - Single-coherence-domain architecture: one execution slot at a time, no concurrent state mutation, deterministic ordering without cross-domain coordination.
 
-**Demonstration**: Cross-domain route registration uses a deferred `call_out("registerRoutes", 0)` from a user-tier handler's `create()` to defer registration with another domain (e.g., `/usr/WWW/sys/router`) until after the System initd has finished iterating all domains. The deferred call runs after the registering domain's `create()` commits, demonstrating atomic-with-state-change dispatch.
+**Demonstration**: Cross-domain route registration uses a deferred `call_out("registerRoutes", 0)` from a user-tier handler's `create()` to defer registration with another domain (e.g., `/usr/WWW/sys/router`) until after the System initd has finished iterating all domains. The deferred call runs after the registering domain's `create()` commits, demonstrating atomic-with-state-change dispatch. The property-change dispatcher (`docs/dispatcher.md`) adds a second demonstration at the property-state-change boundary: every `set_property` write fans out to registered pre/main/post observers within the same atomic envelope as the write itself, with cascade-depth bounding, cycle detection, and explicit batching. Observers are compiled Merry scripts dispatched via the script-binding mechanism (`docs/merry-applications.md`). The `examples/merry-app` smoke exercises pre-veto, main-cascade, post-audit, and cycle-detection paths against the host state.
 
-**Status**: Partial. Mechanism + simple deferred-dispatch demonstration. Richer event surfaces (property-change events, module-load events, configuration-change events) are absent.
+**Status**: Partial. Mechanism + deferred-dispatch demonstration + the property-change event surface via the Merry dispatcher. Module-load events and configuration-change events remain absent.
 
 **Extensions**:
+- **Property-change dispatcher** (`/usr/Merry/sys/merry`): per-property-write observer fan-out at pre/main/post timings, with cascade-depth bounds, cycle detection, batching surface, and Merry-source observers. See `docs/dispatcher.md`.
 - Continuation classes at `/lib/{Chained,Delayed,Iterative,Dist}Continuation.c`: continuation-passing primitives compiled at boot, currently unconsumed. Enable longer-running chains of deferred operations without nested call_out scaffolding.
 - Configuration-change events (port candidate, `configd`): subscriber pattern for runtime-configurable values, dispatching on configuration change.
 - Module-load events (port candidate, `moduled`): per-module load tracking with `module_loaded` events, useful for staged bootstrap and domain-specific code load.
@@ -176,7 +178,8 @@ Multiple callers see a consistent view of state without user-land coordination.
 
 **Status**: Foundation-only. Emergent from §1 plus the single-coherence-domain architecture; multi-call demonstration pending.
 
-**Extensions**: None specific. Multi-agent coherence is an architectural property; runtime primitives that strengthen it appear elsewhere (atomicity, asynchronous events).
+**Extensions**:
+- **Property-change dispatcher** (`docs/dispatcher.md`): bounded ordered fan-out of observer chains within an atomic envelope, with explicit batch identity surface (`batch` / `batched_set`, atomic-mode opt-in, batch-status log). Provides the per-batch serializability surface that future multi-agent demonstrations rely on for ordering claims.
 
 **Open**:
 - Concurrent HTTP requests against the same application state (two POST /compile requests to the same path; two GET /counter requests during a POST /increment) with serializable behavior visible at the HTTP responses.

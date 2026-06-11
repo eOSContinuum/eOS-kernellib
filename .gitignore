@@ -6,3 +6,10 @@ src/include/status.h
 src/include/trace.h
 src/include/type.h
 src/kernel/data/access.data
+
+# Deployment targets for the examples/ directory:
+# canonical example source lives at examples/<name>/; src/usr/<Mount>/ is a
+# deployment artifact created via `cp -R examples/<name> src/usr/<Mount>`.
+src/usr/MyApp/
+src/usr/Vault/data/
+src/usr/MyApp/data/

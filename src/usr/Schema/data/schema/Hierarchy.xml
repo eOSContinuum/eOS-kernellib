@@ -1,0 +1,12 @@
+<object program="/usr/Schema/obj/schema_node">
+  <Element ns="Ur" tag="Hierarchy" recpoint="false" transient="false">
+    <Children/>
+    <Attributes>
+      <Attribute id="parent" atype="lpc_obj" acomment="This object's parent object, if any." areadonly="false" aquery="query_parent"/>
+    </Attributes>
+    <Iterator/>
+    <Callbacks>
+      <Callback call="set_ur_object(parent)"/>
+    </Callbacks>
+  </Element>
+</object>

@@ -23,18 +23,30 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Writing applications
 
 - [lpc-essentials.md](lpc-essentials.md) — LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
+- [kernel-reference/](kernel-reference/README.md) -- man-page-style reference for the kernel layer's modified API surface (efun overrides, lfun and hook contracts, the kernel overview).
 - [kernel-libraries.md](kernel-libraries.md) — inheritable libraries under `src/lib/` (strings, persistent collections, iteration, asynchronous control, time, utilities).
 - [application-authoring.md](application-authoring.md) — general tier-E application patterns; owner/access conventions; `call_touch` upgrade model; non-HTTP transports.
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
+- [schema.md](schema.md) -- the Schema subsystem: namespace-indexed typed-element registry, type-system dispatcher, the schema-for-schemas bootstrap, namespace vocabulary.
+- [xml.md](xml.md) -- the XML transport subsystem: parser, generator, XMD internal form, type registration with the Schema dispatcher, naming conventions.
+- [vault-applications.md](vault-applications.md) — Vault-specific patterns: participating-domain contract, property-bearing clonables, per-application schema registration, on-disk XML shape, round-trip cycle, cross-domain access requirements.
+- [signal-applications.md](signal-applications.md) -- the smallest signal-on-property demonstration: one observer, one write, the reaction done when the write returns; why reacting to state change is a runtime primitive here rather than assembled queue/poller/worker glue.
+- [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
+- [chat-applications.md](chat-applications.md) — multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, the planned growth path across capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
+- [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fourteen merryfuns. Read this when writing Merry source, not just binding it.
 
 ### Operations
 
 - [operations.md](operations.md) — the `.dgd` configuration, boot modes, state persistence, logging and diagnostics, resource limits, host-driver extension loading. The deployment surface.
 - [admin-console.md](admin-console.md) — the operator's console (verb-based REPL on `telnet_port`): connecting, security posture, per-task operational reference, verb appendix.
 
-### Working example
+### Working examples
 
 - `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
+- `../examples/vault-app/` — minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
+- `../examples/signal-app/` -- minimal signal application: a one-inherit property host, one Merry observer, a synchronous-fire assertion. Read alongside [signal-applications.md](signal-applications.md).
+- `../examples/merry-app/` — minimal Merry application: a property + ur-bearing clonable, an ancestry-walk assertion through `run_merry`, and a sandbox-firing assertion. Read alongside [merry-applications.md](merry-applications.md).
+- `../examples/chat-app/` — multi-user chat application: Room and User clonables, an admin-token LWO, capability-gated admin verbs, a three-boot test driver whose twenty assertions span the runtime-primitive demonstrations (capability gates, persistence, sandboxed reactions, atomic events, multi-agent coherence). Read alongside [chat-applications.md](chat-applications.md).
 
 ### Reference
 
@@ -49,6 +61,11 @@ Common goals and the docs that serve them.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
+- **React to property changes** -- [lpc-essentials.md](lpc-essentials.md), [signal-applications.md](signal-applications.md), `../examples/signal-app/`, then [dispatcher.md](dispatcher.md).
+- **Write a multi-user chat application** — [lpc-essentials.md](lpc-essentials.md), [chat-applications.md](chat-applications.md), `../examples/chat-app/`.
+- **Write a Vault-persisted application** — [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
+- **Add scripted, sandboxed behavior to an object** — [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
+- **Write Merry source** — [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
 - **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md).
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
