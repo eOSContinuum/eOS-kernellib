@@ -6,29 +6,12 @@
  * type-system queries (ascii<->typed conversion, validity checks, etc.)
  * to the registered handler.
  *
- * Lifted from skoot/usr/DTD/sys/dtd.c. LV-4.5b refactors:
- * (a) <SAM.h> SkotOS include + SAM module + SAMD->register_root call
- *     stripped per Game-specific-content exclusion. SAM_loaded() hook
- *     dropped (it was a sugar-tag registration callback).
- * (b) /lib/module inherit dropped (SAM-module machinery, Game content).
- * (c) /lib/url inherit dropped + typed_to_html implementation stripped
- *     (HTML-output is an admin-surface concern; the lifted XML transport
- *     is the only public serialization). The typed_to_html stub remains
- *     as nil-returning passthrough for inherit-chain compile parity.
- * (d) /lib/mapargs inherit + mixed_to_ascii / ascii_to_mixed calls
- *     stripped; LPC_MIXED ascii conversion temporarily uses dumpValue
- *     for serialization and a string-only round-trip for deserialization
- *     pending a richer mapargs-style lift at a future task. This is a
- *     deliberate degradation noted in scope.md (future enhancement).
- * (e) /lib/string inherit replaced by /lib/util/ascii (lower_case).
- * (f) eval_sam_ref() dropped (SAM-side sugar-tag reference dispatch).
- * (g) Function names for the type-handler API kept snake_case as a
- *     contract surface (callers in xml_daemon.c / schema_node.c / future
- *     stateimpex inherit through /usr/Schema/lib/dtd and expect these
- *     names). LV-2.5b camelCase rename held at LV-4.5b lift time pending
- *     a coordinated sweep of the schema-API surface across all callers.
- * (h) name() / dumpValue helpers from /lib/util/lpc replace SkotOS
- *     `name(val)` / `dump_value(val)` bare calls.
+ * LPC_MIXED ascii conversion uses dumpValue for serialization and a
+ * string-only round-trip for deserialization -- a deliberate
+ * degradation pending a richer type-coercion lift. typed_to_html is a
+ * nil-returning passthrough (HTML output is an admin-surface concern;
+ * XML transport is the only public serialization). The type-handler
+ * API stays snake_case as a contract surface across its callers.
  */
 
 # include <type.h>
@@ -200,9 +183,9 @@ string typed_to_ascii(mixed value, string type)
     }
     switch (type) {
     case LPC_MIXED:
-	/* Degraded vs SkotOS mapargs-shape mixed_to_ascii: serialize via
-	 * dumpValue. Round-trip not exact for arrays / mappings. Future
-	 * task: lift a mapargs-equivalent helper into /lib/util. */
+	/* Degraded mixed serialization via dumpValue. Round-trip not
+	 * exact for arrays / mappings; a richer type-coercion helper
+	 * in /lib/util is the future fix. */
 	return dumpValue(value);
     case LPC_STR:
 	if (value == nil) {
@@ -245,10 +228,9 @@ mixed ascii_to_typed(string ascii, string type)
     }
     switch (type) {
     case LPC_MIXED:
-	/* Degraded vs SkotOS ascii_to_mixed: only string round-trip is
+	/* Degraded mixed deserialization: only the string round-trip is
 	 * supported. Complex types (array, mapping) are not round-tripped
-	 * back to LPC values; the caller receives the ASCII as a string.
-	 * Future task: lift a mapargs-equivalent parser. */
+	 * back to LPC values; the caller receives the ASCII as a string. */
 	return ascii;
     case LPC_STR:
 	if (!strlen(ascii)) {

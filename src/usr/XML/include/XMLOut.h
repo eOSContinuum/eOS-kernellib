@@ -1,7 +1,5 @@
 /*
  * XML parser output-buffer state + macros. Included by ~XML/lib/xmlparse.c.
- *
- * Lifted verbatim from SkotOS skoot/usr/XML/include/XMLOut.h.
  */
 
 

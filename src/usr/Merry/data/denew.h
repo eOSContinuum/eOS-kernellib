@@ -1,7 +1,7 @@
 /*
  * denew: strip the 'new' keyword from LPC source.
  *
- * Lifted verbatim from SkotOS /usr/SkotOS/data/denew.h. The 'new'
+ * The 'new'
  * keyword is reserved in some LPC dialects / cloud-server contexts;
  * Merry-generated LPC may inadvertently use it via user-supplied
  * identifiers. denew() walks the source preserving strings,

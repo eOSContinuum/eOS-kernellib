@@ -1,8 +1,7 @@
 /*
  * Index subsystem initialization daemon.
  *
- * LV-4.5d lifts the second-level naming registry (was SkotOS
- * skoot/usr/System/sys/idd.c, "IDD"). Provides a logical-name -> object
+ * Compiles the second-level naming registry: a logical-name -> object
  * mapping distinct from DGD's path-based object_name() / find_object().
  * Callers set logical names via /lib/util/named.c::set_object_name(),
  * which delegates to Index->set_name(); reverse lookup is via

@@ -4,16 +4,10 @@
  * Translate back and forth between quoted entities in the XML manner.
  * In true XML this is a dynamic database; here a hard-coded list of the
  * XML spec's predefined entities (plus pipe / lbrace / rbrace for embedded
- * Merry-attribute escaping per the SkotOS lift's lexer convention).
+ * Merry-attribute escaping per the lexer convention).
  *
- * Lifted from skoot/usr/XML/lib/entities.c. LV-4.5a refactors:
- * (a) /lib/mapping reverse_mapping -> /lib/util/lpc reverseMapping; the
- *     /lib/mapping helper does not lift.
- * (b) <faststr.h> FStrNew / FStrApp / FStrRes -> bounded part-array +
- *     implode; the faststr.h macro infrastructure does not lift. The
- *     XML subsystem can revisit if profiling shows entityString hot.
- * (c) Function names refactored to camelCase per LV-2.5 / LV-2.5b. Mapping
- *     field names also camelCase to match.
+ * entityString builds via a bounded part-array + implode; revisit if
+ * profiling shows it hot.
  */
 
 inherit "/lib/util/lpc";

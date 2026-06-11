@@ -6,8 +6,7 @@
  * its object_name so the runtime registry can find clones by their
  * "Schema:<namespace>:<tag>" identity.
  *
- * Lifted from skoot/usr/SID/obj/sidnode.c. LV-4.5b refactors:
- * (a) Object-name prefix renamed SID: -> Schema: per LV-2 rename.
+ * Object names carry the Schema: prefix.
  * (b) query_state_root() result renamed SID:Element -> Schema:Element
  *     (the schema-element-FOR-schema-elements -- this is the self-
  *     describing schema node that lives at the root of the Schema

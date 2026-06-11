@@ -1,7 +1,7 @@
 /*
  * Merry subsystem initialization daemon.
  *
- * LM-3 source-lifts the Merry sublanguage runtime (merry daemon,
+ * Compiles the Merry sublanguage runtime (merry daemon,
  * invocation API, per-script clonable + base class, yacc grammar
  * + continuation context). Compile-order: data clonables compile
  * first so new_object() can find their masters, then the daemon
@@ -20,7 +20,7 @@ void create()
 
     compile_object("sys/merry");
 
-    /* EX-3 admin_console extension. The library carries the verb
+    /* The admin_console extension. The library carries the verb
      * implementations; the obj master inheriting it is what
      * /kernel/sys/admin_console_registry stores by path and what
      * /kernel/obj/admin_console::process() find_object's at unknown-

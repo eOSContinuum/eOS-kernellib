@@ -1,9 +1,7 @@
 /*
  * Merry AST node-type tags.
  *
- * Lifted from SkotOS /usr/SkotOS/include/merry.h. VAL_SAM removed
- * per LM-2 sub-decision (c) (drop $"" SAM-token surface entirely).
- * Remaining tags renumbered to keep the sequence contiguous.
+ * Value tags for the Merry AST.
  */
 
 # define VAL_OBJREF		0

@@ -59,7 +59,7 @@ Registers a Merry-script observer at the given (`path`, `timing`) on `ob`. Store
 - `timing` -- one of `"pre"`, `"main"`, `"post"` (case-insensitive). Anything else errors; nil collapses to `"main"`.
 - `source` -- Merry source string. Compiled at registration time (a `/usr/Merry/data/merry` clone is created); the compiled object is what gets stored.
 
-Capability-gated per `DD-1 (e)`: callable from `/kernel/`, from a `KERNEL()`-trusting registrar program, and from any program whose creator is in the approved-registrar set. Application code typically calls through its own initd or a registered admin path; raw test drivers that want to register from `/usr/<App>/sys/test.c` need their creator listed via `add_approved_registrar(<domain>)` (KERNEL-gated). The MerryApp example registers from the test driver directly, so `MerryApp` lives in the approved set at boot.
+Capability-gated: callable from `/kernel/`, from a `KERNEL()`-trusting registrar program, and from any program whose creator is in the approved-registrar set. Application code typically calls through its own initd or a registered admin path; raw test drivers that want to register from `/usr/<App>/sys/test.c` need their creator listed via `add_approved_registrar(<domain>)` (KERNEL-gated). The MerryApp example registers from the test driver directly, so `MerryApp` lives in the approved set at boot.
 
 Errors on: nil host, non-property-bearing host, unrecognized timing, capability-gate failure. The compile step may also error if the source has a parse failure.
 
@@ -93,7 +93,7 @@ Two consequences for application authors:
 - The dispatcher is *opt-in by environment*. A kernel-layer instance that does not load the Merry daemon (e.g., the cloud-server upstream, or an early-bootstrap probe) sees `find_object(MERRY)` return nil and writes go straight through to `set_raw_property`. The property primitive remains usable without the dispatcher.
 - Inside the dispatcher, writes back to the host's raw property use `set_raw_property` rather than `set_property` -- that is what prevents the dispatcher from infinitely re-entering itself during its own main-timing write. Application code that wants the same bypass (early bootstrap, schema initialization, fixture seeding) calls `set_raw_property` directly. The cycle detector exists for accidental observer-source recursion; `set_raw_property` is for intentional bypass.
 
-### Ancestry walk -- the `merry:on-inherit:*` re-enable marker (DD-5 (a))
+### Ancestry walk -- the `merry:on-inherit:*` re-enable marker
 
 The dispatcher's observer lookup walks `query_ur_object()` from the host upward. The walk policy is **declarative-dominant with explicit re-enable**:
 
@@ -105,7 +105,7 @@ The dispatcher's observer lookup walks `query_ur_object()` from the host upward.
 
 The default is local-override: if a descendant declares its own observer for `test:val:main`, the ancestor's observer does NOT fire. This is the path of least surprise -- a host that explicitly registers a behavior should not also pull in inherited behaviors it did not opt into.
 
-The re-enable marker is per-`(path, timing)`. Setting `obj->set_property("merry:on-inherit:test:val:main", 1)` says "I have local observers for `test:val:main` AND I want my ancestors' observers for `test:val:main` to also fire." Other timing slots are independent (per `DD-5 (b)`); a host that re-enables inheritance for main does not affect pre or post.
+The re-enable marker is per-`(path, timing)`. Setting `obj->set_property("merry:on-inherit:test:val:main", 1)` says "I have local observers for `test:val:main` AND I want my ancestors' observers for `test:val:main` to also fire." Other timing slots are independent; a host that re-enables inheritance for main does not affect pre or post.
 
 Worked example:
 
@@ -129,15 +129,15 @@ The marker is itself an ordinary property. The cache invalidation in `dispatch_s
 
 ### `batch(object obj, string func, mixed *args, varargs mapping opts)` and `batched_set(object obj, mapping kv_map, varargs mapping opts)`
 
-Two batching APIs per `DD-1 (c)`. `batch` calls `func` on `obj` with `args` inside a fresh batch context; any `set_property` writes the callable performs share the batch id. `batched_set` writes the `kv_map`'s key/value pairs (each via `set_property`) inside a single batch.
+Two batching APIs. `batch` calls `func` on `obj` with `args` inside a fresh batch context; any `set_property` writes the callable performs share the batch id. `batched_set` writes the `kv_map`'s key/value pairs (each via `set_property`) inside a single batch.
 
 Opts is an optional mapping:
 
-- `"atomic": 1` -- run the callable / writes inside a DGD `atomic{}` block per `DD-4 (d)`. On error all writes roll back; the batch-status entry is suppressed (atomic rollback removes the daemon-local entry the same way it removes the application's writes). On success, writes commit and the entry records `completed`.
+- `"atomic": 1` -- run the callable / writes inside a DGD `atomic{}` block. On error all writes roll back; the batch-status entry is suppressed (atomic rollback removes the daemon-local entry the same way it removes the application's writes). On success, writes commit and the entry records `completed`.
 
 Both return the callable's return value (`batch`) or `nil` (`batched_set`). Both propagate errors from the callable / writes and from the dispatcher itself.
 
-`batched_set` is also reachable from Merry observer source via the `BatchedSet` merryfun -- the mapping-arg signature composes inline (no function-reference required per `L14 #15`), so observers can perform multi-key writes themselves.
+`batched_set` is also reachable from Merry observer source via the `BatchedSet` merryfun -- the mapping-arg signature composes inline (Merry has no function-reference syntax), so observers can perform multi-key writes themselves.
 
 ### `set_max_cascade_depth(int n)` and `query_max_cascade_depth()`
 
@@ -147,21 +147,21 @@ The bound counts depth, not breadth -- a flat batch with many legitimate writes 
 
 ### `unregister_observer(object ob, string path, string timing)`
 
-Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`, and refuses a non-property-bearing target the same way. Asymmetric with `register_observer`'s add-one semantics; finer-grained removal (by source string or by compiled-object identity) is a future-work item (see eos-harness BACKLOG `#FH-14`).
+Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`, and refuses a non-property-bearing target the same way. Asymmetric with `register_observer`'s add-one semantics; finer-grained removal (by source string or by compiled-object identity) is a future-work item.
 
-The MVA-scope coarse granularity is sufficient for the common operator scenario (clear all observers at a triple to start fresh, e.g., for an in-flight troubleshooting session). For surgical removal in a multi-observer-on-one-triple host, current options are (a) read the property value list, remove one entry by index, write back via `set_raw_property` (operator-tier surgery; admin verb `register-observer` / `unregister-observer` in `admin-console.md` does not yet expose this), or (b) clear all and re-register the keepers.
+The coarse granularity is sufficient for the common operator scenario (clear all observers at a triple to start fresh, e.g., for an in-flight troubleshooting session). For surgical removal in a multi-observer-on-one-triple host, current options are (a) read the property value list, remove one entry by index, write back via `set_raw_property` (operator-tier surgery; admin verb `register-observer` / `unregister-observer` in `admin-console.md` does not yet expose this), or (b) clear all and re-register the keepers.
 
 ### `set_dispatch_trace(int flag)` and `query_dispatch_trace()`
 
 Toggle the optional verbose dispatcher trace logging. `set_dispatch_trace` is `KERNEL()`-gated; `query_dispatch_trace` is public read-only. Default is `0` (off). When `1`, the `_trace_dispatch` private helper writes per-entry trace events to `/usr/Merry/log/dispatch.log` alongside the always-on cycle and cascade events from `_log_dispatch`. The flag is statedump-persistent.
 
-Current trace coverage is the `dispatch_set` entry site only (MVA demonstration). Additional trace sites (batch-entry/exit, observer-fire, cascade-depth-increment, cycle-chain mutation, observer-cache hit/miss) are future-work (see eos-harness BACKLOG `#FH-15`). The flag-gating contract is established; site additions are mechanical.
+Current trace coverage is the `dispatch_set` entry site only. Additional trace sites (batch-entry/exit, observer-fire, cascade-depth-increment, cycle-chain mutation, observer-cache hit/miss) are future-work. The flag-gating contract is established; site additions are mechanical.
 
 The `dispatch-trace on|off|status` admin verb (see `admin-console.md`) is the operator-facing surface; it routes through `ADMIN_CONSOLE_REGISTRY->verb_set_dispatch_trace` for the KERNEL elevation since the underlying setter is gated.
 
 ### Batch status
 
-`_record_batch_status` writes a status entry for each batch; `_query_batch_status(int batch_id)` reads it back. Status values per `DD-3 (c)`:
+`_record_batch_status` writes a status entry for each batch; `_query_batch_status(int batch_id)` reads it back. Status values:
 
 | Status | When |
 |---|---|
@@ -255,7 +255,7 @@ What is verified by the MerryApp smoke (phases 16 and 17):
 - An external restart -- `dgd mva.dgd state/snapshot` -- restores. The pre-snapshot `call_out` fires after restore.
 - Phase 17 reads the saved `persist_host`, writes `42` to `test:persist:val`, and asserts that both the value landed (property storage survived) and that `test:persist:fired` became `1` (the observer's compiled source ran against the restored object reference).
 
-The smoke is the first end-to-end empirical confirmation that the dispatcher's substrate composes correctly with DGD's persistence. Prior phases (DI-1, DI-2, DI-3) verified each runtime primitive in isolation against cold-boot; phase 17 verifies their composition across restore. Any future regression in the persistence contract -- e.g., a change to how the compiled merry-script artifact is named, a change to property-mapping pickling, an observer cache that fails to rebuild after restore -- surfaces here as a `PERSIST VERIFY FAIL: ...` sentinel.
+The smoke is the first end-to-end empirical confirmation that the dispatcher's substrate composes correctly with DGD's persistence. The earlier driver phases verified each runtime primitive in isolation against cold-boot; phase 17 verifies their composition across restore. Any future regression in the persistence contract -- e.g., a change to how the compiled merry-script artifact is named, a change to property-mapping pickling, an observer cache that fails to rebuild after restore -- surfaces here as a `PERSIST VERIFY FAIL: ...` sentinel.
 
 ## Kernel-layer internals
 
@@ -280,11 +280,11 @@ Daemon-local mappings:
 
 The cache exists because the per-dispatch ancestry walk is O(ancestor-count) and observers don't change between registrations. `_find_observers_cached(obj, path, timing)` looks up the triple-key; on miss, runs the walk (`query_ur_object` from `obj` upward, reading `merry:on:<path>:<timing>` at each level), caches the result, and returns.
 
-Invalidation is conservative: `register_observer` calls `_invalidate_observer_cache(ob, path, timing)`, which removes all cache entries whose first key element matches `object_name(ob)` AND whose path matches AND whose timing matches. This is broad enough to catch ancestor-side registrations correctly (a registration on an ancestor invalidates descendant cache entries) at the cost of full mapping iteration on each registration. Acceptable for MVA scope; a more targeted invalidation is post-MVA polish.
+Invalidation is conservative: `register_observer` calls `_invalidate_observer_cache(ob, path, timing)`, which removes all cache entries whose first key element matches `object_name(ob)` AND whose path matches AND whose timing matches. This is broad enough to catch ancestor-side registrations correctly (a registration on an ancestor invalidates descendant cache entries) at the cost of full mapping iteration on each registration. Acceptable at the current scale; a more targeted invalidation is future polish.
 
 ### `_resolve_observer(mixed val)`
 
-The dispatcher stores observers as compiled object references after `DI-3` (versus the source strings `DI-1` stored). `_resolve_observer` accepts either shape -- it returns the value unchanged if it is an `object`, looks it up via `new_object`-compile if it is a `string` (the `DI-1` legacy shape, kept for forward-compat through the property-storage transition). Currently called only when iterating the observer list inside `_fire_timing_slot`; the legacy-string path is exercised by no current registration site but kept until a sweep over upgrade-path scenarios is complete.
+The dispatcher stores observers as compiled object references (the original design stored source strings). `_resolve_observer` accepts either shape -- it returns the value unchanged if it is an `object`, looks it up via `new_object`-compile if it is a `string` (the legacy shape, kept for forward-compat through the property-storage transition). Currently called only when iterating the observer list inside `_fire_timing_slot`; the legacy-string path is exercised by no current registration site but kept until a sweep over upgrade-path scenarios is complete.
 
 ### `_fire_timing_slot(object obj, string path, string timing, ...)`
 
@@ -329,7 +329,7 @@ Each documented signature is exercised by at least one phase of the 17-phase Mer
 | `batched_set` (from Merry source via `BatchedSet`) | 8 | `BATCH SOURCE OK` |
 | Batch status -- `completed` | 6, 7, 8, 15 | various |
 | Batch status -- `main-aborted` | 9 | `BATCH ABORT OK` |
-| `max_cascade_depth` bound | (DI-3 hits at default; an explicit test phase covering `cascade-aborted` is `DI-8` scope) | -- |
+| `max_cascade_depth` bound | (the cycle-detection phase hits the default bound; an explicit test phase covering `cascade-aborted` is future work) | -- |
 | Observer-source contract -- `$this` binding to dispatch host | 14 | `DISPATCH ANCESTRY OK` |
 | Observer-source contract -- `Set` from observer source | 10, 11, 13, 14, 16 | various |
 | `BatchedSet` from observer source | 8 | `BATCH SOURCE OK` |

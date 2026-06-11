@@ -5,15 +5,8 @@
  * xml_daemon / schema_daemon). Delegates everything to the dtd_daemon's
  * registered type and colour handlers.
  *
- * Lifted from skoot/usr/DTD/lib/dtd.c. LV-4.5b refactors:
- * (a) NREF / hard.h SkotOS namespace-reference machinery stripped per
- *     Game-specific-content exclusion. ascii_to_untyped no longer parses
- *     the NREF(...) / OBJ(...) typed-literal forms; only the bare ASCII
- *     fallthrough remains.
- * (b) DTD constant inline-defined as /usr/Schema/sys/dtd_daemon per LV-2
- *     rename (was /usr/DTD/sys/dtd via DTD.h).
- * (c) name() helper from /lib/util/lpc replaces SkotOS's `name(val)`
- *     bare call; this lift inherits /lib/util/lpc to bring it into scope.
+ * ascii_to_untyped parses only the bare ASCII fallthrough (no
+ * typed-literal forms).
  */
 
 # include <type.h>

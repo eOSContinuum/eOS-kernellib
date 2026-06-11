@@ -14,7 +14,7 @@
  *   3. destruct the original clone
  *   4. Vault->spawn_one_by_name("MyApp:demo:thing1") -- reads the XML, clones a
  *      fresh thing, dispatches set_label / set_count via import_state
- *   5. resolve the reloaded clone via Index (find_named, lifted at LV-4.5d)
+ *   5. resolve the reloaded clone via Index (find_named)
  *   6. assert query_label and query_count match
  *
  * A second assertion set (run_singleton_test) exercises the singleton
@@ -35,7 +35,7 @@
  * requires KERNEL() or SYSTEM() previous_program; MyApp is neither.
  * The sentinel-file path is what an application-tier daemon can do
  * without a kernel-layer log facility (the lifted sysLog is currently
- * a no-op stub per LV-4.5b Decision pending such a facility).
+ * a no-op stub pending such a facility).
  */
 
 # include <type.h>

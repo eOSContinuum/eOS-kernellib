@@ -3,9 +3,6 @@
  * allows the specification of a grammar filename during
  * initialization, making the parse_string() call even simpler.
  *
- * Lifted from SkotOS /lib/fileparse.c (Skotos Tech 1999) per LM-2
- * sub-decision (d). Conventions adjusted to eos-kernellib:
- *   inherit "/lib/parse" -> inherit "/lib/util/parse"
  */
 
 inherit "/lib/util/parse";

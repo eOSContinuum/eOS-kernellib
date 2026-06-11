@@ -13,7 +13,7 @@ mixed data;
 
 int is_pcdata() { return TRUE; }
 
-/* LV-4.5d: See element.c for the create-vs-configure rationale. */
+/* See element.c for the create-vs-configure rationale. */
 static void create(mixed d)
 {
     data = d;

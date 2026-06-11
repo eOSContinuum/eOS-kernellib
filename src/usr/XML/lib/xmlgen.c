@@ -5,22 +5,9 @@
  * to a caller-supplied object via `append(string)` (StringBuffer-shape API);
  * the lifted xml_daemon.c clones a /lib/StringBuffer per gen_xml call.
  *
- * Lifted from skoot/usr/XML/lib/xmlgen.c. LV-4.5a refactors:
- * (a) /lib/string inherit dropped; strip + ascii helpers via /lib/util/ascii.
- *     break_paragraph inlined at the one call site (SkotOS impl is a 4-line
- *     normalization, name overpromises).
- * (b) SUGAR (the SAM sugar-tag daemon) references dropped per the project's
- *     Game-specific-content exclusion. Without SUGAR, generate_pcdata falls
- *     through to element / pcdata / samref dispatch directly. The COL_SAMREF
- *     case emits a literal $(ref attrs) form for any reader that wants it;
- *     no game-content interpretation.
- * (c) DTD inherit deferred to LV-4.5b. xmlgen.c source-lifts verbatim; the
- *     `typed_to_ascii` / `untyped_to_ascii` calls + `SID->` daemon calls
- *     resolve at compile time when LV-4.5b lifts the Schema subsystem.
- * (d) StringBuffer-shape `append` replaces `append_string` at 6 call sites.
- * (e) Function call sites updated: queryColourValue / queryColour, xmdElement
- *     / xmdAttributes / xmdContent / xmdRefRef / xmdRefAttributes (LV-2.5b
- *     camelCase from lifted xmd.c).
+ * generate_pcdata dispatches to element / pcdata / samref directly;
+ * the COL_SAMREF case emits a literal $(ref attrs) form for any reader
+ * that wants it, with no game-content interpretation.
  */
 
 # include <type.h>

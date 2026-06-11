@@ -1,8 +1,7 @@
 /*
  * Boot-time test driver for the Merry application example.
  *
- * Exercises the LM-3 + LM-3.5 + LM-6 lift end-to-end via five
- * assertions:
+ * Exercises the Merry runtime end-to-end via the assertions below:
  *
  *   1. Ancestry-walk + invocation. A 2-generation Hierarchy
  *      (parent <- child) is built via set_ur_object. A Merry script
@@ -16,7 +15,7 @@
  *      merrynode.c. The call must error with "function 'clone_object'
  *      not allowed in merry code".
  *
- *   3. Spawn merryfun (LM-6 sub-task a). A Merry script invokes the
+ *   3. Spawn merryfun. A Merry script invokes the
  *      Spawn() static merryfun on the binding host; Spawn calls
  *      ::clone_object to escape the local SANDBOX(clone_object)
  *      shadow, clones the binding host's clonable, and sets the
@@ -30,7 +29,7 @@
  *      carrying the schema-declared state (export_state walks
  *      SID->get_root_node(ob); import_state replays it on the copy).
  *
- *   4. $delay() / mcontext.c::create 4-arg dispatch (LM-6 sub-task b).
+ *   4. $delay() / mcontext.c::create 4-arg dispatch.
  *      A Merry script issues `$delay(1, FALSE);` then sets a marker
  *      property on the binding host. The first call returns FALSE
  *      synchronously and schedules a continuation via the binding
@@ -42,7 +41,7 @@
  *      verify_delay call_out checks the property two seconds after
  *      test setup completes.
  *
- *   5. LabelCall / LabelRef script-space resolution (LM-6 sub-task c).
+ *   5. LabelCall / LabelRef script-space resolution.
  *      The test driver registers itself as the "testspace" script
  *      space via MERRY->register_script_space; this object's
  *      query_method / call_method LFUNs (below) constitute the
@@ -53,7 +52,7 @@
  *
  * Pass/fail is observable via a sentinel file at
  * /usr/MerryApp/data/test-result.log (same convention as the vault-app
- * example -- no kernel-layer log facility lifted yet per LV-4.5b).
+ * example -- the platform has no kernel-layer log facility yet).
  *
  * Phases are wrapped in catch{} so a failure in one does not mask a
  * different failure in another; both fail-paths log a distinct
@@ -76,10 +75,9 @@ inherit "/lib/util/named";
  * call the SYS_MERRY daemon via ->run_merry) -- the static methods
  * resolve via the inherit chain at compile time and avoid the
  * external-call overhead of an LFUN dispatch on every invocation. This
- * is the SkotOS convention and what merryapi.c was authored against
- * (every find_merry / find_merry_location / run_merry / find_merries /
- * run_merries call site in production SkotOS goes through an
- * inheriting daemon, not through SYS_MERRY directly). */
+ * is the convention merryapi.c was authored against: invocation call
+ * sites go through an inheriting daemon, not through the Merry daemon
+ * directly. */
 inherit "/usr/Merry/lib/merryapi";
 
 # define MERRY_DAEMON	"/usr/Merry/sys/merry"
@@ -438,11 +436,11 @@ static void run_tests()
 
     log_line("MerryApp:test: TARGET REJECT OK");
 
-    /* phase 6: DI-2 batched_set (non-atomic) per DD-1 (c) -- writes a
+    /* phase 6: batched_set (non-atomic) -- writes a
      * multi-key mapping under one batch-id with sequential seq starting
-     * at 0 (DD-3 (b)). Verifies the public LFUN compiles and that both
+     * at 0 (the implicit-batch semantics). Verifies the public LFUN compiles and that both
      * properties land; the batch-id and seq are daemon-internal and not
-     * surfaced through a public API at DI-2 scope (DI-5's
+     * surfaced through a public API at this scope (a future change-log's
      * query_changes_since exposes them). */
 
     catch {
@@ -470,9 +468,9 @@ static void run_tests()
 
     log_line("MerryApp:test: BATCH OK");
 
-    /* phase 7: DI-2 atomic-mode opt-in per DD-4 (d) -- body + status
+    /* phase 7: atomic-mode opt-in -- body + status
      * entry write run inside DGD atomic{}; on success the writes commit
-     * normally. The abort-rollback branch is DI-8's scope; phase 7
+     * normally. The abort-rollback branch is covered elsewhere; phase 7
      * verifies the success branch and that the opts-mapping is
      * accepted on the varargs slot. */
 
@@ -491,9 +489,9 @@ static void run_tests()
 
     log_line("MerryApp:test: BATCH ATOMIC OK");
 
-    /* phase 8: DI-2 BatchedSet from Merry source -- verifies the
+    /* phase 8: BatchedSet from Merry source -- verifies the
      * merrynode.c surface is reachable from compiled scripts; the
-     * mapping-arg signature composes inline per L14 #15. */
+     * mapping-arg signature composes inline (no function reference). */
 
     catch {
 	object batch_source_script;
@@ -522,8 +520,8 @@ static void run_tests()
 
     log_line("MerryApp:test: BATCH SOURCE OK");
 
-    /* phase 9: DI-2 non-atomic batch() abort path per DD-2 (d) +
-     * DD-3 (c) -- the callable throws; status entry must persist as
+    /* phase 9: non-atomic batch() abort path per the catch'd-error default +
+     * the batch-status contract -- the callable throws; status entry must persist as
      * "main-aborted" and the error must propagate to caller's catch{}. */
 
     catch {
@@ -542,7 +540,7 @@ static void run_tests()
 	}
 	/* Scan a small batch-id window looking for the main-aborted
 	 * entry; the exact id isn't surfaced through a public API at
-	 * DI-2 scope (DI-5's query_changes_since covers that). */
+	 * this scope (a future change-log's query_changes_since covers that). */
 	status_after = nil;
 	for (i = 1; i <= 200 && !status_after; i ++) {
 	    mixed *s;
@@ -566,7 +564,7 @@ static void run_tests()
 
     log_line("MerryApp:test: BATCH ABORT OK");
 
-    /* phase 10: DI-3 dispatcher -- simple main-timing observer.
+    /* phase 10: dispatcher -- simple main-timing observer.
      * Register a main observer on child for "test:dispatch:main" with
      * a source that writes a marker property; verify the marker landed
      * after a set_property on the observed path. */
@@ -625,10 +623,10 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH FANOUT OK");
 
-    /* phase 11: DI-3 dispatcher -- pre + main + post timings.
+    /* phase 11: dispatcher -- pre + main + post timings.
      * Register observers on all three slots that append to a marker
      * string. Verify the string reads "pre|main|post" after the write,
-     * confirming both per-timing slot firing and DD-4 (b) ordering. */
+     * confirming both per-timing slot firing and the documented ordering contract. */
 
     catch {
 	MERRY_DAEMON->register_observer(child, "test:dispatch:order", "pre",
@@ -655,7 +653,7 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH ORDER OK");
 
-    /* phase 12: DI-3 dispatcher -- pre veto per DD-4 (a). Register a
+    /* phase 12: dispatcher -- pre veto per the pre-veto contract. Register a
      * pre observer that throws; verify (1) the error propagates to
      * caller, (2) the value did NOT land (pre veto aborts before the
      * write step). Initial value seeded via set_raw_property so the
@@ -690,7 +688,7 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH VETO OK");
 
-    /* phase 13: DI-3 dispatcher -- cycle detection per DD-2 (b).
+    /* phase 13: dispatcher -- cycle detection per the cascade-depth bound.
      * Register a main observer that writes the SAME property; the
      * recursive dispatch must detect the cycle and throw. The outer
      * set_property error string must include "cycle". */
@@ -718,7 +716,7 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH CYCLE OK");
 
-    /* phase 14: DI-3 dispatcher -- ancestry walk per DD-5 (a). Register
+    /* phase 14: dispatcher -- ancestry walk per the ancestry-walk design. Register
      * a main observer on PARENT for "test:ancestry"; write the property
      * on CHILD; find_observers walks the ur chain and resolves the
      * parent's observer; observer's $this is CHILD (the dispatch host)
@@ -745,7 +743,7 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH ANCESTRY OK");
 
-    /* phase 15: DI-3 dispatcher -- implicit-batch wrapping per DD-3 (b).
+    /* phase 15: dispatcher -- implicit-batch wrapping per the implicit-batch semantics.
      * An unbatched set_property must (1) leave _current_batch_id() at 0
      * before AND after the call (the implicit batch is entered and
      * exited cleanly), and (2) record a "completed" status entry for

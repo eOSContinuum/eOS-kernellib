@@ -6,23 +6,10 @@
  * /lib/util/fileparse + grammar/merry.y) and exposes a runtime-extensible
  * script-space registry (register_script_space / space::method() syntax).
  *
- * Lifted from SkotOS /usr/SkotOS/sys/merry.c per LM-2 sub-decisions.
- * Stripped per LM-2 sub-decision (g):
- *   - signal-dispatch convenience methods (run_signal, do_new_signal,
- *     pre_signal, new_signal, desc_signal, post_signal, special_signal,
- *     post_hook) -- DD phase defines its own pre/main/post timing;
- *   - SAM admin endpoints (eval_sam_ref, patch_sam, patch_parser,
- *     patch_runner, patch_ticks);
- *   - clear_merry_cache (SkotOS file-cache cleanup; eos-kernellib uses
- *     a different runtime sync model per CT-2);
- *   - 'udat' pre-registered script-space (game-content);
- *   - SAMD->register_root + BASE_INITD->set_runner (game-content infra).
- *
- * Conventions adjusted to eos-kernellib:
- *   /lib/string  -> /lib/util/ascii
- *   /lib/fileparse -> /lib/util/fileparse
- *   SYS_MERRY    -> MERRY (eos-kernellib short-name convention)
- *   SysLog       -> sysLog
+ * Also hosts the property-change dispatcher: observer registration
+ * (capability-gated), the batching surface, and dispatch_set, the
+ * single entry point property writes route through. The dispatcher's
+ * full reference is docs/dispatcher.md.
  */
 
 # include <status.h>
@@ -49,7 +36,7 @@ mapping script_spaces;
 int     cleanup_stamp;
 
 /*
- * DD-1 (e) capability gate state. `approved_registrars` is the daemon-wide
+ * Registrar capability-gate state. `approved_registrars` is the daemon-wide
  * allowlist of caller domains that may register observers / script-spaces
  * on objects outside their own domain; KERNEL programs always pass and
  * domain-match is the default allow path. Seeded with "System" +
@@ -57,24 +44,24 @@ int     cleanup_stamp;
  * remove_approved_registrar (KERNEL-gated). Per-domain rather than
  * per-program — matches the cloud-server /usr/<domain>/ ownership model.
  *
- * `observer_cache` caches resolved observer lists per DI-1 (g). Broad
+ * `observer_cache` caches resolved observer lists. Broad
  * invalidation (clear the whole cache on any registration write) is the
- * MVA strategy; descendant-chain tracking is deferred per the DI-1 (g)
- * "implementation choice" framing.
+ * deliberate minimal strategy; descendant-chain tracking is deferred
+ * as an implementation choice.
  */
 mapping approved_registrars;
 mapping observer_cache;
 
 /*
- * DI-2 batching surface state. `next_batch_id` is the daemon-wide
+ * Batching surface state. `next_batch_id` is the daemon-wide
  * monotonically-increasing counter advanced at every batch boundary
- * (explicit and implicit) per DD-3 (b); statedump-persistent so batch
- * identity survives restart. `batch_status` is a DI-2 stub for the
- * batch-status entries DD-3 (c) calls for; keyed by batch-id, value is
- * ({ status, reason }). DI-5 will subsume this into the full change-log
+ * (explicit and implicit) per the implicit-batch semantics; statedump-persistent so batch
+ * identity survives restart. `batch_status` is a minimal stub for the
+ * batch-status entries the batch-status contract calls for; keyed by batch-id, value is
+ * ({ status, reason }). A future change-log surface will subsume this into the full change-log
  * surface (`query_changes_since`, retention pruning, etc.); the daemon-
- * local mapping here is enough for DI-2 smoke verification and for the
- * DI-3 dispatcher hooks to record outcomes against.
+ * local mapping here is enough for smoke verification and for the
+ * dispatcher hooks to record outcomes against.
  */
 int     next_batch_id;
 mapping batch_status;
@@ -87,7 +74,7 @@ mapping batch_status;
  * returns), which gives "no batch active" the natural nil reading on
  * a fresh execution.
  *
- * DI-3 adds TLS_CYCLE_CHAIN per DD-2 (b) amendment: a per-EXECUTION
+ * The dispatcher adds TLS_CYCLE_CHAIN for cycle detection: a per-EXECUTION
  * stack of (object_name + ":" + path) keys appended at dispatch_set
  * entry and popped on exit. Persists across nested batches; resets
  * only when the outermost call_limited frame returns. String-keyed
@@ -100,8 +87,8 @@ mapping batch_status;
 # define TLS_CYCLE_CHAIN	"merry_cycle_chain"
 
 /*
- * DI-3 dispatcher state. max_cascade_depth caps total successful
- * property writes within a single batch per DD-2 (b); seeded to 32 at
+ * Dispatcher state. max_cascade_depth caps total successful
+ * property writes within a single batch per the cascade-depth bound; seeded to 32 at
  * create(), configurable via set_max_cascade_depth (KERNEL-gated).
  * Statedump-persistent.
  */
@@ -109,7 +96,7 @@ mapping batch_status;
 int max_cascade_depth;
 
 /*
- * EX-3 verbose dispatch tracing. dispatch_trace is a daemon-wide flag
+ * Operator-facing verbose dispatch tracing. dispatch_trace is a daemon-wide flag
  * toggled by admin_console_ext's `dispatch-trace on|off` verb (routed
  * through ADMIN_CONSOLE_REGISTRY's KERNEL-tier helper) or set directly
  * via set_dispatch_trace (KERNEL-gated). When non-zero, _trace_dispatch
@@ -119,11 +106,11 @@ int max_cascade_depth;
 int dispatch_trace;
 
 /*
- * Dispatcher log path. DI-3 (f) calls for sysLog growth so the cycle
+ * Dispatcher log path. The logging design calls for sysLog growth so the cycle
  * chain is recoverable post-mortem; rather than wire the global
- * sysLog stub (cross-cutting beyond DI-3 scope), DI-3 adds a Merry-
+ * sysLog stub (a cross-cutting concern), the dispatcher keeps a Merry-
  * local file logger used only by the dispatcher for cycle and cascade
- * events. Future workstreams can grow sysLog wholesale.
+ * events. A future logging facility can grow sysLog wholesale.
  */
 # define MERRY_LOG_DIR	"/usr/Merry/log"
 # define MERRY_LOG_FILE	"/usr/Merry/log/dispatch.log"
@@ -160,7 +147,7 @@ void create() {
     * /merry/<md5>.c holds the compiled wrapper objects produced by
     * data/merry::create(); /merry/cleaned/ catches files renamed
     * by merrynode::do_suicide during LRU eviction; /log/ holds the
-    * DI-3 dispatcher log. None exist in a fresh runtime tree, so
+    * dispatcher log. None exist in a fresh runtime tree, so
     * create them here -- catch the EEXIST shape so warm restarts
     * don't error. */
    catch(make_dir("/usr/Merry/tmp"));
@@ -172,7 +159,7 @@ void create() {
 }
 
 /*
- * _check_registrar: DD-1 (e) capability gate. Called by register_script_space,
+ * _check_registrar: the registrar capability gate. Called by register_script_space,
  * unregister_script_space, and register_observer. Throws unless caller is
  * /kernel/* (KERNEL programs always trusted), OR caller's domain is in
  * approved_registrars, OR caller's domain matches target_name's domain.
@@ -225,7 +212,7 @@ void _check_property_bearer(object ob) {
 }
 
 /*
- * _invalidate_observer_cache: broad invalidation per DI-1 (g) MVA choice.
+ * _invalidate_observer_cache: broad invalidation as the deliberate minimal choice.
  * Any observer-property write clears the whole cache. Args carried for
  * future descendant-chain-tracking switch; currently unused.
  */
@@ -235,9 +222,9 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
 }
 
 /*
- * register_observer: DD-1 (d) procedural sugar for declarative observer
- * writes. Compiles the source at registration time (DI-3 amendment to
- * DI-1: store compiled merry-script OBJECTS, not source strings, so
+ * register_observer: procedural sugar for declarative observer
+ * writes. Compiles the source at registration time (a deliberate choice:
+ * store compiled merry-script OBJECTS, not source strings, so
  * the dispatcher's per-fire path avoids recompilation and syntax
  * errors surface at registration rather than first-fire). Reads the
  * existing list, normalizes string + array + object forms, appends
@@ -250,10 +237,10 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
  * of dispatch infrastructure and avoids spurious batch-context entries
  * during boot when many registrations land in sequence.
  *
- * Capability-gated per DD-1 (e); per-timing independent per DD-5 (b).
+ * Capability-gated per the registrar capability gate; per-timing independent per the per-timing-independence contract.
  * Writes the explicit form `merry:on:<path>:<timing>`; the alias form
  * `merry:on:<path>` (timing-less = implicit main) is accepted on read
- * by find_observers per DI-1 (b) MVP choice.
+ * by find_observers as the minimal lookup choice.
  */
 void register_observer(object ob, string path, string timing, string source) {
    string caller_program, prop_name, low_timing;
@@ -292,13 +279,13 @@ void register_observer(object ob, string path, string timing, string source) {
 }
 
 /*
- * unregister_observer: EX-3 mutation surface paired with register_observer
+ * unregister_observer: operator-console mutation surface paired with register_observer
  * for the admin_console_ext `unregister-observer` verb. Removes ALL
  * observers at (ob, path, timing) by clearing the merry:on:<path>:<timing>
  * property. Finer-grained removal (by source string or by compiled-object
- * identity) is left to a future workstream -- the compiled-object identity
+ * identity) is future work -- the compiled-object identity
  * path is the more tractable shape (source strings don't survive compile)
- * but adds API surface beyond the diagnostic-tier needs of #EX-3.
+ * but adds API surface beyond diagnostic-tier needs.
  * Capability-gated identically to register_observer via _check_registrar.
  */
 void unregister_observer(object ob, string path, string timing) {
@@ -324,7 +311,7 @@ void unregister_observer(object ob, string path, string timing) {
 }
 
 /*
- * Capability-set extension trio per DD-1 (e) amendment 2026-05-22. add and
+ * Capability-set extension trio per the capability-gate design. add and
  * remove are KERNEL-gated; query is public read-only. Pattern mirrors
  * /kernel/sys/access_daemon.c set_global_access -- daemon-local mapping,
  * statedump-persistent, gated at the entry point.
@@ -348,17 +335,17 @@ string *query_approved_registrars() {
 }
 
 /*
- * DI-2 batching surface. Implements DD-1 (c) hybrid batching with the
- * DD-4 (d) atomic-mode opt-in. Two public LFUNs (`batch`, `batched_set`)
- * and a small set of internal helpers exposed for DI-3 (dispatcher) and
- * DI-5 (change-log) to weave into. Per DD-1 (e) Amendment 2026-05-22 the
+ * Batching surface. Implements the hybrid batching design with the
+ * atomic-mode opt-in. Two public LFUNs (`batch`, `batched_set`)
+ * and a small set of internal helpers exposed for the dispatcher and
+ * the future change-log surface to weave into. Per the capability-gate design (LFUN-entry gating only) the
  * capability gate is LFUN-only at registration entry points -- batching
  * writes through `set_property` and is not gated here.
  *
  * Per-execution context lives in TLS under TLS_BATCH_STACK as a stack of
  * { batch_id, atomic, opts, seq, cascade_depth } mappings. Nested batches
- * push; exit pops. The DD-2 (b) amendment puts the cycle-chain at a
- * separate TLS slot (DI-3 owns); the batch-stack here tracks only what
+ * push; exit pops. The the cycle-detection design puts the cycle-chain at a
+ * separate TLS slot (the dispatcher owns); the batch-stack here tracks only what
  * a batch needs to identify and account for itself.
  */
 
@@ -406,13 +393,13 @@ void _pop_batch_context() {
 }
 
 /*
- * Records the batch-status entry per DD-3 (c). DI-2 stub: writes to the
- * daemon-local `batch_status` mapping. DI-5 will replace this with the
+ * Records the batch-status entry per the batch-status contract. Stub shape: writes to the
+ * daemon-local `batch_status` mapping. The future change-log surface will replace this with the
  * full change-log surface (`query_changes_since` + retention + per-host
- * pruning). The six-status enum (DI-3 extension): completed,
+ * pruning). The six-status enum: completed,
  * cascade-aborted, cycle-detected, pre-vetoed, main-aborted, post-aborted.
  *
- * Check-before-overwrite per DI-3: the dispatcher records a specific
+ * Check-before-overwrite: the dispatcher records a specific
  * abort category (e.g., "pre-vetoed") inside dispatch_set when an
  * observer throws; the outer batch() / batched_set() then catches the
  * propagated error and calls _record_batch_status again with a less-
@@ -429,11 +416,11 @@ void _record_batch_status(int batch_id, string status, mixed reason) {
 }
 
 /*
- * Public read-only accessors over the batch-stack TLS slot. DI-3 calls
+ * Public read-only accessors over the batch-stack TLS slot. The dispatcher calls
  * _current_batch_id() to decide whether to allocate an implicit batch on
- * an unbatched property write; DI-3 + DI-5 read _current_batch_context()
+ * an unbatched property write; the dispatcher and the future change-log surface read _current_batch_context()
  * to track cascade-depth and to fetch the active batch-id when writing
- * change-log tuples; DI-5 calls _current_batch_seq_advance() per tuple.
+ * change-log tuples, advancing _current_batch_seq_advance() per tuple.
  */
 int _current_batch_id() {
    mapping *stack;
@@ -471,8 +458,8 @@ mixed *_query_batch_status(int batch_id) {
 }
 
 /*
- * DI-2 hooks for the DI-3 implicit-single-mutation path per
- * sub-deliverable (e) and DD-3 (b). DI-3's dispatcher calls
+ * Hooks for the implicit-single-mutation path per the
+ * implicit-batch semantics. The dispatcher calls
  * _enter_implicit_batch() at the top of `set_property` when no batch is
  * already active: a fresh non-atomic batch-id is allocated so the
  * unbatched mutation lands in the change-log with seq=0 under its own
@@ -503,7 +490,7 @@ void _exit_implicit_batch(int batch_id, string status, mixed reason) {
  * Body helpers. The non-atomic pair runs the batch body directly; the
  * atomic pair runs inside DGD's atomic{} via the function-level `atomic`
  * modifier so a throw rolls back all mutations made during the body
- * (per DD-4 (d) opt-in semantics). The atomic-mode status-entry write
+ * (per the atomic-mode opt-in semantics). The atomic-mode status-entry write
  * happens INSIDE the atomic function so a rollback also erases it,
  * matching the "atomic batches that abort leave no trace" contract.
  */
@@ -522,10 +509,10 @@ void _run_kv_writes(object obj, mapping kv_map) {
    n = sizeof(keys);
    for (i = 0; i < n; i ++) {
       /*
-       * set_property routes through dispatch_set per DI-3, which owns
+       * set_property routes through dispatch_set, which owns
        * seq-advance and observer firing around the actual write. The
-       * DI-2 explicit _current_batch_seq_advance call was removed at
-       * DI-3 so seq advances exactly once per dispatched write whether
+       * earlier explicit _current_batch_seq_advance call was removed
+       * so seq advances exactly once per dispatched write whether
        * the path is batched or unbatched.
        */
       ::call_other(obj, "set_property", keys[i], kv_map[keys[i]]);
@@ -548,17 +535,17 @@ void _atomic_run_kv_writes(object obj, mapping kv_map, int batch_id) {
 }
 
 /*
- * batch: DD-1 (c) function-reference batching API. Invokes
+ * batch: the function-reference batching API. Invokes
  * obj->func(args...) inside a fresh batch context; atomic-mode opt-in
- * via opts mapping per DD-4 (d) (`([ "atomic": 1 ])`). Non-atomic is
- * the DD-2 (d) catch'd-error default: on throw, a "main-aborted" status
- * entry persists per DD-3 (c) and the error propagates to the caller's
+ * via opts mapping via the atomic-mode opt-in (`([ "atomic": 1 ])`). Non-atomic is
+ * the catch'd-error default: on throw, a "main-aborted" status
+ * entry persists per the batch-status contract and the error propagates to the caller's
  * catch{}. In atomic-mode, DGD rolls back both mutations and the status
- * entry (the atomic batch leaves no trace per DD-4 (d)).
+ * entry (the atomic batch leaves no trace per the atomic-mode opt-in).
  *
- * Not callable from Merry observer source per DD-1 (c) -- the SANDBOX
- * whitelist in merrynode.c does not expose this verb because L14 #15
- * forbids function-reference syntax in Merry.
+ * Not callable from Merry observer source by design -- the SANDBOX
+ * whitelist in merrynode.c does not expose this verb because Merry
+ * has no function-reference syntax.
  */
 mixed batch(object obj, string func, mixed *args, varargs mapping opts) {
    int batch_id, atomic_mode;
@@ -599,14 +586,14 @@ mixed batch(object obj, string func, mixed *args, varargs mapping opts) {
 }
 
 /*
- * batched_set: DD-1 (c) mapping-write batching API. Writes the kv_map's
+ * batched_set: the mapping-write batching API. Writes the kv_map's
  * key/value pairs to obj via set_property; all writes share a single
- * batch-id with sequential seq values starting at 0 (per DD-3 (b)).
- * Atomic-mode opt-in identical to batch() per DD-4 (d).
+ * batch-id with sequential seq values starting at 0 (per the implicit-batch semantics).
+ * Atomic-mode opt-in identical to batch() per the atomic-mode opt-in.
  *
  * Callable from Merry observer source (via the BatchedSet merryfun in
- * merrynode.c) because the mapping-arg signature satisfies L14 #15
- * (no function-reference required; arguments compose inline).
+ * merrynode.c) because the mapping-arg signature needs no function
+ * reference; arguments compose inline.
  */
 mixed batched_set(object obj, mapping kv_map, varargs mapping opts) {
    int batch_id, atomic_mode;
@@ -644,14 +631,14 @@ mixed batched_set(object obj, mapping kv_map, varargs mapping opts) {
 }
 
 /*
- * DI-3 dispatcher. dispatch_set wraps each property write with
- * pre/main/post observer firing per DD-4 (b), cascade-depth bound per
- * DD-2 (b), cycle detection per DD-2 (b) amendment, and implicit
- * batch wrapping per DD-3 (b). Called from /lib/util/properties.c
+ * The dispatcher. dispatch_set wraps each property write with
+ * pre/main/post observer firing per the pre->write->main->post ordering contract, cascade-depth bound per
+ * the cascade-bound design, cycle detection per the cycle-detection design, and implicit
+ * batch wrapping per the implicit-batch semantics. Called from /lib/util/properties.c
  * set_property when MERRY is loaded; the raw write step uses
  * obj->set_raw_property to bypass re-entry.
  *
- * Configuration accessors per DI-3 (c). set is KERNEL-gated like the
+ * Configuration accessors per the dispatcher configuration surface. set is KERNEL-gated like the
  * approved-registrar mutators; query is public read-only.
  */
 void set_max_cascade_depth(int n) {
@@ -669,7 +656,7 @@ int query_max_cascade_depth() {
 }
 
 /*
- * EX-3 dispatch-trace accessors. set is KERNEL-gated for symmetry with
+ * Dispatch-trace accessors. set is KERNEL-gated for symmetry with
  * set_max_cascade_depth; query is public read-only. The flag is non-zero
  * to enable verbose trace logging; _trace_dispatch consults this flag
  * and emits an entry-event line per dispatch_set call. The cycle and
@@ -689,7 +676,7 @@ int query_dispatch_trace() {
 }
 
 /*
- * DI-3 dispatcher helpers. _cycle_chain_get / _cycle_chain_set manage
+ * Dispatcher helpers. _cycle_chain_get / _cycle_chain_set manage
  * the per-execution cycle chain at TLS_CYCLE_CHAIN; the chain is an
  * array of string keys of the form `<object_name>:<path>` so
  * the static `member()` predicate (from /lib/util/lpc; LPC array-
@@ -697,18 +684,18 @@ int query_dispatch_trace() {
  *
  * _resolve_observer normalizes find_observers' return values to
  * compiled merry-script objects: T_OBJECT passes through; T_STRING
- * (legacy DI-1-era property values) is compiled lazily. Future
- * registrations always store compiled objects via the DI-3 amendment
+ * (legacy source-string property values) is compiled lazily. Future
+ * registrations always store compiled objects by design
  * to register_observer, but the dispatcher remains tolerant.
  *
- * _find_observers_cached is the DI-3 (l) cache-population helper.
+ * _find_observers_cached is the the cache-population helper.
  * Cache key is `<object_name>:<path>:<timing>`; on miss it calls
  * the static find_observers from merryapi and stores the resolved
- * list. The existing _invalidate_observer_cache (DI-1) clears the
+ * list. The existing _invalidate_observer_cache clears the
  * whole map on observer-property writes, so the cache key shape
  * does not need to be partition-friendly.
  *
- * _log_dispatch is the DI-3 (f) Merry-local file logger for cycle
+ * _log_dispatch is the the dispatcher-logging note Merry-local file logger for cycle
  * and cascade events. Appends one line per event to MERRY_LOG_FILE;
  * catch'd so log-write failures do not propagate into dispatch.
  */
@@ -791,8 +778,8 @@ void _log_dispatch(string msg) {
 /*
  * _trace_dispatch is the optional fine-grain trace surface gated by
  * dispatch_trace. Identical write path to _log_dispatch but elides the
- * file I/O entirely when the flag is unset (the common case). EX-3
- * threads this into dispatch_set entry; future workstreams may add
+ * file I/O entirely when the flag is unset (the common case). The operator surface
+ * threads this into dispatch_set entry; future work may add
  * batch-entry, observer-fire, and cascade-depth-increment trace sites.
  */
 private
@@ -805,8 +792,8 @@ void _trace_dispatch(string msg) {
 
 /*
  * _fire_timing_slot: iterates the observers for a (obj, path, timing)
- * triple per DD-4 (c) "LPC list order"; each evaluate is wrapped in
- * catch so the first throw halts the slot and propagates per DD-4 (a).
+ * triple in LPC list order (the documented firing order); each evaluate is wrapped in
+ * catch so the first throw halts the slot and propagates per the pre-veto contract.
  * The args mapping carries the change context (path, new value, old
  * value, timing, host) into the merry-script's args TLS, accessible
  * from the source as $path / $new / $old / $timing / $this.
@@ -838,11 +825,11 @@ void _fire_timing_slot(object obj, string path, string timing,
 }
 
 /*
- * dispatch_set: DD-4 (b) pre->write->main->post sequencing around a
- * property write. Bounded by DD-2 (b) cascade depth (per-batch
+ * dispatch_set: Pre->write->main->post sequencing around a
+ * property write. Bounded by the cascade-bound design cascade depth (per-batch
  * counter) and cycle detection (per-execution chain). Wraps unbatched
- * mutations in an implicit batch per DD-3 (b). Records batch-status
- * per DD-3 (c) + DD-4 (d) on abort categories; check-before-overwrite
+ * mutations in an implicit batch per the implicit-batch semantics. Records batch-status
+ * per the batch-status contract + the atomic-mode opt-in on abort categories; check-before-overwrite
  * so the dispatcher's specific category survives if batch() / batched_set
  * subsequently catches the same error.
  *
@@ -878,13 +865,13 @@ mixed dispatch_set(object obj, string path, mixed val) {
    }
 
    /*
-    * DD-2 (b) cascade-depth bound. Counter is depth-shaped (incremented
+    * The cascade-depth bound. Counter is depth-shaped (incremented
     * at dispatch entry after the bound check, decremented at exit on
     * BOTH success and failure paths) so a flat batch with many
     * legitimate writes does not hit the cap, but a deep recursive
     * chain does. The check compares the CURRENT depth (before this
     * dispatch's increment) against max -- if the parent's depth has
-    * already reached max, this nested dispatch refuses. The DI-3 (k)
+    * already reached max, this nested dispatch refuses. The the depth-vs-count distinction
     * note "increments only on successful completion" is reconciled by
     * decrementing on failure too: vetoed mutations roll the counter
     * back rather than leave it artificially inflated.
@@ -903,7 +890,7 @@ mixed dispatch_set(object obj, string path, mixed val) {
    }
 
    /*
-    * DD-2 (b) cycle detection. Check before push so the firing
+    * Cycle detection. Check before push so the firing
     * (obj, path) is not its own first-occurrence false-positive.
     */
    cycle_key = _cycle_key(obj, path);
@@ -926,7 +913,7 @@ mixed dispatch_set(object obj, string path, mixed val) {
 
    /*
     * Capture old value before write; observers see both. seq advances
-    * once per dispatched write (the DI-2 _run_kv_writes seq advance
+    * once per dispatched write (the earlier _run_kv_writes seq advance
     * is removed in this commit -- seq now lives entirely in dispatch_set
     * so batched + unbatched mutations both advance through the same
     * counter).
@@ -943,7 +930,7 @@ mixed dispatch_set(object obj, string path, mixed val) {
    ]);
 
    /*
-    * pre -> write -> main -> post per DD-4 (b). Per DD-4 (a) + (d):
+    * pre -> write -> main -> post per the pre->write->main->post ordering contract. Per the pre-veto and atomic-mode contracts:
     * any throw halts the current slot, records the timing-specific
     * abort category, and re-raises. Post-write slots do not retry
     * the failed slot; the contract is halt-and-propagate.
@@ -964,7 +951,7 @@ mixed dispatch_set(object obj, string path, mixed val) {
 
    /*
     * Observer-property writes invalidate the cache so the next
-    * dispatch sees the new registration. The DI-1 _invalidate_observer_cache
+    * dispatch sees the new registration. The _invalidate_observer_cache
     * is broad (clears the whole map); a dispatch on a non-observer
     * property does not invalidate.
     */

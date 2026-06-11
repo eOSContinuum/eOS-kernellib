@@ -102,11 +102,11 @@ static void process(string str)
     default:
 	{
 	    /*
-	     * EX-3 selective extension. Unknown verbs route through the
+	     * Selective extension. Unknown verbs route through the
 	     * KERNEL-tier registry, which holds the verb -> (ext_path,
 	     * method) dispatch table populated for /usr/-tier domains
-	     * (Merry today; Vault/Schema/HTTP as future workstreams
-	     * extend the registry's create()). If the registry has no
+	     * (Merry today; Vault/Schema/HTTP whenever future work
+	     * extends the registry's create()). If the registry has no
 	     * entry, or the registered extension is not loaded, the
 	     * "No command" fallback fires.
 	     *

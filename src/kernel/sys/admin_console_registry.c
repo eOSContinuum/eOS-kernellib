@@ -3,7 +3,7 @@
  * /kernel/obj/admin_console::process() in the switch-default branch
  * when an incoming verb is not in the hardcoded built-in set.
  *
- * #EX-3 selective extension (P3 layering). The registry holds two
+ * A selective extension surface. The registry holds two
  * pieces of state:
  *
  *   1. dispatch_table -- verb -> ([ "path": <ext_obj_path>,
@@ -20,16 +20,16 @@
  *      caller-domain (register-observer, unregister-observer) call
  *      these helpers from /usr/Merry/lib/admin_console_ext; the helpers
  *      forward to the daemon with KERNEL elevation. This is a
- *      narrow-surface mini-capability-model; the Seed 11 future
- *      capability-model workstream generalizes the pattern across all
+ *      narrow-surface mini-capability-model; a future
+ *      capability-model layer can generalize the pattern across all
  *      kernel-layer subsystems (dispatcher approved-registrars +
  *      script-space registration + persist_helper + http_server auth
  *      + admin_console verb registration).
  *
- * Registration is hardcoded at create() for the MVA. Future domains
- * (Vault, Schema, HTTP operator surfaces) extend the dispatch_table +
+ * Registration is hardcoded at create(). Future domains (Vault,
+ * Schema, HTTP operator surfaces) extend the dispatch_table +
  * allowed_callers entries here, or replace this object with dynamic
- * registration when Seed 11 lands.
+ * registration when a generalized capability model lands.
  */
 
 # include <kernel/kernel.h>
@@ -88,7 +88,7 @@ mapping query_dispatch(string verb) {
 /*
  * query_verbs: public read-only enumeration of the registered verbs.
  * Exposed for operator-tier introspection (e.g., a future `help` verb)
- * and for the verify path at #EX-3 close.
+ * and for verification.
  */
 string *query_verbs() {
    return map_indices(dispatch_table);

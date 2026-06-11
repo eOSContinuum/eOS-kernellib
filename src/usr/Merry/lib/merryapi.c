@@ -1,13 +1,6 @@
 /*
  * Merry invocation API.
  *
- * Lifted from SkotOS /usr/SkotOS/lib/merryapi.c per LM-2 sub-decisions.
- * Conventions adjusted to eos-kernellib:
- *   inherit "/lib/string"        -> inherit "/lib/util/ascii"
- *   inherit "/base/lib/urcalls"  -> inherit "/lib/util/lpc" (name(ob))
- *   "~SkotOS/sys/profiler" call  -> dropped (no profiler lifted)
- *   categorize_merry_word        -> game-content merryfun tokens removed
- *                                   (Act, Describe, EmitIn, EmitTo, SAM)
  */
 
 # include <status.h>
@@ -192,23 +185,23 @@ mixed run_merries(object ob, string signal, string mode, mapping args,
 
 
 /*
- * find_observers: DD-5 (a) declarative-dominant lookup for the property-
+ * find_observers: declarative-dominant lookup for the property-
  * change dispatcher. Walks query_ur_object() ancestry. At each level:
  *   - local present + no re-enable marker -> return accumulated; terminate.
  *   - local present + re-enable marker -> accumulate, continue walk.
  *   - local absent -> continue walk without accumulating.
  *
- * Per DD-5 (b), each (path, timing) slot resolves independently. Per
- * DI-1 (b) MVP choice, both property-name forms are accepted on read:
+ * Each (path, timing) slot resolves independently. Both property-name
+ * forms are accepted on read:
  * `merry:on:<path>` aliases `merry:on:<path>:main`; the explicit form is
  * tried first, then the alias form for main timing.
  *
- * Returns mixed* because DI-3 amended register_observer to store
- * compiled merry-script OBJECTS rather than source strings; the
- * dispatcher's _resolve_observer helper normalizes both shapes
- * (T_OBJECT pass-through, T_STRING lazy-compile) so legacy DI-1-era
+ * Returns mixed* because register_observer stores compiled
+ * merry-script OBJECTS rather than source strings; the dispatcher's
+ * _resolve_observer helper normalizes both shapes (T_OBJECT
+ * pass-through, T_STRING lazy-compile) so legacy source-string
  * registrations still work. Single-value property forms (T_STRING or
- * T_OBJECT) are normalized to one-element lists per DI-6 (b).
+ * T_OBJECT) are normalized to one-element lists.
  *
  * Returns an empty array when no observers are found anywhere in the
  * chain (callers treat ({}) as "no observers" without distinguishing

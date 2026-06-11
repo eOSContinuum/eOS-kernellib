@@ -7,40 +7,11 @@
  * convention (colon-separated object names map to URL-encoded
  * filesystem path segments).
  *
- * Lifted from SkotOS /usr/SID/sys/vault.c (commit feature/cohesive-lift,
- * LV-3) with the following changes per workstream Decisions:
- *
- *   - Note 1 (element distinction): on-disk root form unchanged here;
- *     vault.c only stores daemons (singletons), always emits <object
- *     program="..."> form. The <clone .../> form for instances lives
- *     in vault_node.c (LV-4).
- *
- *   - Note 3 (distribution layer drops): query_blocking_objects(),
- *     save_hierarchy(), store_more(), eval_sam_ref() and the SAMD
- *     register_root() call dropped. Cross-server mastery, SAM-ref
- *     resolution, and hierarchy-save chain belong to a future cross-
- *     runtime workstream, not this lift.
- *
- *   - LV-2 path renames: /usr/SID/* -> ~Vault/* etc.; vault_node.c
- *     (renamed from vaultnode.c); set_object_name "Vault:Daemon"
- *     (was "SID:TheVault").
- *
- *   - LV-2.5 helper-name refactor: url_encode -> urlEncode (from
- *     /lib/util/url); pave_way -> paveWay, write_data_to_file ->
- *     writeDataToFile, copy_file -> copyFile (from /lib/util/file).
- *     Bare file kfuns (read_file, remove_file, rename_file) unchanged
- *     and resolve via cloud-server kernel auto-chain wrappers.
- *
- *   - LV-2.5b SkotOS-helper disposition: ur_name(ob) -> object_name(ob)
- *     inlined (SkotOS's ur_name was a shim around DGD's object_name
- *     kfun, present only to bypass SkotOS's own override; eOS-kernellib
- *     does not override object_name so the shim is unnecessary).
- *     INFO/SysLog -> info/sysLog (no-op stubs in /lib/util/lpc, pending
- *     kernel-layer log facility). dump_value -> dumpValue (richer
- *     recursive stringifier in /lib/util/lpc, ported from
- *     admin_console.c). lower_case via /lib/util/ascii inherit.
- *     map(arr, "fname") call patterns rewritten as explicit for-loops
- *     since /lib/util/url helpers are static (inheritance-visible only).
+ * On-disk root forms: <object program="..."> for one-of-a-kind daemons,
+ * <clone program="..."/> for instances; vault_node.c's spawn pipeline
+ * discriminates on the element name. Cross-server mastery, archive
+ * packing, and the other distribution-layer concerns of the historical
+ * design are out of scope for this layer.
  */
 
 # include <type.h>
@@ -125,13 +96,9 @@ string store(object ob) {
    state = export_state(ob, nil, nil, nil, TRUE); /* vaultflag TRUE */
 
    program = object_name(ob);
-   /* Note 1 (LV-5 closure): emit <clone> for instances, <object> for
-    * singletons. vault_node::spawn_create_one discriminates on the root
-    * element name (clone_object path vs findOrLoad path). SkotOS's
-    * /usr/SID/sys/vault.c stored only itself (the Vault daemon) and
-    * thus always emitted <object>; that pattern survived through
-    * LV-3 / LV-4 / LV-4.5c because vault.c::store was never exercised
-    * at runtime against a clone. */
+   /* Emit <clone> for instances, <object> for singletons.
+    * vault_node::spawn_create_one discriminates on the root element
+    * name (clone_object path vs findOrLoad path). */
    is_clone = sscanf(program, "%s#", program);
    root_elem = is_clone ? "clone" : "object";
 
@@ -139,10 +106,8 @@ string store(object ob) {
 		    ({ "program", program }),
 		    state);
 
-   /* LV-4.5c refactor: SkotOS used new_object("/data/data") + generate_xml
-    * (a chunked-data wrapper). eOS-kernellib's XML daemon exposes
-    * gen_xml(xml) returning a string (uses StringBuffer internally per
-    * LV-4.5a Decision). write_file accepts a string directly. */
+   /* The XML daemon exposes gen_xml(xml) returning a string (built
+    * on StringBuffer internally); write_file accepts it directly. */
    xml_text = XML->gen_xml(state);
 
    /* create a safe (for unix paths) representation of the name */

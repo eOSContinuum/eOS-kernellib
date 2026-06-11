@@ -7,7 +7,7 @@
  * "Schema:Element:Hierarchy") inherit this lib and call
  * set_object_name() at create() time.
  *
- * LV-4.5d wires set_object_name() through to ~Index/sys/index_daemon
+ * set_object_name() wires through to ~Index/sys/index_daemon
  * so the name -> object map is global and O(1)-invertible via
  * find_named(). The local _logical_name slot is kept as a cheap cache
  * for query_object_name() callers (avoids a daemon round-trip on every

@@ -16,7 +16,7 @@
  *
  * The properties and ur libs both define static void create(); cloud-
  * server's inherit resolution requires labels to disambiguate. Same
- * pattern surfaced on the LM-3.5 throwaway probe object.
+ * pattern recurs for any pair of libs that both define create().
  *
  * query_state_root() returns "MerryApp:Thing"; sys/test registers the
  * matching schema at boot (one lpc_str attribute, `label`, backed by

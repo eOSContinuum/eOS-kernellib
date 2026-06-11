@@ -3,14 +3,6 @@
  *
  * Carries (mode, signal, label, args) across a delayed call and
  * resumes the script via run_merries() when the call fires.
- *
- * Lifted from SkotOS /usr/SkotOS/data/mcontext.c per LM-2.
- * Conventions adjusted to eos-kernellib:
- *   configure -> create (cloud-server _F_init dispatch per L14 #10)
- *   inherit "/lib/string"               -> inherit "/lib/util/ascii"
- *   inherit "/usr/SkotOS/lib/merryapi"  -> inherit "/usr/Merry/lib/merryapi"
- *   SYS_MERRY->update_resource          -> MERRY->update_resource
- *   name(args[0])                       -> inlined via /lib/util/lpc name()
  */
 
 # include <status.h>

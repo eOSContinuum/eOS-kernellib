@@ -1,9 +1,8 @@
 /*
  * Marshal subsystem initialization daemon.
  *
- * LV-4.5c lifts the XmlBinding/lib/stateimpex marshaler (was
- * skoot/usr/SID/lib/stateimpex). Marshal is the format-pluggable
- * marshaling layer per the LV-2 architecture: XmlBinding/ is today's
+ * Hosts the XmlBinding/lib/stateimpex marshaler. Marshal is the
+ * format-pluggable marshaling layer: XmlBinding/ is today's
  * XML-binding implementation; future siblings dCBORBinding/,
  * EnvelopeBinding/, TripleBinding/ slot in at the same level when
  * additional format bindings land.

@@ -3,31 +3,11 @@
  *
  * Uses an all-LPC lexer/parser (no parse_string) -- slow but flexible.
  * Inheritable by callers that need to parse XML inline (the Marshal /
- * stateimpex path lifted at LV-4.5c is one such caller).
+ * stateimpex marshaling path is one such caller).
  *
- * Lifted from skoot/usr/XML/lib/xmlparse.c. LV-4.5a refactors:
- * (a) /lib/womble inherit dropped (one-shot NRef-migration helper, never
- *     called from xmlparse body). womble_xml() callback dropped with it.
- * (b) /lib/string inherit dropped; strip + lower_case via /lib/util/ascii.
- * (c) <SID.h> / <System.h> / <nref.h> SkotOS-only includes dropped.
- *     SID daemon constant defined inline per the LV-3 / LV-4 convention.
- * (d) Debug / XDebug / DEBUG diagnostic macros mapped to no-ops in the
- *     lift's current logging story; corresponding dump_value references
- *     in their args become dead code (never compiled). Wire to a concrete
- *     log facility when one exists.
- * (e) TLSD->query_tls_value / SYSLOGD->query_last_error diagnostic
- *     fallbacks dropped; convert() uses literal error strings.
- * (f) SUGAR (SAM sugar-tag daemon) call in p_oneof stripped per
- *     Game-specific-content exclusion. The `{ ... | ... }` SAM syntax
- *     raises LexErr at the lifted transport layer.
- * (g) /usr/SkotOS/data/merry path renamed to /usr/Merry/data/merry
- *     anticipating LM-phase Merry lift; the LPC source-lift compiles
- *     after LM lifts the Merry data wrapper.
- * (h) DTD inherit + SID-> runtime calls deferred to LV-4.5b (Schema
- *     subsystem lift). Same compile-chain deferral pattern as LV-3 -> LV-4.
- * (i) Function call sites updated to LV-2.5b camelCase: entityToAscii,
- *     xmdText, xmdRef, xmdStripPcdata, queryColour, queryColourValue,
- *     sysLog, dumpValue.
+ * Diagnostic macros are no-ops in the current logging story; wire to
+ * a concrete log facility when one exists. The `{ ... | ... }` legacy
+ * sugar syntax raises LexErr at this transport layer.
  */
 
 # include <type.h>
@@ -242,10 +222,8 @@ private void p_virgin(varargs int oneof)
 }
 
 /*
- * SAM sugar-tag dispatch. The original SkotOS impl called
- * /usr/SAM/sys/sugar->parse_specials(nuggets); SAM is excluded by
- * Game-specific-content rule, so the `{ ... | ... }` syntax raises
- * a parse error at the lifted transport layer.
+ * Legacy sugar-tag dispatch is not part of this transport layer, so
+ * the `{ ... | ... }` syntax raises a parse error here.
  */
 private void p_oneof()
 {

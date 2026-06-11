@@ -273,7 +273,7 @@ void claim_slot_stale(object user, object *stale_snapshot)
 
 Phase 9b captures one empty snapshot and passes it to both writers. The second write (`stale_snapshot + ({ user })`) overwrites the first, so one writer's addition is lost and only the other remains (sentinel `LOST-UPDATE OK`). This is the lost update that appears when a writer acts on state read before a concurrent commit instead of re-reading at write time -- exactly the bug an external coordination layer would otherwise have to prevent, and the bug `claim_slot` avoids by construction.
 
-The full agent-to-agent conflict scenario -- agents with identity wrappers contending through an inter-agent protocol -- is a downstream concern (the agent-identity workstream). This phase demonstrates the substrate serialization that such a wrapper exposes at the agent-facing surface.
+The full agent-to-agent conflict scenario -- agents with identity wrappers contending through an inter-agent protocol -- is a downstream concern for an agent-identity layer. This phase demonstrates the substrate serialization that such a wrapper exposes at the agent-facing surface.
 
 ### Phase 9c -- read coherence and the cached-snapshot drift
 

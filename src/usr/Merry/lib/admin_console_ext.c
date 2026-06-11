@@ -3,13 +3,13 @@
  * inspecting and mutating dispatcher state from the kernel admin
  * console.
  *
- * #EX-3 selective extension (P3 layering). The verbs are registered in
+ * A selective extension: the verbs are registered in
  * ADMIN_CONSOLE_REGISTRY's hardcoded dispatch_table; admin_console's
  * switch-default branch routes unknown verbs through that registry,
  * find_object's the clone of this library at OBJ_MERRY_ADMIN_CONSOLE_EXT,
  * and call_other's the matching cmd_<verb> method here.
  *
- * Verb-set (9 verbs per #EX-3 sub-decision 2):
+ * Verb-set (9 verbs):
  *
  *   READ / DIAGNOSTIC (4):
  *     observers <obj_path> <path> [timing]
@@ -29,9 +29,9 @@
  * and _check_registrar gates on the underlying MERRY LFUNs pass. The
  * registry's _check_caller gate constrains who can use the elevation
  * surface (only this library's program path is in allowed_callers).
- * The narrow elevation surface here is a mini-capability-model that
- * the Seed 11 future workstream generalizes across all kernel-layer
- * subsystems.
+ * The narrow elevation surface here is a mini-capability-model; a
+ * future capability-model layer can generalize it across all
+ * kernel-layer subsystems.
  *
  * Output: each verb writes to user->message() directly with the user
  * arg passed in by the dispatcher; admin_console's private message()
@@ -299,7 +299,7 @@ void cmd_register_observer(object user, string cmd, string str) {
 /*
  * unregister-observer <obj_path> <path> <timing>
  *
- * Removes all observers at (target, path, timing). MVA-scope coarse
+ * Removes all observers at (target, path, timing). Coarse
  * granularity (matches the daemon's unregister_observer signature).
  */
 void cmd_unregister_observer(object user, string cmd, string str) {

@@ -1,19 +1,6 @@
 /*
  * Ur-object infrastructure (parent + child tracking).
  *
- * Lifted from SkotOS /lib/ur.c per LM-3.5. Strips at lift:
- *   # include <adt.h>            -> dropped (only contained URCHILD_ITERATOR)
- *   query_ur_child_iterator()    -> dropped (depends on /lib/bigmap_iterator
- *                                   + /data/urchild_iterator LWO; not used
- *                                   by Merry's find_merry ancestry walk)
- *   XDebug(...)                  -> dropped (debug-no-op per L14 #5)
- *   SysLog(...)                  -> dropped (no log facility yet per LV-4.5b;
- *                                   the two SysLog calls were warning paths
- *                                   in delete_child / add_child and are
- *                                   informational only)
- *   ur_name(child) helper        -> inlined as ::object_name(child) per
- *                                   SkotOS usr/System/lib/sys_auto.c::ur_name
- *
  * Inheriting this lib makes an object both an ur-parent and an ur-child.
  * Merry's find_merry / find_merries / run_merry walk the chain via
  * query_ur_object() to look up the merry:<mode>:<signal> property at

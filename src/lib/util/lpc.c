@@ -1,17 +1,17 @@
 /*
- * LPC convenience helpers for code lifted from SkotOS.
+ * LPC convenience helpers shared across the lifted subsystems.
  *
  * dumpValue: recursive stringification of any LPC value, matching the
- *            quoted-and-escaped shape used by SkotOS's dump_value and
- *            cloud-server's admin_console::dump_value. Useful in error
+ *            quoted-and-escaped shape of admin_console::dump_value.
+ *            Useful in error
  *            messages and trace logs where the value's structure matters.
  *
  * member:    array contains predicate.
  *
- * sysLog, info, debugLog: logging stubs. Preserve call sites at lift time;
- *            pending a kernel-layer log facility, these are no-ops with
- *            TODO markers. Replace with concrete wiring (e.g., DRIVER
- *            message() or a kernel logger daemon) when one exists.
+ * sysLog, info, debugLog: logging stubs. Pending a kernel-layer log
+ *            facility these are no-ops with TODO markers; replace with
+ *            concrete wiring (e.g., DRIVER message() or a kernel logger
+ *            daemon) when one exists.
  */
 
 # include <type.h>
@@ -118,11 +118,11 @@ static int member(mixed item, mixed *arr)
 
 /*
  * return ob's logical name: query_object_name() if defined, else the LPC
- * object_name kfun. SkotOS's richer name() falls back through query_ur_object
- * for unnamed clones with an ur parent; that path doesn't arise for objects
- * created via vault_node.c's spawn_create_one (every clone gets set_object_name
- * at create time), so the simpler two-step fallback suffices for the cohesive
- * lift's MVA. Revise when an unnamed-ur-clone case is discovered.
+ * object_name kfun. A richer fallback through query_ur_object for
+ * unnamed clones with an ur parent doesn't arise for objects created
+ * via vault_node.c's spawn_create_one (every clone gets set_object_name
+ * at create time), so the two-step fallback suffices. Revise when an
+ * unnamed-ur-clone case is discovered.
  */
 static string name(object ob)
 {
@@ -151,11 +151,9 @@ static object findOrLoad(string path)
  * stateimpex callers (spawn_create_one, spawn_configure_one) to peek
  * inside parse_xml's typed-tree output.
  *
- * The /base/data/nref wrapper drops with Note 3 distribution-layer strip.
- * The XML element + pcdata + samref wrappers remain; samref is preserved
- * as a structural primitive at LV-4.5a (SAM-side game-content interpretation
- * is excluded, but the LWO carries XML data with no semantic interpretation
- * here — removing it would force xmd.c / xmlparse.c rewrite).
+ * The XML element + pcdata + samref wrappers are recognized; samref is
+ * a structural primitive (the LWO carries XML data with no semantic
+ * interpretation here).
  */
 static mixed queryColourValue(mixed value)
 {
@@ -176,7 +174,6 @@ static mixed queryColourValue(mixed value)
  * return the colour constant for an XML data wrapper LWO, or 0 if
  * value is not one of the recognized XML data wrappers. Used by
  * xmlgen.c::generate_xml to dispatch on element / pcdata / samref kind.
- * Mirrors SkotOS sys_auto.c::query_colour.
  */
 static int queryColour(mixed value)
 {
@@ -217,9 +214,8 @@ static mapping reverseMapping(mapping m)
 /*
  * logging stubs (no-op pending a kernel-layer log facility)
  *
- * Call sites preserved at lift time so SkotOS-shape trace structure
- * survives intact; concrete wiring (DRIVER message(), kernel logger
- * daemon, etc.) lands when a log story exists for the kernel layer.
+ * Concrete wiring (DRIVER message(), a kernel logger daemon, etc.)
+ * lands when a log story exists for the kernel layer.
  */
 
 static void info(string msg)

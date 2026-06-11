@@ -5,19 +5,6 @@
  * constmap), and a pointer to the compiled /merry/<md5> program. The
  * constructor parses Merry source via SYS_MERRY, generates wrapper LPC
  * from the AST, hashes it, and compiles to a cached object.
- *
- * Lifted from SkotOS /usr/SkotOS/data/merry.c per LM-2 sub-decisions.
- * Changes:
- *   - VAL_SAM cases removed from expand_to_source + expand_to_lpc
- *     per LM-2 sub-decision (c).
- *   - samarr per-script storage + womble_merry samarr cleanup removed.
- *   - Generate_pcdata SAM-rendering helper + /usr/XML/lib/xmlgen
- *     inherit removed.
- *   - SkotOS configure(string lpc) merged into create(string lpc) per
- *     cloud-server _F_init dispatch (L14 #10 from LV-4.5d).
- *   - MERRYNODE(n) replaced with MERRY_NODE(n) via <Merry.h>.
- *   - /lib/string -> /lib/util/ascii; /lib/womble inherit removed
- *     (samarr was its only consumer; merrynode wombles args itself).
  */
 
 # include <status.h>

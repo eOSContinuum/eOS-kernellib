@@ -94,7 +94,7 @@ void set_room_config(object actor, object room, mapping config)
  * Public LFUN: mint an admin-token LWO and attach it to the subject's
  * admin-tokens list. The grantor must itself hold a "grant" action
  * for the room (or realm-wide). nil grantor is allowed as a bootstrap
- * path; the caller-program domain isolation gates this at MVA scope.
+ * path; the caller-program domain isolation is the current gate.
  */
 mixed grant_admin(object grantor, object subject, object room, string *actions)
 {

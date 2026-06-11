@@ -5,15 +5,8 @@
  * ASCII serialization. These helpers construct, query, and reshape XMD
  * trees built from the LWO data wrappers in /usr/XML/data/.
  *
- * Lifted from skoot/usr/XML/lib/xmd.c. LV-4.5a refactors:
- * (a) /lib/array + /lib/string inherits replaced by /lib/util/ascii +
- *     /lib/util/lpc helper inherits.
- * (b) Function names refactored to camelCase per LV-2.5 / LV-2.5b. Calls
- *     into the lifted XML transport (queryColourValue / queryColour /
- *     sysLog / dumpValue / member) use the lifted names.
- * (c) lower_case and the strip helpers retain snake_case in ascii.c
- *     (lower_case is pre-existing in cloud-server's kernel ascii lib;
- *     strip / strip_left / strip_right added at LV-4.5a alongside).
+ * Helper names are camelCase; lower_case and the strip helpers from
+ * /lib/util/ascii retain snake_case.
  */
 
 # include <type.h>

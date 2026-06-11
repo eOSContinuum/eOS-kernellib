@@ -1,11 +1,11 @@
 /*
  * XML lexer state vars + macros. Included by ~XML/lib/xmlparse.c.
  *
- * Lifted verbatim from SkotOS skoot/usr/XML/include/XMLIn.h. The `DEBUG(...)`
- * calls in ScanMerry expand to no-ops in the lift's current logging story
- * (defined as empty in xmlparse.c); the dump_value references inside those
- * calls are therefore dead code and never compiled. When a real kernel-layer
- * log facility lands, DEBUG and dump_value get wired here at that point.
+ * The `DEBUG(...)` calls in ScanMerry expand to no-ops in the current
+ * logging story (defined as empty in xmlparse.c); the dump_value
+ * references inside those calls are dead code and never compiled. When
+ * a real kernel-layer log facility lands, DEBUG and dump_value get
+ * wired here.
  */
 
 /* input state */

@@ -7,21 +7,8 @@
  * XML-typed properties resolve through this daemon for their colour and
  * marshaling rules.
  *
- * Lifted from skoot/usr/XML/sys/xml.c. LV-4.5a refactors:
- * (a) /lib/data inherit replaced by /lib/StringBuffer clone in gen_xml.
- *     The SkotOS clear() / query_chunks() pattern becomes a per-call
- *     StringBuffer clone + drain loop. No <fastarr.h>/<faststr.h> lift.
- * (b) <DTD.h> SkotOS-only include dropped; DTD constant defined inline
- *     pointing at the lifted dtd_daemon.
- * (c) HARD() / HARDEN() NREF-machinery references stripped from
- *     XML_BOOL handling per Note 3 distribution-layer strip + Game-
- *     specific-content exclusion. The lifted XML_BOOL is a simple
- *     true / false serialization.
- * (d) DTD-> runtime calls deferred to LV-4.5b lift of the Schema's
- *     dtd_daemon; create() / patch() will error at boot until LV-4.5b
- *     lands. Same LV-3 -> LV-4 compile-chain deferral pattern.
- * (e) Function call sites updated to LV-2.5b camelCase: xmdForceToData,
- *     queryColour.
+ * gen_xml clones a /lib/StringBuffer per call and drains it to a
+ * string. XML_BOOL is a simple true / false serialization.
  */
 
 # include <type.h>
@@ -71,12 +58,10 @@ string gen_xml(mixed xml)
     mixed chunk;
     string out;
 
-    /* LV-5 L8 closure: System/lib/auto::clone_object requires /obj/ in the
+    /* System/lib/auto::clone_object requires /obj/ in the
      * path; /lib/StringBuffer fails that check. Every other StringBuffer
      * use in the codebase is `new StringBuffer(...)` (a non-persistent
-     * LWO via new_object). gen_xml never ran at runtime through LV-4.5c
-     * (vault.c::store was not exercised until LV-5's round-trip), so the
-     * mismatch surfaced here. */
+     * LWO via new_object). */
     res = new StringBuffer();
     ::generate_xml(xml, res);
     out = "";

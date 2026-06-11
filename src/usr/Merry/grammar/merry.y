@@ -20,13 +20,11 @@ void prepare() {
 }
 
 /* Single-character hex digit (lowercase) by integer value, returned as
- * an ASCII codepoint. Lifted as a private helper because SkotOS had
- * hex_digit() as a /lib/string function; cloud-server's /lib/util/ascii
- * has no equivalent (hex::encode in /lib/util/hex returns a string,
- * not an int). The $delay() label-generation site below writes the
+ * an ASCII codepoint. A private helper: /lib/util/ascii has no
+ * equivalent (hex::encode in /lib/util/hex returns a string, not an
+ * int). The $delay() label-generation site below writes the
  * digit into a fixed-length string via byte assignment, which expects
- * an int. New L14 category #11 substitution sibling to LM-3's
- * to_hex / hash_md5 / file_stamp set. */
+ * an int. */
 int hex_digit(int n)
 {
    return n < 10 ? '0' + n : 'a' + n - 10;

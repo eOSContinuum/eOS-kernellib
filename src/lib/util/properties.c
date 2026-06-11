@@ -1,14 +1,11 @@
 /*
  * Generic property access mechanism.
  *
- * Lifted from SkotOS /lib/properties.c per LM-3.5. Strips at lift:
- *   inherit "/lib/womble"           -> dropped (SAM-related; LM-2 (c) dropped SAM)
- *   womble_properties()             -> dropped (same)
- *   query_ascii_property            -> dropped (depends on mixed_to_ascii not lifted)
- *   set_ascii_property              -> dropped (same)
- *   nullify static                  -> dropped (only used by ascii path)
- *   inherit "/lib/string"           -> inherit "/lib/util/ascii" (lower_case)
- *   inherit "/lib/mapping"          -> inline prefixed_map below
+ * The ascii-property accessor pair (query_ascii_property /
+ * set_ascii_property) that the Core:Entry schema callbacks reference is
+ * not provided yet -- it depends on a richer type-coercion layer; until
+ * it lands, per-app schemas with typed accessors are the marshaling
+ * path for property-bearing objects.
  *
  * Inheritors receive query_state_root() returning "Core:Properties" by default;
  * application objects that bind to their own schema must override (the
@@ -23,7 +20,7 @@ private mapping properties;
 
 /*
  * MERRY dispatcher hook. set_property routes through MERRY->dispatch_set
- * when the daemon is loaded so observers (DI-1 registrations) fire around
+ * when the daemon is loaded so observers (dispatcher registrations) fire around
  * the actual write. set_raw_property is the bypass path used by the
  * dispatcher itself to perform the write step without re-entering
  * dispatch; it is also available to callers that need to skip dispatch
@@ -34,9 +31,8 @@ private mapping properties;
 
 /*
  * Sub-mapping with keys starting with `prefix` (and lexicographically
- * up to prefix + "\377"). Lifted inline from SkotOS /lib/mapping.c per
- * LM-3.5 (the `prune` / `reverse` modes are unused by Merry's call
- * sites and dropped).
+ * up to prefix + "\377") (only the prefix-window mode
+ * is provided; Merry's call sites need nothing more).
  */
 private mapping prefixed_map(mapping map, string prefix)
 {

@@ -8,27 +8,14 @@
  * nested mapping; a parallel object -> name map supports destruct-time
  * cleanup without the caller knowing the registered name.
  *
- * Source-lifted from skoot/usr/System/sys/idd.c (LV-4.5d). Refactors at
- * lift:
- *   - The SkotOS event surface (add_event/event/allow_subscribe for
- *     "set"/"clear" name-change notifications) is dropped. The DD-phase
- *     property-change dispatcher will revisit name-change observers if
- *     downstream consumers surface; for now the workstream defers per
- *     scope.md LV-4.5d Decision (a).
- *   - The SAM-style query_method/call_method export ("idd:get-objects",
- *     "idd:get-folders" properties) is dropped; introspection is via
- *     direct method calls (query_tree, query_subdirs, query_objects).
- *   - The SkotOS gate previous_program() == SYS_AUTO becomes
- *     previous_program() == NAMED (= "/lib/util/named"), aligning with
- *     the post-lift call path through /lib/util/named.c. The new
- *     destruct entry point clear_name_for_object() is gated by KERNEL()
- *     so only /kernel/lib/auto's destruct_object can invoke it.
- *   - A reverse map names_by_object is added so destruct can clear
- *     without round-tripping through the caller. The SkotOS design
- *     stored the name privately in sys_auto (alongside the object), so
- *     clear_name(name) was sufficient; we don't have a per-object
- *     destruct-time slot we can trust, so the daemon owns the reverse
- *     map.
+ * Name-change event notifications are not part of this surface;
+ * introspection is via direct method calls (query_tree, query_subdirs,
+ * query_objects). set_name is gated to previous_program() ==
+ * "/lib/util/named"; the destruct entry point clear_name_for_object()
+ * is KERNEL()-gated so only /kernel/lib/auto's destruct_object can
+ * invoke it. The daemon owns the names_by_object reverse map so
+ * destruct can clear a registration without the destruct site knowing
+ * the name.
  */
 
 # include <type.h>

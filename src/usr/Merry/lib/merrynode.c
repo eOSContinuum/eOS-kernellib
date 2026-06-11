@@ -11,18 +11,6 @@
  *   - the obref() runtime lookup that resolves AST `${objref-name}` tokens
  *     to actual objects via the per-script object array.
  *
- * Lifted from SkotOS /usr/SkotOS/lib/merrynode.c per LM-2 sub-decisions.
- * Game-content merryfuns dropped: Social / Bilbo / Popup / Act / Describe
- * / Match / MatchPlural / EmitTo / EmitIn / UnSAM / ParseXML and their
- * SkotOS-only inherit chain (bilbo, ursocials, describe, xmd).
- * SAM surface dropped: samref(), samarr, set_sam_array().
- * Spawn inlined as clone_object + set_ur_object (SkotOS spawn_thing was
- * game-content "thing" predicated).
- *
- * /lib/womble inherit + womble_merry() callback dropped at LM-4 (was the
- * last surviving SAM-cleanup hook; never invoked under cloud-server -- the
- * SkotOS caller was data/merry's womble_merry which itself was removed at
- * LM-3 when samarr was dropped per LM-2 sub-decision (c)).
  */
 
 # include <type.h>
@@ -131,8 +119,7 @@ void do_suicide() {
 	 ::rename_file(path + ".c", "/usr/Merry/merry/cleaned/" + name + ".c");
       }
    }
-   /* cloud-server destruct_object takes an explicit object arg; SkotOS
-    * had a no-arg shorthand that destructed this_object(). */
+   /* cloud-server destruct_object takes an explicit object arg. */
    :: destruct_object(this_object());
 }
 
@@ -197,15 +184,14 @@ mixed Get(object o, string p) {
 }
 
 /*
- * BatchedSet: DD-1 (c) multi-key batching surface for Merry observer
- * source. Composes inline per L14 #15: the mapping-arg signature carries
- * all mutation values without requiring a local handle variable. The
- * opts mapping is the DD-4 (d) atomic-mode opt-in carrier
+ * BatchedSet: multi-key batching surface for Merry observer source.
+ * Composes inline: the mapping-arg signature carries all mutation
+ * values without requiring a local handle variable. The opts mapping
+ * is the atomic-mode opt-in carrier
  * (`BatchedSet($this, ([ ... ]), ([ "atomic": 1 ]))`); absent or nil
- * runs non-atomic per the DD-2 (d) default. The function-reference
- * batch (`MERRY->batch(fn)`) is intentionally NOT exposed to Merry
- * source per DD-1 (c) -- L14 #15 forbids the function-reference syntax
- * the LPC-side surface would need.
+ * runs non-atomic per the catch'd-error default. The function-
+ * reference batch (`MERRY->batch(fn)`) is intentionally NOT exposed to
+ * Merry source -- the language has no function-reference syntax.
  */
 nomask static
 mixed BatchedSet(object o, mapping kv_map, varargs mapping opts) {
@@ -416,7 +402,7 @@ object new_object(string obj, mixed args...) {
 
 # define SANDBOX(f) mixed f(mixed args...) { error("function '" + #f + "' not allowed in merry code"); }
 
-/* SkotOS-era forbidden set (37 functions verbatim). Several names
+/* The historical forbidden set (37 functions). Several names
  * may not resolve to actual DGD kfuns in cloud-server (e.g.
  * add_event, event, subscribe_event, ports, open_port, this_user,
  * users, set_object_name) -- the SANDBOX entries are harmless
@@ -462,9 +448,8 @@ SANDBOX(unsubscribe_event)
 SANDBOX(users)
 SANDBOX(write_file)
 
-/* LM-3 cloud-server kfun-delta additions (per LM-2 sub-decision (b)
- * audit; kfuns present in DGD 1.7.x cloud-server but not in
- * SkotOS-era DGD or not in SkotOS's sandbox list). Conservative-deny:
+/* Kfun-delta additions: kfuns present in DGD 1.7.x cloud-server that
+ * the historical deny list predates. Conservative-deny:
  * each is either escape-shaped (state restore, program removal,
  * file dump) or external-effect-shaped (UDP/telnet networking,
  * connection disconnect). */

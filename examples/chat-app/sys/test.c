@@ -96,8 +96,8 @@ inherit "/lib/util/lpc";
 
 /* Merry's invocation API is a static surface (find_merry / run_merry).
  * Inherited rather than called via the SYS_MERRY daemon so the static
- * methods resolve at compile time -- the SkotOS convention merryapi.c
- * was authored against, mirrored by examples/merry-app/sys/test.c. The
+ * methods resolve at compile time -- the convention merryapi.c was
+ * authored against, mirrored by examples/merry-app/sys/test.c. The
  * cross-domain inherit + the cross-domain clone of ~Merry/data/merry
  * below ride the global-access grants set in src/usr/System/initd.c. */
 inherit "/usr/Merry/lib/merryapi";

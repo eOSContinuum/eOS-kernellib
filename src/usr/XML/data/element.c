@@ -13,7 +13,7 @@ mixed data;
 
 int is_element() { return TRUE; }
 
-/* LV-4.5d: System/lib/auto._F_init dispatches new_object(path, args...) to
+/* System/lib/auto._F_init dispatches new_object(path, args...) to
  * create(args...), not configure(args...). LWO data wrappers carry their
  * payload as a single mixed via create(). */
 static void create(mixed d)

@@ -1,51 +1,19 @@
 /*
  * Marshal XmlBinding: state import/export via schema-driven XML.
  *
- * Lifted from skoot/usr/SID/lib/stateimpex.c. LV-4.5c refactors:
- * (a) /usr/DTD/lib/dtd inherit -> ~Schema/lib/dtd (LV-2 rename;
- *     lifted at LV-4.5b).
- * (b) /usr/XML/lib/xmd inherit -> ~XML/lib/xmd (lifted at LV-4.5a;
- *     helpers are camelCase: xmdElts, xmdText, xmdElement,
- *     xmdAttributes, xmdContent, xmdForceToData, attributesToMapping;
- *     queryColourValue lives in /lib/util/lpc).
- * (c) /lib/util/lpc inherit added for queryColourValue + dumpValue +
- *     sysLog + name. ur_name(ob) inlined as object_name(ob) per
- *     LV-2.5b convention.
- * (d) <mapargs.h> include dropped -- stateimpex does not call any
- *     arg_mixed/arg_object/arg_string/arg_int helpers; the include
- *     was dead in the SkotOS source.
- * (e) <SID.h> include replaced by inline `# define SID
- *     "/usr/Schema/sys/schema_daemon"` per LV-2 rename + L6 inline
- *     daemon-path convention.
- * (f) DTD-callback API surface (query_attributes, query_callbacks,
- *     query_attribute_query, query_attribute_type,
- *     query_iterator_variable, query_iterator_call,
- *     query_default_value, query_children, query_transient,
- *     query_leaf, query_type, query_name, is_parent on schema_node;
- *     get_root_node, query_node on schema_daemon; ascii_to_typed,
- *     test_raw_data on dtd_daemon) kept snake_case per L7 / LV-4.5b
- *     Decision (b). The camelCase sweep across this contract surface
- *     is tracked as #FH-3 and is a follow-on commit.
- * (g) Helper-name refactors: query_colour_value -> queryColourValue;
- *     xmd_text -> xmdText; xmd_elts -> xmdElts; xmd_element ->
- *     xmdElement; xmd_attributes -> xmdAttributes; xmd_content ->
- *     xmdContent; xmd_force_to_data -> xmdForceToData;
- *     attributes_to_mapping -> attributesToMapping; SysLog ->
- *     sysLog; dump_value -> dumpValue; ur_name(ob) inlined as
- *     object_name(ob).
- * (h) Note 1 element-distinction at marshal time: vault.c wraps
- *     export_state output in xmdElts("object", ...) for daemons
- *     (singletons); vault_node.c spawn_create_one discriminates
- *     <object> vs <clone> on the root element of the parsed XML.
- *     stateimpex itself emits only the inner element body, so no
- *     Note 1 logic lives here.
- * (i) Note 4 namespace rename at marshal time: stateimpex calls
- *     el->query_name() to obtain the on-disk element name, which
- *     the schema_node returns post-rename (Hierarchy / Entry rather
- *     than Ur:UrObject / Core:Property). The rename lives in the
- *     schema definitions (LV-4.5b applied them in code and in the
- *     XML schema files); stateimpex just emits whatever the schema
- *     gives back.
+ * The DTD-callback API surface (query_attributes, query_callbacks,
+ * query_attribute_query, query_attribute_type, query_iterator_variable,
+ * query_iterator_call, query_default_value, query_children,
+ * query_transient, query_leaf, query_type, query_name, is_parent on
+ * schema_node; get_root_node, query_node on schema_daemon;
+ * ascii_to_typed, test_raw_data on dtd_daemon) stays snake_case as a
+ * contract surface; a coordinated camelCase sweep is a follow-on item.
+ *
+ * Root-element wrapping is the Vault's concern: vault.c wraps
+ * export_state output in xmdElts("object", ...) for singletons and
+ * <clone> for instances; stateimpex emits only the inner element body.
+ * Element names come from el->query_name() -- stateimpex emits
+ * whatever the schema gives back.
  */
 
 # include <type.h>
@@ -126,10 +94,9 @@ mixed *translate_parameters(mixed *params, mapping args) {
 	    sscanf(params[i], "%d", params[i]);
 	 }
       } else if (params[i] == "&user") {
-	 /* SkotOS's `&user` token substituted with the originator's name
-	  * via query_originator() (a SkotOS sys_auto-chain extension
-	  * delegating to SYSLOGD). eOS-kernellib has no equivalent; the
-	  * token is admin-tooling territory and not required by the
+	 /* The historical `&user` token substituted the originator's
+	  * name; eOS-kernellib has no originator-tracking facility, and
+	  * the token is admin-tooling territory not required by the
 	  * persistence pathway. Surface a clear error if a schema
 	  * actually uses it; revisit when an originator-tracking facility
 	  * lands. */

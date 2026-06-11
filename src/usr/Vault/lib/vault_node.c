@@ -4,38 +4,11 @@
  * spawn-configure pipeline that the Vault daemon calls during single-
  * object load.
  *
- * Lifted from SkotOS /usr/SID/lib/vaultnode.c (commit feature/cohesive-lift,
- * LV-4) with the following changes per workstream Decisions:
- *
- *   - Note 1 (element distinction): root-element discriminator switched
- *     from the SkotOS /obj/ path-convention heuristic
- *     (sscanf(program_attr, "%*s/obj/")) to structural element-name check
- *     <object> for singletons (find_or_load path) vs <clone> for instances
- *     (clone_object path). The element name carries the kind information,
- *     eliminating the fragile path-convention discriminator.
- *
- *   - Note 3 (distribution layer drops): removed the entire distribution
- *     machinery — query_local_blocking_objects, kill_local_blocking_objects,
- *     rename_local_blocking_objects, do_rename, do_disable, query_master,
- *     check_mastery, spawn_now, find_named_objects_recursively (function),
- *     parse_archives state machine (ST_CLEAR/ST_CREATE/ST_CONFIGURE),
- *     refresh_list_file, compile_archives, append, collect, compile,
- *     query_halt, halt(). Also dropped the state vars supporting those
- *     paths (blocking, include, exclude, master, halt, nice,
- *     total_errors, test_only) and the relay callback parameter on
- *     spawn_create_one. Cross-server mastery, .xma archive packing,
- *     blocker-rename, vault.lst include/exclude resolution all belong
- *     to a future cross-runtime workstream, not this lift.
- *
- *   - LV-2 path renames: VAULT daemon path -> ~Vault/sys/vault (defines
- *     in the inheriting daemon, not here); /usr/XML/lib/* -> ~XML/lib/*.
- *     The vault_node lib lives at ~Vault/lib/vault_node.
- *
- *   - LV-2.5 + LV-2.5b helper-name refactor: SysLog -> sysLog,
- *     Debug -> debugLog, dump_value -> dumpValue, ur_name(ob) inlined
- *     as object_name(ob), find_or_load -> findOrLoad,
- *     query_colour_value -> queryColourValue. lower_case stays
- *     (eOS-kernellib already has it in /lib/util/ascii).
+ * The root-element name is the spawn discriminator: <object> for
+ * singletons (find-or-load path) vs <clone> for instances
+ * (clone_object path). The element name carries the kind information,
+ * so no path-convention heuristic is needed. Cross-server mastery and
+ * archive packing belong to a future cross-runtime layer, not here.
  */
 
 # include <type.h>
@@ -50,11 +23,10 @@ inherit "~XML/lib/xmlparse";
 # define VAULT		"/usr/Vault/sys/vault"
 # define INDEX		"/usr/Index/sys/index_daemon"
 
-/* LV-5 L8 closure: vault_node tests whether an object already exists.
- * find_object is a path-lookup kfun; logical names registered via
- * set_object_name (set_name on Index after LV-4.5d) do not resolve
- * through it. This helper tries path lookup first, then falls back to
- * Index->query_object. */
+/* vault_node tests whether an object already exists. find_object is a
+ * path-lookup kfun; logical names registered via set_object_name do
+ * not resolve through it. This helper tries path lookup first, then
+ * falls back to Index->query_object. */
 private object find_by_path_or_name(string name)
 {
     object ob;

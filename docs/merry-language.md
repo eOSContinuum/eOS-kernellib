@@ -26,7 +26,7 @@ Restrictions exist at three layers: grammar (the parser refuses the form), trans
 
 **Narrow allowed-kfun set.** The Merry-recognized kfun catalog (`merryapi.c::categorize_merry_word`) lists the kfuns a Merry source may name. The set covers safe arithmetic, string, mapping, array, time, and reflection kfuns: `acos`, `allocate`, `allocate_float`, `allocate_int`, `asin`, `atan`, `atan2`, `call_trace`, `ceil`, `cos`, `cosh`, `crypt`, `ctime`, `error`, `exp`, `explode`, `fabs`, `find_object`, `floor`, `fmod`, `frexp`, `function_object`, `implode`, `ldexp`, `log`, `log10`, `map_indices`, `map_sizeof`, `map_values`, `millitime`, `modf`, `object_name`, `parse_string`, `pow`, `previous_object`, `previous_program`, `random`, `sin`, `sinh`, `sizeof`, `sqrt`, `sscanf`, `status`, `strlen`, `tan`, `tanh`, `this_object`, `time`, `typeof`. Notably absent: every kfun that touches the network (`open_port`, `connect`, `send_datagram`), the file system (`read_file`, `write_file`, `make_dir`, `remove_file`, `rename_file`, `get_dir`, `file_info`), the process (`shutdown`, `dump_state`, `restore_object`, `swapout`), the event surface (`add_event`, `subscribe_event`, `event`, `block_input`), and the code-loading surface (`clone_object`, `compile_object`, `destruct_object`, `call_touch`).
 
-The sandbox (the runtime layer) is the authoritative deny: see [the sandbox surface](#the-sandbox-surface) below for the full list. The categorize list is a tooling hint (used by syntax highlighters and the SkotOS-era debugger); the sandbox does the actual blocking.
+The sandbox (the runtime layer) is the authoritative deny: see [the sandbox surface](#the-sandbox-surface) below for the full list. The categorize list is a tooling hint (used by syntax highlighters and legacy debugging tools); the sandbox does the actual blocking.
 
 ## What is added
 
@@ -73,7 +73,7 @@ The translator and the runtime share an AST tag enumeration in `src/usr/Merry/in
 | `VAL_LABELCALL` | `space::method(args)` and `::method(args)` | Resolved at runtime via script-space registry |
 | `VAL_LABELREF` | `space::` | Returns the script-space handler object |
 
-`VAL_SAM` was removed at the kernel-layer lift (the `$"..."` SAM-token surface is a SkotOS game-content extension; eOS-kernellib does not carry it). The numbering above reflects the post-removal contiguous sequence.
+There is no `VAL_SAM` tag (the `$"..."` SAM-token surface is a game-content extension of the historical design; eOS-kernellib does not carry it). The numbering above is contiguous.
 
 ## The sandbox surface
 
@@ -118,7 +118,7 @@ Fourteen merryfuns are available to Merry source:
 | `Every(signal, seconds)` | `schedule_entry(...)` recurring | Schedules a recurring re-fire of `signal` |
 | `Stop(id)` | `unschedule_entry(id)` | Cancels a scheduled entry by id |
 
-For raising errors from inside Merry source, use the allowed kfun `error("message")` directly — there is no `Error` merryfun. (The `categorize_merry_word` syntax-categorizer in `merryapi.c` lists `Error` as a merryfun token, but the merrynode implementation carries no `Error` LFUN; the entry is vestigial from SkotOS-era categorization tooling.)
+For raising errors from inside Merry source, use the allowed kfun `error("message")` directly — there is no `Error` merryfun. (The `categorize_merry_word` syntax-categorizer in `merryapi.c` lists `Error` as a merryfun token, but the merrynode implementation carries no `Error` LFUN; the entry is vestigial categorization tooling.)
 
 `Set`, `Get`, `SetVar`, `GetVar`, `Call`, `LabelCall`, `LabelRef`, `FindMerry`, `Spawn`, `Slay`, `Duplicate` are marked `nomask`: subclasses cannot redefine them. `Spawn` and `Duplicate` are also `atomic`.
 
@@ -187,7 +187,7 @@ The LFUNs that make these examples work split by home: the binding host's `delay
 
 - **[merry-applications.md](merry-applications.md)** — the application-author perspective: writing a script-bearing object, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the LPC-side invocation surface.
 - **[lpc-essentials.md](lpc-essentials.md)** — LPC language orientation. Read this if `inherit`, `clone_object`, `call_out`, `atomic`, or the per-call atomicity model are unfamiliar.
-- **[runtime-primitives.md](runtime-primitives.md)** — the sandboxed-code-load primitive (FX-2e) that Merry provides, and how it composes with the other runtime primitives.
+- **[runtime-primitives.md](runtime-primitives.md)** — the sandboxed-code-load primitive that Merry provides, and how it composes with the other runtime primitives.
 - **`src/usr/Merry/grammar/merry.y`** — the authoritative grammar. Read this when a parse error is unexplained or when extending the language.
 - **`src/usr/Merry/lib/merrynode.c`** — the sandbox installer and merryfun implementations. Read this when a runtime error from inside a Merry script needs tracing.
 - **`src/usr/Merry/lib/merryapi.c`** — the `find_merry` / `run_merry` / `find_merries` / `run_merries` invocation API used by LPC code that calls into bound scripts.

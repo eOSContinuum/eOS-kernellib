@@ -10,13 +10,8 @@
  * Attribute, Attributes, Callback, Callbacks, Iterator) are themselves
  * schema_node instances defined in code by schema_daemon.c.
  *
- * Lifted from skoot/usr/SID/lib/sidnode.c. LV-4.5b refactors:
- * (a) /lib/string inherit dropped; strip helper via /lib/util/ascii.
- * (b) SID constant inline-defined as /usr/Schema/sys/schema_daemon per
- *     LV-2 rename (was /usr/SID/sys/sid via SID.h).
- * (c) Daemon-callback function names (query_*, set_*, add_*) kept
- *     snake_case as the schema-API contract; LV-2.5b camelCase sweep
- *     held pending a coordinated rename across schema callers.
+ * Daemon-callback function names (query_*, set_*, add_*) stay
+ * snake_case as the schema-API contract surface.
  */
 
 # include <type.h>

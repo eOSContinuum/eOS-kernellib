@@ -6,12 +6,6 @@
  * The inheritor must have write-access to the scratch-object filename
  * that is passed to create().
  *
- * Lifted from SkotOS /lib/parse.c (Skotos Tech 1999) per LM-2
- * sub-decision (d). Conventions adjusted to eos-kernellib:
- *   inherit "/lib/file"   -> inherit "/lib/util/file"
- *   inherit "/lib/string" -> inherit "/lib/util/ascii"
- *   SysLog                -> sysLog (via inherit "/lib/util/lpc")
- *   dump_value            -> dumpValue
  */
 
 # include <status.h>

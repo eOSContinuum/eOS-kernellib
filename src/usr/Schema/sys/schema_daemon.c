@@ -8,33 +8,15 @@
  * Callback / Callbacks / Iterator) at boot -- the schema-FOR-schemas
  * tree -- and is the load target for additional domain schemas.
  *
- * Lifted from skoot/usr/SID/sys/sid.c. LV-4.5b refactors:
- * (a) /usr/SID/lib/vaultnode inherit dropped -- vault participation is a
- *     LV-4.5c concern (Marshal/stateimpex coordinates the vault path).
- *     The schema_daemon does NOT live in the vault tree at this lift.
- * (b) /usr/SID/lib/stateimpex inherit dropped for the same reason --
- *     stateimpex is the LV-4.5c lift target; schema_daemon delegates
- *     to it once it lands.
- * (c) /lib/string inherit replaced by /lib/util/ascii (lower_case).
- * (d) tool/vault->load_subdir(...) bootstrap calls dropped per BACKLOG
- *     instruction: schema_daemon must NOT depend on vault_ops.c. Core
- *     schemas are code-defined in configure_initial_nodes() (extended
- *     to cover the lifted Ur:Hierarchy / Ur:UrChild / Ur:UrChildren /
- *     Core:Entry / Core:Entries primitives with Note 4 renames
- *     applied). XML-file-driven loading via read_file + parse_xml is
- *     scaffolded as load_core_schemas() but deferred to LV-4.5c when
- *     stateimpex lands -- the XML files in data/schema/ reference the
- *     <object program=...> spawn format that stateimpex handles.
- * (e) Object-name "SID:Daemon" -> "Schema:Daemon" per LV-2 rename.
- *     SCHEMA_NODE constant inline-defined for the obj clonable path.
- * (f) Element names in configure_initial_nodes() renamed SID: -> Schema:
- *     so the schema-for-schemas tree lives in the Schema: namespace.
- *     Note 4 renames applied: Ur:UrObject -> Ur:Hierarchy with
- *     `urobject` attribute renamed to `parent`; Core:Property ->
- *     Core:Entry with `property` attribute renamed to `key`.
- * (g) INFO() logging stub replaced by sysLog() from /lib/util/lpc.
- *     SkotOS-style HARD/NREF and SID:* special-case for SkotOS:Socials
- *     dropped per Game-specific-content exclusion.
+ * Core schemas are code-defined in configure_initial_nodes() --
+ * structural primitives plus the Ur:Hierarchy / Ur:Child / Ur:Children
+ * ancestry shapes and the Core:Entry / Core:Entries property-bag
+ * shapes. XML-file-driven loading (load_core_schemas) cross-checks the
+ * code-defined primitives against the data/schema/ files. Vault
+ * participation lives in the Vault subsystem; the marshaler
+ * (~Marshal/XmlBinding/lib/stateimpex) coordinates the vault path.
+ * The type-handler API stays snake_case as a contract surface across
+ * its callers.
  */
 
 # include <type.h>
@@ -54,12 +36,8 @@ private inherit "~XML/lib/xmd";
 inherit "/lib/util/named";
 inherit "/usr/Schema/lib/dtd";
 
-/* LV-4.5c re-adds the stateimpex inherit so load_core_schemas() can call
- * import_state() directly to dispatch parsed XML schema files through
- * the marshaler. SkotOS's /usr/SID/sys/sid.c originally inherited
- * stateimpex; LV-4.5b dropped it because Marshal had not lifted yet.
- * stateimpex is `private inherit "~Marshal/XmlBinding/lib/stateimpex"`
- * via the LV-2 path-rename. */
+/* The stateimpex inherit lets load_core_schemas() call import_state()
+ * directly to dispatch parsed XML schema files through the marshaler. */
 inherit "~Marshal/XmlBinding/lib/stateimpex";
 
 mapping namespaces;
@@ -88,7 +66,7 @@ int boot(int block)
 {
     /* Core schemas are code-defined via configure_initial_nodes(); the
      * scaffolded load_core_schemas() reads data/schema/<file>.xml when
-     * a stateimpex-equivalent loader lands at LV-4.5c. */
+     * the marshaler loads them. */
     return 60;
 }
 
@@ -215,11 +193,9 @@ private void configure_initial_nodes()
 	urChildren->add_child(urChild);
     }
 
-    /* Core:Entry primitives (was Core:Property / Properties). Note 4
-     * rename applied: Property -> Entry with attribute id `property` ->
-     * `key`. The leaf type stays lpc_str; the marshaling callbacks stay
-     * the SkotOS query/clear/set_ascii_property naming until a wider
-     * property-API rename lands. */
+    /* Core:Entry primitives. The leaf type stays lpc_str; the
+     * marshaling callbacks keep the query/clear/set_ascii_property
+     * naming until a wider property-API rename lands. */
 
     {
 	object entry, entries;

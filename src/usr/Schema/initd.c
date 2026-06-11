@@ -1,7 +1,7 @@
 /*
  * Schema subsystem initialization daemon.
  *
- * LV-4.5b lifts the Schema subsystem (DTD lib + dtd_daemon + schema_node
+ * Compiles the Schema subsystem (DTD lib + dtd_daemon + schema_node
  * lib+obj + schema_daemon + 5 core schema XML files in data/schema/).
  *
  * Boot order is governed by /usr/System/initd.c::create(), which iterates
@@ -15,7 +15,7 @@
  *
  * The XML files in data/schema/ carry the on-disk format reference for
  * the lifted Ur:Hierarchy / UrChild / UrChildren / Core:Entry / Entries
- * primitives. XML-driven load via stateimpex is deferred to LV-4.5c;
+ * primitives. XML-driven load runs through the marshaler;
  * at this lift the primitives are code-defined in
  * schema_daemon::configure_initial_nodes().
  */

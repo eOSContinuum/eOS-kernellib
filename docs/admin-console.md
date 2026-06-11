@@ -234,13 +234,13 @@ For substantial edits, prefer a host-side editor. The `ed` verb is for cases whe
 
 **Why**: the Merry dispatcher (`docs/dispatcher.md`) routes every property-change observation through a substrate that maintains observer registrations, cascade-depth bounds, cycle detection, and batch-status accounting. Operators investigating dispatcher behavior at runtime — debugging a deep cascade, auditing observer registrations after a deploy, toggling verbose trace for a session — need first-class verbs rather than long-form `code MERRY->_query_batch_status(7)` invocations.
 
-**How**: these verbs are not built into the kernel admin console (its built-in set is the kernel-tier categories enumerated above). They live in `src/usr/Merry/lib/admin_console_ext.c` and reach the console via the selective-extension model introduced at #EX-3:
+**How**: these verbs are not built into the kernel admin console (its built-in set is the kernel-tier categories enumerated above). They live in `src/usr/Merry/lib/admin_console_ext.c` and reach the console via the selective-extension model:
 
-- A KERNEL-tier registry at `/kernel/sys/admin_console_registry` holds a `verb -> (extension_path, method_name)` dispatch table. Merry's nine verbs are hardcoded into the registry's `create()` for the MVA.
+- A KERNEL-tier registry at `/kernel/sys/admin_console_registry` holds a `verb -> (extension_path, method_name)` dispatch table. Merry's nine verbs are hardcoded into the registry's `create()`.
 - The console's unknown-verb switch default consults the registry; if it finds an entry and the extension master is loaded, it dispatches there.
 - Mutation verbs whose underlying daemon LFUNs are KERNEL-gated (`approve-registrar`, `unapprove-registrar`, `cascade-depth N`, `dispatch-trace on|off`) or capability-gated by caller-domain (`register-observer`, `unregister-observer`) route through the registry's `verb_*` elevation helpers. The registry is KERNEL-tier, so the daemon's gates pass; the registry's own caller-program whitelist constrains which extensions may use the elevation surface.
 
-The kernel admin console itself remains MERRY-unaware. Future operator surfaces for Vault, Schema, or HTTP extend the registry's hardcoded list the same way. (When the cross-subsystem capability-model workstream lands, dynamic registration replaces the hardcoded table; the dispatch shape is unchanged.)
+The kernel admin console itself remains MERRY-unaware. Future operator surfaces for Vault, Schema, or HTTP extend the registry's hardcoded list the same way. (When a cross-subsystem capability model lands, dynamic registration replaces the hardcoded table; the dispatch shape is unchanged.)
 
 **What for**:
 

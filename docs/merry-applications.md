@@ -28,7 +28,7 @@ static void create()
 }
 ```
 
-The pattern surfaced on the LM-3.5 throwaway probe object when the same two libs collided; labels are the canonical fix.
+The pattern surfaces whenever the same two libs collide; labels are the canonical fix.
 
 ## Script storage convention
 
@@ -235,4 +235,4 @@ The reference application binds scripts to in-memory clones; statedump survival 
 - a per-app `MerryApp:Thing` schema_node with `merry:*` attributes typed as `lpc_obj` (so the marshaler can record the bound script clonable's program path on dump and re-resolve on restore);
 - Vault registration via inheriting `~Vault/lib/vault_node` (the `examples/vault-app/` pattern), so the property tree survives `dump_state`.
 
-The composite "scripted persistent object" is the natural next example -- composing `merry-app` and `vault-app` into a single demonstrator -- and lands as a follow-on once the LM phase closes.
+The composite "scripted persistent object" is the natural next example -- composing `merry-app` and `vault-app` into a single demonstrator -- and is a natural follow-on.
