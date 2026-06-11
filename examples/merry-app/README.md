@@ -48,6 +48,7 @@ kill %1
 #   MerryApp:test: ANCESTRY OK
 #   MerryApp:test: SANDBOX OK
 #   MerryApp:test: SPAWN OK
+#   MerryApp:test: DUPLICATE OK
 #   MerryApp:test: LABELCALL OK
 #   MerryApp:test: BATCH OK
 #   MerryApp:test: BATCH ATOMIC OK
@@ -77,5 +78,5 @@ The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result
 ## Notes
 
 - The example exercises invocation and observer-survival across snapshot+restore -- no Schema registration, no on-disk Vault round-trip. A Merry script is a runtime object (a `/usr/Merry/data/merry` clone) carrying parsed AST + cached compiled program; the cached compile artifact lives on-disk under `/usr/Merry/merry/<md5>` and DGD's object-reference resurrection re-attaches the property's stored reference on restore. Phases 16 and 17 verify this end-to-end at the dispatcher layer; Schema + Marshal round-trips are out of scope and demonstrated by `examples/vault-app/`.
-- `Duplicate` shares the `::clone_object` escape with `Spawn` (both fixed in merrynode at LM-6) but `export_state` requires a Schema-registered state model (`SID->get_root_node(ob)`). A Schema registration on `MerryApp:Thing` would unblock Duplicate; that work pairs with whichever phase first introduces Schema-bound Merry hosts.
+- `Duplicate` shares the `::clone_object` escape with `Spawn`, and additionally walks the source clone's registered state model (`export_state` resolves it via the schema daemon). Phase 3b registers the `MerryApp:Thing` schema (one property-backed `label` attribute) and asserts a Merry-invoked `Duplicate($this)` returns a distinct clone carrying the schema-declared state.
 - Observer-property naming (`merry:on:<path>:<timing>` storage for property-change observers) is the property-change dispatcher's convention; phases 10-15 exercise registration and pre/main/post firing, and phases 16-17 exercise survival across snapshot+restore. The convention and its lookup semantics (ancestry walk via `query_ur_object()`, declarative-dominant with `merry:on-inherit:<path>:<timing>` re-enable marker, observer-source `$this` binding) are documented in `docs/dispatcher.md`.

@@ -183,7 +183,7 @@ result = run_merry(child, "make_one", "lib", ([ ]));
 /* result is "/usr/MerryApp/obj/thing#NN" */
 ```
 
-`Spawn($this)` resolves to the static `Spawn(object ur)` merryfun on `merrynode`, which extracts the binding host's clonable from its object_name and calls `::clone_object(clonable)`. The `::` escape past the local `SANDBOX(clone_object)` shadow uses the same idiom merrynode applies for `::call_other`, `::destruct_object`, and `::new_object`. `Duplicate` shares the escape; it is not exercised here because `export_state` walks `SID->get_root_node(ob)` and requires a Schema-registered state model. The escape fix applies identically.
+`Spawn($this)` resolves to the static `Spawn(object ur)` merryfun on `merrynode`, which extracts the binding host's clonable from its object_name and calls `::clone_object(clonable)`. The `::` escape past the local `SANDBOX(clone_object)` shadow uses the same idiom merrynode applies for `::call_other`, `::destruct_object`, and `::new_object`. `Duplicate` shares the escape and additionally walks the source's registered state model: phase 3b registers the `MerryApp:Thing` schema (one property-backed `label` attribute) at setup, then asserts a Merry-invoked `Duplicate($this)` returns a distinct clone of the same clonable carrying the schema-declared state (`export_state` resolves the model via `SID->get_root_node(ob)`; `import_state` replays it on the fresh clone).
 
 Merry source has no LPC-style variable declarations -- `object o = Spawn(...)` is a parse error. Compose the call inline.
 
@@ -226,9 +226,7 @@ Script-space handlers are independent of the ancestry-walk lookup. `LabelCall` i
 
 ## What this example does NOT exercise
 
-The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now exercised, and snapshot+restore survival of property-bound script clones is exercised by the dispatcher's own example (`examples/merry-app/sys/test.c` phases 16 and 17, walked in `docs/dispatcher.md` Persistence). The remaining gap is:
-
-- **Duplicate full path**. The `::clone_object` escape applies to Duplicate as well, but `export_state` requires a Schema-registered state model (`SID->get_root_node(ob)`). Adding a per-app Schema registration to `obj/thing.c` and exercising Duplicate is follow-on work tied to whichever phase first introduces Schema-bound merry hosts.
+The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now exercised -- Duplicate's full runtime path included, since phase 3b gives the clonable a registered state model -- and snapshot+restore survival of property-bound script clones is exercised by the dispatcher's own example (`examples/merry-app/sys/test.c` phases 16 and 17, walked in `docs/dispatcher.md` Persistence).
 
 ## Storage and round-trip
 

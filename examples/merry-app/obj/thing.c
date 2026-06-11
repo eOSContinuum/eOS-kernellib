@@ -18,11 +18,10 @@
  * server's inherit resolution requires labels to disambiguate. Same
  * pattern surfaced on the LM-3.5 throwaway probe object.
  *
- * query_state_root() returns "MerryApp:Thing" so a future per-app
- * Schema registration can bind this clonable into the marshaler.
- * stateimpex round-trip is not exercised here -- LM-4's scope is the
- * runtime invocation path, not on-disk persistence. The application's
- * structure stays compatible with adding a Schema registration later.
+ * query_state_root() returns "MerryApp:Thing"; sys/test registers the
+ * matching schema at boot (one lpc_str attribute, `label`, backed by
+ * the property store). The Duplicate merryfun walks this state model
+ * when it copies a clone's state.
  *
  * The $delay() continuation glue Merry requires of every
  * script-bearing object lives in /lib/util/delayed, inherited below.
@@ -36,6 +35,12 @@ inherit ur "/lib/util/ur";
 inherit "/lib/util/delayed";
 
 string query_state_root() { return "MerryApp:Thing"; }
+
+/* Typed accessors for the MerryApp:Thing schema (registered by
+ * sys/test at boot). Backed by the property store so the marshaled
+ * state and the runtime state are the same value. */
+string query_label() { return query_property("demo:label"); }
+void set_label(string val) { set_property("demo:label", val); }
 
 static void create()
 {

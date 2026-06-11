@@ -23,11 +23,12 @@
  *      ur-object on the new clone. The script returns the spawned
  *      clone's object_name; the test driver verifies it begins with
  *      the parent's clonable path and includes a clone suffix.
- *      Duplicate() uses the same ::clone_object escape but is not
- *      exercised here because it requires a Schema-registered state
- *      model (export_state walks SID->get_root_node(ob)). The fix
- *      applies to both merryfuns; the test covers the more
- *      schema-free of the two.
+ *      Duplicate() uses the same ::clone_object escape and is
+ *      exercised by phase 3b: the MerryApp:Thing schema registered at
+ *      setup gives the clonable a state model, and a Merry script
+ *      calls Duplicate($this), whose result must be a distinct clone
+ *      carrying the schema-declared state (export_state walks
+ *      SID->get_root_node(ob); import_state replays it on the copy).
  *
  *   4. $delay() / mcontext.c::create 4-arg dispatch (LM-6 sub-task b).
  *      A Merry script issues `$delay(1, FALSE);` then sets a marker
@@ -84,6 +85,7 @@ inherit "/usr/Merry/lib/merryapi";
 # define MERRY_DAEMON	"/usr/Merry/sys/merry"
 # define MERRY_DATA	"/usr/Merry/data/merry"
 # define THING_PROG	"/usr/MerryApp/obj/thing"
+# define SCHEMA_NODE	"/usr/Schema/obj/schema_node"
 # define PERSIST_HELPER	"/usr/System/sys/persist_helper"
 # define RESULT_FILE	"/usr/MerryApp/data/test-result.log"
 
@@ -108,7 +110,18 @@ static void create()
 
 static void setup_and_run()
 {
+    object node;
+
     set_object_name("MerryApp:TestDriver");
+    /* Register the MerryApp:Thing schema (matching obj/thing's
+     * query_state_root) so export_state / import_state can walk a
+     * state model for the clonable -- the Duplicate merryfun needs
+     * it. One lpc_str attribute, label, backed by the property
+     * store. */
+    node = clone_object(SCHEMA_NODE);
+    node->set_name("MerryApp", "Thing");
+    node->add_attribute("label", "lpc_str", "query_label");
+    node->add_callback("set_label", "label");
     /* /usr/MerryApp/data/ may not exist on first boot. */
     catch(make_dir("/usr/MerryApp/data"));
     catch(remove_file(RESULT_FILE));
@@ -118,8 +131,9 @@ static void setup_and_run()
 
 static void run_tests()
 {
-    object parent, child;
+    object parent, child, dup_host;
     object script, bad_script, spawn_script, delay_script, label_script;
+    object dup_script;
     mixed result;
     string spawn_name;
 
@@ -221,6 +235,58 @@ static void run_tests()
     }
 
     log_line("MerryApp:test: SPAWN OK");
+
+    /* phase 3b: Duplicate merryfun -- the state-copying sibling of
+     * Spawn. Unlike Spawn (which clones the clonable fresh),
+     * Duplicate exports the source clone's state through its
+     * registered state model (the MerryApp:Thing schema registered
+     * at setup) and imports it into the new clone. The duplicate
+     * must be a distinct clone of the same clonable carrying the
+     * schema-declared state. */
+
+    catch {
+	dup_script = new_object(MERRY_DATA, "return Duplicate($this);");
+    } : {
+	log_line("MerryApp:test: FAIL: dup-script compile threw");
+	return;
+    }
+
+    dup_host = clone_object(THING_PROG);
+    dup_host->set_label("carried");
+    dup_host->set_property("merry:lib:make_copy", dup_script);
+
+    catch {
+	result = run_merry(dup_host, "make_copy", "lib", ([ ]));
+    } : {
+	log_line("MerryApp:test: FAIL: Duplicate threw");
+	return;
+    }
+
+    if (typeof(result) != T_OBJECT) {
+	log_line("MerryApp:test: FAIL: Duplicate returned non-object "
+		 + "(typeof=" + (string) typeof(result) + ")");
+	return;
+    }
+    if (result == dup_host) {
+	log_line("MerryApp:test: FAIL: Duplicate returned the source");
+	return;
+    }
+    if (!sscanf(object_name(result), THING_PROG + "#%*d")) {
+	log_line("MerryApp:test: FAIL: duplicate \""
+		 + object_name(result) + "\" is not a clone of "
+		 + THING_PROG);
+	return;
+    }
+    if (result->query_label() != "carried") {
+	log_line("MerryApp:test: FAIL: duplicate did not carry label "
+		 + "(got "
+		 + (result->query_label() ?
+		    "\"" + result->query_label() + "\"" : "(nil)")
+		 + ")");
+	return;
+    }
+
+    log_line("MerryApp:test: DUPLICATE OK");
 
     /* phase 4: $delay() -- schedules a continuation via the binding
      * host's delayed_call LFUN. First call returns FALSE
