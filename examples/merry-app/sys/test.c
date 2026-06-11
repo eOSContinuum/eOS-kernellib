@@ -388,6 +388,35 @@ static void run_tests()
 
     log_line("MerryApp:test: LABELCALL OK");
 
+    /* phase 5b: capability-gate reject path. Every registration so
+     * far rode the accept path (caller domain == target domain). The
+     * reject branch -- a caller from one domain registering on a
+     * target in another domain, without approved-registrar
+     * membership -- must throw for both gated surfaces. The Merry
+     * daemon itself serves as the cross-domain target. */
+
+    catch {
+	MERRY_DAEMON->register_script_space("rejectspace",
+					    find_object(MERRY_DAEMON));
+	log_line("MerryApp:test: FAIL: cross-domain register_script_space "
+		 + "did not throw");
+	return;
+    } : {
+	/* expected: the gate refused the cross-domain registration */
+    }
+
+    catch {
+	MERRY_DAEMON->register_observer(find_object(MERRY_DAEMON),
+	    "test:reject", "main", "return TRUE;");
+	log_line("MerryApp:test: FAIL: cross-domain register_observer "
+		 + "did not throw");
+	return;
+    } : {
+	/* expected: same gate, same refusal */
+    }
+
+    log_line("MerryApp:test: REGISTRAR REJECT OK");
+
     /* phase 6: DI-2 batched_set (non-atomic) per DD-1 (c) -- writes a
      * multi-key mapping under one batch-id with sequential seq starting
      * at 0 (DD-3 (b)). Verifies the public LFUN compiles and that both
