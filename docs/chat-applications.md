@@ -8,15 +8,42 @@ A chat application on eOS-kernellib presents multi-user messaging as a thin laye
 
 ## Reference application
 
-`examples/chat-app/` carries a working reference implementation: a domain initd, Room and User clonables, an admin-token LWO, chat and admin daemons, and a boot-time test driver. The code there is the canonical example -- accurate, compiling, and runnable. To deploy it:
-
-```sh
-cp -R examples/chat-app src/usr/Chat
-```
-
-Then sync the runtime tree (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/Chat/data/test-result.log` and counts " OK" lines after the smoke harness completes.
+`examples/chat-app/` carries a working reference implementation: a domain initd, Room and User clonables, an admin-token LWO, chat and admin daemons, and a boot-time test driver. The code there is the canonical example -- accurate, compiling, and runnable.
 
 The sections below explain what the reference application is doing and why. Read the code in `examples/chat-app/sys/test.c` alongside this document.
+
+## Quick start
+
+Deploy, run, and verify the reference application before reading the walkthrough. Assumes the setup from `docs/getting-started.md` (DGD built; `example.dgd`'s `directory` pointing at this repository's `src/`; a `state/` directory beside it).
+
+```sh
+# Deploy: System initd picks up /usr/[A-Z]*/initd.c automatically.
+cp -R examples/chat-app src/usr/Chat
+
+# Boot 1 (cold): the test driver runs phases 1 through 9e and 10 at boot,
+# dumps a snapshot at t+5, and exits on its own.
+/path/to/dgd/bin/dgd example.dgd
+
+# Boot 2 (restore from snapshot): the persistence-verify call_out captured
+# in the snapshot fires and appends PERSIST-VERIFY OK.
+/path/to/dgd/bin/dgd example.dgd state/snapshot &
+sleep 5
+kill %1
+
+# Boot 3 (cold again, snapshot NOT loaded): the negative case appends
+# COLDBOOT-LOST OK -- in-memory state does not survive without the snapshot.
+/path/to/dgd/bin/dgd example.dgd &
+sleep 3
+kill %1
+```
+
+The test driver's twenty assertions write sentinel lines to `src/usr/Chat/data/test-result.log`; each passing phase appends a line ending in ` OK`:
+
+```sh
+grep -c ' OK' src/usr/Chat/data/test-result.log
+```
+
+The example's `README.md` lists the expected result-log contents per boot. For a fresh re-run, clear the deployed domain and the state files first (`rm -rf src/usr/Chat; rm -f state/snapshot* state/swap`) -- the marker and result files live in the deployed source tree, and a stale snapshot changes what boot 1 restores.
 
 ## Application layout
 
