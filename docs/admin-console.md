@@ -105,7 +105,7 @@ The verb categories below are organized around the operational situation an oper
   - Destruct each child (`destruct /usr/MyApp/obj/foo`) and recompile (`compile /usr/MyApp/obj/foo.c`). Loses clone state.
   - Use `call_touch` (via `code`) to mark every dependent for lazy upgrade through `_F_touch()`. Preserves state.
 
-  Platform-level recompile-with-dependents (the `upgrade` verb in SkotOS Wiztool; the `progdb` daemon pattern) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
+  Platform-level recompile-with-dependents (an `upgrade` verb backed by a `progdb`-style dependency daemon) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
 - **Recover from a wedged daemon**: `destruct /usr/MyApp/sys/router` then `clone /usr/MyApp/sys/router` would re-instantiate from the master — except `sys/` daemons are singletons that compile at boot, not on demand. The recovery is `destruct` followed by `compile` of the daemon source.
 - **A/B testing**: keep the canonical handler at `/usr/MyApp/obj/handler.c`; copy it to `handler_b.c`; compile the variant; route a percentage of traffic to the variant; compile the winner back as `handler.c` when results are in.
 

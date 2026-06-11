@@ -41,7 +41,7 @@ A Merry script binds to its target via a property key of the form `merry:<mode>:
 
 `find_merry` walks `query_parent()` from the target upward, looking for an exact match at each level. The first hit wins. If no level has the property, `find_merry` returns nil and `run_merry` returns `TRUE` (the conservative no-op).
 
-`mode` is an application-defined namespace -- `lib` is the SkotOS convention for callable libraries; an application can introduce its own (`pre`, `validate`, ...) without touching the runtime. The property-change dispatcher uses `on` as its mode and the composite `<path>:<timing>` as its signal; the storage convention, ancestry walk, batching surface, and observer-source contract are documented in `docs/dispatcher.md`.
+`mode` is an application-defined namespace -- `lib` is the convention for callable libraries; an application can introduce its own (`pre`, `validate`, ...) without touching the runtime. The property-change dispatcher uses `on` as its mode and the composite `<path>:<timing>` as its signal; the storage convention, ancestry walk, batching surface, and observer-source contract are documented in `docs/dispatcher.md`.
 
 ## Invocation surface
 
@@ -55,7 +55,7 @@ Merry's invocation API is a static surface in `/usr/Merry/lib/merryapi`:
 | `find_merries(ob, signal, mode)` | Returns a mapping of every script bound under `<dprop>` or `<dprop>%`-prefix or delegated via `merry:inherit:*` keys across the full ancestry. |
 | `run_merries(ob, signal, mode, args, [label])` | Calls each script in the `find_merries` mapping, anding their results. |
 
-The methods are `static`. Daemons that want to dispatch a Merry script inherit `merryapi` rather than calling `SYS_MERRY->run_merry(...)`. The static qualifier preserves the inheritance-based invocation convention SkotOS authored against (every production callsite of `run_merry` in SkotOS goes through an inheriting daemon, not through the daemon object via `->`).
+The methods are `static`. Daemons that want to dispatch a Merry script inherit `merryapi` rather than calling `SYS_MERRY->run_merry(...)`. The static qualifier preserves the inheritance-based invocation convention the API was authored against: call sites go through an inheriting daemon, not through the daemon object via `->`.
 
 If a daemon-level dispatch surface is needed in the future (for cross-domain or stateless callers), a public delegator added to `sys/merry.c` is the natural extension point; the static merryapi stays as the inheritance-target.
 
