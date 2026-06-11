@@ -226,7 +226,7 @@ Script-space handlers are independent of the ancestry-walk lookup. `LabelCall` i
 
 ## What this example does NOT exercise
 
-The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now exercised -- Duplicate's full runtime path included, since phase 3b gives the clonable a registered state model -- and snapshot+restore survival of property-bound script clones is exercised by the dispatcher's own example (`examples/merry-app/sys/test.c` phases 16 and 17, walked in `docs/dispatcher.md` Persistence).
+The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now exercised -- Duplicate's full runtime path included, since phase 3b gives the clonable a registered state model -- and snapshot+restore survival of property-bound script clones is exercised by the dispatcher's own example (`examples/merry-app/sys/test.c` phases 16 and 17, walked in `docs/dispatcher.md` Persistence). For the dispatcher's smallest standalone introduction, see `signal-applications.md` + `examples/signal-app/`.
 
 ## Storage and round-trip
 
