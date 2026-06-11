@@ -143,12 +143,14 @@ Cold shutdown (`shutdown`) leaves no snapshot of its own; the platform restarts 
 - `access <user>` prints another user's access bits.
 - `access <directory>` prints who has access to the directory.
 - `access global` prints which directories permit global read.
-- `grant <user> <directory> <mode>` calls `set_access()` with the directory and mode (typically `READ_ACCESS`, `WRITE_ACCESS`, or `FULL_ACCESS`).
-- `ungrant <user> <directory>` removes the grant.
+- `grant <user> <directory> [read | write | full]` calls `set_access()` with the directory and mode (default `write` when the mode keyword is omitted).
+- `grant <user> access` creates the user's file access itself (adds the owner and creates `/usr/<user>`).
+- `grant global <directory>` adds a `/usr/`-subdirectory to the global-read set.
+- `ungrant <user> <directory>` removes the grant; `ungrant <user> access` removes the user's file access; `ungrant global <directory>` removes a global-read entry.
 
 **What for**:
 
-- **Onboard a developer**: `grant developer /usr/SharedLib READ_ACCESS` — they can now read the shared library but not modify it.
+- **Onboard a developer**: `grant developer access` creates their owner tree; `grant developer /usr/SharedLib read` — they can now read the shared library but not modify it.
 - **Investigate a permission denied**: `access <user>` shows the user's current bits; `access <directory>` shows who has access to the target. Compare to find the missing grant.
 - **Lock down a sensitive directory**: `ungrant <user> /usr/Secrets` removes their access; `access /usr/Secrets` confirms no one else has unexpected reach.
 
@@ -202,11 +204,11 @@ For substantial edits, prefer a host-side editor. The `ed` verb is for cases whe
 | `cd <dir>` | `get_dir`, `file_info` | Updates the operator's session directory; verifies the target exists and is a directory |
 | `pwd` | (internal) | Prints session directory; never errors |
 | `ls [-l] [<glob>]` | `get_dir`, `file_info` | `-l` shows long format with size and timestamp |
-| `cp <src> <dst>` | `read_file`, `write_file` | Reads from src, writes to dst; access-checked at each side |
-| `mv <src> <dst>` | `rename_file` | Single rename; preserves access bits when allowed by tier |
-| `rm <path>` | `remove_file` | Access-checked against the operator |
-| `mkdir <path>` | `make_dir` | Creates directory under the operator's owner tree |
-| `rmdir <path>` | `remove_dir` | Removes empty directory |
+| `cp <file> [...] <target>` | `read_file`, `write_file` | Copies one or more files to target; access-checked at each side |
+| `mv <file> [...] <target>` | `rename_file` | Renames or moves one or more files; preserves access bits when allowed by tier |
+| `rm <file> [...]` | `remove_file` | Removes one or more files; access-checked against the operator; refuses directories |
+| `mkdir <directory> [...]` | `make_dir` | Creates directories under the operator's owner tree |
+| `rmdir <directory> [...]` | `remove_dir` | Removes empty directories |
 
 **What for**:
 
@@ -300,15 +302,15 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `clone <obj>\|$N` | Code lifecycle | Clone a master; stores clone in history |
 | `code <expr>` | REPL | Evaluate an LPC expression; stores result in history (`$N`) |
 | `compile <file.c> [...]` | Code lifecycle | Compile one or more LPC source files |
-| `cp <src> <dst>` | Filesystem | Copy file (access-checked at each side) |
+| `cp <file> [...] <target>` | Filesystem | Copy files (access-checked at each side) |
 | `destruct <obj>\|$N` | Code lifecycle | Destruct an object |
 | `dispatch-trace on\|off\|status` | Dispatcher | Toggle or report verbose dispatch-entry tracing (extension) |
 | `ed <file>` | Editor | Open the platform's line editor on a file |
-| `grant <user> <dir> <mode>` | Permissions | Grant access at the given mode |
+| `grant <user> <dir> [read\|write\|full]`, `grant <user> access`, `grant global <dir>` | Permissions | Grant directory access (default `write`), create a user's file access, or add global read |
 | `history [N]` | REPL | Show last N values from the code-history ring |
 | `ls [-l] [<glob>]` | Filesystem | List directory; `-l` shows size + timestamp |
-| `mkdir <path>` | Filesystem | Create directory |
-| `mv <src> <dst>` | Filesystem | Rename / move file |
+| `mkdir <directory> [...]` | Filesystem | Create directories |
+| `mv <file> [...] <target>` | Filesystem | Rename / move files |
 | `new <obj>\|$N` | Code lifecycle | Instantiate an LWO from a `data/` master |
 | `observers <obj_path> <path> [timing]` | Dispatcher | List registered observers per timing slot (extension) |
 | `people` | Connections | List active connections |
@@ -317,15 +319,15 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `quota [<user> [<rsrc> [<limit>]]]` | Resources | Read or set per-owner resource limits |
 | `reboot` | Lifecycle | Incremental snapshot + cold shutdown (recovers from snapshot on next boot) |
 | `register-observer <obj_path> <path> <timing> <source...>` | Dispatcher | Install a runtime observer (extension) |
-| `rm <path>` | Filesystem | Remove file |
-| `rmdir <path>` | Filesystem | Remove empty directory |
+| `rm <file> [...]` | Filesystem | Remove files (refuses directories) |
+| `rmdir <directory> [...]` | Filesystem | Remove empty directories |
 | `rsrc [<resource> [<limit>]]` | Resources | Read or set platform-wide resource caps |
 | `shutdown` | Lifecycle | Cold shutdown without snapshot |
 | `snapshot` | Persistence | Write a full statedump to `dump_file` |
 | `status [<obj>]` | State inspection | System-wide health vector, or per-object status |
 | `swapout` | Persistence | Swap all in-memory objects to the swap file |
 | `unapprove-registrar <domain>` | Dispatcher | Remove a caller domain from MERRY's approved-registrars set (extension) |
-| `ungrant <user> <dir>` | Permissions | Remove an access grant |
+| `ungrant <user> <dir>`, `ungrant <user> access`, `ungrant global <dir>` | Permissions | Remove a directory grant, a user's file access, or a global-read entry |
 | `unregister-observer <obj_path> <path> <timing>` | Dispatcher | Clear all observers at (obj, path, timing) (extension) |
 
 ## Where to next
