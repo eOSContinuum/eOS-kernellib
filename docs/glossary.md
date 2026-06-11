@@ -112,6 +112,10 @@ The five capability layers. Tier A: host driver and dlopen-loaded extensions. Ti
 
 The execution-time unit DGD's scheduler uses between atomic operations. Statedumps fire between timeslices (never inside an atomic operation); long-running atomic envelopes are charged ticks against the timeslice budget and may be terminated if they exceed `tick_max`. Load-bearing in [operations.md](operations.md) Resource limits.
 
+## ur-parent / ur-child / ur-hierarchy
+
+The data-inheritance cluster, distinct from LPC's code inheritance (`inherit`). An object's **ur-parent** is its data ancestor: a clone designates another object as its ur via `set_ur_object` (the Merry `Spawn` merryfun stamps the relationship at clone time), forming the **ur-hierarchy**. Lookups that honor the hierarchy — Merry script resolution (`find_merry`) and the dispatcher's observer-ancestry walk — search the object first and then walk `query_parent()` up the chain, so behavior bound at an ancestor serves every descendant (one observer on a base room reacts for the whole cohort; see the chat example's ancestry phase). Plain property reads do not walk the chain. The cluster lives in `/lib/util/ur`. Load-bearing in [merry-applications.md](merry-applications.md) the ancestry walk and [dispatcher.md](dispatcher.md).
+
 ## userd
 
 The System daemon mediating incoming connections per binding. Each `.dgd`-declared port has a userd-attached connection manager; a new connection drives `select(str)` on the userd, which clones a per-connection user object. Load-bearing in [architecture.md](architecture.md) Tier-C daemons.
@@ -119,6 +123,30 @@ The System daemon mediating incoming connections per binding. Each `.dgd`-declar
 ## wiztool
 
 The interactive wizard-tier shell that ships with cloud-server's upstream. eOS-kernellib's analogous interactive surface is the admin_console (the term "harness-shell" is the eOS-DeepContext graph's vocabulary refresh; either name refers to the same kind of tier-C operator surface). Load-bearing in [admin-console.md](admin-console.md).
+
+## Vocabulary bridges
+
+Readers arrive from two adjacent vocabularies: the SkotOS/kernellib lineage this platform descends from, and the eOS-DeepContext companion graph that documents the platform's design commitments in its own terms. The bridges:
+
+**From the SkotOS lineage**:
+
+| Lineage term | Platform term | Note |
+|---|---|---|
+| Signal phases `pre` / `prime` / `post` | Dispatcher timings `pre` / `main` / `post` | `prime` corresponds to `main`; the veto/mutate/audit roles carry over ([dispatcher.md](dispatcher.md)) |
+| `patch()` | `_F_touch()` | Same platform dispatch, different hook name ([code-lifecycle.md](code-lifecycle.md) Terminology note) |
+| Wiztool | admin_console | See the `wiztool` entry above |
+| Meriadoc / Merry (SkotOS subsystem) | The Merry subsystem (`src/usr/Merry/`) | The shipped implementation of the same decoration-and-compile pattern ([runtime-primitives.md](runtime-primitives.md) §5) |
+
+**From the eOS-DeepContext graph**:
+
+| Graph term | Platform term |
+|---|---|
+| substrate | runtime platform |
+| harness-shell | admin_console |
+| atomic envelope | atomic context (see `atomic` above) |
+| persistence image | the in-memory image; statedump / snapshot capture it |
+| code-as-state | hot reload semantics — code becomes live by state mutation, no deploy step ([code-lifecycle.md](code-lifecycle.md)) |
+| data inheritance | the ur-parent chain (see `ur-parent` above) |
 
 ## Where to next
 
