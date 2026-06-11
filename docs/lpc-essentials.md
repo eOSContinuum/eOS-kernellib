@@ -42,7 +42,7 @@ LPC.md §3.4.2 lists eight types:
 Two composite shapes are not in the type list but are first-class:
 
 - **Arrays** — written `({ a, b, c })`. Heterogeneous (an array can hold mixed types). `arr[0]` indexes; `arr[1..3]` slices.
-- **Lightweight objects (LWOs)** — value-shaped objects that travel inside another object's dataspace rather than living independently. Cloned with `new` (different from `clone_object()`); the lifetime is tied to the containing object's reference.
+- **Lightweight objects (LWOs)** — value-shaped objects that travel inside another object's dataspace rather than living independently. Created with `new_object()` (distinct from `clone_object()`); deallocated when the last reference is dropped. Consolidated treatment in `docs/code-lifecycle.md` LWO instantiation.
 
 `int` and `float` arithmetic does not auto-coerce; `1 + 1.0` is a type error. Use `(float) 1` or `(int) 1.0` to convert explicitly.
 

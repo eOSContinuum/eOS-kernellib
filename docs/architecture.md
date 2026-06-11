@@ -36,7 +36,7 @@ Within each user-tier domain (tiers C, D, E), four subdirectories carry conventi
 - **`/lib/`** — inheritable / abstract library objects. Cannot be cloned. The driver's `inherit_program` kfun requires the inherited path to contain `/lib/`.
 - **`/obj/`** — cloneable objects. The master at `/usr/X/obj/Y` is the class; clones have names like `/usr/X/obj/Y#37`. The master carries no instance data.
 - **`/sys/`** — singleton daemons. Compiled at domain init; one master object per file; no clones.
-- **`/data/`** — Light-Weight Objects (LWOs). Structured value types without separate identity; pass-by-value semantics.
+- **`/data/`** — Light-Weight Objects (LWOs). Structured value types without separate identity; copied rather than shared when they cross dataspaces (consolidated treatment in `docs/code-lifecycle.md` LWO instantiation).
 
 The same shape applies in `/kernel/` for kernel-tier code. These conventions are not just style; the driver enforces the `/lib/` requirement on inheritance, and the System auto's `find_object` discipline depends on path-based type recognition.
 

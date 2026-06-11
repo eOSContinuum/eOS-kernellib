@@ -62,7 +62,7 @@ A domain's initialization daemon. The System initd at `/usr/System/initd.c` orch
 
 ## LWO (lightweight object)
 
-A short-lived object created via `new_object` rather than `clone_object`. LWOs have their own dataspace but their lifetime is tied to the containing dataspace (the LPC variable holding the reference); when no reference remains, the LWO is collected. LWOs are pass-by-reference within their containing dataspace. Load-bearing in [code-lifecycle.md](code-lifecycle.md) LWO via new_object.
+An object created via `new_object` rather than `clone_object`, living inside a holder's dataspace rather than in the object table. Cannot be destructed; collected when the last reference is dropped. References alias within one dataspace; a reference exported to another object's dataspace becomes that dataspace's own copy, so cross-object handoff behaves as pass-by-value. Consolidated treatment in [code-lifecycle.md](code-lifecycle.md) LWO instantiation.
 
 ## master
 
