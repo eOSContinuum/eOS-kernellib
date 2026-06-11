@@ -96,7 +96,7 @@ The list covers escape-shape and external-effect-shape kfuns: object lifecycle (
 cp -R examples/merry-app src/usr/MerryApp
 ```
 
-Then sync the runtime (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/MerryApp/data/test-result.log` and expects three lines, in order:
+Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README cats `src/usr/MerryApp/data/test-result.log` and expects three lines, in order:
 
 ```
 MerryApp:test: starting

@@ -152,7 +152,7 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 ## Reference applications
 
-Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat .runtime/.../test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
+Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat src/usr/<Domain>/data/test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
 
 | Example | Primitive demonstrated | Walkthrough |
 |---|---|---|

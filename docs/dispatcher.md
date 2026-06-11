@@ -252,7 +252,7 @@ What survives, and why:
 What is verified by the MerryApp smoke (phases 16 and 17):
 
 - Phase 16 clones a fresh parent / child pair, registers a main observer on the child for `test:persist:val`, saves the child as a `static` global on the test driver, schedules a `phase17_verify` call_out three seconds out, and calls `/usr/System/sys/persist_helper->trigger_dump_and_exit()`. The helper writes a full snapshot via `dump_state(FALSE)` and `shutdown()`s the driver.
-- An external restart -- `dgd mva.dgd state/snapshot` -- restores. The pre-snapshot `call_out` fires after restore.
+- An external restart -- `dgd example.dgd state/snapshot` -- restores. The pre-snapshot `call_out` fires after restore.
 - Phase 17 reads the saved `persist_host`, writes `42` to `test:persist:val`, and asserts that both the value landed (property storage survived) and that `test:persist:fired` became `1` (the observer's compiled source ran against the restored object reference).
 
 The smoke is the first end-to-end empirical confirmation that the dispatcher's substrate composes correctly with DGD's persistence. The earlier driver phases verified each runtime primitive in isolation against cold-boot; phase 17 verifies their composition across restore. Any future regression in the persistence contract -- e.g., a change to how the compiled merry-script artifact is named, a change to property-mapping pickling, an observer cache that fails to rebuild after restore -- surfaces here as a `PERSIST VERIFY FAIL: ...` sentinel.

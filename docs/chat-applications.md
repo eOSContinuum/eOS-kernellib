@@ -131,7 +131,7 @@ The snapshot captures everything reachable in the image: the room clone, the two
 
 ### Phase 11 -- persist verify
 
-The smoke harness restarts DGD against the snapshot (`dgd mva.dgd .runtime/state/snapshot`). DGD does not re-run `create()` on restored objects; it resumes the dumped image and fires `call_out`s whose scheduled times have elapsed. The surviving `persist_verify` `call_out` fires immediately and asserts:
+The second boot restarts DGD against the snapshot (`dgd example.dgd state/snapshot`). DGD does not re-run `create()` on restored objects; it resumes the dumped image and fires `call_out`s whose scheduled times have elapsed. The surviving `persist_verify` `call_out` fires immediately and asserts:
 
 - the room still holds three messages and two members;
 - `persist_alice` and `persist_bob` resolve to live clones with their `chat-user.name` values intact (the user accounts survived);

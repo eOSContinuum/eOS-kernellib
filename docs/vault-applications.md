@@ -24,7 +24,7 @@ Paths written with a leading `~` (as in `~Schema/sys/schema_daemon`) are DGD's p
 cp -R examples/vault-app src/usr/MyApp
 ```
 
-Then sync the runtime tree (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects six OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), and the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`).
+Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects six OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), and the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`).
 
 The sections below explain what the reference application is doing and why. Read the code in `examples/vault-app/sys/test.c` alongside this document.
 

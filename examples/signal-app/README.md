@@ -21,13 +21,15 @@ System/initd's `/usr/[A-Z]*/initd.c` iteration picks up the new domain automatic
 ## Verify
 
 ```sh
-rm -f .runtime/state/snapshot .runtime/state/snapshot.old
-scripts/setup-runtime.sh
-cp -R examples/signal-app .runtime/src/usr/SignalApp
-.runtime/bin/dgd mva.dgd &
+# Clean slate: remove any prior deploy and state, then redeploy.
+rm -rf src/usr/SignalApp
+rm -f state/snapshot state/snapshot.old
+cp -R examples/signal-app src/usr/SignalApp
+
+/path/to/dgd/bin/dgd example.dgd &
 sleep 5
 kill %1
-cat .runtime/src/usr/SignalApp/data/test-result.log
+cat src/usr/SignalApp/data/test-result.log
 ```
 
 Expected result-log contents:

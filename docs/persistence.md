@@ -171,7 +171,7 @@ For operator-level recovery procedures when any of these boundaries are hit, see
 The platform's persistence contract is exercised by the bundled examples. The richer-state composition that lands with the property-change dispatcher (`docs/dispatcher.md` Persistence; `docs/runtime-primitives.md` §3 Extensions) is verified end-to-end by `examples/merry-app/sys/test.c` phases 16 and 17:
 
 - Phase 16 sets up a parent / child pair with a property-bound Merry-script observer on the child, stashes the child as an LPC global on the test driver, schedules a `call_out` for the verification phase, and triggers a snapshot via `/usr/System/sys/persist_helper->trigger_dump_and_exit()` — the helper calls `dump_state(0)` followed by `shutdown()`.
-- An external restart against the snapshot (`dgd mva.dgd state/snapshot`) restores the image; the pre-snapshot `call_out` fires after restore.
+- An external restart against the snapshot (`dgd example.dgd state/snapshot`) restores the image; the pre-snapshot `call_out` fires after restore.
 - Phase 17 reads the saved LPC global, writes the observed property, and asserts that the value landed and that the observer's compiled source ran against the resurrected host.
 
 Five orthogonal-persistence guarantees compose in the same verification: LPC global variables, property storage on host objects, references to compiled Merry-script clones at `/usr/Merry/merry/<md5>`, the observer-source contract (`$this` binding to the dispatch host, `Set` re-entry), and the scheduled call_out queue. Any future regression in those guarantees surfaces here as a `PERSIST VERIFY FAIL:` sentinel on the second-boot run.
