@@ -24,7 +24,7 @@ Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`;
 cp -R examples/vault-app src/usr/MyApp
 ```
 
-Then sync the runtime tree (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects `MyApp:test: ROUND-TRIP OK`.
+Then sync the runtime tree (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects four OK sentinels: `ROUND-TRIP OK` plus the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`).
 
 The sections below explain what the reference application is doing and why. Read the code in `examples/vault-app/sys/test.c` alongside this document.
 
@@ -40,6 +40,7 @@ src/usr/MyApp/
   obj/
     thing.c         - property-bearing clonable
   sys/
+    config.c        - one-of-a-kind configuration daemon (singleton storage)
     test.c          - boot-time test driver (inherits lib/app)
 ```
 
@@ -154,13 +155,20 @@ static void run_tests()
 
 `find_named(name)` is the convenience wrapper from `/lib/util/named` over `~Index/sys/index_daemon::query_object`. The Index lookup is the inverse direction of `set_object_name`: any object that called `set_object_name(name)` is resolvable by that name through Index.
 
+## The singleton path
+
+One-of-a-kind daemons store as `<object program="..."/>`. The test driver exercises this shape with `sys/config.c` across three assertions:
+
+- **Store + re-import against a loaded singleton.** The driver compiles the config daemon, names it, stores it, then mutates the live state and calls `Vault->spawn_one_by_name`. Because the program is loaded and named, the spawn re-imports the stored property tree onto the existing object: the stored values win over the mutation.
+- **The cross-domain compile boundary.** With the program destructed, the Vault daemon's `findOrLoad` cannot bring it back: kernel `compile_object` grants non-lib compiles only to callers with write access to the path, and the Vault has none over `/usr/MyApp`. The error is caught inside the Vault's spawn internals (an `Access denied [caught]` trace in the boot log), so the spawn returns normally and the program simply stays unloaded. Application code must not rely on `Vault->spawn_one_by_name` to load another domain's singleton from scratch.
+- **The owning-domain respawn.** The supported way to respawn an unloaded singleton is from inside its own domain: any vault node (the test driver is one) inherits `spawn_create_one` / `spawn_configure_one` from `~Vault/lib/vault_node`, and calling them with the stored XML compiles the program in the owning domain's own context, re-binds the logical name, and re-imports the state.
+
 ## Cross-domain access
 
 Inheriting `~Vault/lib/vault_node` from a domain other than Vault requires Vault to be globally readable. The platform's `src/usr/System/initd.c` grants `set_global_access("Vault", TRUE)` alongside the Schema / XML / Marshal / Index grants. Cloning `/usr/Schema/obj/schema_node` from a non-Schema domain works without a separate grant (clone_object has no access check against the path's domain), but the `set_global_access("Schema", TRUE)` grant is required for the schema_daemon constants to inherit cleanly when the application's own inherit chain pulls them in.
 
 ## What this example does not exercise
 
-- **Singleton storage**. The reference application stores a clone; the `<object>` path (singletons saved via Vault) exists but is not exercised here. SkotOS's pattern of having domains store their own daemon as a vault root is the singleton case; future examples can demonstrate that shape.
 - **Cross-object references**. The MyApp:Thing schema declares only flat primitives. The lifted core schemas (`Ur:Hierarchy` for ancestry, `Core:Entries` for flat key-value) compose into cross-object references via `lpc_obj`-typed attributes that resolve through Index; an example demonstrating that pattern is a natural follow-on.
 - **Statedump survival**. The DGD `dump_state` cycle (write snapshot, restart against the snapshot, verify property state survives) is part of the Vault's value proposition but is awkward to exercise in a single boot. A multi-boot test harness is a natural follow-on once the platform grows a CI shape.
 - **Hot reload**. Recompiling thing.c via `compile_object` updates the clonable in place; existing clones survive the recompile and dispatch to the new code on next method call. Demonstrating this requires admin_console interaction; out of scope for a boot-time assertion driver.
