@@ -2,11 +2,25 @@
 
 The platform's signature property: in-memory state is the primary state of the system. Objects, their variables, their dataspaces, their pending `call_out`s, their access bits, their resource counters — every piece of runtime state — survive process exit and return on the next boot. Applications do not write save/load code for the platform-tracked state; the runtime does the work.
 
-This document covers what persists, how the platform captures and restores it, how the operator drives that cycle, and where the platform's persistence model differs from common alternatives (databases, ORMs, file-backed serialization).
+This document covers why the architecture exists, what persists, how the platform captures and restores it, how the operator drives that cycle, and where the platform's persistence model differs from common alternatives (databases, ORMs, file-backed serialization, untyped process checkpointing).
 
 For the language-level interaction between LPC's `static` modifier and persistence, see `docs/lpc-essentials.md` Type modifiers. For operator commands that drive the persistence cycle, see `docs/admin-console.md` Snapshot, restore, and shutdown. For the per-primitive runtime guarantee, see `docs/runtime-primitives.md` §3.
 
 **Audience**: a developer, architect, or operator reasoning about what survives a restart, what does not, and how the platform captures and restores state; assumes `docs/architecture.md` for the structural model and basic familiarity with the platform's boot sequence.
+
+## Why orthogonal persistence
+
+Start from the pain. An application with long-lived state on a conventional stack maintains the same data in two representations — the in-memory objects the code computes with, and the storage representation (rows, documents, serialized files) the data survives in — plus the mapping code that translates between them. Every feature that touches persistent state pays the translation toll twice, once per direction, and the mapping layer itself becomes load-bearing code with its own bugs, its own schema-evolution story, and its own failure modes. Atkinson and Morrison open their survey of the field with the cost: studies they cite estimate roughly thirty percent of a typical database application's code is this mapping and transfer plumbing (King 1978, via [Atkinson & Morrison 1995][am-1995], p. 333) — code that contributes nothing to the application's actual behavior.
+
+The deeper observation is about **lifetimes**. Data in a running system spans a spectrum of lifetimes — from intermediate expression results that live microseconds, through session state, to records that outlive the program and the machine. The conventional stack forces a representation change at an arbitrary point on that spectrum: below the line, language values; above it, storage formats. Atkinson and Morrison's framing deliberately says *transient versus long-lived*, not *in-memory versus on-disk* — where data lives is an implementation choice, and binding the representation to the storage medium is exactly the mistake the architecture removes.
+
+Orthogonal persistence removes the line. Atkinson and Morrison state three principles (their §2.2.2):
+
+- **Persistence independence** — the form of a program does not depend on the longevity of the data it manipulates; the same code operates on transient and long-lived values.
+- **Data type orthogonality** — every type may have persistent and transient instances; persistence is not a property of special "storable" types.
+- **Persistence identification** — which objects persist is determined by the system (here: reachability in the image), not declared through the type system or special calls.
+
+What falls away for the application author when the runtime honors all three: the storage representation (there is only the image), the mapping layer (nothing to map), explicit save and load calls (the snapshot cycle is the runtime's), cache invalidation between representations (there is one representation), and the class of bugs where the two representations disagree. The rest of this document describes the machinery that pays for this — and its boundaries, which are real.
 
 ## Orthogonal persistence as architectural property
 
@@ -17,6 +31,29 @@ DGD has implemented orthogonal persistence since 1993. Christopher Allen's [2000
 The practical consequence for application authors: **no `save_to_db` call, no `serialize` method, no `restore_from_storage` plumbing**. An object created in the runtime persists by default; modifying its variables modifies the in-memory image; statedump captures the image; restore reconstructs it. The platform's storage manager handles the bookkeeping.
 
 The property is foundational for the platform's other primitives. Atomic rollback (§1) presumes there's an in-memory state to roll back to. Hot reload (§4) presumes the state survives the code transition. State introspection (§8) presumes the state graph is queryable; orthogonal persistence makes "the state graph" a coherent runtime concept rather than a database/cache/file-tree archipelago.
+
+## Compared with common alternatives
+
+The intro promised the comparison; here it is. Each alternative solves real problems — the comparison is about what each one makes the *application author* responsible for.
+
+| | Database / ORM | File-backed serialization | Untyped checkpointing (CRIU-class) | Orthogonal persistence (this platform) |
+|---|---|---|---|---|
+| Representations the author maintains | Two (objects + schema) plus the mapping | Two (objects + format) plus save/load code | One | One |
+| What persists | What the schema covers | What the author remembered to serialize | The whole process image, untyped | The whole image, typed |
+| Save points | Per-transaction, explicit | Explicit calls | External snapshot | Runtime snapshot cycle (automatic + on-demand) |
+| Restore | Reconnect + rehydrate | Explicit load + validation | Same machine/kernel shape, fragile | Type-aware restore from the versioned snapshot format |
+| Schema / code evolution | Migration framework | Hand-written format versioning | None — the image is opaque | Hot reload + lazy upgrade (`call_touch`); see `docs/code-lifecycle.md` |
+| Transactionality | In the database, separate from program state | None | None | Atomic functions over the same state the snapshot captures (§1) |
+
+**Database / ORM**: the canonical two-representation architecture. The database brings real strengths (declarative queries, concurrent writers across machines), and for multi-machine workloads it is the right call — this platform is deliberately single-coherence-domain. The cost is the impedance mismatch: program logic lives in one type system, durable state in another, and transactions protect the storage side only — in-memory state that depends on a rolled-back write is the application's problem.
+
+**File-backed serialization** (JSON/pickle/protobuf save files): cheap to start, and coverage decays from there — persistence is exactly as complete as the author's save code, save points are exactly as frequent as the author's calls, and format evolution is hand-maintained. The platform keeps `save_object` (below) for the narrow cases where an explicit, portable, per-object file is the point; it is not the persistence mechanism.
+
+**Untyped process checkpointing** (CRIU-class snapshots of process memory): the closest cousin, and the instructive contrast. It achieves persistence independence — the program does not change — but the captured image is raw memory: no portable representation, no reliable type information, restore bound to the platform shape that wrote it. Atkinson and Morrison treat memory-image schemes of this kind as incomplete orthogonal persistence for exactly this reason (their discussion of untyped-store systems, p. 354). DGD's statedump clears the bar the untyped image fails: the snapshot is a **typed** image in a versioned format — the driver restores objects, not bytes, which is why a snapshot survives driver upgrades, why `call_touch` can migrate restored objects to recompiled programs, and why the restore path can re-key structures rather than hoping the memory layout still matches.
+
+In Atkinson and Morrison's taxonomy of implementation architectures (their §4.1), DGD sits in the deepest tier — the persistent-world architecture, where the runtime owns the entire object world and persistence is a property of the world rather than a service objects call. Citation details in [references.md](references.md#atkinson-morrison-1995).
+
+[am-1995]: references.md#atkinson-morrison-1995
 
 ## What persists
 
