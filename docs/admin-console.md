@@ -255,12 +255,12 @@ The kernel admin console itself remains MERRY-unaware. Future operator surfaces 
 A worked example: an application's property write fails with a `cascade-aborted` error after a deploy of new observer scripts. The operator session:
 
 ```text
-> cascade-depth
+# cascade-depth
 cascade-depth: 32
-> batch-status 14
-batch-status 14: cascade-aborted (merry: cascade depth 32 exceeded at /usr/App/obj/order:total)
-> observers /usr/App/obj/order total
-/usr/App/obj/order total:
+# batch-status 14
+batch-status 14: cascade-aborted (merry: cascade depth 32 exceeded at /usr/App/sys/orders:total)
+# observers /usr/App/sys/orders total
+/usr/App/sys/orders total:
   pre:
     (none)
   main:
@@ -268,9 +268,11 @@ batch-status 14: cascade-aborted (merry: cascade depth 32 exceeded at /usr/App/o
     /usr/Merry/merry/9876543210ab
   post:
     /usr/Merry/merry/cdef01234567
-> dispatch-trace on
+# dispatch-trace on
 dispatch-trace on
 ```
+
+(The console prompt is `# `, and the console does not echo commands; a response can therefore read identically to the command typed, as `dispatch-trace on` does above.)
 
 The combination identifies which timing slots have observers, gives runtime visibility into the next cascade, and bounds further investigation to the three compiled scripts named — all without restarting the platform or modifying application code.
 
