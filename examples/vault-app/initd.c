@@ -16,4 +16,7 @@ static void create()
     ::create();
     compile_object("obj/thing");
     compile_object("sys/test");
+    /* sys/config is deliberately NOT compiled here: the test driver's
+     * singleton respawn assertion needs the program unloaded so the
+     * Vault's find-or-load branch compiles it fresh. */
 }
