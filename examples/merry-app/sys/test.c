@@ -513,6 +513,39 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH MAIN OK");
 
+    /* phase 10b: multi-observer fan-out -- two observers registered
+     * under the SAME merry:on:<path>:<timing> key are stored as a
+     * list on the property; one write must fire both, in list order
+     * (registration order) per the dispatcher's ordering contract.
+     * Each observer appends its tag to a shared trace string. */
+
+    catch {
+	MERRY_DAEMON->register_observer(child, "test:dispatch:fanout", "main",
+	    "Set($this, \"test:dispatch:fanout:trace\", Get($this, \"test:dispatch:fanout:trace\") + \"first|\"); return TRUE;");
+	MERRY_DAEMON->register_observer(child, "test:dispatch:fanout", "main",
+	    "Set($this, \"test:dispatch:fanout:trace\", Get($this, \"test:dispatch:fanout:trace\") + \"second\"); return TRUE;");
+
+	child->set_raw_property("test:dispatch:fanout:trace", "");
+	child->set_property("test:dispatch:fanout", 7);
+
+	if (child->query_raw_property("test:dispatch:fanout") != 7) {
+	    log_line("MerryApp:test: FAIL: DISPATCH FANOUT value did not land");
+	    return;
+	}
+	if (child->query_raw_property("test:dispatch:fanout:trace")
+	    != "first|second") {
+	    log_line("MerryApp:test: FAIL: DISPATCH FANOUT trace was \""
+		     + (string) child->query_raw_property("test:dispatch:fanout:trace")
+		     + "\"");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: DISPATCH FANOUT setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH FANOUT OK");
+
     /* phase 11: DI-3 dispatcher -- pre + main + post timings.
      * Register observers on all three slots that append to a marker
      * string. Verify the string reads "pre|main|post" after the write,
