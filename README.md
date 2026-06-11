@@ -30,13 +30,14 @@ Treating these eight as runtime primitives is the architectural commitment of eO
 
 ## Quickstart
 
-New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top.
+New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime.
 
 **Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated as of 2026-05-15. Other POSIX-compatible systems should work; `docs/building.md` covers platform-specific build notes.
 
 ## Documentation
 
-- **Setup** — `docs/getting-started.md` (first-time setup, install DGD, run the example configuration), `docs/building.md` (DGD build details, platform-specific notes)
+- **Setup** — `docs/getting-started.md` (first-time setup, install DGD, run the example configuration), `docs/first-hour.md` (hands-on tutorial: from a fresh boot to the persistence loop), `docs/building.md` (DGD build details, platform-specific notes)
+- **Orientation** — `docs/coming-from-contemporary-infrastructure.md` (the translation bridge from database/queue/deploy-pipeline/IAM stacks to the runtime's mechanisms)
 - **Platform model** — `docs/architecture.md` (capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions), `docs/runtime-primitives.md` (the eight runtime primitives with per-primitive foundation and status), `docs/persistence.md` (orthogonal persistence, statedump cycle, hot boot), `docs/code-lifecycle.md` (compile / clone / destruct / call_touch / object-manager events)
 - **Writing applications** — `docs/lpc-essentials.md` (LPC language orientation, bridges to the formal spec), `docs/kernel-libraries.md` (the inheritable libraries under `src/lib/`), `docs/application-authoring.md` (general tier-E application patterns, non-HTTP transports), `docs/http-applications.md` (HTTP/1-specific patterns)
 - **Operations** — `docs/operations.md` (`.dgd` configuration, boot modes, state persistence, logging, resource limits, extension loading), `docs/admin-console.md` (operator console: connecting, security posture, per-task operational reference, verb appendix)

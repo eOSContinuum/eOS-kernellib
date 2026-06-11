@@ -70,6 +70,8 @@ The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an appli
 
 ## Where to next
 
+- `docs/first-hour.md` is the natural next step: a hands-on hour from this booted platform to the persistence loop — your own objects, state, and reactions surviving a process restart.
+- `docs/coming-from-contemporary-infrastructure.md` maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
 - `examples/http-app/README.md` and `docs/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
 - `docs/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
 - `docs/architecture.md` covers the platform's tier model, daemons, and boot sequence; `docs/runtime-primitives.md` covers the per-primitive foundation-and-proof statement.
