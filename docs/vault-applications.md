@@ -18,7 +18,7 @@ Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`;
 
 ## Reference application
 
-`examples/vault-app/` carries a working reference implementation: a domain initd, a property-bearing clonable, a vault_node-inheriting lib, and a boot-time test driver that round-trips a thing through `Vault->store` + `Vault->spawn_one_by_name` and asserts the property tree matches. The code in that directory is the canonical example -- accurate, compiling, and runnable. To deploy it:
+Paths written with a leading `~` (as in `~Schema/sys/schema_daemon`) are DGD's per-domain shorthand: `~Name/` resolves to `/usr/Name/`. `examples/vault-app/` carries a working reference implementation: a domain initd, a property-bearing clonable, a vault_node-inheriting lib, and a boot-time test driver that round-trips a thing through `Vault->store` + `Vault->spawn_one_by_name` and asserts the property tree matches. The code in that directory is the canonical example -- accurate, compiling, and runnable. To deploy it:
 
 ```sh
 cp -R examples/vault-app src/usr/MyApp

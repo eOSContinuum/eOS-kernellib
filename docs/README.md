@@ -46,7 +46,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - `../examples/vault-app/` — minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
 - `../examples/signal-app/` -- minimal signal application: a one-inherit property host, one Merry observer, a synchronous-fire assertion. Read alongside [signal-applications.md](signal-applications.md).
 - `../examples/merry-app/` — minimal Merry application: a property + ur-bearing clonable, an ancestry-walk assertion through `run_merry`, and a sandbox-firing assertion. Read alongside [merry-applications.md](merry-applications.md).
-- `../examples/chat-app/` — multi-user chat application: Room and User clonables, an admin-token LWO, capability-gated admin verbs, an 11-phase boot-time test driver that grows across the runtime-primitive demonstrations. Read alongside [chat-applications.md](chat-applications.md).
+- `../examples/chat-app/` — multi-user chat application: Room and User clonables, an admin-token LWO, capability-gated admin verbs, a three-boot test driver whose twenty assertions span the runtime-primitive demonstrations (capability gates, persistence, sandboxed reactions, atomic events, multi-agent coherence). Read alongside [chat-applications.md](chat-applications.md).
 
 ### Reference
 

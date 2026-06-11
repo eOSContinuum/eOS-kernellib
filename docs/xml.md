@@ -54,7 +54,7 @@ XML uses two representations and a clear vocabulary for the boundary:
 
 ## Sugar tags: structural-only
 
-Legacy sugar-tag content interpretation is not part of this transport layer. Three consequences:
+Sugar tags are a legacy inline content-substitution syntax (`$(ref ...)` references and `{ choice | choice }` alternation embedded in text). Their interpretation is not part of this transport layer. Three consequences:
 
 - **`xmlgen.c::generate_pcdata` does not consult a sugar-tag daemon**; it dispatches element / pcdata / samref directly.
 - **The brace form (`{ choice | choice }`) raises LexErr.** `xmlparse.c::p_oneof` does not interpret it; the parser flags it as invalid input.

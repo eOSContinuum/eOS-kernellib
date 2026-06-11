@@ -62,7 +62,7 @@ Schema uses three namespaces for the structural primitives plus their content-do
 
 Domain-specific schemas (loaded after boot) introduce their own namespaces. The schema_daemon's `query_node(ns, tag)` resolves any registered `(namespace, tag)` pair regardless of which subsystem registered it.
 
-The vocabulary avoids name collisions with the UR (Universal Resource) standards in [Blockchain Commons]: ancestry elements are `Ur:Hierarchy` / `Ur:Child` / `Ur:Children` with a `parent` attribute, and property-bag elements are `Core:Entry` / `Core:Entries` with a `key` attribute.
+The vocabulary avoids name collisions with the UR (Uniform Resource) identifier standards published by [Blockchain Commons], since this platform's roadmap composes with those (the `Ur:` namespace here means ur- as in prototype-ancestor, not Uniform Resource): ancestry elements are `Ur:Hierarchy` / `Ur:Child` / `Ur:Children` with a `parent` attribute, and property-bag elements are `Core:Entry` / `Core:Entries` with a `key` attribute.
 
 [Blockchain Commons]: https://github.com/BlockchainCommons
 
