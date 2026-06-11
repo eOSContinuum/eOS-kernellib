@@ -278,6 +278,24 @@ dispatch-trace on
 
 The combination identifies which timing slots have observers, gives runtime visibility into the next cascade, and bounds further investigation to the three compiled scripts named — all without restarting the platform or modifying application code.
 
+## Debugging a stuck platform
+
+The investigative moves from the task sections above, consolidated into one walkthrough. Each entry is a symptom, the verb sequence to run, and how to read what comes back. Take a `snapshot` before any invasive recovery step — the snapshot is the rollback point if the recovery makes things worse.
+
+**The platform feels unresponsive; requests hang or take seconds.** Run `status` and read the health vector against capacity: call_out count near the `call_outs` cap means a backlog of deferred work; object count near the `objects` cap means allocation failures are imminent; heavy swap activity means the resident set exceeds memory and every access is paging. If the vector is healthy — counts well under caps, no swap churn — the problem is logical, not capacity: move to the per-owner and per-object probes below.
+
+**One workload is eating the platform.** Run `rsrc ticks` and read the per-owner tick consumption with the max-usage column. The owner consuming far beyond its peers hosts the offending code — typically an unbounded loop or runaway recursion. `quota <owner>` shows the owner's limits and current use. Two exits: fix the looping code (hot-fix via `compile`, no restart), or — when the workload is legitimate — raise the budget with `quota <owner> ticks <limit>`, after considering whether the work should instead be split across timeslices via `call_out`. A tick-exhausted call errors and rolls back its atomic context, so the platform itself survives the runaway; the budget is the protection.
+
+**A daemon stopped responding.** Probe its state directly: `code "/usr/App/sys/router"->query_state()` (any cheap LFUN the daemon exposes). An error reveals whether the master is wedged, destructed, or erroring internally — the trace names the failing function and line. Recovery for a singleton daemon is `destruct /usr/App/sys/router` followed by `compile /usr/App/sys/router.c` (daemons compile at boot, not on demand; the recompile re-instantiates it). The daemon's in-memory state does not survive this — check what the domain's initd re-establishes before destructing.
+
+**A property write fails with a cascade or batch error.** This is dispatcher territory: `cascade-depth` for the current bound, `batch-status <id>` for the failing batch's status and propagated reason, `observers <obj_path> <path>` for what is registered where, `dispatch-trace on` for per-dispatch visibility into the next occurrence. The worked example in the Dispatcher operator surface section above walks the full sequence.
+
+**Something an operator did, or a stray connection, is interfering.** `people` lists live connections with addresses and idle time; compare against the expected operator population. Combine with `status` for the who-is-on plus what-is-going-on snapshot. The console's own sessions appear here too — `people` marks who is in the editor, and editor sessions come from a small fixed pool (the `editors` field in the `.dgd` configuration).
+
+**The platform is degrading slowly across days.** Capacity creep: `rsrc objects` and `rsrc callouts` against the `.dgd` caps show whether the platform is drifting toward a hard ceiling; `status` swap numbers show whether the image has outgrown memory. A `swapout` relieves memory pressure immediately (objects page back in on access); a config raise needs a reboot and belongs to `docs/operations.md`.
+
+**None of the above explains it.** `snapshot`, then experiment freely — `code` reaches everything the platform exposes, and the snapshot plus `<dump_file>.old` are the way back. For failures at boot rather than at runtime (compile errors in the initd cascade, restore failures, missing extensions), see the Common failure modes table in `docs/operations.md`.
+
 ## Bootstrap and authentication
 
 On first cold boot with no persisted admin password:
