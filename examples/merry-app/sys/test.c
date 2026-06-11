@@ -91,10 +91,12 @@ inherit "/usr/Merry/lib/merryapi";
 
 static void run_tests();
 static void verify_delay(object child);
+static void verify_suicide();
 static void phase17_verify();
 private void log_line(string msg);
 
 object delay_target;	/* binding host for phase 4; checked by verify_delay */
+object suicide_prog;	/* compiled node for phase 3c; nulls on destruct */
 object persist_host;	/* binding host for phase 16/17; survives hotboot */
 
 
@@ -287,6 +289,33 @@ static void run_tests()
     }
 
     log_line("MerryApp:test: DUPLICATE OK");
+
+    /* phase 3c: compiled-node eviction. suicide() is the eviction
+     * entry point MERRY's clean_nodes() drives on MRU overflow; it
+     * schedules do_suicide via call_out, which runs the (sandbox-
+     * escaped) source-file cleanup and self-destructs the compiled
+     * program. A distinctive source keeps the MD5-keyed program from
+     * being shared with any other phase's script. The global
+     * suicide_prog ref nulls when the destruct lands; verify_suicide
+     * checks it at t=+2 (after the restore, alongside DELAY OK,
+     * since boot 1 self-exits before timed call_outs fire). */
+
+    catch {
+	script = new_object(MERRY_DATA, "return 20260610;");
+	suicide_prog = script->query_program();
+    } : {
+	log_line("MerryApp:test: FAIL: suicide-script compile threw");
+	return;
+    }
+
+    if (!suicide_prog) {
+	log_line("MerryApp:test: FAIL: compiled node not reachable via "
+		 + "query_program");
+	return;
+    }
+
+    suicide_prog->suicide();
+    call_out("verify_suicide", 2);
 
     /* phase 4: $delay() -- schedules a continuation via the binding
      * host's delayed_call LFUN. First call returns FALSE
@@ -794,6 +823,16 @@ static void phase17_verify()
 void _throw_for_test()
 {
     error("MerryApp:test: deliberate throw for batch abort verification");
+}
+
+
+static void verify_suicide()
+{
+    if (suicide_prog) {
+	log_line("MerryApp:test: FAIL: compiled node survived suicide()");
+	return;
+    }
+    log_line("MerryApp:test: SUICIDE OK");
 }
 
 

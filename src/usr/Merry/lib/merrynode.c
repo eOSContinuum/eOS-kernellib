@@ -114,14 +114,21 @@ void do_suicide() {
       string path;
 
       path = object_name(this_object());
-      if (file_info(path + ".c")) {
+      /* :: escapes past the local SANDBOX(file_info) / SANDBOX(
+       * remove_file) / SANDBOX(rename_file) shadows -- without them
+       * the first call throws into this catch and the cleanup block
+       * silently no-ops. Merry programs are compiled from in-memory
+       * source (compile_object with a source argument), so there is
+       * normally no on-disk .c file and the block is a no-op anyway;
+       * the escapes keep it correct for file-backed sources. */
+      if (::file_info(path + ".c")) {
 	 string name;
 
 	 sscanf(path, "/usr/Merry/merry/%s", name);
-	 if (file_info("/usr/Merry/merry/cleaned/" + name + ".c")) {
-	    remove_file("/usr/Merry/merry/cleaned/" + name + ".c");
+	 if (::file_info("/usr/Merry/merry/cleaned/" + name + ".c")) {
+	    ::remove_file("/usr/Merry/merry/cleaned/" + name + ".c");
 	 }
-	 rename_file(path + ".c", "/usr/Merry/merry/cleaned/" + name + ".c");
+	 ::rename_file(path + ".c", "/usr/Merry/merry/cleaned/" + name + ".c");
       }
    }
    /* cloud-server destruct_object takes an explicit object arg; SkotOS
