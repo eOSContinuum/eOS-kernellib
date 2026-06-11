@@ -7,7 +7,7 @@ Schema is one of five subsystems in the cohesive Vault layout (Vault / Marshal /
 ## What this subsystem provides
 
 - **A namespace-indexed registry** of typed elements. Callers resolve `query_node(ns, tag)` → schema_node; the schema_node carries the type, child rules, attribute set, and callback hooks for that element.
-- **A type-system dispatcher**. `dtd_daemon` registers type handlers (xml_daemon registers the core XML types; future stateimpex will add LPC types). Callers ask "what's the colour of `lpc_str`?" or "convert this ascii to typed value" and the daemon routes to the handler.
+- **A type-system dispatcher**. `dtd_daemon` registers type handlers (xml_daemon registers the core XML types; the daemon itself handles the LPC primitives). Callers ask "what's the colour of `lpc_str`?" or "convert this ascii to typed value" and the daemon routes to the handler.
 - **The schema-for-schemas tree**. The structural primitives (`Schema:Element`, `Schema:Children`, `Schema:Attribute`, `Schema:Attributes`, `Schema:Callback`, `Schema:Callbacks`, `Schema:Iterator`) are themselves schema_node instances, defined in code by `schema_daemon::configure_initial_nodes()`. The schema_daemon bootstraps its own type tree before any external schema loads.
 
 ## Layout
@@ -46,9 +46,9 @@ XML's initd then compiles `xml_daemon`, whose `create()` calls `DTD->register_ty
 The Schema subsystem's structural primitives are bootstrapped in **two places** that must stay consistent:
 
 - **`schema_daemon::configure_initial_nodes()`** — LPC code that clones a schema_node and calls `set_name(ns, tag)`, `add_attribute(...)`, `add_callback(...)` for each primitive. This is the boot-time path; the schema tree comes up before any on-disk schemas load.
-- **`data/schema/<Name>.xml`** — XML files in the SkotOS-compatible format that describe the same primitives. They are the on-disk reference for the wire format and the load-target for a future stateimpex-driven loader.
+- **`data/schema/<Name>.xml`** — XML files describing the same primitives. They are the on-disk reference for the wire format and the load target for the marshaler-driven loader.
 
-The boot path uses the LPC code. `schema_daemon` exposes a scaffolded `load_core_schemas()` that will read the XML files via `parse_xml + stateimpex::import_state` when Marshal/XmlBinding/stateimpex lifts and registers as a type handler. Until then, the XML files document the on-disk format for the lifted primitives and provide the bootstrap target for the future XML-driven path. The two definitions must produce equivalent schema_node trees; that cross-check becomes the load_core_schemas() validation step.
+The boot path uses the LPC code. `schema_daemon::load_core_schemas()` reads the XML files via `parse_xml + stateimpex::import_state` and cross-checks them against the code-defined primitives; load mismatches surface as boot-log errors. The two definitions must produce equivalent schema_node trees.
 
 ## Namespace vocabulary
 
@@ -62,38 +62,24 @@ Schema uses three namespaces for the structural primitives plus their content-do
 
 Domain-specific schemas (loaded after boot) introduce their own namespaces. The schema_daemon's `query_node(ns, tag)` resolves any registered `(namespace, tag)` pair regardless of which subsystem registered it.
 
-The vocabulary intentionally differs from SkotOS in three places to avoid name collisions with the UR (Universal Resource) standards in [Blockchain Commons]:
-
-| SkotOS | This subsystem |
-|--------|----------------|
-| `Ur:UrObject` | `Ur:Hierarchy` |
-| `urobject` attribute | `parent` attribute |
-| `Core:Property` | `Core:Entry` |
-| `Core:Properties` | `Core:Entries` |
-| `property` attribute | `key` attribute |
-
-The LPC method `query_ur_object` is held at the SkotOS name for now (smaller blast radius). It will rename to `query_parent` as part of the dispatcher-API review.
+The vocabulary avoids name collisions with the UR (Universal Resource) standards in [Blockchain Commons]: ancestry elements are `Ur:Hierarchy` / `Ur:Child` / `Ur:Children` with a `parent` attribute, and property-bag elements are `Core:Entry` / `Core:Entries` with a `key` attribute.
 
 [Blockchain Commons]: https://github.com/BlockchainCommons
 
-## SkotOS dependencies dropped
+## Boundaries
 
-Schema does not pull along the following SkotOS extensions; the lift is to a leaner platform layer:
+What this layer deliberately does not provide:
 
-- **SAM (SAM-A-Mole sugar-tag module)** — registered as a content extension in SkotOS; dropped per the game-content exclusion. The `SAM_loaded()` hook and `eval_sam_ref()` dispatch are absent.
-- **`/lib/module`** — SAM-module machinery.
-- **`/lib/url` and `typed_to_html`** — HTML-output is an admin-surface concern; the public serialization in this layer is XML transport only. `typed_to_html` remains as a nil-returning passthrough for inherit-chain compile parity in dtd_daemon.
-- **`/lib/mapargs`** — `LPC_MIXED` ascii conversion currently uses `dumpValue` for serialization and a string-only round-trip for deserialization. A richer mapargs-style lift is a future enhancement; the degradation is noted in the workstream's open questions.
-- **NREF / `<hard.h>` typed-literal forms** — `ascii_to_untyped` parsed `NREF(...)` / `OBJ(...)` SkotOS-specific literals; that path is removed. The bare-ASCII fallthrough remains.
-- **`/lib/string`** — replaced by `/lib/util/ascii` (which the lift extended with `char_to_string` and `replace_strings`).
-- **SkotOS-specific schema namespaces** (`SkotOS:`, `Base:`, `System:` prefixes on element names in SkotOS's `data/sid/`) — only the structural primitives lift. Domain-content schemas are not lifted.
-- **vaultnode and stateimpex inherits in schema_daemon** — Vault participation lives in the Vault subsystem; stateimpex lifts at LV-4.5c. The schema_daemon does not depend on `vault_ops.c`.
+- **HTML output.** The public serialization is XML transport only; `typed_to_html` is a nil-returning passthrough kept for inherit-chain compile parity in dtd_daemon.
+- **Rich `LPC_MIXED` conversion.** Ascii conversion currently uses `dumpValue` for serialization and a string-only round-trip for deserialization; a richer type-coercion layer is a future enhancement.
+- **Typed-literal parsing in `ascii_to_untyped`.** Only the bare-ASCII fallthrough is supported.
+- **Domain-content schemas.** Only the structural primitives ship; applications register their own schemas at boot (see the examples).
 
 ## Kernel-layer hooks Schema depends on
 
 Schema uses two cross-cutting infrastructure pieces in eOS-kernellib's kernel layer:
 
-- **`/lib/util/named`** — a stub providing `set_object_name(string)` and `query_object_name()`. Schema's `sys/schema_daemon` and `lib/schema_node` inherit it; daemons and clones set their logical name at create() time (`"Schema:Daemon"`, `"Schema:UrNode"`, `"Schema:<ns>:<tag>"`). The stub stores names locally; a future Index-mediated implementation will maintain a global name → object map for O(1) inverse lookup. The API surface is stable across that transition.
+- **`/lib/util/named`** — provides `set_object_name(string)` and `query_object_name()`, wired through `~Index/sys/index_daemon` so the name → object map is global and O(1)-invertible via `find_named()`. Schema's `sys/schema_daemon` and `lib/schema_node` inherit it; daemons and clones set their logical name at create() time (`"Schema:Daemon"`, `"Schema:UrNode"`, `"Schema:<ns>:<tag>"`).
 - **`set_global_access("Schema", TRUE)` + `set_global_access("XML", TRUE)`** in `System/initd.c`. Required for cross-domain inherits (Schema → XML/lib/entities, future Marshal → Schema/lib/dtd). The matching two-pass loop in System's domain iteration registers all owners before loading any initd, so the cross-domain inherits resolve at compile time.
 
 ## File-by-file reference
@@ -104,7 +90,7 @@ Inheritable poor-man's abstract data type repository. Routes type-system queries
 
 ### `sys/dtd_daemon.c` (309 lines)
 
-The daemon. Handlers register types and colours via `register_type(t)` / `register_colour(c)` at their own `create()`; the daemon stores `(type → handler-object)` and dispatches the lib/dtd queries to the right handler.
+The daemon. Handlers register types and colours via `register_type(t)` / `register_colour(c)` at their own `create()`; the daemon stores `(type → handler-object)` and dispatches the lib/dtd queries to the right handler. The daemon itself handles the core LPC types (`lpc_str`, `lpc_int`, `lpc_flt`, `lpc_obj`, `lpc_mixed`).
 
 ### `lib/schema_node.c` (473 lines)
 
@@ -124,10 +110,10 @@ Boot trigger. Compiles `sys/dtd_daemon` first, then `sys/schema_daemon`. The dae
 
 ### `data/schema/*.xml` (5 files, ~56 lines total)
 
-On-disk reference for the lifted primitives (`Ur:Hierarchy`, `Ur:Child`, `Ur:Children`, `Core:Entry`, `Core:Entries`) in the SkotOS-compatible XML format. Each is a `<object program="/usr/Schema/obj/schema_node">` wrapper around a `<Element ns="..." tag="..." ...>` body. These document the wire format and are the load-target for the future stateimpex-driven `load_core_schemas()` path.
+On-disk reference for the structural primitives (`Ur:Hierarchy`, `Ur:Child`, `Ur:Children`, `Core:Entry`, `Core:Entries`). Each is a `<object program="/usr/Schema/obj/schema_node">` wrapper around a `<Element ns="..." tag="..." ...>` body. These document the wire format and are the load-target for the future stateimpex-driven `load_core_schemas()` path.
 
 ## See also
 
-- `src/usr/XML/` — the transport layer Schema uses for the on-disk format
-- `src/usr/Marshal/` (lifts at LV-4.5c) — XmlBinding/stateimpex consumes Schema's `dtd_daemon` for type-handler dispatch during marshal
-- `src/usr/Vault/` — uses Schema's namespace registry for per-element marshaling rules
+- [xml.md](xml.md) — the transport layer Schema uses for the on-disk format (`src/usr/XML/`)
+- `src/usr/Marshal/` — XmlBinding/stateimpex consumes Schema's `dtd_daemon` for type-handler dispatch during marshal
+- `src/usr/Vault/` — uses Schema's namespace registry for per-element marshaling rules; [vault-applications.md](vault-applications.md) walks the application surface

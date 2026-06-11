@@ -23,9 +23,12 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Writing applications
 
 - [lpc-essentials.md](lpc-essentials.md) — LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
+- [kernel-reference/](kernel-reference/README.md) -- man-page-style reference for the kernel layer's modified API surface (efun overrides, lfun and hook contracts, the kernel overview).
 - [kernel-libraries.md](kernel-libraries.md) — inheritable libraries under `src/lib/` (strings, persistent collections, iteration, asynchronous control, time, utilities).
 - [application-authoring.md](application-authoring.md) — general tier-E application patterns; owner/access conventions; `call_touch` upgrade model; non-HTTP transports.
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
+- [schema.md](schema.md) -- the Schema subsystem: namespace-indexed typed-element registry, type-system dispatcher, the schema-for-schemas bootstrap, namespace vocabulary.
+- [xml.md](xml.md) -- the XML transport subsystem: parser, generator, XMD internal form, type registration with the Schema dispatcher, naming conventions.
 - [vault-applications.md](vault-applications.md) — Vault-specific patterns: participating-domain contract, property-bearing clonables, per-application schema registration, on-disk XML shape, round-trip cycle, cross-domain access requirements.
 - [signal-applications.md](signal-applications.md) -- the smallest signal-on-property demonstration: one observer, one write, the reaction done when the write returns; why reacting to state change is a runtime primitive here rather than assembled queue/poller/worker glue.
 - [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.

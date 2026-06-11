@@ -32,7 +32,7 @@ src/usr/XML/
 └── data/
     ├── element.c            LWO wrapper for XML element data
     ├── pcdata.c             LWO wrapper for PCDATA
-    └── samref.c             LWO wrapper for SAM-reference data (structural; no game-content interpretation)
+    └── samref.c             LWO wrapper for samref data (structural; no content interpretation)
 ```
 
 ## Boot sequence
@@ -52,31 +52,27 @@ XML uses two representations and a clear vocabulary for the boundary:
 
 `xmd.c` is named for the internal form; the helpers there (`xmdElts`, `xmdElement`, `xmdAttributes`, `xmdContent`, `xmdOptimize`, etc.) operate on XMD trees, not on serialized XML strings.
 
-## SUGAR and the SAM module: structural-only
+## Sugar tags: structural-only
 
-SAM (SAM-A-Mole) is a SkotOS sugar-tag module for game content; it is excluded from this subsystem per the project's game-content exclusion. Three consequences in the XML lift:
+Legacy sugar-tag content interpretation is not part of this transport layer. Three consequences:
 
-- **The SUGAR daemon is absent.** `xmlgen.c::generate_pcdata` does not consult a sugar-tag daemon; it dispatches element / pcdata / samref directly.
-- **The SAM-syntax brace form (`{ choice | choice }`) raises LexErr.** `xmlparse.c::p_oneof` no longer interprets it; the parser flags it as invalid input.
-- **`samref.c` is preserved as a structural LWO.** The wrapper carries XML data with no semantic interpretation. xmlgen.c emits a literal `$(ref attrs)` form for any reader that wants it; no game-content rewrite happens in this layer. Removing samref.c would force a xmd.c / xmlparse.c rewrite, which is out of scope.
+- **`xmlgen.c::generate_pcdata` does not consult a sugar-tag daemon**; it dispatches element / pcdata / samref directly.
+- **The brace form (`{ choice | choice }`) raises LexErr.** `xmlparse.c::p_oneof` does not interpret it; the parser flags it as invalid input.
+- **`samref.c` is a structural LWO.** The wrapper carries XML data with no semantic interpretation. xmlgen.c emits a literal `$(ref attrs)` form for any reader that wants it; no content rewrite happens in this layer.
 
-## SkotOS dependencies dropped
+## Boundaries
 
-The XML lift is to a leaner platform layer. These SkotOS dependencies are not present:
+What this layer deliberately does not provide:
 
-- **SUGAR / SAM** — see above.
-- **NREF / `<hard.h>` typed-literal forms** — `HARD()` / `HARDEN()` references in XML_BOOL handling are stripped; the lifted XML_BOOL is a simple `true` / `false` serialization.
-- **`/lib/womble`** — a one-shot NRef-migration helper, never invoked from xmlparse body. Inherit dropped; `womble_xml()` callback dropped with it.
-- **`/lib/string`** — replaced by `/lib/util/ascii` (`strip`, `strip_left`, `strip_right`, `lower_case`, plus `char_to_string` and `replace_strings` added at lift time).
-- **`/lib/data` and `<fastarr.h>` / `<faststr.h>`** — `xml_daemon.c::gen_xml` uses a per-call `/lib/StringBuffer` clone instead of SkotOS's `/lib/data` accumulator + faststr macros. The `append_string` method becomes `append` at xmlgen.c's emission sites.
-- **`/lib/array`, `/lib/mapping`** — replaced by `/lib/util/ascii` and `/lib/util/lpc` (which provides `member`, `reverseMapping`, `queryColour`, `queryColourValue`, `sysLog`, `dumpValue`).
-- **Logging stubs (`DEBUG` / `Debug` / `XDebug`, `TLSD->query_tls_value`, `SYSLOGD->query_last_error`)** — mapped to no-ops. The `dump_value` references in their args are dead code. When a kernel-layer log facility lands, these wire to it.
-- **SkotOS-only includes (`<SID.h>`, `<DTD.h>`, `<System.h>`, `<nref.h>`, `<SAM.h>`)** — dropped. The Schema-side `SID` and `DTD` constants are inline-defined per the LV-2 rename (`SID = /usr/Schema/sys/schema_daemon`, `DTD = /usr/Schema/sys/dtd_daemon`).
-- **Merry data wrapper path** — references to `/usr/SkotOS/data/merry` rewritten to `/usr/Merry/data/merry`, anticipating a future Merry-subsystem lift.
+- **Sugar-tag interpretation** — see above.
+- **Typed-literal forms in `XML_BOOL`** — the serialization is a simple `true` / `false`.
+- **Logging** — the `DEBUG` / `Debug` / `XDebug` diagnostic macros are no-ops; the `dump_value` references in their args are dead code. When a kernel-layer log facility lands, these wire to it.
+
+The `SID` and `DTD` daemon constants are inline-defined (`SID = /usr/Schema/sys/schema_daemon`, `DTD = /usr/Schema/sys/dtd_daemon`).
 
 ## Naming convention
 
-Function names within the XML transport were rewritten to camelCase at lift time, matching the `/lib/util/*` helper convention:
+Function names within the XML transport are camelCase, matching the `/lib/util/*` helper convention:
 
 - `xmdElts`, `xmdText`, `xmdElement`, `xmdAttributes`, `xmdContent`, `xmdRef`, `xmdRefRef`, `xmdRefAttributes`, `xmdWipeTags`, `xmdStripPcdata`, `xmdForceToData`, `xmdOptimize`, `attributesToMapping`
 - `queryColour`, `queryColourValue`, `entityToAscii`, `asciiToEntity`
@@ -84,8 +80,8 @@ Function names within the XML transport were rewritten to camelCase at lift time
 
 Two boundaries retain `snake_case` as a contract surface:
 
-- The **DTD-callback API** in `xml_daemon.c` (`query_type_colour`, `typed_to_ascii`, `ascii_to_typed`, `test_raw_data`, `query_asciisize`, `query_asciiheight`, `query_checkboxed`, `default_value`, `query_state_root`). These are called by name through `dtd_daemon`'s dispatch, so all handlers registered with the daemon must agree on the names. A coordinated rename across handlers (xml_daemon + the future stateimpex) is a separate sweep, not a per-handler decision.
-- `lower_case`, `strip`, `strip_left`, `strip_right` in `/lib/util/ascii` keep their pre-existing names (`lower_case` was already there before the lift; `strip*` were added alongside at lift time).
+- The **DTD-callback API** in `xml_daemon.c` (`query_type_colour`, `typed_to_ascii`, `ascii_to_typed`, `test_raw_data`, `query_asciisize`, `query_asciiheight`, `query_checkboxed`, `default_value`, `query_state_root`). These are called by name through `dtd_daemon`'s dispatch, so all handlers registered with the daemon must agree on the names. A coordinated rename across handlers is a separate sweep, not a per-handler decision.
+- `lower_case`, `strip`, `strip_left`, `strip_right` in `/lib/util/ascii` keep their snake_case names.
 
 ## File-by-file reference
 
@@ -95,11 +91,11 @@ Public type constants: `XML_ELEMENT`, `COL_ELEMENT`, `XML_SAMREF`, `COL_SAMREF`,
 
 ### `src/usr/XML/include/XMLIn.h` (302 lines)
 
-Lexer state variables and macros for `lib/xmlparse.c`. Source-lifted verbatim from SkotOS. `DEBUG(...)` macro calls expand to no-ops in the lift's current logging story; the `dump_value` references inside those calls are dead code (never compiled). When a real kernel-layer log facility lands, `DEBUG` and `dump_value` wire here.
+Lexer state variables and macros for `lib/xmlparse.c`. `DEBUG(...)` macro calls expand to no-ops in the current logging story; the `dump_value` references inside those calls are dead code (never compiled). When a real kernel-layer log facility lands, `DEBUG` and `dump_value` wire here.
 
 ### `src/usr/XML/include/XMLOut.h` (88 lines)
 
-Output-buffer macros for `lib/xmlgen.c`. Source-lifted verbatim. Operates against the StringBuffer-shape `append(string)` sink the lifted xml_daemon clones per gen_xml call.
+Output-buffer macros for `lib/xmlgen.c`. Operates against the StringBuffer-shape `append(string)` sink xml_daemon clones per gen_xml call.
 
 ### `lib/entities.c` (79 lines)
 
@@ -137,6 +133,6 @@ XML's libraries (`xmd`, `xmlgen`, `xmlparse`, `entities`) are inheritable, so Va
 
 ## See also
 
-- `src/usr/Schema/` — `dtd_daemon` is the registry XML registers with; `lib/dtd` is what XML inherits to query types
-- `src/usr/Marshal/` (lifts at LV-4.5c) — XmlBinding/stateimpex builds on top of this XML transport for SkotOS-style state import/export
-- `src/lib/util/ascii.c` and `src/lib/util/lpc.c` — the helper libs the XML lift pulls from instead of SkotOS's `/lib/string`, `/lib/array`, `/lib/mapping`, `/lib/data`
+- [schema.md](schema.md) — `dtd_daemon` is the registry XML registers with; `lib/dtd` is what XML inherits to query types
+- `src/usr/Marshal/` — XmlBinding/stateimpex builds on top of this XML transport for state import/export
+- `src/lib/util/ascii.c` and `src/lib/util/lpc.c` — the helper libs the XML transport uses
