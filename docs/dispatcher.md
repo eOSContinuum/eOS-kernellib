@@ -54,14 +54,14 @@ The implicit batch is recorded as `completed` in the batch-status log on exit. T
 
 Registers a Merry-script observer at the given (`path`, `timing`) on `ob`. Stored as a property-list under `merry:on:<path>:<timing>`. Multiple observers may be registered for the same slot; they fire in registration order.
 
-- `ob` -- host object. Must be non-nil and must inherit `/lib/util/properties`.
+- `ob` -- host object. Must be non-nil and must inherit `/lib/util/properties`; the daemon refuses a target without the property API (before that validation, such a registration reported success while storing nothing, since `call_other` on a missing function returns nil).
 - `path` -- property path (dot-notation; arbitrary string).
 - `timing` -- one of `"pre"`, `"main"`, `"post"` (case-insensitive). Anything else errors; nil collapses to `"main"`.
 - `source` -- Merry source string. Compiled at registration time (a `/usr/Merry/data/merry` clone is created); the compiled object is what gets stored.
 
 Capability-gated per `DD-1 (e)`: callable from `/kernel/`, from a `KERNEL()`-trusting registrar program, and from any program whose creator is in the approved-registrar set. Application code typically calls through its own initd or a registered admin path; raw test drivers that want to register from `/usr/<App>/sys/test.c` need their creator listed via `add_approved_registrar(<domain>)` (KERNEL-gated). The MerryApp example registers from the test driver directly, so `MerryApp` lives in the approved set at boot.
 
-Errors on: nil host, unrecognized timing, capability-gate failure. The compile step may also error if the source has a parse failure.
+Errors on: nil host, non-property-bearing host, unrecognized timing, capability-gate failure. The compile step may also error if the source has a parse failure.
 
 ### `dispatch_set(object obj, string path, mixed val)`
 
@@ -147,7 +147,7 @@ The bound counts depth, not breadth -- a flat batch with many legitimate writes 
 
 ### `unregister_observer(object ob, string path, string timing)`
 
-Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`. Asymmetric with `register_observer`'s add-one semantics; finer-grained removal (by source string or by compiled-object identity) is a future-work item (see eos-harness BACKLOG `#FH-14`).
+Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`, and refuses a non-property-bearing target the same way. Asymmetric with `register_observer`'s add-one semantics; finer-grained removal (by source string or by compiled-object identity) is a future-work item (see eos-harness BACKLOG `#FH-14`).
 
 The MVA-scope coarse granularity is sufficient for the common operator scenario (clear all observers at a triple to start fresh, e.g., for an in-flight troubleshooting session). For surgical removal in a multi-observer-on-one-triple host, current options are (a) read the property value list, remove one entry by index, write back via `set_raw_property` (operator-tier surgery; admin verb `register-observer` / `unregister-observer` in `admin-console.md` does not yet expose this), or (b) clear all and re-register the keepers.
 

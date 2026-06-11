@@ -209,6 +209,22 @@ void _check_registrar(string caller_program, string target_name) {
 }
 
 /*
+ * _check_property_bearer: register/unregister target validation. The
+ * observer store IS the target's property table; an object that does
+ * not inherit the property API silently ignores the call_other writes
+ * (call_other on a missing function returns nil), which reads as a
+ * successful registration that stores nothing. Erroring here turns
+ * that silent no-op into a caller-visible refusal.
+ */
+private
+void _check_property_bearer(object ob) {
+   if (!function_object("set_raw_property", ob)) {
+      error("MERRY: target " + ::object_name(ob) +
+            " does not carry the property API (inherit /lib/util/properties)");
+   }
+}
+
+/*
  * _invalidate_observer_cache: broad invalidation per DI-1 (g) MVA choice.
  * Any observer-property write clears the whole cache. Args carried for
  * future descendant-chain-tracking switch; currently unused.
@@ -250,6 +266,7 @@ void register_observer(object ob, string path, string timing, string source) {
       error("register_observer: nil host object");
    }
    _check_registrar(caller_program, ::object_name(ob));
+   _check_property_bearer(ob);
 
    low_timing = timing ? lower_case(timing) : "main";
    if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {
@@ -292,6 +309,7 @@ void unregister_observer(object ob, string path, string timing) {
       error("unregister_observer: nil host object");
    }
    _check_registrar(caller_program, ::object_name(ob));
+   _check_property_bearer(ob);
 
    low_timing = timing ? lower_case(timing) : "main";
    if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {

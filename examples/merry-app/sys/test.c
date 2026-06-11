@@ -417,6 +417,27 @@ static void run_tests()
 
     log_line("MerryApp:test: REGISTRAR REJECT OK");
 
+    /* phase 5c: non-property-bearing target reject. The observer
+     * store is the target's property table; before the daemon-side
+     * validation, registering on an object without the property API
+     * reported success while storing nothing (call_other on a
+     * missing function returns nil). The daemon must now refuse.
+     * This driver inherits no property lib, so it is its own
+     * negative target -- and the domain matches, so the registrar
+     * gate passes and the property-bearer check is what throws. */
+
+    catch {
+	MERRY_DAEMON->register_observer(this_object(),
+	    "test:badtarget", "main", "return TRUE;");
+	log_line("MerryApp:test: FAIL: register_observer on a "
+		 + "non-property-bearing target did not throw");
+	return;
+    } : {
+	/* expected: the daemon refused the target */
+    }
+
+    log_line("MerryApp:test: TARGET REJECT OK");
+
     /* phase 6: DI-2 batched_set (non-atomic) per DD-1 (c) -- writes a
      * multi-key mapping under one batch-id with sequential seq starting
      * at 0 (DD-3 (b)). Verifies the public LFUN compiles and that both

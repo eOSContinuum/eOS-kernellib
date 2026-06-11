@@ -51,6 +51,7 @@ kill %1
 #   MerryApp:test: DUPLICATE OK
 #   MerryApp:test: LABELCALL OK
 #   MerryApp:test: REGISTRAR REJECT OK
+#   MerryApp:test: TARGET REJECT OK
 #   MerryApp:test: BATCH OK
 #   MerryApp:test: BATCH ATOMIC OK
 #   MerryApp:test: BATCH SOURCE OK
