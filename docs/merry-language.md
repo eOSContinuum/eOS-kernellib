@@ -99,28 +99,29 @@ The merrynode's own merryfuns escape sandbox shadowing using LPC's `::` operator
 
 ## Merryfun call surface
 
-Fourteen merryfuns are available to Merry source:
+Fifteen merryfuns are available to Merry source. Signatures below are the declarations in `merrynode.c`; the leading type is the return type.
 
-| Merryfun | Signature (LPC equivalent) | Effect |
+| Merryfun | Signature | Behavior |
 |---|---|---|
-| `Set(obj, prop, value)` | `obj->set_property(prop, value)` | Property set on a target object |
-| `Get(obj, prop)` | `obj->query_property(prop)` | Property read on a target object |
-| `SetVar(name, value)` | `args[name] = value` | Mutate the inherited `args` mapping |
-| `GetVar(name)` | `args[name]` | Read from the inherited `args` mapping |
-| `Call(obj, name, key, val, ...)` | dispatches LFUN or merry script | Cross-object call (replacement for `->`); resolves to `obj->call_method(name, args)` if defined, else `run_merry(obj, name, "lib", args)` |
-| `LabelCall(space, fun, key, val, ...)` | calls `space`-registered handler | Cross-script-space dispatch via the Merry daemon's space registry |
-| `LabelRef(space)` | returns handler | Reflects the script-space's handler object |
-| `FindMerry(oref, mode, signal)` | location of script | Returns the object on whose ancestry the named script is found |
-| `Spawn(ur)` | `clone_object(...)` with ur set | Clones the ur's clonable and stamps the result with the ur as parent |
-| `Slay(obj)` | `obj->suicide()` | Schedules `obj`'s `suicide` LFUN |
-| `Duplicate(ob)` | clone + state copy | Clones `ob`'s program and re-imports its state via Schema marshaling |
-| `In(signal, seconds)` | `schedule_entry(...)` | Schedules a single re-fire of `signal` on `this` at `t+seconds` |
-| `Every(signal, seconds)` | `schedule_entry(...)` recurring | Schedules a recurring re-fire of `signal` |
-| `Stop(id)` | `unschedule_entry(id)` | Cancels a scheduled entry by id |
+| `Set` | `mixed Set(object o, string p, mixed v)` | `o->set_property(p, v)`; the wildcard `Set(o, "*", map)` atomically replaces the entire property map. Errors if `o` is nil |
+| `Get` | `mixed Get(object o, string p)` | `o->query_property(p)`; the wildcard `Get(o, "*")` returns the full property map. Errors if `o` is nil |
+| `BatchedSet` | `mixed BatchedSet(object o, mapping kv_map, varargs mapping opts)` | Multi-key property write via `MERRY->batched_set(o, kv_map[, opts])`; pass `([ "atomic": 1 ])` as `opts` to opt into atomic mode (absent or nil runs non-atomic). The function-reference batch form (`MERRY->batch(fn)`) is not exposed — Merry has no function-reference syntax |
+| `SetVar` | `mixed SetVar(string n, mixed v)` | Writes `v` into the inherited `args` mapping under `lower_case(n)` |
+| `GetVar` | `mixed GetVar(string n)` | Reads `args[lower_case(n)]` from the inherited `args` mapping |
+| `Call` | `mixed Call(mixed oref, string name, varargs mixed *local)` | Cross-object call (replacement for `->`); resolves `oref` (object or path string), then dispatches `obj->call_method(name, args)` if defined, else `run_merry(obj, name, "lib", args)`. `local` is key-value pairs spliced into the callee's `args`. Errors if neither method nor script exists |
+| `LabelCall` | `mixed LabelCall(string space, string fun, varargs mixed *local)` | Looks up the handler registered for script-space `space` via the Merry daemon's registry, then delegates to `Call(handler, fun, local)`. Errors if the space is not registered |
+| `LabelRef` | `object LabelRef(string space)` | Returns the script-space's registered handler object without calling it |
+| `FindMerry` | `object FindMerry(mixed oref, string mode, string signal)` | Walks `oref`'s Ur-hierarchy and returns the ancestor holding the named `merry:<mode>:<signal>` script |
+| `Spawn` | `object Spawn(object ur)` | Clones the ur's clonable (via the `::clone_object` escape) and stamps the result with `ur` as parent. Atomic |
+| `Slay` | `void Slay(object obj)` | Calls `obj->suicide()` to schedule destruction. Errors if `obj` is nil |
+| `Duplicate` | `object Duplicate(object ob)` | Clones `ob`'s program and re-imports its full state via Schema marshaling. Atomic; errors if `ob` is nil or not a clone |
+| `In` | `string In(string signal, int seconds)` | Schedules a single re-fire of `signal` on `this` at `t+seconds` via `schedule_entry`; returns the schedule-entry id |
+| `Every` | `string Every(string signal, int seconds)` | Schedules a recurring re-fire of `signal` every `seconds`; returns the schedule-entry id |
+| `Stop` | `string Stop(string id)` | Cancels a scheduled `In` or `Every` entry by id via `unschedule_entry` |
 
 For raising errors from inside Merry source, use the allowed kfun `error("message")` directly — there is no `Error` merryfun. (The `categorize_merry_word` syntax-categorizer in `merryapi.c` lists `Error` as a merryfun token, but the merrynode implementation carries no `Error` LFUN; the entry is vestigial categorization tooling.)
 
-`Set`, `Get`, `SetVar`, `GetVar`, `Call`, `LabelCall`, `LabelRef`, `FindMerry`, `Spawn`, `Slay`, `Duplicate` are marked `nomask`: subclasses cannot redefine them. `Spawn` and `Duplicate` are also `atomic`.
+All fifteen merryfuns are marked `nomask`: subclasses cannot redefine them. `Spawn` and `Duplicate` are also `atomic`.
 
 The `Set(obj, "*", mapping)` and `Get(obj, "*")` forms are bulk: the wildcard `"*"` replaces or returns the entire property map atomically (`merrynode.c::set_all` clears then re-sets under one atomic block).
 

@@ -33,7 +33,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [signal-applications.md](signal-applications.md) -- the smallest signal-on-property demonstration: one observer, one write, the reaction done when the write returns; why reacting to state change is a runtime primitive here rather than assembled queue/poller/worker glue.
 - [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
 - [chat-applications.md](chat-applications.md) — multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, the planned growth path across capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
-- [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fourteen merryfuns. Read this when writing Merry source, not just binding it.
+- [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fifteen merryfuns with full signatures. Read this when writing Merry source, not just binding it.
 
 ### Operations
 
