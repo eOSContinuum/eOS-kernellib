@@ -1,7 +1,8 @@
 /*
  * Property-bearing demonstration clonable.
  *
- * One string-typed `label` and one int-typed `count`. Implements the
+ * One string-typed `label`, one int-typed `count`, and one
+ * object-typed `peer` (a cross-object reference). Implements the
  * Schema callback surface (query_/set_ pairs per attribute) that the
  * MyApp:Thing schema declares, plus the /lib/util/named API that
  * Vault->store / Vault->spawn_one_by_name use to round-trip the clone
@@ -21,6 +22,7 @@ inherit "/lib/util/named";
 
 private string _label;
 private int _count;
+private object _peer;
 
 static void create()
 {
@@ -34,6 +36,8 @@ string query_state_root()
 
 string query_label()  { return _label; }
 int    query_count()  { return _count; }
+object query_peer()   { return _peer; }
 
 void set_label(string val) { _label = val; }
 void set_count(int val)    { _count = val; }
+void set_peer(object val)  { _peer = val; }

@@ -24,7 +24,7 @@ Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`;
 cp -R examples/vault-app src/usr/MyApp
 ```
 
-Then sync the runtime tree (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects four OK sentinels: `ROUND-TRIP OK` plus the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`).
+Then sync the runtime tree (`scripts/setup-runtime.sh`) and boot DGD against `mva.dgd`. The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects six OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), and the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`).
 
 The sections below explain what the reference application is doing and why. Read the code in `examples/vault-app/sys/test.c` alongside this document.
 
@@ -163,13 +163,21 @@ One-of-a-kind daemons store as `<object program="..."/>`. The test driver exerci
 - **The cross-domain compile boundary.** With the program destructed, the Vault daemon's `findOrLoad` cannot bring it back: kernel `compile_object` grants non-lib compiles only to callers with write access to the path, and the Vault has none over `/usr/MyApp`. The error is caught inside the Vault's spawn internals (an `Access denied [caught]` trace in the boot log), so the spawn returns normally and the program simply stays unloaded. Application code must not rely on `Vault->spawn_one_by_name` to load another domain's singleton from scratch.
 - **The owning-domain respawn.** The supported way to respawn an unloaded singleton is from inside its own domain: any vault node (the test driver is one) inherits `spawn_create_one` / `spawn_configure_one` from `~Vault/lib/vault_node`, and calling them with the stored XML compiles the program in the owning domain's own context, re-binds the logical name, and re-imports the state.
 
+## Cross-object references
+
+The MyApp:Thing schema types its `peer` attribute as `lpc_obj`. On export, an object-valued attribute serializes as the literal `OBJ(<name>)`, where the name is the target's logical name when it has one (its `query_object_name`), or its LPC object path otherwise. On import, the literal resolves path-first, then through Index for logical names -- so a reference to another named object survives the disk round-trip as long as the target is loaded (or resolvable by name) at import time.
+
+Two boundaries to design around:
+
+- **Dangling references do not throw to the spawn caller.** If the target resolves to nothing at import time, the type conversion errors inside the Vault's configure step, which is caught internally. The referencing object still spawns (the create step already succeeded) and carries whatever attributes imported cleanly, with the dangling reference left nil. Applications that need referential integrity must order their respawns so targets load before referrers, or re-check references after a bulk respawn.
+- **Vault-respawned clones are owned by the Vault daemon.** `clone_object` runs in the Vault's context during a respawn, so the kernel's owner-gated `destruct_object` refuses the application domain's attempt to destruct an object the Vault respawned -- even though the object logically belongs to the application. An application that needs to retire Vault-respawned objects must route the destruct through code the owner can call (for example, a self-destruct method on the object itself).
+
 ## Cross-domain access
 
 Inheriting `~Vault/lib/vault_node` from a domain other than Vault requires Vault to be globally readable. The platform's `src/usr/System/initd.c` grants `set_global_access("Vault", TRUE)` alongside the Schema / XML / Marshal / Index grants. Cloning `/usr/Schema/obj/schema_node` from a non-Schema domain works without a separate grant (clone_object has no access check against the path's domain), but the `set_global_access("Schema", TRUE)` grant is required for the schema_daemon constants to inherit cleanly when the application's own inherit chain pulls them in.
 
 ## What this example does not exercise
 
-- **Cross-object references**. The MyApp:Thing schema declares only flat primitives. The lifted core schemas (`Ur:Hierarchy` for ancestry, `Core:Entries` for flat key-value) compose into cross-object references via `lpc_obj`-typed attributes that resolve through Index; an example demonstrating that pattern is a natural follow-on.
 - **Statedump survival**. The DGD `dump_state` cycle (write snapshot, restart against the snapshot, verify property state survives) is part of the Vault's value proposition but is awkward to exercise in a single boot. A multi-boot test harness is a natural follow-on once the platform grows a CI shape.
 - **Hot reload**. Recompiling thing.c via `compile_object` updates the clonable in place; existing clones survive the recompile and dispatch to the new code on next method call. Demonstrating this requires admin_console interaction; out of scope for a boot-time assertion driver.
 

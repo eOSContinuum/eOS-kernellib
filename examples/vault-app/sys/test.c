@@ -9,7 +9,7 @@
  *
  * Assertion path:
  *   1. clone a thing, set label + count, set_object_name "MyApp:demo:thing1"
- *   2. Vault->store(thing) -- emits XML to .runtime/state/vault/data/MyApp/demo/thing1.xml
+ *   2. Vault->store(thing) -- emits XML to /usr/Vault/data/vault/MyApp/demo/thing1.xml
  *      via export_state -> Schema callbacks (query_label / query_count)
  *   3. destruct the original clone
  *   4. Vault->spawn_one_by_name("MyApp:demo:thing1") -- reads the XML, clones a
@@ -61,6 +61,7 @@ inherit "/lib/util/named";
 
 static void run_tests();
 static void run_singleton_test();
+static void run_xref_test();
 private void register_thing_schema();
 private void register_config_schema();
 private void log_line(string msg);
@@ -102,8 +103,10 @@ private void register_thing_schema()
     node->set_name("MyApp", "Thing");
     node->add_attribute("label", "lpc_str", "query_label");
     node->add_attribute("count", "lpc_int", "query_count");
+    node->add_attribute("peer", "lpc_obj", "query_peer");
     node->add_callback("set_label", "label");
     node->add_callback("set_count", "count");
+    node->add_callback("set_peer", "peer");
 }
 
 
@@ -182,6 +185,7 @@ static void run_tests()
     log_line("MyApp:test: ROUND-TRIP OK");
 
     run_singleton_test();
+    run_xref_test();
 }
 
 
@@ -308,6 +312,112 @@ static void run_singleton_test()
     }
 
     log_line("MyApp:test: NODE-RESPAWN OK");
+}
+
+
+static void run_xref_test()
+{
+    object alpha, beta, gamma, reloaded;
+
+    /* phase 5: cross-object lpc_obj reference at application tier.
+     * alpha's `peer` attribute points at beta; the stored XML carries
+     * the literal OBJ(MyApp:xref:beta), and import resolves it through
+     * Index (the name is not an LPC path) when beta is loaded. */
+    alpha = clone_object(THING_PROG);
+    alpha->set_object_name("MyApp:xref:alpha");
+    alpha->set_label("alpha");
+    alpha->set_count(1);
+
+    beta = clone_object(THING_PROG);
+    beta->set_object_name("MyApp:xref:beta");
+    beta->set_label("beta");
+    beta->set_count(2);
+
+    alpha->set_peer(beta);
+
+    catch {
+	VAULT->store(alpha);
+	VAULT->store(beta);
+    } : {
+	log_line("MyApp:test: FAIL: xref store threw");
+	return;
+    }
+
+    destruct_object(alpha);		/* beta stays loaded */
+
+    catch {
+	VAULT->spawn_one_by_name("MyApp:xref:alpha");
+    } : {
+	log_line("MyApp:test: FAIL: xref respawn threw");
+	return;
+    }
+
+    reloaded = find_named("MyApp:xref:alpha");
+    if (!reloaded) {
+	log_line("MyApp:test: FAIL: xref alpha not findable after respawn");
+	return;
+    }
+    if (reloaded->query_peer() != beta) {
+	log_line("MyApp:test: FAIL: xref peer did not resolve to the "
+		 + "loaded beta");
+	return;
+    }
+    if (reloaded->query_label() != "alpha" || reloaded->query_count() != 1) {
+	log_line("MyApp:test: FAIL: xref alpha state mismatch");
+	return;
+    }
+
+    log_line("MyApp:test: XREF OK");
+
+    /* phase 6: dangling reference. A fresh driver-owned gamma stores
+     * a peer reference to beta; with BOTH unloaded, importing gamma's
+     * peer errors inside the Vault's configure step ("no object"),
+     * which do_spawn catches internally. The create step already
+     * succeeded, so gamma exists -- with whatever attributes imported
+     * before the dangling one, and a nil peer. The assertion pins that
+     * boundary: a dangling lpc_obj reference does not throw to the
+     * spawn caller and leaves the object without its peer.
+     *
+     * gamma is used instead of re-destructing alpha because the
+     * respawned alpha is OWNED BY THE VAULT DAEMON (clone_object ran
+     * in the Vault's context during the respawn), so this driver
+     * cannot destruct it -- kernel destruct_object is owner-gated.
+     * Ownership of Vault-respawned clones follows the spawning
+     * daemon, not the logical domain in the object's name. */
+    gamma = clone_object(THING_PROG);
+    gamma->set_object_name("MyApp:xref:gamma");
+    gamma->set_label("gamma");
+    gamma->set_count(3);
+    gamma->set_peer(beta);
+
+    catch {
+	VAULT->store(gamma);
+    } : {
+	log_line("MyApp:test: FAIL: dangling store threw");
+	return;
+    }
+
+    destruct_object(gamma);
+    destruct_object(beta);
+
+    catch {
+	VAULT->spawn_one_by_name("MyApp:xref:gamma");
+    } : {
+	log_line("MyApp:test: FAIL: dangling respawn threw to caller");
+	return;
+    }
+
+    reloaded = find_named("MyApp:xref:gamma");
+    if (!reloaded) {
+	log_line("MyApp:test: FAIL: dangling respawn did not create gamma");
+	return;
+    }
+    if (reloaded->query_peer() != nil) {
+	log_line("MyApp:test: FAIL: dangling peer unexpectedly resolved");
+	return;
+    }
+
+    log_line("MyApp:test: XREF-DANGLING OK");
 }
 
 

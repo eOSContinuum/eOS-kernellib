@@ -4,10 +4,11 @@ A minimal Vault application that runs on top of eOS-kernellib. Demonstrates the 
 
 ## Operations
 
-- A `MyApp:Thing` clonable carries one `lpc_str` property (`label`) and one `lpc_int` property (`count`).
+- A `MyApp:Thing` clonable carries an `lpc_str` property (`label`), an `lpc_int` property (`count`), and an `lpc_obj` property (`peer`, a cross-object reference).
 - At boot, the test driver clones a thing, sets properties, names it `MyApp:demo:thing1`, calls `Vault->store`, destructs the clone, then `Vault->spawn_one_by_name` reloads it from the XML on disk and asserts the property values round-trip.
 - The reloaded object is also looked up via `Index->query_object(name)` to verify Vault's restoration registers the object's logical name.
 - A second assertion set exercises the singleton storage shape: `sys/config.c` (a one-of-a-kind daemon) is stored as `<object program="...">` rather than `<clone .../>`. Three paths are asserted: store + re-import through the public Vault API against the loaded singleton (mutated live state loses to stored state); the cross-domain boundary (with the program unloaded, the Vault daemon cannot compile `/usr/MyApp/sys/config` -- kernel `compile_object` grants non-lib compiles only with write access to the path -- so the respawn is a no-op and the boot log carries an expected `[caught]` access trace); and the supported owning-domain respawn (the test driver, itself a vault node, calls its inherited `spawn_create_one` / `spawn_configure_one`, which compile the program in MyApp's own context and re-import the stored state).
+- A final assertion pair exercises cross-object `lpc_obj` references: a thing's `peer` attribute pointing at another named thing stores as the literal `OBJ(<logical-name>)` and re-resolves through Index on import when the peer is loaded; with the peer unloaded, the import fails inside the Vault's configure step (caught internally, two expected `[caught]` traces), so the respawned object exists but carries a nil peer -- a dangling reference does not throw to the spawn caller.
 
 ## Deployment
 
@@ -39,19 +40,21 @@ MyApp:test: ROUND-TRIP OK
 MyApp:test: SINGLETON OK
 MyApp:test: XDOMAIN-RESPAWN-REJECT OK
 MyApp:test: NODE-RESPAWN OK
+MyApp:test: XREF OK
+MyApp:test: XREF-DANGLING OK
 ```
 
-The boot log additionally carries one expected `Access denied [caught]` trace from the cross-domain boundary assertion.
+The boot log additionally carries three expected `[caught]` traces: one `Access denied` from the cross-domain boundary assertion, and a `no object` pair (the raw error plus its XML-layer wrapper) from the dangling-reference assertion.
 
-The on-disk artifact lands at `.runtime/state/vault/data/MyApp/demo/thing1.xml`. The Vault root resolves to `<data-dir>/data/MyApp/demo/thing1.xml` where `<data-dir>` is the runtime's data root.
+The on-disk artifacts land under the Vault daemon's storage root, `/usr/Vault/data/vault/` (`.runtime/src/usr/Vault/data/vault/` in the deployed tree): the round-trip thing at `MyApp/demo/thing1.xml`, the singleton at `MyApp/config/main.xml`, and the cross-reference things under `MyApp/xref/`.
 
 ## Files
 
 - `initd.c` -- domain initd; compiles `obj/thing` + `sys/test` at boot. Deliberately does not compile `sys/config`: the singleton respawn assertion is only meaningful when the program is not loaded.
 - `lib/app.c` -- thin wrapper inheriting `~Vault/lib/vault_node`; daemons inherit this to participate in the Vault.
-- `obj/thing.c` -- property-bearing clonable; carries `label` (string) + `count` (int).
+- `obj/thing.c` -- property-bearing clonable; carries `label` (string) + `count` (int) + `peer` (object reference).
 - `sys/config.c` -- one-of-a-kind configuration daemon; carries `greeting` (string) + `limit` (int); exercises the singleton `<object>` storage shape.
-- `sys/test.c` -- boot-time test driver; registers the `MyApp:Thing` + `MyApp:Config` schemas and runs the round-trip and singleton assertions via `call_out("run_tests", 0)`.
+- `sys/test.c` -- boot-time test driver; registers the `MyApp:Thing` + `MyApp:Config` schemas and runs the round-trip, singleton, and cross-reference assertions via `call_out("run_tests", 0)`.
 
 ## Notes
 
