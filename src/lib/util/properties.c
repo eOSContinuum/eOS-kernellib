@@ -7,9 +7,9 @@
  * it lands, per-app schemas with typed accessors are the marshaling
  * path for property-bearing objects.
  *
- * Inheritors receive query_state_root() returning "Core:Properties" by default;
+ * Inheritors receive queryStateRoot() returning "Core:Properties" by default;
  * application objects that bind to their own schema must override (the
- * vault-app/obj/thing.c pattern: query_state_root() -> "MyApp:Thing").
+ * vault-app/obj/thing.c pattern: queryStateRoot() -> "MyApp:Thing").
  */
 
 # include <type.h>
@@ -40,7 +40,7 @@ private mapping prefixed_map(mapping map, string prefix)
 }
 
 
-string query_state_root() { return "Core:Properties"; }
+string queryStateRoot() { return "Core:Properties"; }
 
 
 static

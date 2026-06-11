@@ -635,7 +635,7 @@ private mixed convert(mixed content, varargs string ltype, int strip)
     /* if the content is a string, convert according to ltype (may be nil) */
     if (typeof(content) == T_STRING) {
 	catch {
-	    content = ascii_to_typed(content, ltype);
+	    content = asciiToTyped(content, ltype);
 	} : {
 	    DEBUG("content = " + dumpValue(content));
 	    LexErr("type conversion failed: expected " + (ltype ? ltype : "nil"));
@@ -648,11 +648,11 @@ private mixed convert(mixed content, varargs string ltype, int strip)
 	/* if there is no type, we're an attribute value: do no more */
 	return content;
     }
-    if (query_type_colour(ltype)) {
+    if (queryTypeColour(ltype)) {
 	int val;
 
 	/* if there is a colour associated with this type, paint the value */
-	switch (val = query_type_colour(ltype)) {
+	switch (val = queryTypeColour(ltype)) {
 	default:
 	    DEBUG("Unrecognized colour " + val + ", content = " + dumpValue(content));
 	    return content;
@@ -665,7 +665,7 @@ private mixed convert(mixed content, varargs string ltype, int strip)
 	}
     }
     /* otherwise, check that the data is what it's supposed to be */
-    if (!test_raw_data(content, ltype)) {
+    if (!testRawData(content, ltype)) {
 	XDebug(dumpValue(content));
 	LexErr("expecting type " + ltype);
     }

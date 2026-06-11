@@ -15,14 +15,14 @@
 
 private inherit "/lib/util/lpc";
 
-static int query_type_colour(string type)
+static int queryTypeColour(string type)
 {
-    return DTD->get_type_handler(type)->query_type_colour(type);
+    return DTD->get_type_handler(type)->queryTypeColour(type);
 }
 
-static string query_colour_type(int colour)
+static string queryColourType(int colour)
 {
-    return DTD->get_colour_handler(colour)->query_colour_type(colour);
+    return DTD->get_colour_handler(colour)->queryColourType(colour);
 }
 
 static string *query_ascii_enumeration(string type)
@@ -30,22 +30,22 @@ static string *query_ascii_enumeration(string type)
     return DTD->query_enumeration(type);
 }
 
-static int query_checkboxed(string type)
+static int queryCheckboxed(string type)
 {
-    return DTD->get_type_handler(type)->query_checkboxed(type, ([ ]));
+    return DTD->get_type_handler(type)->queryCheckboxed(type, ([ ]));
 }
 
-static int test_raw_data(mixed val, string type)
+static int testRawData(mixed val, string type)
 {
-    return DTD->get_type_handler(type)->test_raw_data(val, type);
+    return DTD->get_type_handler(type)->testRawData(val, type);
 }
 
-static mixed default_value(string type)
+static mixed defaultValue(string type)
 {
-    return DTD->get_type_handler(type)->default_value(type);
+    return DTD->get_type_handler(type)->defaultValue(type);
 }
 
-static string typed_to_ascii(mixed val, string type);
+static string typedToAscii(mixed val, string type);
 
 static string untyped_to_ascii(mixed val)
 {
@@ -53,8 +53,8 @@ static string untyped_to_ascii(mixed val)
     int colour;
 
     if (colour = queryColour(val)) {
-	if (type = query_colour_type(colour)) {
-	    return typed_to_ascii(val, type);
+	if (type = queryColourType(colour)) {
+	    return typedToAscii(val, type);
 	}
     }
     switch (typeof(val)) {
@@ -74,12 +74,12 @@ static string untyped_to_ascii(mixed val)
     error("eek");
 }
 
-static string typed_to_ascii(mixed val, string type)
+static string typedToAscii(mixed val, string type)
 {
     if (!type) {
 	return untyped_to_ascii(val);
     }
-    return DTD->get_type_handler(type)->typed_to_ascii(val, type);
+    return DTD->get_type_handler(type)->typedToAscii(val, type);
 }
 
 static mixed ascii_to_untyped(string ascii)
@@ -103,20 +103,20 @@ static mixed ascii_to_untyped(string ascii)
 }
 
 
-static mixed ascii_to_typed(string ascii, string type)
+static mixed asciiToTyped(string ascii, string type)
 {
     if (!type) {
 	return ascii_to_untyped(ascii);
     }
-    return DTD->get_type_handler(type)->ascii_to_typed(ascii, type);
+    return DTD->get_type_handler(type)->asciiToTyped(ascii, type);
 }
 
 static int ascii_size(string type)
 {
-    return DTD->get_type_handler(type)->query_asciisize(type);
+    return DTD->get_type_handler(type)->queryAsciiSize(type);
 }
 
 static int ascii_height(string type)
 {
-    return DTD->get_type_handler(type)->query_asciiheight(type);
+    return DTD->get_type_handler(type)->queryAsciiHeight(type);
 }

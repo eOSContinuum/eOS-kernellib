@@ -41,7 +41,7 @@ System's initd loads XML's initd in alphabetical iteration after Schema (S) — 
 
 1. `compile_object("sys/xml_daemon")` — compiles the daemon. At `create()` time it inherits `~/lib/xmlparse`, `~/lib/xmlgen`, `~/lib/xmd` (which transitively pull `lib/entities`), then calls `DTD->register_type(XML_ELEMENT | XML_PCDATA | XML_SAMREF | XML_BOOL)` and `DTD->register_colour(COL_ELEMENT | COL_PCDATA | COL_SAMREF)` against the now-loaded Schema's `dtd_daemon`.
 
-After boot, Schema-mediated type dispatch resolves any XML-typed values through xml_daemon's handler methods (`query_type_colour`, `typed_to_ascii`, `ascii_to_typed`, `test_raw_data`, etc.).
+After boot, Schema-mediated type dispatch resolves any XML-typed values through xml_daemon's handler methods (`queryTypeColour`, `typedToAscii`, `asciiToTyped`, `testRawData`, etc.).
 
 ## Internal vs wire format
 
@@ -78,10 +78,9 @@ Function names within the XML transport are camelCase, matching the `/lib/util/*
 - `queryColour`, `queryColourValue`, `entityToAscii`, `asciiToEntity`
 - `sysLog`, `dumpValue`
 
-Two boundaries retain `snake_case` as a contract surface:
+The **DTD-callback API** in `xml_daemon.c` is camelCase to match (`queryTypeColour`, `typedToAscii`, `asciiToTyped`, `testRawData`, `queryAsciiSize`, `queryAsciiHeight`, `queryCheckboxed`, `defaultValue`, `queryStateRoot`). These are called by name through `dtd_daemon`'s dispatch, so all handlers registered with the daemon must agree on the names; any new handler implements the camelCase set.
 
-- The **DTD-callback API** in `xml_daemon.c` (`query_type_colour`, `typed_to_ascii`, `ascii_to_typed`, `test_raw_data`, `query_asciisize`, `query_asciiheight`, `query_checkboxed`, `default_value`, `query_state_root`). These are called by name through `dtd_daemon`'s dispatch, so all handlers registered with the daemon must agree on the names. A coordinated rename across handlers is a separate sweep, not a per-handler decision.
-- `lower_case`, `strip`, `strip_left`, `strip_right` in `/lib/util/ascii` keep their snake_case names.
+Two boundaries retain `snake_case`: the schema_node query surface (`query_attributes`, `query_name`, and kin -- the marshaler walks these on schema definitions, a separate contract from handler dispatch), and `lower_case` / `strip` / `strip_left` / `strip_right` in `/lib/util/ascii`.
 
 ## File-by-file reference
 
@@ -115,7 +114,7 @@ ASCII XML parser. All-LPC lexer + recursive-descent parser. Returns an XMD tree 
 
 ### `sys/xml_daemon.c` (196 lines)
 
-The XML type daemon. Inherits `~/lib/xmlparse`, `~/lib/xmlgen`, `~/lib/xmd`. At `create()` time registers four types and three colours with `dtd_daemon`. Implements the DTD-callback API for the XML-typed values (`query_type_colour`, `typed_to_ascii`, `ascii_to_typed`, `test_raw_data`, etc.). `gen_xml(xmd)` is the public serialize entry, cloning a `/lib/StringBuffer` for the output sink.
+The XML type daemon. Inherits `~/lib/xmlparse`, `~/lib/xmlgen`, `~/lib/xmd`. At `create()` time registers four types and three colours with `dtd_daemon`. Implements the DTD-callback API for the XML-typed values (`queryTypeColour`, `typedToAscii`, `asciiToTyped`, `testRawData`, etc.). `gen_xml(xmd)` is the public serialize entry, cloning a `/lib/StringBuffer` for the output sink.
 
 ### `initd.c` (15 lines)
 

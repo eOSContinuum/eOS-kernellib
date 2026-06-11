@@ -39,7 +39,7 @@ object find_merry(object ob, string signal, string mode) {
 	    return new_val;
 	 }
       }
-      ob = ob->query_ur_object();
+      ob = ob->query_parent();
    }
    return nil;
 }
@@ -79,7 +79,7 @@ object find_merry_location(object ob, string signal, string mode) {
 	    return code;
 	 }
       }
-      ob = ob->query_ur_object();
+      ob = ob->query_parent();
    }
    return nil;
 }
@@ -118,7 +118,7 @@ mapping find_merries(object ob, string signal, string mode) {
    out = ([ ]);
 
    ancestry = ({ });
-   for (new_val = ob; new_val; new_val = new_val->query_ur_object()) {
+   for (new_val = ob; new_val; new_val = new_val->query_parent()) {
       ancestry = ({ new_val }) + ancestry;
    }
 
@@ -186,7 +186,7 @@ mixed run_merries(object ob, string signal, string mode, mapping args,
 
 /*
  * find_observers: declarative-dominant lookup for the property-
- * change dispatcher. Walks query_ur_object() ancestry. At each level:
+ * change dispatcher. Walks query_parent() ancestry. At each level:
  *   - local present + no re-enable marker -> return accumulated; terminate.
  *   - local present + re-enable marker -> accumulate, continue walk.
  *   - local absent -> continue walk without accumulating.
@@ -237,7 +237,7 @@ mixed *find_observers(object ob, string path, string timing) {
             return out;
          }
       }
-      ob = ob->query_ur_object();
+      ob = ob->query_parent();
    }
    return out;
 }

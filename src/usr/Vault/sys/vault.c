@@ -38,7 +38,7 @@ private void do_spawn(string name, string path);
 private string name_to_path(string name);
 private string path_to_name(string path);
 
-string query_state_root() { return "Vault:Daemon"; }
+string queryStateRoot() { return "Vault:Daemon"; }
 
 
 static

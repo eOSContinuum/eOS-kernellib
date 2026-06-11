@@ -1,6 +1,6 @@
 # Writing Merry applications
 
-A Merry application on eOS-kernellib runs sandboxed scripts against an object hierarchy. Scripts are looked up by signal name through an ancestry walk -- a property bound on an ur-parent is visible to every descendant via `query_ur_object()`. The sections below show what the surface looks like, how to invoke a script from external code, what the sandbox forbids, and what the bundled reference application actually exercises.
+A Merry application on eOS-kernellib runs sandboxed scripts against an object hierarchy. Scripts are looked up by signal name through an ancestry walk -- a property bound on an ur-parent is visible to every descendant via `query_parent()`. The sections below show what the surface looks like, how to invoke a script from external code, what the sandbox forbids, and what the bundled reference application actually exercises.
 
 **Audience**: an application author who wants to add scripted, sandboxed behavior to a persistent object surface on eOS-kernellib; comfortable with LPC (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
 
@@ -11,7 +11,7 @@ A Merry application on eOS-kernellib runs sandboxed scripts against an object hi
 A Merry-dispatching object only needs three things:
 
 - a property store that distinguishes raw (case-preserving) and downcased keys -- inherit `/lib/util/properties` to get `set_property` / `query_raw_property` / `query_prefixed_properties`;
-- an ur-parent / ur-child relationship that `find_merry` can walk -- inherit `/lib/util/ur` to get `set_ur_object` / `query_ur_object`;
+- an ur-parent / ur-child relationship that `find_merry` can walk -- inherit `/lib/util/ur` to get `set_ur_object` / `query_parent`;
 - a logical name registration so the script's `Get(obj, "...")` and `Set(obj, "...", ...)` calls have a stable identity to reach -- inherit `/lib/util/named` and call `set_object_name(name)` at create.
 
 Both `/lib/util/properties` and `/lib/util/ur` define `static void create()`; cloud-server's inherit resolution requires labels to disambiguate them in any inheritor that combines both. The reference application uses:
@@ -39,7 +39,7 @@ A Merry script binds to its target via a property key of the form `merry:<mode>:
 | `merry:<mode>:<signal>` | Script object found at this exact ancestor wins the dispatch. |
 | `merry:inherit:<mode>:<signal>` | Pointer to another object whose `merry:<mode>:<signal>` should be consulted (delegation chain). |
 
-`find_merry` walks `query_ur_object()` from the target upward, looking for an exact match at each level. The first hit wins. If no level has the property, `find_merry` returns nil and `run_merry` returns `TRUE` (the conservative no-op).
+`find_merry` walks `query_parent()` from the target upward, looking for an exact match at each level. The first hit wins. If no level has the property, `find_merry` returns nil and `run_merry` returns `TRUE` (the conservative no-op).
 
 `mode` is an application-defined namespace -- `lib` is the SkotOS convention for callable libraries; an application can introduce its own (`pre`, `validate`, ...) without touching the runtime. The property-change dispatcher uses `on` as its mode and the composite `<path>:<timing>` as its signal; the storage convention, ancestry walk, batching surface, and observer-source contract are documented in `docs/dispatcher.md`.
 
@@ -150,7 +150,7 @@ result = run_merry(child, "greet", "lib", ([ ]));
 
 1. queries `child` for `merry:lib:greet` -- nil (script was bound on parent);
 2. queries `child` for `merry:inherit:lib:greet` -- nil;
-3. walks to `child->query_ur_object()` -> parent;
+3. walks to `child->query_parent()` -> parent;
 4. queries `parent` for `merry:lib:greet` -- finds the script object;
 5. returns the script.
 

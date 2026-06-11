@@ -5,9 +5,10 @@
  * query_attribute_query, query_attribute_type, query_iterator_variable,
  * query_iterator_call, query_default_value, query_children,
  * query_transient, query_leaf, query_type, query_name, is_parent on
- * schema_node; get_root_node, query_node on schema_daemon;
- * ascii_to_typed, test_raw_data on dtd_daemon) stays snake_case as a
- * contract surface; a coordinated camelCase sweep is a follow-on item.
+ * schema_node; get_root_node, query_node on schema_daemon) stays
+ * snake_case as the schema-definition contract surface; the
+ * dtd_daemon handler-dispatch surface (asciiToTyped, testRawData,
+ * and kin) is camelCase.
  *
  * Root-element wrapping is the Vault's concern: vault.c wraps
  * export_state output in xmdElts("object", ...) for singletons and
@@ -146,7 +147,7 @@ mapping parse_context_mappings(mapping amap, mapping tmap) {
 
    vars = map_indices(amap);
    for (i = 0; i < sizeof(vars); i ++) {
-      res[vars[i]] = ascii_to_typed(amap[vars[i]], tmap[vars[i]]);
+      res[vars[i]] = asciiToTyped(amap[vars[i]], tmap[vars[i]]);
    }
    return res;
 }
@@ -170,7 +171,7 @@ mapping parse_xml_context(mixed state) {
           error("expected iterator");
        }
        map = attributesToMapping(xmdAttributes(states[i]));
-       args[map["var"]] = ascii_to_typed(map["val"], map["type"]);
+       args[map["var"]] = asciiToTyped(map["val"], map["type"]);
       }
    }
    return args;
@@ -187,12 +188,12 @@ mixed raw_value(string type, mapping args, object ob, mixed query...) {
 
    if (sizeof(query) == 1 &&
        sscanf(query[0], "<%s>", aval)) {
-      return ascii_to_typed(aval, type);
+      return asciiToTyped(aval, type);
    }
 
    val = execute_call(query, ob, args);
 
-   if (!test_raw_data(val, type)) {
+   if (!testRawData(val, type)) {
       error("Schema:: query " + query[0] +
 	    dumpValue(translate_parameters(query[1 ..], args)) +
 	    " does not return " + type);

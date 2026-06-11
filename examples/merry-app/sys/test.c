@@ -6,7 +6,7 @@
  *   1. Ancestry-walk + invocation. A 2-generation Hierarchy
  *      (parent <- child) is built via set_ur_object. A Merry script
  *      is bound to the parent under "merry:lib:greet"; run_merry is
- *      called on the child; find_merry walks query_ur_object() up to
+ *      called on the child; find_merry walks query_parent() up to
  *      the parent, finds the script, evaluates it. The expected
  *      return value is the literal "MerryApp:test: ANCESTRY OK".
  *
@@ -114,7 +114,7 @@ static void setup_and_run()
 
     set_object_name("MerryApp:TestDriver");
     /* Register the MerryApp:Thing schema (matching obj/thing's
-     * query_state_root) so export_state / import_state can walk a
+     * queryStateRoot) so export_state / import_state can walk a
      * state model for the clonable -- the Duplicate merryfun needs
      * it. One lpc_str attribute, label, backed by the property
      * store. */

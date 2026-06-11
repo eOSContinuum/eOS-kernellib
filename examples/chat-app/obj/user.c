@@ -5,7 +5,7 @@
  * name, presence, room subscriptions, mention-tracker, and the
  * admin-token list that backs the capability check inside sys/admin.
  *
- * query_state_root() returns "ChatApp:User" -- forward-compat for a
+ * queryStateRoot() returns "ChatApp:User" -- forward-compat for a
  * future revision's persistence demonstration. The first revision
  * exercises only the in-memory admin-token surface.
  *
@@ -19,7 +19,7 @@ inherit "/lib/util/lpc";
 inherit properties "/lib/util/properties";
 inherit ur "/lib/util/ur";
 
-string query_state_root() { return "ChatApp:User"; }
+string queryStateRoot() { return "ChatApp:User"; }
 
 static void create()
 {

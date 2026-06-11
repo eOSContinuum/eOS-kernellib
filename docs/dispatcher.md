@@ -43,7 +43,7 @@ child->set_property("test:val", 42);
 Three things happened on `set_property`:
 
 1. The property-layer hook in `/lib/util/properties` saw that the Merry daemon was loaded and forwarded to `MERRY->dispatch_set(child, "test:val", 42)`.
-2. `dispatch_set` entered an implicit batch (since no explicit one was active), checked the cascade-depth bound and the per-execution cycle chain, walked the ancestry via `query_ur_object` looking for observers at `merry:on:test:val:pre` (none), wrote `42` to the raw property, then fired the main observer.
+2. `dispatch_set` entered an implicit batch (since no explicit one was active), checked the cascade-depth bound and the per-execution cycle chain, walked the ancestry via `query_parent` looking for observers at `merry:on:test:val:pre` (none), wrote `42` to the raw property, then fired the main observer.
 3. The observer's compiled Merry script executed against an `$this` of `child`; its `Set($this, "test:fired", 1)` re-entered `set_property` and (a second, cleanly nested) `dispatch_set` for `test:fired`, which (no observers, no cycle, depth still small) wrote `1` and returned.
 
 The implicit batch is recorded as `completed` in the batch-status log on exit. The dispatcher has run with no application-author involvement beyond the `set_property` call.
@@ -95,7 +95,7 @@ Two consequences for application authors:
 
 ### Ancestry walk -- the `merry:on-inherit:*` re-enable marker
 
-The dispatcher's observer lookup walks `query_ur_object()` from the host upward. The walk policy is **declarative-dominant with explicit re-enable**:
+The dispatcher's observer lookup walks `query_parent()` from the host upward. The walk policy is **declarative-dominant with explicit re-enable**:
 
 | Ancestor level state | Effect |
 |---|---|
@@ -223,7 +223,7 @@ The property convention `merry:on:<path>:<timing>` parallels `merry:<mode>:<sign
 | `merry:lib:greet` | `lib` | `greet` | `find_merry(ob, "greet", "lib")` -- application invocation |
 | `merry:on:test:val:main` | `on` | `test:val:main` | `find_observers(ob, "test:val", "main")` -- dispatch |
 
-`on` is the dispatcher's mode namespace; the `<path>:<timing>` composite is its signal. The lookup mechanics are different in detail (the dispatcher iterates the property list per timing slot, while application invocation typically takes the first hit), but the storage shape is the same and the ancestry walk through `query_ur_object` is identical.
+`on` is the dispatcher's mode namespace; the `<path>:<timing>` composite is its signal. The lookup mechanics are different in detail (the dispatcher iterates the property list per timing slot, while application invocation typically takes the first hit), but the storage shape is the same and the ancestry walk through `query_parent` is identical.
 
 The compositional consequence is that the dispatcher reuses, rather than re-implements, the merry-script lifecycle:
 
@@ -278,7 +278,7 @@ Daemon-local mappings:
 
 ### `observer_cache`
 
-The cache exists because the per-dispatch ancestry walk is O(ancestor-count) and observers don't change between registrations. `_find_observers_cached(obj, path, timing)` looks up the triple-key; on miss, runs the walk (`query_ur_object` from `obj` upward, reading `merry:on:<path>:<timing>` at each level), caches the result, and returns.
+The cache exists because the per-dispatch ancestry walk is O(ancestor-count) and observers don't change between registrations. `_find_observers_cached(obj, path, timing)` looks up the triple-key; on miss, runs the walk (`query_parent` from `obj` upward, reading `merry:on:<path>:<timing>` at each level), caches the result, and returns.
 
 Invalidation is conservative: `register_observer` calls `_invalidate_observer_cache(ob, path, timing)`, which removes all cache entries whose first key element matches `object_name(ob)` AND whose path matches AND whose timing matches. This is broad enough to catch ancestor-side registrations correctly (a registration on an ancestor invalidates descendant cache entries) at the cost of full mapping iteration on each registration. Acceptable at the current scale; a more targeted invalidation is future polish.
 

@@ -65,7 +65,7 @@ private string xml_attr(string tag, mixed *attr)
 	    if (type == XML_SAMREF || queryColour(attr[i+1]) == COL_SAMREF || queryColour(attr[i+1]) == COL_PCDATA) {
 		astr = generate_pcdata(attr[i+1]);
 	    } else {
-		astr = typed_to_ascii(attr[i+1], type);
+		astr = typedToAscii(attr[i+1], type);
 		astr = replace_strings(astr, "\"", "\\\"");
 		if (type != XML_PCDATA && queryColour(attr[i+1]) != COL_PCDATA) {
 		    astr = replace_strings(astr, "$", "\\$");
@@ -111,7 +111,7 @@ static string generate_pcdata(mixed pcdata)
 	    return xml_head(tag, xmdAttributes(pcdata), nil);
 	}
 	type = node ? node->query_type() : nil;
-	body = typed_to_ascii(xmdContent(pcdata), type);
+	body = typedToAscii(xmdContent(pcdata), type);
 
 	/* try to figure out when escaping has already been done */
 	if ((type || typeof(xmdContent(pcdata)) == T_STRING) &&
@@ -199,7 +199,7 @@ static void generate_xml(mixed data, object res, varargs string indent)
 	return;
     }
 
-    body = typed_to_ascii(data[2], type);
+    body = typedToAscii(data[2], type);
     if (type != XML_PCDATA) {
 	body = EscapePCData(body);
     }

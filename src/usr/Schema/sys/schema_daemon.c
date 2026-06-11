@@ -15,7 +15,7 @@
  * code-defined primitives against the data/schema/ files. Vault
  * participation lives in the Vault subsystem; the marshaler
  * (~Marshal/XmlBinding/lib/stateimpex) coordinates the vault path.
- * The type-handler API stays snake_case as a contract surface across
+ * The type-handler dispatch API is camelCase across
  * its callers.
  */
 
@@ -173,14 +173,14 @@ private void configure_initial_nodes()
     /* Ur:Hierarchy primitives (was Ur:UrObject / UrChild / UrChildren).
      * Note 4 rename applied: UrObject -> Hierarchy; the `urobject`
      * attribute renamed to `parent` so participating-object API surface
-     * reads more naturally (query_ur_object stays as the LPC method
+     * reads more naturally (query_parent stays as the LPC method
      * name for now, per Note 4's smaller-blast-radius decision). */
 
     {
 	object hierarchy, urChild, urChildren;
 
 	hierarchy = Node("Ur", "Hierarchy");
-	hierarchy->add_attribute("parent", LPC_OBJ, "query_ur_object");
+	hierarchy->add_attribute("parent", LPC_OBJ, "query_parent");
 	hierarchy->add_callback("set_ur_object", "parent");
 
 	urChild = Node("Ur", "Child");
@@ -331,7 +331,7 @@ object get_root_node(object ob)
 {
     string el;
 
-    if (el = ob->query_state_root()) {
+    if (el = ob->queryStateRoot()) {
 	return get_node(el);
     }
     error("no Schema root node defined for object");

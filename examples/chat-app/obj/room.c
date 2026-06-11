@@ -5,7 +5,7 @@
  * list, message log, and per-room config. Property names use the
  * "chat-room." prefix to namespace them off the room ancestry.
  *
- * query_state_root() returns "ChatApp:Room" -- a future Schema
+ * queryStateRoot() returns "ChatApp:Room" -- a future Schema
  * registration could bind this clonable into the marshaler when a
  * later revision exercises the persistence path. The first
  * revision's scope is the capability-gated admin verbs;
@@ -23,7 +23,7 @@ inherit properties "/lib/util/properties";
 inherit ur "/lib/util/ur";
 inherit "/lib/util/delayed";
 
-string query_state_root() { return "ChatApp:Room"; }
+string queryStateRoot() { return "ChatApp:Room"; }
 
 static void create()
 {

@@ -11,7 +11,7 @@ A Vault application on eOS-kernellib supplies a participating domain whose clone
 The Vault daemon (`/usr/Vault/sys/vault`) stores any object that:
 
 - carries a logical name via `/lib/util/named::set_object_name(name)` (Vault uses the logical name as both the on-disk path and the inverse-lookup key through `~Index/sys/index_daemon`);
-- defines `query_state_root()` returning a Schema namespace:tag pair that names a registered `~Schema/obj/schema_node` (the marshaler walks that schema_node's attributes to extract the value tree);
+- defines `queryStateRoot()` returning a Schema namespace:tag pair that names a registered `~Schema/obj/schema_node` (the marshaler walks that schema_node's attributes to extract the value tree);
 - implements the per-attribute `query_<name>` getters and `set_<name>` setters that the schema declares.
 
 Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`; clones come from `clone_object(program)`. The Vault stores both, distinguished on disk by `<object program="..."/>` vs `<clone program="..."/>` root elements.
@@ -79,7 +79,7 @@ private int _count;
 
 static void create() { }   /* clones only -- master is a template */
 
-string query_state_root() { return "MyApp:Thing"; }
+string queryStateRoot() { return "MyApp:Thing"; }
 
 string query_label()  { return _label; }
 int    query_count()  { return _count; }
@@ -88,7 +88,7 @@ void set_label(string val) { _label = val; }
 void set_count(int val)    { _count = val; }
 ```
 
-`query_state_root()` returns the schema name -- the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape.
+`queryStateRoot()` returns the schema name -- the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape.
 
 ## Schema registration
 

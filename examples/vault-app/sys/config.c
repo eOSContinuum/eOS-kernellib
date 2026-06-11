@@ -13,7 +13,7 @@
  * meaningful when the program is not loaded, so the test driver
  * compiles it on demand and the Vault recompiles it during respawn.
  *
- * query_state_root() returns "MyApp:Config", the schema name the test
+ * queryStateRoot() returns "MyApp:Config", the schema name the test
  * driver registers at boot. The schema declares `greeting` (lpc_str)
  * and `limit` (lpc_int) with the query_/set_ callback pairs below.
  */
@@ -25,7 +25,7 @@ inherit "/lib/util/named";
 private string _greeting;
 private int _limit;
 
-string query_state_root()
+string queryStateRoot()
 {
     return "MyApp:Config";
 }

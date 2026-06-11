@@ -118,7 +118,7 @@ int dispatch_trace;
 /* merry code begins 5 lines into the generated LPC file */
 int query_line_offset() { return 5; }
 
-string query_state_root() { return "Merry"; }
+string queryStateRoot() { return "Merry"; }
 
 static
 void create() {

@@ -86,7 +86,7 @@ Schema uses two cross-cutting infrastructure pieces in eOS-kernellib's kernel la
 
 ### `lib/dtd.c` (123 lines)
 
-Inheritable poor-man's abstract data type repository. Routes type-system queries to dtd_daemon's registered handlers. Inheritors: `xmlgen`, `xmlparse`, `xml_daemon`, `schema_daemon`. Surface includes `query_type_colour(type)`, `query_colour_type(colour)`, `query_ascii_enumeration(type)`, `query_checkboxed(type)`, `default_value(type)`, `typed_to_ascii(type, val)`, `ascii_to_typed(type, ascii)`, `test_raw_data(type, val)`.
+Inheritable poor-man's abstract data type repository. Routes type-system queries to dtd_daemon's registered handlers. Inheritors: `xmlgen`, `xmlparse`, `xml_daemon`, `schema_daemon`. Surface includes `queryTypeColour(type)`, `queryColourType(colour)`, `query_ascii_enumeration(type)`, `queryCheckboxed(type)`, `defaultValue(type)`, `typedToAscii(type, val)`, `asciiToTyped(type, ascii)`, `testRawData(type, val)`.
 
 ### `sys/dtd_daemon.c` (309 lines)
 
@@ -102,7 +102,7 @@ Thin clonable wrapper. Inherits `lib/schema_node`. Each instance is a configured
 
 ### `sys/schema_daemon.c` (314 lines)
 
-The namespace coordinator. Holds `namespaces: mapping (namespace → mapping (tag → schema_node))`. Surface: `register_node(node)`, `query_node(ns, tag)`, `get_node(ns, tag, default_value)`, `clear_node(ns, tag)`, `query_namespaces()`. The Node() macro is the convenience for `configure_initial_nodes()`: find-or-clone a `Schema:<ns>:<tag>` and `set_name(ns, tag)` it.
+The namespace coordinator. Holds `namespaces: mapping (namespace → mapping (tag → schema_node))`. Surface: `register_node(node)`, `query_node(ns, tag)`, `get_node(ns, tag, defaultValue)`, `clear_node(ns, tag)`, `query_namespaces()`. The Node() macro is the convenience for `configure_initial_nodes()`: find-or-clone a `Schema:<ns>:<tag>` and `set_name(ns, tag)` it.
 
 ### `initd.c` (27 lines)
 

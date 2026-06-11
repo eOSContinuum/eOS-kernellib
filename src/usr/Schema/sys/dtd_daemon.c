@@ -11,7 +11,9 @@
  * degradation pending a richer type-coercion lift. typed_to_html is a
  * nil-returning passthrough (HTML output is an admin-surface concern;
  * XML transport is the only public serialization). The type-handler
- * API stays snake_case as a contract surface across its callers.
+ * API is camelCase (queryTypeColour, typedToAscii, asciiToTyped,
+ * testRawData, and kin); every registered handler implements the
+ * same names, since dispatch is by name.
  */
 
 # include <type.h>
@@ -35,7 +37,7 @@ mapping enumerations;
 mapping type_handlers;
 mapping colour_handlers;
 
-string query_state_root() { return "DTD:Enumerations"; }
+string queryStateRoot() { return "DTD:Enumerations"; }
 
 static void create()
 {
@@ -139,12 +141,12 @@ string *query_enumeration(string enum, varargs mapping args)
 /* we handle queries on the raw LPC types ourselves */
 
 
-int query_type_colour(string type)
+int queryTypeColour(string type)
 {
     return 0;
 }
 
-int test_raw_data(mixed value, string type)
+int testRawData(mixed value, string type)
 {
     switch (type) {
     case LPC_MIXED:
@@ -161,7 +163,7 @@ int test_raw_data(mixed value, string type)
     error("unknown type: " + type);
 }
 
-mixed default_value(string type)
+mixed defaultValue(string type)
 {
     switch (type) {
     case LPC_MIXED:
@@ -176,7 +178,7 @@ mixed default_value(string type)
     error("unknown type: " + type);
 }
 
-string typed_to_ascii(mixed value, string type)
+string typedToAscii(mixed value, string type)
 {
     if (!type) {
 	return ::untyped_to_ascii(value);
@@ -216,7 +218,7 @@ string typed_to_html(mixed value, string type)
     return nil;
 }
 
-mixed ascii_to_typed(string ascii, string type)
+mixed asciiToTyped(string ascii, string type)
 {
     string str;
     object ob;
@@ -269,7 +271,7 @@ mixed ascii_to_typed(string ascii, string type)
     error("unknown type: " + type);
 }
 
-int query_asciisize(string type, varargs mapping args)
+int queryAsciiSize(string type, varargs mapping args)
 {
     switch (type) {
     case LPC_FLT:
@@ -284,7 +286,7 @@ int query_asciisize(string type, varargs mapping args)
     error("unknown type: " + type);
 }
 
-int query_asciiheight(string type, varargs mapping args)
+int queryAsciiHeight(string type, varargs mapping args)
 {
     switch (type) {
     case LPC_STR:

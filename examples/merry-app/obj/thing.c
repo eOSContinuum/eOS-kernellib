@@ -9,7 +9,7 @@
  *                           query_prefixed_properties (the storage
  *                           Merry's find_merry walks via the
  *                           merry:<mode>:<signal> key convention)
- *   - /lib/util/ur          set_ur_object / query_ur_object
+ *   - /lib/util/ur          set_ur_object / query_parent
  *                           (the ancestry walk that find_merry follows
  *                           to look up scripts inherited from an
  *                           ur-parent)
@@ -18,7 +18,7 @@
  * server's inherit resolution requires labels to disambiguate. Same
  * pattern recurs for any pair of libs that both define create().
  *
- * query_state_root() returns "MerryApp:Thing"; sys/test registers the
+ * queryStateRoot() returns "MerryApp:Thing"; sys/test registers the
  * matching schema at boot (one lpc_str attribute, `label`, backed by
  * the property store). The Duplicate merryfun walks this state model
  * when it copies a clone's state.
@@ -34,7 +34,7 @@ inherit properties "/lib/util/properties";
 inherit ur "/lib/util/ur";
 inherit "/lib/util/delayed";
 
-string query_state_root() { return "MerryApp:Thing"; }
+string queryStateRoot() { return "MerryApp:Thing"; }
 
 /* Typed accessors for the MerryApp:Thing schema (registered by
  * sys/test at boot). Backed by the property store so the marshaled

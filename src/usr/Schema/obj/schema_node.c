@@ -7,7 +7,7 @@
  * "Schema:<namespace>:<tag>" identity.
  *
  * Object names carry the Schema: prefix.
- * (b) query_state_root() result renamed SID:Element -> Schema:Element
+ * (b) queryStateRoot() result renamed SID:Element -> Schema:Element
  *     (the schema-element-FOR-schema-elements -- this is the self-
  *     describing schema node that lives at the root of the Schema
  *     subsystem's own type tree).
@@ -15,7 +15,7 @@
 
 inherit "/usr/Schema/lib/schema_node";
 
-string query_state_root() { return "Schema:Element"; }
+string queryStateRoot() { return "Schema:Element"; }
 
 static void create()
 {

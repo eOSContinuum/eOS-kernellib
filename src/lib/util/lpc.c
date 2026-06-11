@@ -118,7 +118,7 @@ static int member(mixed item, mixed *arr)
 
 /*
  * return ob's logical name: query_object_name() if defined, else the LPC
- * object_name kfun. A richer fallback through query_ur_object for
+ * object_name kfun. A richer fallback through query_parent for
  * unnamed clones with an ur parent doesn't arise for objects created
  * via vault_node.c's spawn_create_one (every clone gets set_object_name
  * at create time), so the two-step fallback suffices. Revise when an

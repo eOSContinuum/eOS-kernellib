@@ -8,7 +8,7 @@
  * Vault->store / Vault->spawn_one_by_name use to round-trip the clone
  * by logical name.
  *
- * query_state_root() returns "MyApp:Thing", the schema name registered
+ * queryStateRoot() returns "MyApp:Thing", the schema name registered
  * by sys/test::create at boot. stateimpex::export_state(this_object())
  * looks up the schema_node by that name, then walks its attributes
  * calling query_label / query_count to assemble the XML body. Import
@@ -29,7 +29,7 @@ static void create()
     /* clones only -- master is a template, no per-master state. */
 }
 
-string query_state_root()
+string queryStateRoot()
 {
     return "MyApp:Thing";
 }

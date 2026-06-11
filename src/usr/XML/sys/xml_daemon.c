@@ -85,7 +85,7 @@ mixed xmd_force_to_data(mixed xmd)
 
 /* DTD queries */
 
-int query_type_colour(string type)
+int queryTypeColour(string type)
 {
     switch (type) {
     case XML_ELEMENT:
@@ -100,7 +100,7 @@ int query_type_colour(string type)
     error("unknown type: " + type);
 }
 
-string query_colour_type(int colour)
+string queryColourType(int colour)
 {
     switch (colour) {
     case COL_ELEMENT:
@@ -113,12 +113,12 @@ string query_colour_type(int colour)
     error("unknown colour: " + colour);
 }
 
-int query_checkboxed(string type, mapping args)
+int queryCheckboxed(string type, mapping args)
 {
     return type == XML_BOOL;
 }
 
-int test_raw_data(mixed val, string type)
+int testRawData(mixed val, string type)
 {
     switch (type) {
     case XML_PCDATA:
@@ -135,7 +135,7 @@ int test_raw_data(mixed val, string type)
     error("unknown type: " + type);
 }
 
-mixed default_value(string type)
+mixed defaultValue(string type)
 {
     switch (type) {
     case XML_PCDATA:
@@ -146,7 +146,7 @@ mixed default_value(string type)
     error("unknown type: " + type);
 }
 
-string typed_to_ascii(mixed val, string type)
+string typedToAscii(mixed val, string type)
 {
     switch (type) {
     case XML_ELEMENT:
@@ -159,7 +159,7 @@ string typed_to_ascii(mixed val, string type)
     error("unknown type: " + type);
 }
 
-mixed ascii_to_typed(string ascii, string type)
+mixed asciiToTyped(string ascii, string type)
 {
     switch (type) {
     case XML_PCDATA:

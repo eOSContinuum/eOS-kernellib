@@ -3,7 +3,7 @@
  *
  * Inheriting this lib makes an object both an ur-parent and an ur-child.
  * Merry's find_merry / find_merries / run_merry walk the chain via
- * query_ur_object() to look up the merry:<mode>:<signal> property at
+ * query_parent() to look up the merry:<mode>:<signal> property at
  * each ancestor.
  */
 
@@ -76,7 +76,7 @@ void set_ur_object(object ob)
     if (ur == ob) {
 	return;
     }
-    for (tmp = ob; tmp; tmp = tmp->query_ur_object()) {
+    for (tmp = ob; tmp; tmp = tmp->query_parent()) {
 	if (tmp == this_object()) {
 	    error("would cause ur-object cycle");
 	}
@@ -97,7 +97,7 @@ void set_ur_object(object ob)
 }
 
 nomask
-object query_ur_object()
+object query_parent()
 {
     return ur;
 }

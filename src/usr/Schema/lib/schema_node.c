@@ -10,8 +10,9 @@
  * Attribute, Attributes, Callback, Callbacks, Iterator) are themselves
  * schema_node instances defined in code by schema_daemon.c.
  *
- * Daemon-callback function names (query_*, set_*, add_*) stay
- * snake_case as the schema-API contract surface.
+ * The query/set/add function names here stay snake_case as the
+ * schema-definition contract surface (the marshaler walks them by
+ * name); the dtd_daemon handler-dispatch surface is camelCase.
  */
 
 # include <type.h>
@@ -286,7 +287,7 @@ mixed query_default_value(string attr)
 	return val;
     }
     if (val = attribute_types[attr]) {
-	return default_value(val);
+	return defaultValue(val);
     }
     error("can't figure default value for attribute " + attr);
 }
