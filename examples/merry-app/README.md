@@ -28,17 +28,20 @@ System/initd's `/usr/[A-Z]*/initd.c` iteration picks up the new domain automatic
 ## Verify
 
 ```sh
+# Clean slate: remove any prior deploy and state, then redeploy.
+rm -rf src/usr/MerryApp
+rm -f state/snapshot state/snapshot.old
+cp -R examples/merry-app src/usr/MerryApp
+
 # Cold boot: phases 1-16 run; phase 16 dumps a snapshot and the driver exits.
-rm -f .runtime/state/snapshot .runtime/state/snapshot.old
-scripts/setup-runtime.sh
-.runtime/bin/dgd mva.dgd
+/path/to/dgd/bin/dgd example.dgd
 # (driver exits on its own after PERSIST SETUP OK)
 
 # Restore: restart against the snapshot; phase 17 fires from the surviving
 # call_out and writes PERSIST VERIFY OK.
-.runtime/bin/dgd mva.dgd .runtime/state/snapshot &
+/path/to/dgd/bin/dgd example.dgd state/snapshot &
 sleep 5
-cat .runtime/src/usr/MerryApp/data/test-result.log
+cat src/usr/MerryApp/data/test-result.log
 kill %1
 # Expect (in order; SUICIDE OK, DELAY OK and PERSIST VERIFY OK land on the
 # second boot from pre-snapshot call_outs whose scheduled times have
@@ -70,7 +73,7 @@ kill %1
 #   MerryApp:test: PERSIST VERIFY OK
 ```
 
-The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result.log`, which lands at `<directory>/usr/MerryApp/data/test-result.log` on the host filesystem (`<directory>` is the DGD config's `directory` setting; `.runtime/src/` in the standard layout).
+The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result.log`, which lands at `<directory>/usr/MerryApp/data/test-result.log` on the host filesystem (`<directory>` is the DGD config's `directory` setting; this repository's `src/` in the example configuration).
 
 ## Files
 

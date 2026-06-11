@@ -80,13 +80,32 @@ The object manager receives a `clone` event with the clone object before its `cr
 
 ## LWO instantiation: new_object
 
-`new_object(master)` instantiates an LWO from a `/data/` master. LWOs differ from clones:
+`new_object(master)` instantiates a Light-Weight Object from a `/data/` master. This is the consolidated LWO reference; `docs/glossary.md`, `docs/lpc-essentials.md`, and `docs/architecture.md` carry one-line summaries that point here.
 
-- **Identity**: a clone has its own object reference; an LWO is a value, equality-compared by structure.
-- **Storage**: a clone lives in the object table independently; an LWO lives in the dataspace of whichever object holds the reference.
-- **Lifetime**: a clone exists until `destruct_object()`; an LWO is freed when no in-image reference holds it.
+**Creation and identity.** The new LWO's creator function runs immediately at instantiation (unlike a master, whose `create()` defers to the first call). An LWO's name is the master path plus `#-1` — every LWO of a master shares that name; there is no per-instance index and no entry in the object table. Calling `new_object()` on an existing LWO returns a copy of it.
 
-LWOs are useful for structured values that need behavior (methods on the LWO's class) but don't warrant the bookkeeping cost of a first-class object — coordinates, time ranges, structured records.
+**Lifetime.** LWOs cannot be destructed — `destruct_object()` does not apply. An LWO is deallocated when the last reference to it is dropped. Statedump captures LWOs as part of the dataspace that holds them, like every other in-image value.
+
+**Sharing semantics — alias within a dataspace, value across dataspaces.** An LWO lives in the dataspace of an object that references it, with the same locality rules the driver applies to arrays and mappings:
+
+- Within one object's dataspace, references alias: a mutation through one reference is visible through every other, for as long as execution continues.
+- When a reference is exported to another object's dataspace (stored in its variables, passed and kept), each dataspace ends up with its own copy. The driver performs the export processing between executions — never in the middle of one — so within a single task the shared reference still aliases; by the next task each holder has an independent copy.
+
+The practical rule: treat a cross-object LWO handoff as pass-by-value. Mutating an LWO after handing it to another object does not propagate; an LWO is not a substitute for a clone where shared mutable identity is the point (the chat example's admin token works precisely because a capability *should* be a value attached to its holder, not a shared mutable object).
+
+**Upgrade.** Recompiling a `/data/` master upgrades existing LWOs of that master; their variable layout is remapped to the new program like clones under hot reload.
+
+**Differences from clones, in brief**:
+
+| | Clone | LWO |
+|---|---|---|
+| Created by | `clone_object()` from an `/obj/` master | `new_object()` from a `/data/` master |
+| Name | `<path>#N`, unique index | `<path>#-1`, shared |
+| Object table | First-class entry | None — lives in a holder's dataspace |
+| Cross-object reference | Shared identity | Copied at export (value semantics) |
+| End of life | `destruct_object()` | Last reference dropped |
+
+LWOs are useful for structured values that need behavior (methods on the LWO's class) but don't warrant the bookkeeping cost of a first-class object — capability tokens, coordinates, time ranges, structured records.
 
 ## Destruct: removal
 

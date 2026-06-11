@@ -11,6 +11,8 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Setup
 
 - [getting-started.md](getting-started.md) — first-time install of DGD and eOS-kernellib; run the bundled example configuration. Start here if the platform is not yet booted on your machine.
+- [first-hour.md](first-hour.md) — hands-on tutorial from a fresh boot to the persistence loop: create a domain, compile and clone live objects, watch an observer fire, and verify everything survives a process restart. The natural next step after `getting-started.md`.
+- [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) — the translation bridge for developers arriving from an application language plus managed services: what replaces the database, the queue, the deploy pipeline, and the identity provider, plus the habits to unlearn.
 - [building.md](building.md) — DGD build details and platform-specific notes. Read this if `getting-started.md` does not fit your platform or you need to customize the build.
 
 ### Platform model
@@ -33,7 +35,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [signal-applications.md](signal-applications.md) -- the smallest signal-on-property demonstration: one observer, one write, the reaction done when the write returns; why reacting to state change is a runtime primitive here rather than assembled queue/poller/worker glue.
 - [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
 - [chat-applications.md](chat-applications.md) — multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, the planned growth path across capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
-- [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fourteen merryfuns. Read this when writing Merry source, not just binding it.
+- [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fifteen merryfuns with full signatures. Read this when writing Merry source, not just binding it.
 
 ### Operations
 
@@ -57,7 +59,8 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 Common goals and the docs that serve them.
 
-- **Run the platform and see it work** — [getting-started.md](getting-started.md), then `../examples/http-app/README.md`.
+- **Run the platform and see it work** — [getting-started.md](getting-started.md), then [first-hour.md](first-hour.md), then `../examples/http-app/README.md`.
+- **Arriving from a cloud-services stack** — [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).

@@ -4,7 +4,7 @@ LPC is the programming language used by the [DGD] driver and the layers built on
 
 For depth on a specific construct, follow the section citations into LPC.md. For the kfun catalog, see [dworkin/lpc-docs/kfun/]. For how LPC fits into eOS-kernellib's runtime platform (tier model, daemons, the auto-inheritance chain that hands every object its identity), see `docs/architecture.md`. For the patterns an application author writes on top of the platform, see `docs/application-authoring.md`.
 
-**Audience**: a programmer new to LPC; familiar with at least one C-family language (C, C++, Java, Go, or similar); reading this to gain enough LPC literacy to read platform code and write application code on top. The formal language reference at [dworkin/lpc-doc] is authoritative; this document is the bridge to it.
+**Audience**: a programmer new to LPC; familiar with at least one C-family language (C, C++, Java, Go, or similar) — or with a dynamic language (Python, TypeScript, Ruby), in which case read the "If you come from dynamic languages" section first. Reading this to gain enough LPC literacy to read platform code and write application code on top. The formal language reference at [dworkin/lpc-doc] is authoritative; this document is the bridge to it.
 
 ## What is familiar
 
@@ -24,6 +24,15 @@ Five properties make LPC behave differently from most other languages a builder 
 
 **Cross-object calls and inherited calls have their own operators.** `obj->func(arg)` calls `func` on a different object (the call traverses the kfun layer and goes through access checks). `::func()` calls the inherited version of `func` from this object's parent class. `name::func()` calls the inherited version when the inherit was given a name. A bare `func()` call is local to the current object.
 
+## If you come from dynamic languages
+
+The sections above assume C-family instincts. Arriving from Python, JavaScript/TypeScript, Ruby, or Lua, four adjustments matter most:
+
+- **Types are declared and checked.** Variables, parameters, and returns carry declared types, and the platform compiles with strict typechecking (the `typechecking = 2` line in the `.dgd` configuration). `mixed` is the escape hatch when a value is genuinely dynamic — it is the exception in platform code, not the default. There is no implicit numeric coercion: `1 + 1.0` is a compile error, not `2.0`.
+- **Identity semantics differ by kind.** Objects (masters, clones) are true references with stable identity — pass one around and every holder sees the same object. Strings are immutable values. Arrays and mappings behave like Python lists/dicts *within one object*, but they do not make a shared-mutable channel *between* objects: a structure handed to another object becomes that object's own copy once the runtime processes the export (never mid-execution, so within a single call chain the alias still holds). Cross-object shared mutable state therefore lives in an object, reached through its functions — not in a list two objects both captured. The same rule covers LWOs ([code-lifecycle.md](code-lifecycle.md) LWO instantiation).
+- **Functions are not first-class values.** There are no closures or lambdas to store in variables; dispatch is by function name — `obj->func(...)` and the kfun reflection surface (`function_object`). Where a dynamic-language design would store callbacks, platform designs store object references (call a known function on it), schedule by name (`call_out("fn", ...)`), or bind scripts to properties (the Merry layer). Errors follow the same shape: `error("message")` raises a string, `catch` observes it — there is no exception class hierarchy.
+- **The scripting layer is the *more* restricted layer, not the looser one.** Merry looks like the scripting surface — no local variable declarations, inline composition, TCL-ish feel — and arriving from a dynamic language it is tempting to treat it as "the Python of the platform." Invert that: Merry is a sandboxed *subset*. No `->` calls (use `Call()`), no file or network kfuns, no code loading, a 51-entry deny list ([merry-language.md](merry-language.md)). Dynamic-language comfort helps with Merry's idioms; the *capabilities* run the other way — full LPC is the expressive layer, Merry is the contained one.
+
 ## Types and values
 
 LPC.md §3.4.2 lists eight types:
@@ -42,7 +51,7 @@ LPC.md §3.4.2 lists eight types:
 Two composite shapes are not in the type list but are first-class:
 
 - **Arrays** — written `({ a, b, c })`. Heterogeneous (an array can hold mixed types). `arr[0]` indexes; `arr[1..3]` slices.
-- **Lightweight objects (LWOs)** — value-shaped objects that travel inside another object's dataspace rather than living independently. Cloned with `new` (different from `clone_object()`); the lifetime is tied to the containing object's reference.
+- **Lightweight objects (LWOs)** — value-shaped objects that travel inside another object's dataspace rather than living independently. Created with `new_object()` (distinct from `clone_object()`); deallocated when the last reference is dropped. Consolidated treatment in `docs/code-lifecycle.md` LWO instantiation.
 
 `int` and `float` arithmetic does not auto-coerce; `1 + 1.0` is a type error. Use `(float) 1` or `(int) 1.0` to convert explicitly.
 

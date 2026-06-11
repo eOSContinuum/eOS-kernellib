@@ -23,13 +23,15 @@ System/initd's `/usr/[A-Z]*/initd.c` iteration picks up the new domain automatic
 ## Verify
 
 ```sh
-rm -f .runtime/state/snapshot .runtime/state/snapshot.old
-scripts/setup-runtime.sh
-cp -R examples/vault-app .runtime/src/usr/MyApp
-.runtime/bin/dgd mva.dgd &
+# Clean slate: remove any prior deploy and state, then redeploy.
+rm -rf src/usr/MyApp
+rm -f state/snapshot state/snapshot.old
+cp -R examples/vault-app src/usr/MyApp
+
+/path/to/dgd/bin/dgd example.dgd &
 sleep 5
 kill %1
-cat .runtime/src/usr/MyApp/data/test-result.log
+cat src/usr/MyApp/data/test-result.log
 ```
 
 Expected result-log contents:
@@ -46,7 +48,7 @@ MyApp:test: XREF-DANGLING OK
 
 The boot log additionally carries three expected `[caught]` traces: one `Access denied` from the cross-domain boundary assertion, and a `no object` pair (the raw error plus its XML-layer wrapper) from the dangling-reference assertion.
 
-The on-disk artifacts land under the Vault daemon's storage root, `/usr/Vault/data/vault/` (`.runtime/src/usr/Vault/data/vault/` in the deployed tree): the round-trip thing at `MyApp/demo/thing1.xml`, the singleton at `MyApp/config/main.xml`, and the cross-reference things under `MyApp/xref/`.
+The on-disk artifacts land under the Vault daemon's storage root, `/usr/Vault/data/vault/` (`src/usr/Vault/data/vault/` on the host filesystem): the round-trip thing at `MyApp/demo/thing1.xml`, the singleton at `MyApp/config/main.xml`, and the cross-reference things under `MyApp/xref/`.
 
 ## Files
 

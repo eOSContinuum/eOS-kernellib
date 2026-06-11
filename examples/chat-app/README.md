@@ -1,8 +1,8 @@
 # Reference Chat application
 
-A minimal multi-user chat application that runs on top of eOS-kernellib. The runtime primitives the platform provides (property storage, ur-hierarchy, capability separation, the Merry dispatcher, orthogonal persistence) are exercised in turn by a boot-time test driver. Each phase produces a sentinel line in the result log so the smoke harness can verify the expected outcomes ran. The full walkthrough lives in `docs/chat-applications.md`.
+A minimal multi-user chat application that runs on top of eOS-kernellib. The runtime primitives the platform provides (property storage, ur-hierarchy, capability separation, the Merry dispatcher, orthogonal persistence) are exercised in turn by a boot-time test driver. Each phase produces a sentinel line in the result log so the Verify procedure below can confirm the expected outcomes ran. The full walkthrough lives in `docs/chat-applications.md`.
 
-The example is grown incrementally: the first revision wires the capability-separation phases; subsequent revisions add persistence, sandboxed reactions, async events, and multi-agent coherence. At any point in the growth the existing phases continue to pass; the smoke harness counts " OK" sentinels.
+The example is grown incrementally: the first revision wires the capability-separation phases; subsequent revisions add persistence, sandboxed reactions, async events, and multi-agent coherence. At any point in the growth the existing phases continue to pass; verification counts " OK" sentinel lines.
 
 ## Operations
 
@@ -24,7 +24,7 @@ The example is grown incrementally: the first revision wires the capability-sepa
 - **Phase 9d (ATOMIC-COMMIT / ATOMIC-ROLLBACK / PARTIAL-STATE)**: atomic cross-room writes through the Merry batch surface. `cross_write` appends one message to two rooms; wrapped in `MERRY->batch(..., atomic: 1)` the two appends are one atomic unit, so the commit path lands both and the deliberate-failure path rolls both back -- cross-room, where phase 7 showed single-room. PARTIAL-STATE runs the same failing writer through a NON-atomic batch: without the envelope the first room's append survives the throw while the second is never written, the partial state the atomic boundary removes.
 - **Phase 9e (ANCESTRY / NO-INHERIT)**: one observer registered on a room ancestor fans out to every room in the cohort via the UrHierarchy walk. A base room carries the append observer; three child rooms set the base as their ur-object but register nothing themselves, and a message posting in each child resolves the base's observer through the ancestry walk. The coherent reactive behavior is provided once, at the ancestor, to every cohort member. NO-INHERIT is the contrast: a room with neither its own observer nor an ancestor carrying one records nothing -- absent inheritance, each room would need its own registration.
 - **Phase 10 (PERSIST-SETUP)**: the driver establishes a chat session on a fresh room -- two users join, exchange three messages (recorded by an append observer registered on the room), and one user's `chat-user.mention-tracker` is set to a cross-clone reference to the other user's object. The room and the two accounts are saved as object globals, the session shape is recorded to an on-disk marker, and the boot-1 finalization schedules an async-verify `call_out` (t+4), a snapshot dump (t+5, via `/usr/System/sys/persist_helper::trigger_dump_and_exit`), and the post-restore persist-verify `call_out` (t+8, captured pending in the snapshot). Follows the two-boot pattern of `examples/merry-app/sys/test.c` phases 16/17.
-- **Phase 11 (PERSIST-VERIFY)**: after the smoke harness restarts DGD against the snapshot, the surviving `call_out` fires. It asserts that all three messages, both member accounts (live clones with intact names), and the cross-clone mention-tracker reference (the same object, not a copy) survived the snapshot cycle, and that a third user joining the restored room observes the full prior session.
+- **Phase 11 (PERSIST-VERIFY)**: after DGD restarts against the snapshot (boot 2 of the Verify procedure), the surviving `call_out` fires. It asserts that all three messages, both member accounts (live clones with intact names), and the cross-clone mention-tracker reference (the same object, not a copy) survived the snapshot cycle, and that a third user joining the restored room observes the full prior session.
 - **Negative case (COLDBOOT-LOST)**: a third boot starts DGD cold WITHOUT loading the snapshot. The on-disk marker (a file) survived, but the in-memory chat session did not -- the saved-as-global room is `nil` on a cold boot. This demonstrates that in-memory-only state does not survive a cold boot without a snapshot; only the on-disk record persists. Durability of structured state *beyond* the image snapshot (surviving a from-scratch boot) is the on-disk Schema/Marshal path that `examples/vault-app/` demonstrates.
 
 ## Deployment
@@ -46,30 +46,29 @@ fresh run.
 
 ```sh
 # Clean slate (the marker file lives under the deployed domain).
-rm -rf .runtime/src/usr/Chat
-rm -f .runtime/state/snapshot* .runtime/state/swap
-scripts/setup-runtime.sh
-cp -R examples/chat-app .runtime/src/usr/Chat
+rm -rf src/usr/Chat
+rm -f state/snapshot* state/swap
+cp -R examples/chat-app src/usr/Chat
 
 # Boot 1 (cold): phases 1 through 9e and 10 run; phase 4 logs a [caught]
 # sandbox-rejection error to the boot log; phase 8 asserts from a t+4
 # call_out (after its $delay continuation); a t+5 call_out then dumps a
 # snapshot and the driver exits on its own.
-.runtime/bin/dgd mva.dgd
+/path/to/dgd/bin/dgd example.dgd
 
 # Boot 2 (restore): restart against the snapshot; phase 11 fires from the
 # surviving call_out and appends PERSIST-VERIFY OK.
-.runtime/bin/dgd mva.dgd .runtime/state/snapshot &
+/path/to/dgd/bin/dgd example.dgd state/snapshot &
 sleep 5
 kill %1
 
 # Boot 3 (cold, NO snapshot): the negative case. The on-disk marker
 # survived but the in-memory session did not; appends COLDBOOT-LOST OK.
-.runtime/bin/dgd mva.dgd &
+/path/to/dgd/bin/dgd example.dgd &
 sleep 3
 kill %1
 
-cat .runtime/src/usr/Chat/data/test-result.log
+cat src/usr/Chat/data/test-result.log
 ```
 
 Expected result-log contents (boot 1 writes through DEFERRED-OP OK and

@@ -82,6 +82,37 @@ The default access posture for a tier-E domain at boot:
 
 Cross-domain reach for tier-E code is mediated at every relevant kfun call by the access daemon at `/kernel/sys/access_daemon.c`. The access primitives themselves (the `set_access`, `query_user_access`, `query_file_access`, `set_global_access` methods on `/kernel/lib/api/access.c`) are kernel-tier; an application that needs to expose a public read-only library typically requests the access grant through a System-tier helper rather than calling kernel access primitives directly. Applications that ship a binary or HTTP service do not need to manipulate access bits at all — the platform routes cross-tier calls through the System-tier libraries the application inherits, and access checks happen automatically inside those.
 
+## Writing tick-aware code
+
+The platform has no threads and no preemption; what bounds a runaway computation is the **tick budget**. Every entry into application code runs under per-owner resource limits, and exceeding them is a runtime error, not a hung platform. This section is the execution model an application author needs; all of it derives from the driver and kernel source (`src/kernel/lib/auto.c` `call_limited`, `src/kernel/sys/resource_daemon.c`, and the driver's interpreter).
+
+**What a tick is.** A tick is the driver's unit of execution cost, charged as code runs: every function call costs a fixed overhead, every loop iteration is charged on the backward jump, global-variable reads and writes are charged per access, and aggregate operations (constructing or spreading arrays and mappings, expensive kfuns like `crypt` or `parse_string`) are charged in proportion to the data size. The exact per-operation costs are driver internals and may change between driver versions; the model to internalize is *work costs ticks, and data-proportional work costs data-proportional ticks*.
+
+**Where the budget comes from.** The kernel routes every call into non-kernel code through `call_limited`, which asks the resource daemon for the owner's limits and runs the call under an `rlimits` envelope. The platform-wide default ceiling is 20,000,000 ticks per execution (the `ticks` resource, set at boot in `src/kernel/sys/driver.c`); an operator can lower or raise a specific owner's ceiling with `quota <owner> ticks <limit>` ([admin-console.md](admin-console.md) Managing resources). Application code cannot raise its own budget: the driver consults the kernel's `runtime_rlimits` gate for any non-kernel `rlimits` use, and the gate refuses requests for more than what remains. (Merry scripts cannot use `rlimits` at all — the grammar rejects it; see [merry-language.md](merry-language.md).)
+
+**What exhaustion does.** Running past the budget raises the error `Out of ticks` in the offending call. The error propagates like any other: mutations inside the atomic context roll back, the platform keeps running, and other owners are unaffected. The budget is the platform's containment of runaway code — an unbounded loop costs its owner an error, not the system its liveness.
+
+**Atomic functions cost double.** On entry to an `atomic` function the remaining tick budget is halved (restored at commit or rollback). Budget for an atomic operation accordingly: a traversal that fits comfortably outside `atomic` may exhaust inside it.
+
+**Spreading work across timeslices.** Each fired `call_out` runs under a *fresh* budget, computed from the owner's quota at fire time — the kernel wraps every application call_out in the same `call_limited` envelope. This is the platform's idiom for work larger than one budget: process a bounded chunk, save the cursor in object state, re-arm with `call_out("continue_work", 0, cursor)`. Each slice is its own atomic context, so the work also commits incrementally — design the chunk boundaries so each committed slice leaves consistent state. The continuation libraries under `src/lib/` ([kernel-libraries.md](kernel-libraries.md)) package this pattern.
+
+```c
+static void rebuild_index(int cursor)
+{
+    int end;
+
+    end = (cursor + CHUNK < sizeof(items)) ? cursor + CHUNK : sizeof(items);
+    /* ... process items[cursor .. end - 1] ... */
+    if (end < sizeof(items)) {
+        call_out("rebuild_index", 0, end);   /* next slice, fresh budget */
+    }
+}
+```
+
+**Watching consumption.** The resource daemon records ticks consumed per owner into a decaying usage counter (10% decay per hour by default), including consumption on calls that ended in an error. Operators read it with `rsrc ticks` (per-owner usage, ceiling, and throttle threshold) and can set a usage throttle with `quota <owner> ticks usage <float>` — an owner whose decayed usage exceeds the threshold is clamped to effectively no computation until usage decays back under it. For the investigation sequence when an owner is eating the platform, see [admin-console.md](admin-console.md) Debugging a stuck platform.
+
+**The quota mindset.** Per-owner quotas cover more than ticks (objects, call_outs, stack depth — `quota <owner>` lists them). For an application author the practical readings are: an error about exceeding the callout quota means the design leans on unbounded deferral; an `Out of ticks` in normal operation means a traversal needs the chunking idiom above, not a bigger quota; and a quota raise is the right call only when the workload is legitimately that large and the operator owns the decision.
+
 ## Object tracking
 
 The platform ships an object manager at `/usr/System/sys/objectd.c` that tracks every compiled object's identity, inheritance graph, included files, and active issues. The kernel driver registers `objectd` as the object manager at boot (via `driver->set_object_manager(this_object())` from objectd's own `create`), and the driver dispatches object-lifecycle events (`compile`, `clone`, `destruct`, `touch`, `include_file`, and related) to objectd.
@@ -152,7 +183,7 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 ## Reference applications
 
-Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat .runtime/.../test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
+Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat src/usr/<Domain>/data/test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
 
 | Example | Primitive demonstrated | Walkthrough |
 |---|---|---|
