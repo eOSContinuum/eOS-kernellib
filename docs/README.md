@@ -19,6 +19,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [architecture.md](architecture.md) — capability tiers, daemons, boot sequence, auto-inheritance, System global-access, host-driver extensions. The structural reference for the platform.
 - [runtime-primitives.md](runtime-primitives.md) — the eight runtime primitives (atomicity, capability separation, persistent state, hot reload, sandboxed code load, asynchronous events, multi-agent coherence, state introspection), each with foundation, demonstration status, supporting extensions, and open work.
+- [runtime-platform-roadmap.md](runtime-platform-roadmap.md) — the committed forward surfaces in dependency-ordered waves, each with an activation trigger; the transport posture; the application-tier boundary.
 - [persistence.md](persistence.md) — orthogonal persistence as architectural property; the statedump cycle; hot boot; per-variable persistence semantics; persistence boundaries.
 - [code-lifecycle.md](code-lifecycle.md) — compile, clone, destruct, hot reload, `call_touch`, and the object-manager event surface.
 
