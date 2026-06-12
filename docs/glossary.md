@@ -132,7 +132,7 @@ Readers arrive from two adjacent vocabularies: the SkotOS/kernellib lineage this
 
 | Lineage term | Platform term | Note |
 |---|---|---|
-| Signal phases `pre` / `prime` / `post` | Dispatcher timings `pre` / `main` / `post` | `prime` corresponds to `main`; the veto/mutate/audit roles carry over ([dispatcher.md](dispatcher.md)) |
+| Signal phases `pre` / `prime` / `post` | Dispatcher timings `pre` / `main` / `post` | `prime` corresponds to `main`; the veto/mutate/audit roles carry over ([dispatcher.md](dispatcher.md)). SkotOS also ran a fourth `desc` phase (description rendering) between prime and post -- presentation-tier, no dispatcher counterpart |
 | `patch()` | `_F_touch()` | Same platform dispatch, different hook name ([code-lifecycle.md](code-lifecycle.md) Terminology note) |
 | Wiztool | admin_console | See the `wiztool` entry above |
 | Meriadoc / Merry (SkotOS subsystem) | The Merry subsystem (`src/usr/Merry/`) | The shipped implementation of the same decoration-and-compile pattern ([runtime-primitives.md](runtime-primitives.md) §5) |
