@@ -39,10 +39,17 @@ System/initd's `/usr/[A-Z]*/initd.c` iteration picks up the new domain automatic
 
 ## Verify
 
-The capability phases run in a single cold boot; the persistence phases
-span three boots (cold setup, restore, cold-no-snapshot). The marker and
-result files live in the source tree, so clear the Chat domain before a
-fresh run.
+```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh chat-app
+```
+
+The runner does the clean-slate deploy, drives all three boots, and
+asserts the sentinel count; boot output lands under `state/`.
+
+The manual sequence it automates: the capability phases run in a single
+cold boot; the persistence phases span three boots (cold setup, restore,
+cold-no-snapshot). The marker and result files live in the source tree,
+so clear the Chat domain before a fresh run.
 
 ```sh
 # Clean slate (the marker file lives under the deployed domain).
