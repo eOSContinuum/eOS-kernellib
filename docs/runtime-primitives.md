@@ -26,9 +26,7 @@ Operations commit wholly or roll back wholly. Partial effects do not escape on f
 
 **Demonstration**: a deliberate-failure probe in `examples/atomic-demo/`. The counter master declares `atomic void increment_with_failure()` whose body mutates `counter` and then `error()`s. The HTTP route catches the error and reports it in the response body; the next `GET /counter` returns the pre-call value, evidence of rollback. The `[atomic]` annotation in the boot log on the error trace is the runtime's own marker of the atomic envelope. The smoke script (`examples/atomic-demo/smoke.sh`) exercises the three-step probe and asserts the rollback.
 
-The platform's own startup also exercises the primitive: an HTTP1_SERVER clone attempt with mis-shaped arguments errors during the binary-port acceptor's `clone_object` call; the rollback fires, and the platform continues accepting subsequent connections from clean state.
-
-**Status**: Validated. Foundation present; rollback demonstrated empirically by `examples/atomic-demo/` and observed in platform startup.
+**Status**: Validated. Foundation present; rollback demonstrated empirically by `examples/atomic-demo/`.
 
 **Extensions**: None at the platform level. Atomicity is a host-runtime property; eOS-kernellib does not extend it beyond the host's contract.
 
@@ -47,12 +45,12 @@ Code runs under a capability tier that bounds what it can call.
 - The kernel auto (`/kernel/lib/auto.c`) and System auto (`/usr/System/lib/auto.c`) compose the access-control surface every user-tier object inherits.
 - The tier model (Appendix) packages the boundary: B and C carry privileged kfun authority; D and E operate under bounds, gaining cross-domain visibility only through System's `set_global_access` mechanism.
 
-**Demonstration**: HTTP/1 application server at the kernel-defined mount point `/usr/WWW/obj/server` (tier D) inherits `/usr/System/lib/user` (tier C) and `Http1Server` (tier D). The inheritance traverses System's global-access grant; the application receives binary-port connections only through System's `set_binary_manager` registration. The application cannot invoke that kfun directly — the privilege check fails at the host runtime, not at application logic.
+**Demonstration**: HTTP/1 application server at the kernel-defined mount point `/usr/WWW/obj/server` (tier D) inherits `/usr/System/lib/user` (tier C) and `Http1Server` (tier D) — the pattern the reference application at `examples/http-app/` implements. The inheritance traverses System's global-access grant; the application receives binary-port connections only through System's `set_binary_manager` registration. The application cannot invoke that registration directly — the privilege check refuses callers outside the System tier, independent of application logic.
 
 **Status**: Partial. Tier model + ownership + inheritance work; per-request authorization within an application's surface (e.g., HTTP-route-level principal challenge) is absent.
 
 **Extensions**:
-- HTTP authentication and authorization sys objects at `/usr/HTTP/sys/authenticate.c` and `/usr/HTTP/sys/authorize.c`. RFC-aligned challenge / authorization primitives; compiled at boot, currently unconsumed by any application.
+- HTTP authentication and authorization sys objects at `/usr/HTTP/sys/authenticate.c` and `/usr/HTTP/sys/authorize.c`. RFC-aligned challenge / authorization primitives; compiled at boot and consumed by the HTTP API library's header-field parsing (`RemoteFields` / `RemoteAuthentication`); no application exercises a challenge flow.
 - Kernel-tier TLS API (port candidate): wraps the host's per-execution-context thread-local storage as a kernel-API library, useful for per-principal state visible only within an atomic execution slice.
 - Unified clone management (port candidate): `clonable` library + System-tier auto extension providing per-master clone-list maintenance and clone-count tracking with capability-aware access.
 - Runtime-configurable values daemon (port candidate, `configd`): typed configuration store (booleans, integers, strings, object references) with event subscription on configuration change, gated by tier-D ownership.
@@ -73,9 +71,9 @@ The in-memory object graph survives restart without explicit serialization.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html
 
-**Demonstration**: Admin authentication credentials persist across restarts. Bootstrap writes the password hash; subsequent boots find the hash without an explicit save call from the admin_console object. The `examples/merry-app` smoke verifies a richer composition: a property-stored reference to a compiled Merry-script clone, the host's LPC global referencing that host, and a scheduled `call_out` against the host all survive a `dump_state` / `shutdown` / restart cycle, and the observer's compiled source fires correctly against the restored host (phases 16 and 17). `docs/dispatcher.md` Persistence and `docs/persistence.md` Substrate verification walk the composition.
+**Demonstration**: both mechanisms have working demonstrations. The per-object snapshot path: admin authentication credentials persist across restarts because the kernel user object writes the password hash to a `.pwd` file via `save_object` (`/kernel/obj/user.c`) and restores it on the next login — an explicit save point, independent of image dumps. The image-persistence path: the `examples/merry-app` smoke verifies a richer composition: a property-stored reference to a compiled Merry-script clone, the host's LPC global referencing that host, and a scheduled `call_out` against the host all survive a `dump_state` / `shutdown` / restart cycle, and the observer's compiled source fires correctly against the restored host (phases 16 and 17). `docs/dispatcher.md` Persistence and `docs/persistence.md` Substrate verification walk the composition.
 
-**Status**: Validated. Mechanism present; demonstrated empirically in the bootstrap, across reboot, and in the dispatcher's snapshot+restore verification.
+**Status**: Validated. Image persistence demonstrated empirically by the merry-app dump / restart cycle and the dispatcher's snapshot+restore verification; the `save_object` path demonstrated by credential persistence across reboots.
 
 **Extensions**:
 - `KVstore` at `/lib/KVstore.c` and `KVnode` at `/obj/kvnode.c`: persistent keyed-tree structure built on the persistence primitive. Compiled at boot; provides a structured collection suitable as backing storage for higher-level data primitives.
@@ -93,16 +91,17 @@ Code recompiles into the live runtime; existing objects update in place.
 
 **Foundation**: Host-runtime `compile_object` kfun. Passing a path that already has a master in memory replaces the master with the recompiled version. Existing references to the old master continue to function for the in-flight call; subsequent calls dispatch to the new version. No deploy step.
 
-**Demonstration**: the `examples/hot-reload-demo/` reference application. A greeting master exposes a `greet()` method; an HTTP server routes `GET /greet` to the method and `POST /compile` to `compile_object` on the greeting's path. The smoke script (`examples/hot-reload-demo/smoke.sh`) exercises the three-step probe: cold-boot `GET /greet` returns the on-disk string; `POST /compile` with new LPC source returns `200 OK Compiled /usr/WWW/greeting`; immediate `GET /greet` returns the new string. No DGD restart, no application-layer reload mechanism — `compile_object` is the platform mechanism, exercised through the HTTP application surface.
+**Demonstration**: the `examples/hot-reload-demo/` reference application. A greeting master exposes a `greet()` method; an HTTP server routes `GET /greet` to the method and `POST /compile` to `compile_object` on the greeting's path. The smoke script (`examples/hot-reload-demo/smoke.sh`) exercises the three-step probe: cold-boot `GET /greet` returns the on-disk string; `POST /compile` with new LPC source returns a `200 OK` response whose body reports `Compiled /usr/WWW/greeting`; immediate `GET /greet` returns the new string. No DGD restart, no application-layer reload mechanism — `compile_object` is the platform mechanism, exercised through the HTTP application surface.
 
-**Status**: Validated for single-object replacement. Library-inheritance cascade (recompiling a parent library and observing dependents pick up the new parent) is not yet addressed. Concurrent-in-flight behavior (the guarantee that calls already dispatched against the old master finish on the old program) is asserted by the host runtime but not exercised by the sequential smoke; a concurrent-request probe would close that half.
+**Status**: Validated for single-object replacement. The library-inheritance cascade ships as a platform mechanism — the object manager (`/usr/System/sys/objectd.c`) records the inheritance and include graph at compile time, and the upgrade daemon (`/usr/System/sys/upgraded.c`) walks dependents, recompiles them (optionally atomically), and optionally `call_touch`-patches live clones, driven by the operator `upgrade` command — but no example demonstrates the cascade yet. Concurrent-in-flight behavior (the guarantee that calls already dispatched against the old master finish on the old program) is asserted by the host runtime but not exercised by the sequential smoke; a concurrent-request probe would close that half.
 
 **Extensions**:
 - LPC self-compiler at `/usr/LPC/`: full LPC parser, AST classes, and compiler implemented in LPC. Tier D, compiled at boot, currently unconsumed. Enables AST-level transformation passes during the compile path — useful for safety transforms (see §5), authorship-time validation, or code analysis applied as part of hot-reload rather than as a separate deploy step.
-- Program dependency database (port candidate, `progdb`): a daemon tracking inherits and clones across the live image, enabling recompile cascades. When a parent library recompiles, dependents are recompiled (or queued for recompile) so the inheritance graph stays coherent. Generalizes single-object hot-reload to library hot-reload.
+- **Library upgrade cascade**, as shipped: the object manager registers inheritance and include dependencies during compilation; the upgrade daemon recompiles dependents and, when a patch tool is supplied, queues `call_touch` patching so existing clone state migrates on next reference, without a maintenance window. One piece is not implemented: a stored per-master clone list — clone patching sweeps the object table rather than enumerating a registry.
 
 **Open**:
-- Library-cascade behavior in the absence of progdb (does an existing clone of an old parent become stale, or does the host's late binding catch the new parent on next dispatch?).
+- Cascade demonstration: no example exercises a parent-library recompile through the upgrade daemon.
+- Behavior of a clone live during the recompile window (between a parent issue's destruct and the dependent's recompile completing) is unverified; the upgrade daemon's `call_touch` patching covers the post-upgrade path.
 - Concurrent in-flight calls during recompile (what's the platform's guarantee about a method executing in the old version while the new version compiles?).
 - Interaction with host-driver extensions that maintain a compiled-code cache (see Appendix §Tier A: extensions). When `compile_object` recompiles a path, an extension's per-program code cache must invalidate or re-key the corresponding entry, otherwise stale compiled code shadows the new bytecode and hot reload silently fails. Empirically unverified for any specific extension; operators loading such an extension should test the recompile path against their workload before relying on hot reload in production.
 
@@ -125,7 +124,7 @@ Five-axis containment, as shipped: **language** (the grammar refuses `->`, `rlim
 
 **Extensions**:
 - LPC self-compiler at `/usr/LPC/` (as in §4): enables grammar-pass safety transforms over plain LPC — denylist host kfuns, refuse dangerous productions — before handing the result to `compile_object`; the candidate path for extending load-time bounds beyond Merry source.
-- Property-graph support, as shipped: the keyed property map (`/lib/util/properties`), set-time observer dispatch atomic with the write (`docs/dispatcher.md`), ur-parent ancestry walks for script and observer resolution (`/lib/util/ur`; `find_merry` and the dispatcher's ancestry walk), and persistent property storage (§3). The subsystem is **cross-primitive**: set-time dispatch is an instance of §6 (events atomic with state change); the ur chain serves §8 (state introspection via the data graph). One piece is not implemented: generalized data-inheritance on plain property reads (a `query_property` that consults the ur chain) — ancestry applies to script lookup and observer resolution, not to ordinary reads.
+- Property-graph support, as shipped: the keyed property map (`/lib/util/properties`), set-time observer dispatch atomic with the write (`docs/dispatcher.md`), ur-parent ancestry walks for script and observer resolution (`/lib/util/ur`; `find_merry` and the dispatcher's ancestry walk), and persistent property storage (§3). The subsystem is **cross-primitive**: set-time dispatch is an instance of §6 (events atomic with state change); the ur chain serves §8 (state introspection via the data graph). One piece is not yet implemented: generalized data-inheritance on plain property reads (a `query_property` that consults the ur chain). Ancestry applies to script lookup and observer resolution today; extending it to ordinary reads — inherited property defaults — is a committed roadmap surface (`docs/runtime-platform-roadmap.md`, Wave 2), activating with the first consumer that needs inherited defaults.
 
 **Open**:
 - Re-entrancy and signal loops are bounded on the dispatcher path: the cycle detector refuses a recursive dispatch on the same (object, keypath) chain, and cascade depth is bounded and operator-tunable (demonstrated by the merry-app DISPATCH CYCLE phase; `docs/dispatcher.md`). Whether the bounds suffice under adversarial observer graphs — deep cross-object cascades that stay below the depth limit — has no dedicated probe.
@@ -184,20 +183,19 @@ Multiple callers see a consistent view of state without user-land coordination.
 The state graph is queryable directly through runtime calls.
 
 **Foundation**:
-- Host-runtime introspection kfuns: `find_object`, `object_name`, `status`, `query_owners`, `query_users`, `get_dir`. Available to any tier that has the access bit; constrained per tier.
-- Object registry at `/usr/System/sys/objectd.c`: a System-tier daemon maintaining a populated registry of object existence, called during compilation and destruction. The registry is populated; a structured query surface for application code is not currently exposed.
+- Host-runtime introspection kfuns — `find_object`, `object_name`, `status`, `users`, `get_dir` — wrapped per tier by the kernel auto; owner and user enumeration (`query_owners`, `query_users`) through the kernel resource and user APIs. Available to any tier that has the access bit; constrained per tier.
+- Object manager at `/usr/System/sys/objectd.c`: a System-tier daemon registered with the host driver, called during compilation and destruction. It records object paths and issues plus the inheritance and include graph, and answers structured queries (`query_inherits`, `query_inherited`, `query_includes`, `query_included`, `query_path`, `query_issues`) — all gated to the System tier; application code cannot reach the query surface.
 
-**Demonstration**: admin_console (the binary-port REPL on the kernel telnet port) provides interactive introspection: `compile <path>` returns the master object reference, `code <expression>` evaluates an arbitrary LPC expression against the live image, `status` returns the system-wide health table (server / swap / memory / objects / users / uptime / call_outs). Platform smoke testing exercises this surface over telnet and asserts the expected responses.
+**Demonstration**: admin_console (the binary-port REPL on the kernel telnet port) provides interactive introspection: `compile <path>` returns the master object reference, `code <expression>` evaluates an arbitrary LPC expression against the live image with command history and `$N` value recall, `status` returns the system-wide health table (server / swap / memory / objects / users / uptime / call_outs), alongside directory navigation (`cd` / `pwd` / `ls`), object lifecycle (`clone` / `destruct`), access management (`access` / `grant` / `ungrant`), and resource queries (`quota` / `rsrc`). No automated test in this repository exercises the console surface; verification is interactive.
 
-**Status**: Partial. Foundation kfuns work; structured object-graph queries (per-owner enumeration, inheritance-chain walks, clone enumeration) require either ad-hoc LPC code or a daemon exposing them.
+**Status**: Partial. Foundation kfuns work; the object manager answers inheritance and include queries at the System tier; per-owner enumeration and clone enumeration are absent, and no structured query surface reaches application tiers.
 
 **Extensions**:
 - Object-registry query API (port candidate, `objregd` plus a kernel-tier API library): per-owner linked lists of live objects with traversal primitives (`first_link`, `next_link`, `prev_link`). Useful for GC, auditing, and enumeration without grovelling through all owners.
-- Interactive operator console (port candidate, richer than admin_console): command history, directory navigation, integrated compile / clone / destruct / access-grant operations, and resource-state queries.
 
 **Open**:
-- Structured inheritance-chain query: given an object, list its inherits transitively.
-- Live-clone enumeration: given a master, list its live clones.
+- Application-tier access to the object graph: the object manager's query surface is System-gated; exposing structured queries to applications needs a deliberate API decision.
+- Live-clone enumeration: given a master, list its live clones without an object-table sweep.
 
 ---
 

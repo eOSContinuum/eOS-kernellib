@@ -1,219 +1,83 @@
 # Runtime Platform Roadmap
 
-eOS-kernellib's near-term roadmap commits to one cohesive lift that integrates structured-object persistence, typed-property addressing, inheritance with override, and a sandboxed scripting sublanguage into a single use-case-agnostic developer-facing programming model. On top of that programming model, a generic property-change dispatcher ships as the platform's reactive-data surface. This document is the architecture statement: what the lift integrates and why, what the dispatcher looks like, which prior-art systems inform the design, and what readiness conditions Phase 3 implementation depends on.
+eOS-kernellib's roadmap is a set of committed platform surfaces organized into dependency-ordered waves, each item gated by an activation trigger. The integrated programming model the platform set out to ship — structured-object persistence, typed addressable properties, data-shaped inheritance, a sandboxed scripting sublanguage, and a property-change dispatcher binding them together — ships today and is documented in `docs/runtime-primitives.md` and `docs/dispatcher.md`. This document is the forward statement: which surfaces the platform commits to next, in what dependency order, and what observable condition activates each one.
 
-**Audience**: developers and architects who want to understand the platform's near-term architectural direction before Phase 3 implementation begins; downstream application authors gauging which programming-model surfaces will be available; reviewers of the Phase 3 implementation work-in-progress comparing design intent against landed code; assumes `docs/architecture.md` for the structural model, `docs/runtime-primitives.md` for the eight runtime primitives, and `docs/lpc-essentials.md` for LPC vocabulary.
+**Audience**: developers and architects gauging the platform's direction before adopting it; application authors deciding whether to build a pattern at the application tier now or wait for a committed platform surface; contributors choosing what to work on next.
 
-**What this doc is not**: an implementation guide. The lift's components and the dispatcher's API are described at the level of architectural commitments and design intent; concrete signatures, type definitions, and code citations belong in the per-component reference docs that ship alongside the implementation. Two architectural sub-decisions are explicitly deferred to implementation time and named in the open-decisions subsection of the dispatcher section.
+## How to read this roadmap
 
----
+- **Waves are dependency-ordered, not dated.** A wave number says what must exist first, not when the work happens. Wave 2 items build on Wave 1 substrates; Wave 3 items are independent expansions.
+- **Every item carries an activation trigger** — the observable condition that starts the work. Wave 1 items harden surfaces that already ship, and the friction motivating them has already been observed; their triggers are met. Wave 2 and Wave 3 items wait on their named triggers.
+- **Trigger-gating is the boundary discipline.** The kernel layer takes on a surface when a consumer demands it, not speculatively. A surface with no trigger met stays out of the platform, and the corresponding pattern lives at the application tier until then.
 
-## The cohesive lift
+## What ships today
 
-The lift integrates five components into the platform's kernel layer as one structurally inseparable unit:
+`docs/runtime-primitives.md` is the authoritative per-primitive status statement. The shipped inventory the roadmap builds on:
 
-1. **Vault** — structured-object persistence with on-disk source-of-truth, schematized via per-domain XML, surviving image-orthogonal statedump cycles.
-2. **Property system** — typed named properties on objects, addressable by name pattern, the storage surface the rest of the lift uses.
-3. **UrHierarchy** — typed inheritance with override semantics, ancestry walked by name to resolve property lookups and observer chains.
-4. **Merry** — a safe sublanguage for scripts that run inside the platform's capability boundary, with no host-runtime side effects beyond the script's declared output.
-5. **Merry-on-property invocation** — the binding convention that ties the four above together: scripts stored as named properties on objects, looked up by mode and signal, walked through UrHierarchy ancestry to find inherited handlers.
+- The **property system, UrHierarchy ancestry, Merry sandbox, and property-change dispatcher** — the integrated reactive programming model (`docs/dispatcher.md`, `docs/merry-applications.md`).
+- **Structured-object persistence** via Vault, Schema, and the XML transport (`docs/vault-applications.md`, `docs/schema.md`, `docs/xml.md`), layered over the host runtime's orthogonal persistence (`docs/persistence.md`).
+- The **library upgrade cascade**: the object manager's inheritance graph plus the upgrade daemon's recompile-with-dependents flow and `call_touch` clone patching, driven by the operator `upgrade` verb (`docs/code-lifecycle.md`).
+- The **logical-name registry** (the Index daemon): a colon-delimited name tree with reverse lookup, consumed by Schema and Vault.
+- The **operator console** with history, navigation, code lifecycle, access management, and resource queries (`docs/admin-console.md`).
+- **Transport surfaces**: the consuming HTTP/1 mount convention, plus TLS server/client variants, WebSocket framing, and datagram support compiled at boot (see Transport posture below for the activation commitments).
+- **Compiled-but-unconsumed trees kept warm**: the continuation classes and the LPC self-compiler. Both compile at boot; their consumption is roadmap work (Wave 3) or application-tier demonstration.
 
-The components are not separately liftable. Lifting Vault without the property system leaves Vault with no schema to address; lifting the property system without UrHierarchy leaves property lookups flat (no inheritance, no override); lifting Merry without the invocation convention leaves the sublanguage without a way to be invoked in canonical usage; lifting the invocation convention without UrHierarchy ancestry breaks inheritance semantics. The cohesive-lift framing is therefore an architectural commitment to integrate the five components together or not at all.
+## Wave 1 — hardening the shipped surface
 
-What the lift delivers as a programming-model surface: sandboxed scripts in a safe sublanguage, stored as named properties on typed objects, invoked by name with timing modes, with transparent inheritance via the UrHierarchy. The surface is use-case-agnostic; no specific application domain is wired in.
+Each Wave 1 item formalizes or completes something already in the platform. The motivating friction is already observed; no item waits on a trigger.
 
-### Vault: structured-object persistence
+- **Observer-storage formalization.** The dispatcher's observer registration ships with per-timing validation and capability gating; what is missing is the read side and the contract: a public observer-query LFUN, an observer-enumeration operator verb, finer-grained unregistration, cross-property observer encoding, multi-inheritance disambiguation, and a documented observer lifecycle contract.
+- **Logging facility.** The platform's `sysLog` / `info` / `debugLog` calls are no-op stubs today. This item ships a real diagnostic facility, including error reporting that survives the atomic barrier — diagnostics from a rolled-back execution must still reach the operator. Distinct from the Wave 2 change log: this is the developer/operator diagnostic surface, not an application-level event replay API.
+- **Type-coercion helpers.** Marshal helpers for mixed LPC values, enabling the ascii-property accessors that the Schema callbacks already reference but the property layer does not yet implement — so bare property-bearing objects can marshal simple values without importing the full Schema subsystem. Also the substrate for the Wave 2 generalized serializer.
+- **Capability library.** A kernel-tier library providing gated approved-set mutators and entry-point checks, replacing the heterogeneous per-subsystem gating that ships today. Six surfaces migrate to it: dispatcher registrar approval, script-space registration, the persistence helper's dump-and-exit entry point, the HTTP acceptor's binding check, the console access lists, and property-layer gating of direct writes to `merry:on:*` observer properties.
+- **Clone addressing for operators.** Console verbs accept clone references by logical name rather than raw `path#index` form, composing the console with the logical-name registry. Addressing-by-name only; clone *enumeration* is the Wave 3 liveness registry's concern.
 
-Vault stores objects as XML files in a per-domain directory tree, with namespaced property elements as the storage primitive. The relationship to the host runtime's image-orthogonal persistence is additive: the host's statedump/restore mechanism captures the entire in-memory image at the bytes level (no schema); Vault adds named persistence by object identity, schematized via the XML namespaces, surviving across statedump cycles via on-disk source-of-truth. An object reconstituted from Vault has an identity that survives image-level statedump cycles, image migrations, and full host restarts from cold disk — not just from a snapshot.
+## Wave 2 — platform services on Wave 1 substrates
 
-The relationship is layered: Vault depends on host-runtime persistence (the daemon's in-memory state is itself statedump-persistent), but adds named-by-identity addressability on top.
+- **Change log.** An append-only record of property changes: per-batch mutation tuples on the dispatcher, a replay API (query changes since a batch or timestamp), per-property retention configuration, and an operator verb. The shipped batch-identity and batch-status surface is the precursor; the change log proper builds on the Wave 1 observer formalization. *Trigger: the first dispatcher consumer that needs replay or audit.*
+- **Generalized value serializer.** Round-trip serialization for any LPC value — recursive structures, light-weight objects exporting their state, persistent objects by reference — without requiring a schema. The schema-driven XML export/import that Vault uses today covers the schematized case; this generalizes it, building on the Wave 1 type-coercion substrate. *Trigger: the first cross-system transfer or non-schema marshal need.*
+- **Port-label registry.** A label layer ("http", "admin") over the numeric port-to-manager registration that ships, so modules associate with a port by label rather than by number. *Trigger: the first new transport consumer or multi-port application; labels precede any new transport activation.*
+- **Thread-local storage API with originator identity.** A kernel-API wrapper over the host's per-execution-context storage (used internally today but not exposed), and its first consumer: originator identity persisted across deferred calls, so error reports from a `call_out` chain reach the principal that started the work. The mechanism and the use case ship together. *Trigger: the first per-principal state need that crosses a deferred-call boundary.*
+- **Compile-or-locate utility.** A small library for the idempotent bootstrap pattern: return the existing master if present, compile otherwise, with automatic initialization. *Trigger: the pattern recurring across enough daemons that the inline form is measurable boilerplate.*
+- **Inherited property defaults.** A plain property read with no local value walks the UrHierarchy ancestry for an inherited default, completing the platform's data-shaped inheritance story. The ancestry-walk mechanism already ships for script and observer resolution; this extends it to ordinary reads. *Trigger: the first consumer needing inherited property defaults — the prototype-style base-object shape.*
+- **Transport activation** for HTTPS and server-sent events — see Transport posture below.
 
-### Property system: schematized addressable state
+## Wave 3 — trigger-gated expansions
 
-The property system stores typed property values on objects, indexed by property name. Properties are first-class — addressable, observable, settable independently of method calls. The XML namespacing convention from Vault carries forward: properties are named with a namespace prefix (`<namespace>:<name>`), allowing different concerns to attach properties to the same object without name collision.
+Independent items, each waiting on its own demand signal.
 
-The property system is the storage surface the dispatcher reads and writes. Observer registration, observer-script storage, and the change-log surface all key off property names.
+- **Liveness registry.** One subsystem unifying per-master clone enumeration, per-owner object traversal, and clone-count tracking — three interfaces over one registry. Today, clone patching during upgrades sweeps the object table; the registry replaces the sweep. *Trigger: the first audit, GC, or patching need beyond the upgrade daemon's per-upgrade enumeration.*
+- **Typed configuration store with change events.** Runtime-configurable values (booleans, integers, strings, object references) with subscription on change. Configuration is boot-static today. *Trigger: the first subsystem that must be reconfigurable at runtime.*
+- **Module-load events.** Per-module load tracking with load events for staged bootstrap. The boot sequence is a hand-ordered domain list today, and that suffices. *Trigger: staged loading of third-party domains.*
+- **Init sequencer.** Staged daemon initialization via deferred-call chaining when bootstrap ordering outgrows the hand-ordered list. *Trigger: pairs with module-load events.*
+- **Two-level mapping.** A mapping-of-mappings collection that bypasses the host runtime's per-mapping size limit, with an iterator. *Trigger: the first persistent collection approaching the host ceiling.*
+- **Relationship managers.** Bidirectional relationship state (many-to-many, many-to-one) with atomic update semantics for graph-shaped data. *Trigger: the first graph-shaped platform-tier data need; application patterns suffice until then.*
+- **Stub auto-creation.** Instantiating an abstract library directly auto-creates and compiles the tiny concrete stub, avoiding hand-written boilerplate classes. *Trigger: stub-class boilerplate measurably accumulating across applications.*
+- **LPC self-compiler consumption.** The self-compiler tree ships and compiles at boot; consuming it — AST-level safety transforms enabling bounded loading of plain LPC beyond the Merry sandbox — is the roadmap item. *Trigger: a consumer demanding bounded plain-LPC loading.*
+- **Dispatcher performance and diagnostics.** Descendant-chain cache invalidation and dispatch-trace verbosity tiers. *Triggers: observed dispatch cost on deep hierarchies; diagnostic demand beyond the shipped trace flag.*
 
-### UrHierarchy: typed inheritance with override
+## Transport posture
 
-UrHierarchy provides typed inheritance: objects have an UrParent reference; property lookups walk the ancestry chain when no value is found locally; subclass property writes override the inherited value. The walk is performed by name (the property-name key) rather than by class (no method-resolution-order machinery); inheritance is data-shaped rather than code-shaped.
+The transport mechanisms are largely paid for — the TLS server and client variants, the WebSocket framing, and the buffered-connection layer all compile at boot — so the posture below is a commitment decision per transport, not a construction plan.
 
-The dispatcher's observer-inheritance mechanism reuses this exact ancestry walk: when a property changes on an object, the dispatcher looks for observer scripts on the object first, then walks the UrHierarchy to find inherited observer chains. The same lookup function the property system uses for value resolution is reused for handler resolution.
+- **HTTPS: committed, activation trigger-gated.** Native TLS termination is a platform transport. *Trigger: the first network-crossing consumer.* Until activation, the documented deployment doctrine is reverse-proxy TLS termination in front of the platform's HTTP/1 port; the certificate-management story is decided at activation time.
+- **HTTP streaming / server-sent events: committed, activation trigger-gated.** Composes with the shipped HTTP/1 surface. *Trigger: the first live-update consumer — a browser-facing demonstration or an integration bridge that pushes state changes outward.*
+- **WebSocket: deferred, with a trigger.** The shipped framing stays compiled. *Trigger: a bidirectional consumer that server-sent events plus POST cannot serve.* No removal; no activation work until the trigger fires.
 
-### Merry: the safe sublanguage
+## The application-tier boundary
 
-Merry is a scripting sublanguage with a constrained surface: no arbitrary host-runtime side effects, no access to capabilities the script's caller did not explicitly hand it, no ability to subvert the platform's atomic envelope or capability boundary. Scripts are textual content stored as property values; the platform compiles and runs them with the constraints enforced by the language itself, not by application-level checks.
+Some patterns stay above the kernel layer permanently, and the roadmap commits to keeping them out:
 
-The constraints are what make Merry safe to invoke from positions where the platform cannot fully trust the caller: an observer script on a user-domain property is run by the dispatcher, but the dispatcher does not need to vet the script's contents for malicious behavior — the language guarantees the script cannot exceed the dispatcher's intended capability surface.
+- **Intent-carrying domain events.** The platform's change surface is property diffs (and, at Wave 2, the change log's entity-attribute-value facts). An application that wants named domain events builds them as a thin observer layer translating property changes into events; the platform surface stays uniform.
+- **Verb dispatchers and scene fan-out.** Application-level action dispatch (multi-object act/react patterns) layers on the property-change dispatcher; the kernel layer does not commit to a verb namespace.
+- **Auto-tracked reactivity.** Observer registration is explicit by design: the scripting surface is too unrestricted for static dependency inference, and long-running runtime contexts pay too high a debugging cost for auto-tracking's ergonomics. An auto-tracking layer is an application-tier library if a specific application class needs it.
 
-### Merry-on-property invocation: the binding pattern
-
-The invocation pattern that ties the four above together: scripts stored as named properties on objects, looked up by mode and signal, walked through UrHierarchy ancestry. In canonical use, every Merry invocation follows this pattern; there is no Merry-as-pure-eval entry point. The convention is:
-
-```text
-property name:  merry:<mode>:<signal>
-property value: Merry script text
-invocation:     run_merry(object, signal, mode, args)
-lookup:         object's properties → UrHierarchy ancestors' properties
-```
-
-Lifting Merry without the invocation convention would leave the sublanguage without a way to be used in canonical platform code; lifting the invocation convention without UrHierarchy ancestry would break inheritance of handler chains. The two halves are structurally coupled.
-
----
-
-## The property-change dispatcher
-
-On top of the cohesive lift, the kernel layer ships a generic dispatcher that fires observer scripts in response to property changes. The dispatcher is the platform's reactive-data surface: changes to typed properties trigger sandboxed scripts, with timing modes, cascade-depth bounds, batching brackets, and an append-only change log for replay and audit.
-
-The dispatcher is **property-change-triggered, not action-verb-triggered**. The trigger axis is "this typed property on this object changed to this value"; the dispatch is independent of any application-level verb namespace. An application-level verb dispatcher (act/react/witness fan-out across multi-object scenes, for example) is a downstream construct an application can layer on top; the kernel-layer dispatcher does not commit to it.
-
-### Observer registration (KVO-shape API)
-
-Observers register against property-name patterns. The registration API takes an object reference and a property-name pattern; the dispatcher fires the observer when any property matching the pattern changes on that object or its UrHierarchy descendants.
-
-Property-name patterns support exact names, namespace-prefix matches, and (deferred) glob shapes. The pattern surface follows the canonical KVO key-path semantics most developers already recognize: register an observer on `entity.address.city` and the dispatcher fires when `city`'s value changes, with the old and new values passed to the observer.
-
-Registration is a runtime operation; observers can be added and removed dynamically. Observer registrations persist via Vault on the object they observe; observer chains restored across statedump cycles automatically.
-
-### Pre/main/post timings (SQL-trigger shape)
-
-Each observer registration specifies a timing: **pre** (fires before the property write commits; can refuse the write by erroring), **main** (fires at commit time; cannot refuse but sees the committed value), or **post** (fires after the write commits; the change is durable when the observer runs).
-
-The three-timing model is the SQL-trigger pattern, validated by decades of operational lessons across major database engines. Observers with side effects beyond the trigger object register **post**; observers that need to validate the write register **pre**; observers that need transactional cohort with the write register **main**.
-
-Pre-observers run inside the host runtime's atomic envelope for the write. If a pre-observer errors, the write is rolled back as part of the atomic context; the property never observes the new value. Main-observers run inside the same atomic envelope after the value lands. Post-observers run after the atomic envelope closes; their errors do not roll back the write.
-
-### Append-only change log (Datomic shape)
-
-Every property change is recorded as a fact in an append-only log: entity, attribute, value, time. The log is the dispatcher's source of truth for replay, audit, and time-travel queries; observers can subscribe to the log directly (reading the change stream) as an alternative to registering against property names. The log is a first-class queryable surface.
-
-The two access patterns — registered observers via the KVO-shape API and log-stream subscribers via the Datomic-shape API — coexist. Registered observers are convenient for scoped reactivity; log subscribers are convenient for projection-shaped derived state, audit trails, and replay of observer chains during recovery.
-
-Retention of the change log is a deferred design decision; the options range from full append-only history through windowed retention to garbage-collected purges based on observer-subscription state. The platform's commitment is that the surface exists and is queryable; the retention policy is settable per deployment.
-
-### Sandboxed observer scripts (Merry)
-
-Observer scripts are written in Merry and stored as property values on the observed object. The property naming follows the Merry-on-property invocation pattern with timing as an additional axis: `merry:on:<property-path>[:<timing>]` where the timing suffix is omitted for main and named explicitly for pre or post.
-
-```text
-merry:on:address.city           main observer on address.city
-merry:on:address.city:pre       pre observer on address.city
-merry:on:address.*:post         post observer on any address.* property
-```
-
-The script body is plain Merry; the dispatcher invokes it via the same `run_merry` entry point used elsewhere. The script receives the object, the changed property's old and new values, and the timing as arguments; its return value contributes to the dispatch (in pre-timing, an error refuses the write; in main and post, the return is recorded in the change log).
-
-Storing observer scripts as property values means they persist through Vault, survive restarts, and are visible to introspection. An operator inspecting an object can see what reactive behavior is wired in by reading the object's properties.
-
-### Inheritance through UrHierarchy
-
-The dispatcher walks the UrHierarchy when looking up observer scripts. When a property on an object changes, the dispatcher checks the object's own properties first for matching observer scripts, then walks the UrParent chain looking for inherited observers. Override semantics match the property system's: an observer defined locally on an object replaces an inherited observer of the same property name and timing; an observer defined on an ancestor is inherited by descendants unless explicitly overridden.
-
-This is the structurally novel element of the dispatcher design. No surveyed comparable system provides typed-property inheritance with override at the observer-registration level. The combination unlocks programming-model patterns where a base class declares default reactive behavior, subclasses override or extend it, and the dispatcher honors the inheritance chain without application-level lookup logic.
-
-### Open design decisions deferred to Phase 3 implementation
-
-Two architectural sub-decisions inside the dispatcher will be resolved at implementation time:
-
-- **The dispatcher's exact API surface**: key-path syntax (dot-separated vs slash-separated vs glob); observer-property naming convention details (the timing suffix's exact spelling, optional vs required); cascade-depth defaults (where to set the cap before pathological feedback loops fire) and the operator's surface for raising or lowering it; batching API shape (transaction-boundary brackets vs explicit `willChange`/`didChange` calls vs both).
-- **The change-log retention policy**: full append-only history retained indefinitely; windowed retention based on a time or size budget; garbage-collected based on observer-subscription state. The trade-offs are storage cost vs replay range vs audit completeness.
-
-Both decisions affect the dispatcher's user-facing API; both have multiple reasonable choices. The Phase 3 implementation work surfaces the design space concretely and lands one choice with documented reasoning.
-
----
-
-## Prior art and lessons
-
-Eight comparable architectures inform the dispatcher's design. The dispatcher is genuinely novel only in one dimension — observer inheritance through typed-object UrHierarchy — but each of the other dimensions has at least one comparable that has already paid the operational price of getting the shape right. The design adopts the best-validated shape per dimension rather than inventing from first principles.
-
-### Datomic
-
-Typed entities with a schema declaring attribute types, cardinalities, and indexes. State is an append-only log of facts (entity-attribute-value-time tuples); the current value is the latest fact per (entity, attribute). Listeners subscribe via `tx-report-queue`, a push stream of transaction reports. Inline transaction functions (`tx-fns`) run during transaction commit and can refuse the transaction by erroring. Time-travel queries replay history at any past `t`.
-
-**Lesson for the dispatcher**: the closest semantic match. The Datomic separation between change-event-log and reactive-subscribers maps directly to the dispatcher's append-only change log plus registered observers. The tx-fn model maps cleanly to "Merry script on property change with pre/main timing." Datomic does not have typed-property inheritance with override; the dispatcher's contribution is adding that dimension to a Datomic-shaped foundation.
-
-### iOS Key-Value Observing
-
-The canonical property-change observer pattern. Observers register with `observeValueForKeyPath:ofObject:change:context:`, scoped to a specific object and a specific dot-separated key path. The change notification includes the old and new values. Dot-separated key paths compose: registering on `person.address.city` auto-observes through `person.address` and fires when `city` changes.
-
-**Lesson for the dispatcher**: the canonical API shape. Most developers already know KVO's mental model. The dispatcher adopts the key-path syntax and the old/new value diff convention. KVO's biggest operational lesson — **notification storms during bulk updates** — drives the dispatcher's explicit batching-brackets requirement: bulk operations need an explicit suspend/resume around the batch so observers see one notification per logical change, not one per micro-step.
-
-### SQL triggers
-
-The oldest property-change-on-persistent-store precedent. Triggers fire on row insert, update, or delete; column-specific firing via WHEN clauses; BEFORE / AFTER timing modes; ROW vs STATEMENT scope. Triggers persist in the database schema; firing is transactional.
-
-**Lesson for the dispatcher**: the operational hazards. Every major database engine has a recursion-depth cap because **cascading triggers are nightmares** without one — observer A fires, modifies a property observed by B, which fires and modifies a property observed by A, infinite loop. Lock contention on heavily-triggered tables is the second well-validated hazard. Debugging is hard because triggers fire invisibly. The dispatcher takes these as design requirements: explicit cascade-depth bound with infinite-recursion detection mandatory, explicit batching brackets for bulk operations, and introspection surface (the change log) so observers' firing is visible rather than invisible.
-
-### Spreadsheet cells
-
-The architectural ancestor of all reactive-property systems (VisiCalc 1979 onward). Cells whose formulas reference a changed cell auto-recompute. The dependency graph is **inferred from formula references**, not declared; the formula language is constrained by design (no I/O, no side effects beyond setting own cell) so dependencies are statically inferable.
-
-**Lesson for the dispatcher**: the trade-off between automatic dependency tracking and explicit registration. Auto-tracking is ergonomic but requires constraining the script language so dependencies can be inferred without running the script. Merry is too unrestricted for static dependency inference; the dispatcher therefore commits to **explicit observer registration** rather than auto-tracked reads. The reactive surface is more verbose but the inference cost is zero and the dependency graph is itself a first-class artifact (the registered observers).
-
-### MobX / Vue 3 / Solid signals
-
-Modern fine-grained reactive UI. Observers ("reactions", "computeds", "autoruns") that *read* a property during their last execution are auto-tracked via Proxy interception or accessor wrapping. No explicit subscription; the reactivity engine watches reads and auto-registers dependencies.
-
-**Lesson for the dispatcher**: where auto-tracking pays off and where it doesn't. Auto-tracking is ergonomic for UI code that recomputes views from data, where the read pattern is stable and the recomputation is idempotent. It introduces subtle bugs (untracked reads, conditional dependencies, "why isn't this updating?" debugging) that compound in long-running runtime contexts. For an orthogonally-persistent runtime serving long-lived applications, explicit registration is the simpler architectural choice. Auto-tracking remains a candidate for a layered library on top of the dispatcher if a specific application class needs it.
-
-### Erlang/OTP gen_event + gen_server
-
-Process-isolated pub-sub. `gen_event:notify` is an explicit call that triggers handlers registered via `add_handler`. State changes within a gen_server do not auto-notify — the developer must call `notify` explicitly. Handlers live in their own processes; the actor model provides isolation.
-
-**Lesson for the dispatcher**: the layer separation. Erlang's actor isolation is a real capability-separation primitive but does not compose naturally with "property changes fire scripts" — Erlang's model is message-passing, not reactive-data. The property-change discipline must live at the language / framework layer (the dispatcher), not at the actor layer (the host runtime's call dispatch). The dispatcher accepts that capability separation per script invocation comes from Merry's sandbox, not from process isolation.
-
-### Event sourcing
-
-Greg Young's and Martin Fowler's pattern. Append-only events as source of truth; projections subscribe and update derived state. Events carry **intent**: `OrderPlaced` rather than `order_status changed to "placed"`.
-
-**Lesson for the dispatcher**: events with intent are more reusable than raw property diffs, but raw property diffs are what the dispatcher fires. The dispatcher's change-log shape is closer to Datomic (entity-attribute-value-time facts) than to event sourcing (named domain events). Applications that want intent-carrying events build them as a thin layer on top of the dispatcher: an event-emitting observer translates the property change into a domain event for downstream consumers. The dispatcher's surface stays uniform; the intent layer is application-side.
-
-### CRDT-reactive
-
-Yjs, Automerge, Replicache. Triggers fire on CRDT operation applied locally or remotely. Per-path observer callbacks on shared documents or specific paths. The CRDT op-log persists; the current value is a fold of operations.
-
-**Lesson for the dispatcher**: CRDT mechanics solve distributed consensus, which the single-coherence-domain architecture (see `docs/architecture.md`) explicitly does not need. The dispatcher does not adopt CRDT machinery. The per-path observer API, however, is clean prior art for "observe `entity.property` and fire when it changes" — the dispatcher's KVO-shape API matches.
-
-### Synthesis
-
-The dispatcher adopts:
-
-- **Datomic's separation of concerns**: append-only change log plus reactive subscribers as two coexisting access patterns over the same change stream. The log gives time-travel, replay, and audit; the subscribers give scoped reactivity.
-- **SQL triggers' operational discipline**: pre/main/post timings, explicit cascade-depth bounds with infinite-recursion detection, explicit batching brackets for bulk operations, schema-storage of observer scripts.
-- **KVO's API shape**: registered observers per property-name pattern with old/new values in the notification. The mental model most developers already know.
-- **Spreadsheet cells' dependency-tracking lesson taken in the negative**: explicit observer registration rather than auto-tracked reads, because Merry's surface is too unrestricted for static dependency inference and long-running runtime contexts pay too high a debugging cost for the ergonomic gain.
-
-The dispatcher does not adopt:
-
-- CRDT consensus machinery — outside the architecture's distributed-coherence scope.
-- Auto-tracking via Proxy interception — wrong fit for the long-running runtime context.
-- Erlang's process-isolation-as-capability-separation — capability separation comes from Merry's sandbox in this architecture, not from actor processes.
-- Event-sourcing's intent-carrying domain events as the primary surface — applications can build intent-carrying events on top of the property-change log.
-
-The dispatcher's novel contribution is **observer inheritance through typed-object UrHierarchy with override semantics**. No comparable surveyed system provides observer inheritance at the typed-property level; the combination is what makes the cohesive lift's programming-model surface distinct from the sum of its prior-art components.
-
----
-
-## Implementation readiness for Phase 3
-
-Phase 3 implementation begins in a separate workstream after the current workstream closes. The implementation lifts the cohesive unit into eOS-kernellib's source tree and builds the dispatcher on top. Readiness conditions before Phase 3 begins:
-
-- **The cohesive-lift integrity claim is documented and uncontested.** This document carries it; reviewer feedback on the Phase 2 deployment is the validation. If a reviewer surfaces evidence that one of the five components is structurally separable from the others, the lift plan re-modularizes before Phase 3 begins.
-- **The five components' provenance is identified.** Vault, the property system, UrHierarchy, Merry, and the invocation convention exist as working code in adjacent codebases. Phase 3 lifts that working code into the kernel layer rather than implementing the components from scratch. The adjacent-codebase paths are known to the Phase 3 workstream's planning artifact.
-- **The dispatcher's two open design decisions are flagged.** The exact API surface and the change-log retention policy are deferred to implementation time per the open-decisions subsection above. Phase 3 surfaces each choice with documented reasoning before landing it.
-- **The eight runtime primitives' demonstration status is current.** `docs/runtime-primitives.md` reflects the current state of each primitive's foundation and demonstration. The lift's effect on each primitive's status is predictable from the lift's contents: atomicity, hot reload, and state introspection close independently of the lift; capability separation, persistent state, and sandboxed code load close as a direct consequence of the lift's components; asynchronous events and multi-agent coherence need additional Phase 3 demonstrations beyond the lift mechanics.
-- **The Phase 1 demonstrations are in place.** `examples/atomic-demo/`, `examples/hot-reload-demo/`, and the corresponding `docs/runtime-primitives.md` cross-references show the closed-independently primitives at the pre-lift level. Phase 3 demonstrations build on the same example surface for the lift-closed primitives.
-- **The repository's contribution conventions are stable.** Voice (functional, declarative-topic), license posture (BSD-2-Clause-Patent for newly authored content), commit-message conventions, and review process are documented in `CONTRIBUTING.md` and stable enough that Phase 3's PR cadence does not need to renegotiate the conventions mid-implementation.
-
-The Phase 3 workstream's first task is its own scope document: which subset of the cohesive lift lands first, which post-lift primitive demonstrations follow, what testing surface validates the lift's integrity. This roadmap is the architectural reference Phase 3 implementation cites; Phase 3's scope document is the operational plan that turns the architecture into landed commits.
-
----
+The tier boundary is packaging convention, not enforcement (`docs/runtime-primitives.md` Appendix): a pattern proven at the application tier can be promoted into the platform when its trigger condition is met and the pattern has demonstrated its shape.
 
 ## Where to next
 
-- **`docs/runtime-primitives.md`** — per-primitive foundation, demonstration, status, extensions, and open work. Section 1 (Atomicity) and section 4 (Hot reload) carry the Phase 1 example references; sections 2, 3, 5 await the lift; sections 6 and 7 await Phase 3 demonstrations beyond the lift; section 8 (State introspection) is closed independently of the lift.
-- **`docs/architecture.md`** — the platform's tier model, daemons, the auto-inheritance chain, the host-driver extension surface. Read first if you have not seen the structural model.
-- **`docs/lpc-essentials.md`** — LPC language vocabulary including the `atomic` modifier semantics referenced throughout this roadmap.
-- **`docs/code-lifecycle.md`** — how source becomes a running master, how recompilation propagates, how the object manager tracks the dependency graph. The lift's reactive-property surface layers on top of this lifecycle.
-- **`examples/atomic-demo/`** and **`examples/hot-reload-demo/`** — the Phase 1 reference applications. Both deploy at the kernel-defined HTTP/1 mount point; deploying either replaces `examples/http-app/`'s deployment at the same path.
-- **`CONTRIBUTING.md`** — review, voice, and license conventions for Phase 3 PRs.
+- **`docs/runtime-primitives.md`** — the authoritative shipped-status statement per primitive: foundation, demonstration, extensions, open work.
+- **`docs/dispatcher.md`** — the shipped property-change dispatcher: registration, timings, batching, cycle detection, persistence.
+- **`docs/architecture.md`** — capability tiers, daemons, boot sequence, the structural model under all of the above.
+- **`docs/operations.md`** — the deployment surface, including the reverse-proxy doctrine the transport posture references.
+- **`CONTRIBUTING.md`** — conventions for contributing roadmap work.
