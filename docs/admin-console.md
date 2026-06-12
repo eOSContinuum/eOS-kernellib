@@ -101,11 +101,9 @@ The verb categories below are organized around the operational situation an oper
   3. Verify with `code "/usr/MyApp/obj/route_handler"->probe()` (or an equivalent test invocation).
   
   No restart; no disconnect.
-- **Library upgrade**: recompiling a library (`/usr/MyApp/lib/util.c`) replaces the library master, but existing children of the library do not automatically pick up the new parent. Two options:
+- **Library upgrade**: recompiling a library (`/usr/MyApp/lib/util.c`) replaces the library master, but existing children of the library do not automatically pick up the new parent. The `upgrade [-a|-p] <file> [<file> ...]` verb — a System-tier extension to the console's verb set, carried by the operator login object (`/usr/System/obj/user.c`) — drives the platform's recompile cascade: the upgrade daemon (`/usr/System/sys/upgraded.c`) walks the object manager's inheritance graph for every direct and transitive dependent, recompiles them (`-a` for all-or-nothing atomic recompile), and with `-p` queues `call_touch` patching so clone state migrates on next reference. Manual alternatives remain:
   - Destruct each child (`destruct /usr/MyApp/obj/foo`) and recompile (`compile /usr/MyApp/obj/foo.c`). Loses clone state.
   - Use `call_touch` (via `code`) to mark every dependent for lazy upgrade through `_F_touch()`. Preserves state.
-
-  Platform-level recompile-with-dependents (an `upgrade` verb backed by a `progdb`-style dependency daemon) is not currently shipped in this kernel layer; manual coordination is the operator's responsibility.
 - **Recover from a wedged daemon**: `destruct /usr/MyApp/sys/router` then `clone /usr/MyApp/sys/router` would re-instantiate from the master — except `sys/` daemons are singletons that compile at boot, not on demand. The recovery is `destruct` followed by `compile` of the daemon source.
 - **A/B testing**: keep the canonical handler at `/usr/MyApp/obj/handler.c`; copy it to `handler_b.c`; compile the variant; route a percentage of traffic to the variant; compile the winner back as `handler.c` when results are in.
 
