@@ -28,6 +28,14 @@ System/initd's `/usr/[A-Z]*/initd.c` iteration picks up the new domain automatic
 ## Verify
 
 ```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
+```
+
+The runner does the clean-slate deploy, drives the boot cycle, and
+asserts the sentinel count; boot output lands under `state/`. The
+manual sequence it automates:
+
+```sh
 # Clean slate: remove any prior deploy and state, then redeploy.
 rm -rf src/usr/MerryApp
 rm -f state/snapshot state/snapshot.old

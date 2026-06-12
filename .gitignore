@@ -11,5 +11,11 @@ src/kernel/data/access.data
 # canonical example source lives at examples/<name>/; src/usr/<Mount>/ is a
 # deployment artifact created via `cp -R examples/<name> src/usr/<Mount>`.
 src/usr/MyApp/
+src/usr/SignalApp/
+src/usr/MerryApp/
+src/usr/Chat/
 src/usr/Vault/data/
 src/usr/MyApp/data/
+
+# Runtime save file the Merry daemon writes during any from-checkout boot.
+src/usr/Merry/tmp/
