@@ -166,18 +166,13 @@ The trade-off: long-idle objects can accumulate multiple pending upgrades. If th
 
 ## Library upgrade: recompile cascade through dependents
 
-The platform ships no automatic recompile-with-dependents mechanism. When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`.
+When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`. The platform ships the cascade coordination for this:
 
-SkotOS and some kernellib deployments ship a `progdb` daemon (a port candidate listed in `docs/runtime-primitives.md` §4 Extensions) that:
+- The object manager (`/usr/System/sys/objectd.c`) tracks the inheritance and include graph as it builds, via the `compile` and `compile_lib` events.
+- The upgrade daemon (`/usr/System/sys/upgraded.c`) takes one or more source files, walks the graph for every direct and transitive dependent, destructs stale library issues, and recompiles dependents — optionally as one all-or-nothing atomic operation. When a patch tool is supplied, the daemon additionally queues `call_touch` patching so live clones migrate state on next reference instead of being destructed.
+- The operator `upgrade [-a|-p] <file> [<file> ...]` verb on the System operator login (`/usr/System/obj/user.c`) drives the flow interactively: `-a` selects the atomic recompile, `-p` supplies the patch tool and runs the `call_touch` patch flow.
 
-- Tracks the inheritance graph as it builds via `compile` and `compile_lib` events.
-- Receives a recompile signal for a library.
-- Cascades the recompile to every direct and transitive dependent.
-- Optionally call_touches dependents instead of destruct-recompile, preserving state.
-
-eOS-kernellib's current shipped surface stops at the events: `compile_lib` is fired on the object manager with the inheritance graph, and `call_touch` is available for lazy upgrade. The cascade coordination is an application-layer concern unless a `progdb`-style daemon is added.
-
-The SkotOS Wiztool's `upgrade` verb is the operator-facing form of this cascade in deployments that ship `progdb`. eOS-kernellib's `admin_console` does not ship `upgrade`; operators perform cascade manually via `code "/path/to/progdb"->upgrade(...)` if their deployment has a `progdb`-equivalent, or via a sequence of `destruct` + `compile` if it does not.
+One piece the cascade lacks is a stored per-master clone list: clone patching sweeps the object table rather than enumerating a registry (`docs/runtime-primitives.md` §4 and §8 name the gap and the `objregd` port candidate).
 
 ## Object-manager events: the lifecycle surface
 
