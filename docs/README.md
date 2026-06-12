@@ -22,6 +22,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [runtime-platform-roadmap.md](runtime-platform-roadmap.md) — the committed forward surfaces in dependency-ordered waves, each with an activation trigger; the transport posture; the application-tier boundary.
 - [persistence.md](persistence.md) — orthogonal persistence as architectural property; the statedump cycle; hot boot; per-variable persistence semantics; persistence boundaries.
 - [code-lifecycle.md](code-lifecycle.md) — compile, clone, destruct, hot reload, `call_touch`, and the object-manager event surface.
+- [changing-a-running-system.md](changing-a-running-system.md) — the consolidated change story: the ladder from one-object hot fix through library cascade, live state migration, reactive data change, sandboxed behavior, and host-binary swap, with the atomicity safety net under all of it.
 
 ### Writing applications
 
