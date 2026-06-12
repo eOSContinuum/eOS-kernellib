@@ -26,12 +26,12 @@ static void create()
     userd->set_telnet_manager(0, this_object());
     users = ([ ]);
     banner = "\n" +
-	     "Welcome to the Cloud Server.\n" +
+	     "eOS-kernellib runtime platform.\n" +
 	     "\n" +
 	     "After login, the following commands are available:\n" +
-	     " - users                see who is logged on\n" +
-	     " - say, ', emote, :     communication\n" +
-	     " - quit                 leave the mud\n" +
+	     " - users                list connected operators\n" +
+	     " - say, ', emote, :     operator communication\n" +
+	     " - quit                 disconnect\n" +
 	     "\n" +
 	     "login: ";
 }
