@@ -2,6 +2,7 @@
 # include <kernel/rsrc.h>
 # include <kernel/access.h>
 # include <kernel/user.h>
+# include <kernel/capability.h>
 # include <status.h>
 # include <trace.h>
 # include <type.h>
@@ -365,8 +366,15 @@ private void _initialize(mapping tls)
     call_other(userd = _compile(USERD), "???");
     call_other(_compile(DEFAULT_ADMIN_CONSOLE), "???");
 
+    /*
+     * the capability store -- compiled here so it exists (and has seeded
+     * its bootstrap defaults in create()) before the System initd brings
+     * up domains whose gating surfaces consult it
+     */
+    _compile(CAPABILITYD);
+
     /* correct object count */
-    resource_daemon->rsrc_incr("System", "objects", 7);
+    resource_daemon->rsrc_incr("System", "objects", 8);
 
     /* initialize other users as resource owners */
     users = (access_daemon->query_users() - ({ "System" })) | ({ "admin" });
