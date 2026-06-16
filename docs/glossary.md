@@ -24,6 +24,10 @@ The kfun that triggers an `_F_touch` upgrade dispatch on an object whose master 
 
 One of the five layered access levels (A, B, C, D, E) that bound what loaded code can call. Tier A is the host driver and extensions; tier B is the kernel layer; tier C is system daemons; tier D is privileged user domains; tier E is application code. The `previous_program()` call-chain mechanism is the runtime enforcement point. Load-bearing in [architecture.md](architecture.md) Capability tiers and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
 
+## capability library
+
+The kernel layer's consolidated authority mechanism: a store daemon (`/kernel/sys/capabilityd`) holding namespaced approved-sets, plus an inheritable check face (`/kernel/lib/capability`), behind which six gating surfaces share one `is_allowed` / `require_member` choke-point. The platform's capability model is tier and owner-identity mediation — capability-*shaped* (privileged operations reachable only through mediating `/kernel/` objects) but enforced by **ambient authority** (the caller's tier, owning domain, and `previous_program()` chain), not strict no-ambient-authority object-capability, which LPC cannot reach without host-driver changes. The term "capability" across the doc set carries this meaning unless explicitly qualified. Load-bearing in [capability.md](capability.md) and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
+
 ## clone
 
 An instance of a compiled program created via `clone_object(master)`. The clone shares the master's program but has its own dataspace (its own copy of the variables). Clones live under `/obj/` by convention and carry the same owner as the master. Load-bearing in [code-lifecycle.md](code-lifecycle.md) Clone.
@@ -82,7 +86,7 @@ The architectural property that an object's lifetime is decoupled from the lifet
 
 ## principal
 
-The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it); the `previous_program()` chain is how a callee determines the caller's principal. Load-bearing in [architecture.md](architecture.md) Capability tiers.
+The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it); the `previous_program()` chain is how a callee determines the caller's principal. In the capability library a principal is the opaque string key a grant is recorded under — a domain, a caller-program path, or an object name — supplied by the gating surface, never inferred by the store. Load-bearing in [architecture.md](architecture.md) Capability tiers and [capability.md](capability.md).
 
 ## restore_object
 
