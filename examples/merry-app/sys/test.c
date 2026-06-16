@@ -436,6 +436,48 @@ static void run_tests()
 
     log_line("MerryApp:test: TARGET REJECT OK");
 
+    /* phase 5d: observer-property dispatch gate. A direct write of a
+     * merry:on:* property through the property API -- set_property AND
+     * batched_set -- is gated by the same registrar capability as
+     * register_observer, which a direct write would otherwise bypass. A
+     * same-domain writer passes on both paths; the batched path must
+     * attribute the write to the caller (this driver), not the daemon,
+     * or a same-domain merry:on:* batch write is wrongly refused. The
+     * cross-domain refusal is the shared _check_registrar gate proven by
+     * REGISTRAR REJECT above. */
+
+    catch {
+	child->set_property("merry:on:test:gate:direct:main", "gate-direct");
+	if (child->query_raw_property("merry:on:test:gate:direct:main")
+	    != "gate-direct") {
+	    log_line("MerryApp:test: FAIL: same-domain merry:on:* "
+		     + "set_property did not land");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: same-domain merry:on:* set_property "
+		 + "threw");
+	return;
+    }
+
+    catch {
+	MERRY_DAEMON->batched_set(child, ([
+	    "merry:on:test:gate:batched:main": "gate-batched",
+	]));
+	if (child->query_raw_property("merry:on:test:gate:batched:main")
+	    != "gate-batched") {
+	    log_line("MerryApp:test: FAIL: same-domain merry:on:* "
+		     + "batched_set did not land");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: same-domain merry:on:* batched_set "
+		 + "threw");
+	return;
+    }
+
+    log_line("MerryApp:test: DISPATCH GATE OK");
+
     /* phase 6: batched_set (non-atomic) -- writes a
      * multi-key mapping under one batch-id with sequential seq starting
      * at 0 (the implicit-batch semantics). Verifies the public LFUN compiles and that both

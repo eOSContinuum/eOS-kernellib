@@ -491,7 +491,7 @@ mixed _run_callable(object obj, string func, mixed *args) {
 }
 
 private
-void _run_kv_writes(object obj, mapping kv_map) {
+void _run_kv_writes(object obj, mapping kv_map, string origin) {
    string *keys;
    int i, n;
 
@@ -499,13 +499,18 @@ void _run_kv_writes(object obj, mapping kv_map) {
    n = sizeof(keys);
    for (i = 0; i < n; i ++) {
       /*
-       * set_property routes through dispatch_set, which owns
-       * seq-advance and observer firing around the actual write. The
-       * earlier explicit _current_batch_seq_advance call was removed
-       * so seq advances exactly once per dispatched write whether
-       * the path is batched or unbatched.
+       * Route directly to dispatch_set rather than obj->set_property so
+       * the batched_set caller's program -- threaded in as origin --
+       * reaches the observer-property gate. set_property would re-capture
+       * previous_program() as this daemon and misattribute a merry:on:*
+       * write to Merry. dispatch_set owns seq-advance and observer firing
+       * around the write exactly as the set_property path does (and
+       * set_property only lower_cases the key, replicated here), so seq
+       * advances exactly once per dispatched write whether the path is
+       * batched or unbatched.
        */
-      ::call_other(obj, "set_property", keys[i], kv_map[keys[i]]);
+      ::call_other(this_object(), "dispatch_set",
+                   obj, lower_case(keys[i]), kv_map[keys[i]], origin);
    }
 }
 
@@ -519,8 +524,9 @@ mixed _atomic_run_callable(object obj, string func, mixed *args, int batch_id) {
 }
 
 private atomic
-void _atomic_run_kv_writes(object obj, mapping kv_map, int batch_id) {
-   _run_kv_writes(obj, kv_map);
+void _atomic_run_kv_writes(object obj, mapping kv_map, int batch_id,
+                          string origin) {
+   _run_kv_writes(obj, kv_map, origin);
    _record_batch_status(batch_id, "completed", nil);
 }
 
@@ -588,6 +594,16 @@ mixed batch(object obj, string func, mixed *args, varargs mapping opts) {
 mixed batched_set(object obj, mapping kv_map, varargs mapping opts) {
    int batch_id, atomic_mode;
    mixed err;
+   string origin;
+
+   /*
+    * Capture the caller here, at the public entry, where previous_program()
+    * is the originating writer. The per-key writes below run from this
+    * daemon, so without this capture an observer-property (merry:on:*)
+    * write in the batch would be attributed to Merry rather than the
+    * caller. Threaded through to dispatch_set's registrar gate.
+    */
+   origin = previous_program();
 
    if (!obj) {
       error("batched_set: nil object");
@@ -600,9 +616,9 @@ mixed batched_set(object obj, mapping kv_map, varargs mapping opts) {
    batch_id = _push_batch_context(atomic_mode, opts);
 
    if (atomic_mode) {
-      err = catch(_atomic_run_kv_writes(obj, kv_map, batch_id));
+      err = catch(_atomic_run_kv_writes(obj, kv_map, batch_id, origin));
    } else {
-      err = catch(_run_kv_writes(obj, kv_map));
+      err = catch(_run_kv_writes(obj, kv_map, origin));
    }
 
    if (err) {
@@ -939,18 +955,24 @@ mixed dispatch_set(object obj, string path, mixed val,
    }
 
    /*
-    * A direct set_property of an observer-registration property
-    * (merry:on:* / merry:on-inherit:*) reaches the write here without
-    * passing register_observer's _check_registrar gate. Apply the same
-    * registrar capability on the dispatch path so it cannot be used to
-    * install observers the writer is not authorized to register. KERNEL
-    * callers and same-domain writers pass exactly as in register_observer;
-    * the writer's program is threaded in from set_property.
+    * A direct write of an observer-registration property (merry:on:* /
+    * merry:on-inherit:*) reaches the write here without passing
+    * register_observer's _check_registrar gate. Apply the same registrar
+    * capability on the dispatch path so it cannot be used to install
+    * observers the writer is not authorized to register. KERNEL callers
+    * and same-domain writers pass exactly as in register_observer.
+    *
+    * The writer's program is threaded in as caller_program -- from
+    * set_property for the direct path, and from batched_set (via
+    * _run_kv_writes) for the batched path, since both would otherwise
+    * re-capture previous_program() as this daemon. For a direct
+    * MERRY->dispatch_set call that omits it, fall back to the immediate
+    * caller: fail closed, never skip the gate.
     */
-   if (caller_program &&
-       (sscanf(path, "merry:on:%*s") != 0 ||
-        sscanf(path, "merry:on-inherit:%*s") != 0)) {
-      _check_registrar(caller_program, ::object_name(obj));
+   if (sscanf(path, "merry:on:%*s") != 0 ||
+       sscanf(path, "merry:on-inherit:%*s") != 0) {
+      _check_registrar(caller_program ? caller_program : previous_program(),
+                       ::object_name(obj));
    }
 
    obj->set_raw_property(path, val);
