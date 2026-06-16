@@ -356,8 +356,8 @@ void cmd_query_approved_registrars(object user, string cmd, string str) {
 /*
  * approve-registrar <domain>
  *
- * Routes through registry helper (underlying add_approved_registrar is
- * KERNEL-gated).
+ * Routes through the registry helper, which grants the "merry.registrar"
+ * capability against capabilityd (KERNEL-gated).
  */
 void cmd_approve_registrar(object user, string cmd, string str) {
    string *parts;
@@ -379,8 +379,8 @@ void cmd_approve_registrar(object user, string cmd, string str) {
 /*
  * unapprove-registrar <domain>
  *
- * Routes through registry helper (underlying remove_approved_registrar
- * is KERNEL-gated).
+ * Routes through the registry helper, which revokes the "merry.registrar"
+ * capability against capabilityd (KERNEL-gated).
  */
 void cmd_unapprove_registrar(object user, string cmd, string str) {
    string *parts;

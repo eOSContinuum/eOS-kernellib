@@ -15,6 +15,7 @@
 # include <status.h>
 # include <type.h>
 # include <kernel/kernel.h>
+# include <kernel/capability.h>
 # include <Merry.h>
 
 private inherit "/lib/util/ascii";
@@ -36,20 +37,20 @@ mapping script_spaces;
 int     cleanup_stamp;
 
 /*
- * Registrar capability-gate state. `approved_registrars` is the daemon-wide
- * allowlist of caller domains that may register observers / script-spaces
- * on objects outside their own domain; KERNEL programs always pass and
- * domain-match is the default allow path. Seeded with "System" +
- * "admin_console" at create(); extended via add_approved_registrar /
- * remove_approved_registrar (KERNEL-gated). Per-domain rather than
- * per-program — matches the cloud-server /usr/<domain>/ ownership model.
+ * Registrar capability gate. The allowlist of caller domains that may
+ * register observers / script-spaces on objects outside their own domain
+ * lives in capabilityd under the "merry.registrar" capability (seeded
+ * there with "System" + "admin_console"); _check_registrar consults it
+ * via CAPABILITYD->is_allowed. KERNEL programs always pass and the
+ * domain-match path are both still decided here. The set is per-domain
+ * rather than per-program -- it matches the cloud-server /usr/<domain>/
+ * ownership model.
  *
- * `observer_cache` caches resolved observer lists. Broad
- * invalidation (clear the whole cache on any registration write) is the
- * deliberate minimal strategy; descendant-chain tracking is deferred
- * as an implementation choice.
+ * `observer_cache` caches resolved observer lists. Broad invalidation
+ * (clear the whole cache on any registration write) is the deliberate
+ * minimal strategy; descendant-chain tracking is deferred as an
+ * implementation choice.
  */
-mapping approved_registrars;
 mapping observer_cache;
 
 /*
@@ -127,7 +128,6 @@ void create() {
    tick_usage = ([ ]);
 
    script_spaces = ([ ]);
-   approved_registrars = ([ "System": 1, "admin_console": 1 ]);
    observer_cache = ([ ]);
 
    next_batch_id = 1;
@@ -161,8 +161,8 @@ void create() {
 /*
  * _check_registrar: the registrar capability gate. Called by register_script_space,
  * unregister_script_space, and register_observer. Throws unless caller is
- * /kernel/* (KERNEL programs always trusted), OR caller's domain is in
- * approved_registrars, OR caller's domain matches target_name's domain.
+ * /kernel/* (KERNEL programs always trusted), OR caller's domain holds the
+ * merry.registrar capability, OR caller's domain matches target_name's domain.
  * The domain-match path lets each daemon register on its own objects
  * without needing to be in the approved set.
  *
@@ -184,7 +184,7 @@ void _check_registrar(string caller_program, string target_name) {
    if (sscanf(caller_program, "/usr/%s/", caller_domain) == 0) {
       error("MERRY: unrecognized caller program " + caller_program);
    }
-   if (approved_registrars[caller_domain]) {
+   if (CAPABILITYD->is_allowed("merry.registrar", caller_domain)) {
       return;
    }
    if (target_name && sscanf(target_name, "/usr/%s/", target_domain) != 0 &&
@@ -311,27 +311,17 @@ void unregister_observer(object ob, string path, string timing) {
 }
 
 /*
- * Capability-set extension trio per the capability-gate design. add and
- * remove are KERNEL-gated; query is public read-only. Pattern mirrors
- * /kernel/sys/access_daemon.c set_global_access -- daemon-local mapping,
- * statedump-persistent, gated at the entry point.
+ * query_approved_registrars: public read-only enumeration of the merry
+ * registrar set, forwarded from capabilityd where the set now lives.
+ *
+ * Mutation is performed by the kernel mediator (admin_console_registry)
+ * directly against capabilityd: granting/revoking a capability requires
+ * the KERNEL elevation that the store's grant/revoke enforce, which a
+ * /usr/Merry daemon does not hold, so the former add_approved_registrar /
+ * remove_approved_registrar mutators move out of this daemon entirely.
  */
-void add_approved_registrar(string domain) {
-   if (!KERNEL()) {
-      error("add_approved_registrar: not callable from outside /kernel");
-   }
-   approved_registrars[domain] = 1;
-}
-
-void remove_approved_registrar(string domain) {
-   if (!KERNEL()) {
-      error("remove_approved_registrar: not callable from outside /kernel");
-   }
-   approved_registrars[domain] = nil;
-}
-
 string *query_approved_registrars() {
-   return map_indices(approved_registrars);
+   return CAPABILITYD->query_principals("merry.registrar");
 }
 
 /*
@@ -838,7 +828,8 @@ void _fire_timing_slot(object obj, string path, string timing,
  * can mutate further state via Set/BatchedSet; those recursive writes
  * re-enter dispatch_set bounded by cascade + cycle checks.
  */
-mixed dispatch_set(object obj, string path, mixed val) {
+mixed dispatch_set(object obj, string path, mixed val,
+                   varargs string caller_program) {
    int implicit_batch_id;
    mapping ctx;
    string cycle_key;
@@ -945,6 +936,21 @@ mixed dispatch_set(object obj, string path, mixed val) {
          _exit_implicit_batch(implicit_batch_id, "pre-vetoed", err);
       }
       error(err);
+   }
+
+   /*
+    * A direct set_property of an observer-registration property
+    * (merry:on:* / merry:on-inherit:*) reaches the write here without
+    * passing register_observer's _check_registrar gate. Apply the same
+    * registrar capability on the dispatch path so it cannot be used to
+    * install observers the writer is not authorized to register. KERNEL
+    * callers and same-domain writers pass exactly as in register_observer;
+    * the writer's program is threaded in from set_property.
+    */
+   if (caller_program &&
+       (sscanf(path, "merry:on:%*s") != 0 ||
+        sscanf(path, "merry:on-inherit:%*s") != 0)) {
+      _check_registrar(caller_program, ::object_name(obj));
    }
 
    obj->set_raw_property(path, val);

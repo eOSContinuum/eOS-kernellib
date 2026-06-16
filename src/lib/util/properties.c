@@ -88,17 +88,21 @@ void set_raw_property(string prop, mixed val)
  * daemon is loaded so observers fire pre/main/post around the write;
  * falls back to direct write before MERRY is compiled (early bootstrap)
  * and inside MERRY's own dispatcher (which calls set_raw_property to
- * avoid re-entry).
+ * avoid re-entry). The writer's program is captured here and threaded to
+ * dispatch_set so the dispatcher can apply the registrar capability to
+ * direct writes of observer-registration (merry:on:*) properties.
  */
 nomask
 mixed set_property(string prop, mixed val, varargs mixed extra...)
 {
     object merry;
+    string caller;
 
+    caller = previous_program();
     prop = lower_case(prop);
     merry = find_object(MERRY_DAEMON);
     if (merry) {
-	return merry->dispatch_set(this_object(), prop, val);
+	return merry->dispatch_set(this_object(), prop, val, caller);
     }
     return set_downcased_property(prop, val, extra...);
 }

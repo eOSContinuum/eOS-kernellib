@@ -1,9 +1,11 @@
 # include <kernel/kernel.h>
 # include <kernel/user.h>
+# include <kernel/capability.h>
 # include <status.h>
 # include "/usr/HTTP/api/include/HttpConnection.h"
 
 inherit "/usr/System/lib/auto";
+inherit "/kernel/lib/capability";
 
 # define APP_SERVER	"/usr/WWW/obj/server"
 
@@ -34,9 +36,21 @@ static void create()
  */
 object select(string str)
 {
-    object obj;
+    object obj, po;
 
-    if (previous_object() == userd && status(APP_SERVER, O_INDEX) != nil) {
+    /*
+     * The accept gate, routed through the capability choke-point: only
+     * the binary-port manager (userd) may have a connection accepted.
+     * is_allowed is the silent boolean path -- an unauthorized caller
+     * gets a dropped connection (nil), not an error: erroring on every
+     * unauthorized accept (probes included) would buy nothing. The
+     * principal is the manager's object name; the prior
+     * previous_object() == userd identity check is the same test
+     * expressed against the store.
+     */
+    po = previous_object();
+    if (po && is_allowed("http.binary_manager", object_name(po)) &&
+	status(APP_SERVER, O_INDEX) != nil) {
 	catch (obj = clone_object(APP_SERVER));
 	return obj;
     }

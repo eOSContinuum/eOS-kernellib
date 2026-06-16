@@ -26,8 +26,10 @@
  */
 
 # include <kernel/kernel.h>
+# include <kernel/capability.h>
 
 inherit "/usr/System/lib/auto";
+inherit "/kernel/lib/capability";
 
 static void create()
 {
@@ -41,6 +43,14 @@ void trigger_dump_and_exit()
 
 static void _do_dump_and_exit()
 {
+    /*
+     * dump_state/shutdown are gated to System-creator objects in
+     * /kernel/lib/auto (which holds the private `creator`). Surface that
+     * fixed-principal check here in the uniform capability posture,
+     * adjacent to the privileged calls, via the accessible owner; auto
+     * remains the foundational backstop.
+     */
+    require(query_owner() == "System", "Permission denied");
     dump_state(FALSE);
     shutdown();
 }
