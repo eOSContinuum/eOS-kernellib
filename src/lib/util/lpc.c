@@ -8,10 +8,10 @@
  *
  * member:    array contains predicate.
  *
- * sysLog, info, debugLog: logging stubs. Pending a kernel-layer log
- *            facility these are no-ops with TODO markers; replace with
- *            concrete wiring (e.g., DRIVER message() or a kernel logger
- *            daemon) when one exists.
+ * sysLog, info, debugLog: logging forwarders. Each forwards to the logd
+ *            daemon (/usr/System/sys/logd) at a fixed severity
+ *            (sysLog=NOTICE, info=INFO, debugLog=DEBUG); logd owns the
+ *            threshold and the sink (see the forwarders below).
  */
 
 # include <type.h>

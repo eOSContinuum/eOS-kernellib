@@ -5,8 +5,8 @@
  * Inheritable by callers that need to parse XML inline (the Marshal /
  * stateimpex marshaling path is one such caller).
  *
- * Diagnostic macros are no-ops in the current logging story; wire to
- * a concrete log facility when one exists. The `{ ... | ... }` legacy
+ * Diagnostic macros are no-ops; the logd facility now exists but these
+ * are not yet wired to it. The `{ ... | ... }` legacy
  * sugar syntax raises LexErr at this transport layer.
  */
 
@@ -15,7 +15,7 @@
 
 # define SID		"/usr/Schema/sys/schema_daemon"
 
-/* logging stubs: no-op pending a kernel-layer log facility */
+/* DEBUG/Debug/XDebug: no-op macros; not yet wired to the logd facility */
 # define DEBUG(_str)
 # define Debug(_str)
 # define XDebug(_str)

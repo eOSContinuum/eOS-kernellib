@@ -81,7 +81,7 @@ The `src/lib/util/` subdirectory holds small utility libraries that wrap kfun-le
 | `src/lib/util/delayed.c` | `call_out` | The `$delay()` continuation glue every Merry-script-bearing object inherits (`delayed_call` / `perform_delayed_call`) |
 | `src/lib/util/file.c` | file kfuns | Path helpers (`paveWay`, `copyFile`, `writeDataToFile`) |
 | `src/lib/util/fileparse.c` | `parse_string` | File-backed parser-runner; grammar loaded from a file (subclass of `parse.c`) |
-| `src/lib/util/lpc.c` | misc | `dumpValue` stringification, `name()` logical-name fallback, `member`, XML-wrapper colour dispatch, logging stubs |
+| `src/lib/util/lpc.c` | misc | `dumpValue` stringification, `name()` logical-name fallback, `member`, XML-wrapper colour dispatch, `sysLog` / `info` / `debugLog` forwarders to `logd` |
 | `src/lib/util/parse.c` | `parse_string` | Parser-runner over a yacc-shape grammar compiled to a scratch object |
 | `src/lib/util/asn.c` | host kfuns `asn_*` | Big-integer (arbitrary-precision) arithmetic |
 | `src/lib/util/base64.c` | character encoding | Base64 encode and decode |
