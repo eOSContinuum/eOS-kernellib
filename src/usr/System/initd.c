@@ -76,6 +76,7 @@ static void create()
 
     /* server objects */
     load("sys/errord");
+    load("sys/logd");
     load("sys/upgraded");
     load("sys/userd");
     load("sys/persist_helper");

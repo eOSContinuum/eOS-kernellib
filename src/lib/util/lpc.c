@@ -16,6 +16,7 @@
 
 # include <type.h>
 # include <XML.h>
+# include <log.h>
 
 
 /*
@@ -212,23 +213,36 @@ static mapping reverseMapping(mapping m)
 }
 
 /*
- * logging stubs (no-op pending a kernel-layer log facility)
- *
- * Concrete wiring (DRIVER message(), a kernel logger daemon, etc.)
- * lands when a log story exists for the kernel layer.
+ * logging forwarders. sysLog / info / debugLog forward to the logd daemon
+ * (/usr/System/sys/logd) at fixed severity levels; logd applies the
+ * threshold and owns the sink. The find_object guard drops the message if
+ * logd is absent (the boot edge before System init loads it, or a recompile
+ * window) so a log call never breaks the caller.
  */
 
 static void info(string msg)
 {
-    /* TODO: wire to log facility */
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	logd->log(LOG_INFO, msg);
+    }
 }
 
 static void sysLog(string msg)
 {
-    /* TODO: wire to log facility */
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	logd->log(LOG_NOTICE, msg);
+    }
 }
 
 static void debugLog(string msg)
 {
-    /* TODO: wire to log facility */
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	logd->log(LOG_DEBUG, msg);
+    }
 }
