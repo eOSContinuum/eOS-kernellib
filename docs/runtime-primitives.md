@@ -44,10 +44,11 @@ Code runs under a capability tier that bounds what it can call.
 - Host-runtime per-object owner identity and tier-aware kfun access checks.
 - The kernel auto (`/kernel/lib/auto.c`) and System auto (`/usr/System/lib/auto.c`) compose the access-control surface every user-tier object inherits.
 - The tier model (Appendix) packages the boundary: B and C carry privileged kfun authority; D and E operate under bounds, gaining cross-domain visibility only through System's `set_global_access` mechanism.
+- The capability library (`/kernel/sys/capabilityd` plus the inheritable `/kernel/lib/capability`) consolidates the kernel layer's discretionary authority checks behind one membership store and one check API: six gating surfaces — dispatcher registrar approval, script-space registration, observer-property (`merry:on:*`) writes, the persistence dump-and-exit gate, the HTTP acceptor binding, and console verb elevation — route through a single `is_allowed` / `require_member` choke-point. The model is tier and owner-identity mediation: capability-shaped but enforced by ambient authority, not strict no-ambient-authority object-capability. `docs/capability.md` is the full statement, including the limitations and the path toward stricter mediation.
 
-**Demonstration**: HTTP/1 application server at the kernel-defined mount point `/usr/WWW/obj/server` (tier D) inherits `/usr/System/lib/user` (tier C) and `Http1Server` (tier D) — the pattern the reference application at `examples/http-app/` implements. The inheritance traverses System's global-access grant; the application receives binary-port connections only through System's `set_binary_manager` registration. The application cannot invoke that registration directly — the privilege check refuses callers outside the System tier, independent of application logic.
+**Demonstration**: HTTP/1 application server at the kernel-defined mount point `/usr/WWW/obj/server` (tier D) inherits `/usr/System/lib/user` (tier C) and `Http1Server` (tier D) — the pattern the reference application at `examples/http-app/` implements. The inheritance traverses System's global-access grant; the application receives binary-port connections only through System's `set_binary_manager` registration. The application cannot invoke that registration directly — the privilege check refuses callers outside the System tier, independent of application logic. The capability library's registrar gate is exercised by `examples/merry-app` (the REGISTRAR REJECT phase refuses a cross-domain registration; the DISPATCH GATE phase proves a direct `merry:on:*` write is gated identically across the `set_property` and `batched_set` paths).
 
-**Status**: Partial. Tier model + ownership + inheritance work; per-request authorization within an application's surface (e.g., HTTP-route-level principal challenge) is absent.
+**Status**: Partial. Tier model, ownership, inheritance, and the consolidated capability library (six surfaces, including the `merry:on:*` property-write gate) work; per-request authorization within an application's surface (e.g., HTTP-route-level principal challenge) is absent.
 
 **Extensions**:
 - HTTP authentication and authorization sys objects at `/usr/HTTP/sys/authenticate.c` and `/usr/HTTP/sys/authorize.c`. RFC-aligned challenge / authorization primitives; compiled at boot and consumed by the HTTP API library's header-field parsing (`RemoteFields` / `RemoteAuthentication`); no application exercises a challenge flow.
@@ -57,7 +58,7 @@ Code runs under a capability tier that bounds what it can call.
 
 **Open**:
 - Per-route HTTP authorization wiring (consume `authenticate`/`authorize` from an HTTP application).
-- Capability-checked properties — when the property-graph layer (see §5) lands, property-write authorization layers with the existing tier model.
+- Stricter object-capability at the untrusted boundary — held-reference, attenuable, revocable authority for the Merry sandbox and observer surfaces, in place of ambient tier identity. Pure LPC reaches only a partial, bypassable form; a faithful version needs host-driver primitives the platform does not expose today. The capability library's `principal` argument is the seam it would attach to. See `docs/capability.md` (Toward stricter object-capability).
 
 ---
 

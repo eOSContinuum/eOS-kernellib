@@ -3,41 +3,37 @@
  * /kernel/obj/admin_console::process() in the switch-default branch
  * when an incoming verb is not in the hardcoded built-in set.
  *
- * A selective extension surface. The registry holds two
- * pieces of state:
+ * A selective extension surface. The registry holds the dispatch_table
+ * (verb -> ([ "path": <ext_obj_path>, "method": <method_name> ])),
+ * consulted by admin_console::process() at unknown-verb time. The
+ * kernel-tier-to-/usr/-tier reference (the stored ext_obj_path) is the
+ * architectural statement that the named /usr/-tier domain is fundamental
+ * to eos-kernellib's operator surface.
  *
- *   1. dispatch_table -- verb -> ([ "path": <ext_obj_path>,
- *                                   "method": <method_name> ])
- *      Consulted by admin_console::process() at unknown-verb time.
- *      The kernel-tier-to-/usr/-tier reference (the stored ext_obj_path)
- *      is the architectural statement that the named /usr/-tier domain
- *      is fundamental to eos-kernellib's operator surface.
+ * The caller whitelist that once lived here (allowed_callers) is now the
+ * "admin_console.caller" capability in capabilityd, seeded at create();
+ * _check_caller consults it through the inherited /kernel/lib/capability
+ * helpers. The generalized capability model this registry's comment used
+ * to anticipate has landed: the verb_* elevation helpers are the kernel
+ * mediator for two capabilities -- they grant/revoke "merry.registrar"
+ * directly against capabilityd (approve-registrar, unapprove-registrar),
+ * and forward observer registration to MERRY's own _check_registrar gate
+ * (register-observer, unregister-observer), each under the
+ * admin_console.caller check.
  *
- *   2. allowed_callers -- caller-program -> 1
- *      Caller-program whitelist for the verb_* elevation helpers.
- *      Mutation verbs whose underlying MERRY API is KERNEL-gated
- *      (approve-registrar, unapprove-registrar) or capability-gated by
- *      caller-domain (register-observer, unregister-observer) call
- *      these helpers from /usr/Merry/lib/admin_console_ext; the helpers
- *      forward to the daemon with KERNEL elevation. This is a
- *      narrow-surface mini-capability-model; a future
- *      capability-model layer can generalize the pattern across all
- *      kernel-layer subsystems (dispatcher approved-registrars +
- *      script-space registration + persist_helper + http_server auth
- *      + admin_console verb registration).
- *
- * Registration is hardcoded at create(). Future domains (Vault,
- * Schema, HTTP operator surfaces) extend the dispatch_table +
- * allowed_callers entries here, or replace this object with dynamic
- * registration when a generalized capability model lands.
+ * Registration is hardcoded at create(). Future domains (Vault, Schema,
+ * HTTP operator surfaces) extend the dispatch_table here and seed their
+ * own capabilities in capabilityd.
  */
 
 # include <kernel/kernel.h>
 # include <kernel/user.h>
+# include <kernel/capability.h>
 # include <Merry.h>
 
+inherit "/kernel/lib/capability";
+
 private mapping dispatch_table;
-private mapping allowed_callers;
 
 static void create() {
    dispatch_table = ([
@@ -70,9 +66,14 @@ static void create() {
             "method": "cmd_unapprove_registrar" ]),
    ]);
 
-   allowed_callers = ([
-      LIB_MERRY_ADMIN_CONSOLE_EXT: 1,
-   ]);
+   /*
+    * Seed the admin_console.caller capability: the registered extension
+    * library is the sole authorized entrypoint into the verb_* elevation
+    * surface. This object is /kernel-tier so it grants directly. It is
+    * compiled lazily on first admin-console use -- the same flow that
+    * first consults _check_caller -- so the seed is in place in time.
+    */
+   CAPABILITYD->grant("admin_console.caller", LIB_MERRY_ADMIN_CONSOLE_EXT);
 }
 
 /*
@@ -103,10 +104,7 @@ string *query_verbs() {
  * external caller. Same pattern as merry.c::_check_registrar.
  */
 private void _check_caller(string caller_program) {
-   if (!allowed_callers[caller_program]) {
-      error("admin_console_registry: caller " + caller_program +
-            " not authorized");
-   }
+   require_member("admin_console.caller", caller_program);
 }
 
 /*
@@ -129,12 +127,12 @@ nomask void verb_unregister_observer(object ob, string path, string timing) {
 
 nomask void verb_approve_registrar(string domain) {
    _check_caller(previous_program());
-   MERRY->add_approved_registrar(domain);
+   CAPABILITYD->grant("merry.registrar", domain);
 }
 
 nomask void verb_unapprove_registrar(string domain) {
    _check_caller(previous_program());
-   MERRY->remove_approved_registrar(domain);
+   CAPABILITYD->revoke("merry.registrar", domain);
 }
 
 nomask void verb_set_max_cascade_depth(int n) {

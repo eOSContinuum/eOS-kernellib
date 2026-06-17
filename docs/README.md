@@ -19,6 +19,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [architecture.md](architecture.md) — capability tiers, daemons, boot sequence, auto-inheritance, System global-access, host-driver extensions. The structural reference for the platform.
 - [runtime-primitives.md](runtime-primitives.md) — the eight runtime primitives (atomicity, capability separation, persistent state, hot reload, sandboxed code load, asynchronous events, multi-agent coherence, state introspection), each with foundation, demonstration status, supporting extensions, and open work.
+- [capability.md](capability.md) — the capability library (`capabilityd` store + inheritable check face) behind the capability-separation primitive: the mechanism, the six gating surfaces, what "capability" means here (tier-mediation, not strict object-capability) and does not, the lifecycle, and the limitations.
 - [runtime-platform-roadmap.md](runtime-platform-roadmap.md) — the committed forward surfaces in dependency-ordered waves, each with an activation trigger; the transport posture; the application-tier boundary.
 - [persistence.md](persistence.md) — orthogonal persistence as architectural property; the statedump cycle; hot boot; per-variable persistence semantics; persistence boundaries.
 - [code-lifecycle.md](code-lifecycle.md) — compile, clone, destruct, hot reload, `call_touch`, and the object-manager event surface.
@@ -64,6 +65,7 @@ Common goals and the docs that serve them.
 - **Run the platform and see it work** — [getting-started.md](getting-started.md), then [first-hour.md](first-hour.md), then `../examples/http-app/README.md`.
 - **Arriving from a cloud-services stack** — [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
+- **Audit the platform's authority model** — [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
 - **React to property changes** -- [lpc-essentials.md](lpc-essentials.md), [signal-applications.md](signal-applications.md), `../examples/signal-app/`, then [dispatcher.md](dispatcher.md).
