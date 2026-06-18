@@ -81,6 +81,25 @@ ctime(time())[4..18] + " ** " + str
 
 `message` is called by the driver during initialization, snapshot restore, and on interrupt. It is callable by kernel-tier and System-tier code; the underlying `send_message` kfun routes the output to the connection that triggered the current call (typically the operator at admin_console). Application-tier code does not invoke `message` directly.
 
+The platform's general diagnostic facility is `logd`, a System-tier daemon at `/usr/System/sys/logd`. It owns a single persistent sink — `/usr/System/log/system.log` — the emission threshold, and the operator surface. The three diagnostic calls platform and application code already carry, `debugLog` / `info` / `sysLog` (defined in `/lib/util/lpc.c`), forward to `logd`, each mapped to a fixed severity:
+
+| Call | Level | Intended use |
+|---|---|---|
+| `debugLog(str)` | DEBUG | developer tracing |
+| `info(str)` | INFO | routine progress |
+| `sysLog(str)` | NOTICE | general system events |
+
+Levels are ordered ascending by severity (DEBUG < INFO < NOTICE < ERROR); ERROR is reserved for `errord`'s reports (see runtime errors below). `logd` drops any message below its threshold, and the threshold defaults to INFO — so `debugLog` output is suppressed until an operator lowers it. The forwarders reach the daemon by `call_other` rather than inheritance, so code in any tier can log without the `/kernel/lib` inheritance restriction that constrains the capability library (`docs/capability.md`); a `find_object` guard turns a log call into a no-op during the boot window before `logd` is loaded, rather than an error.
+
+`logd` never writes synchronously. DGD forbids `write_file` inside an `atomic` function, and the diagnostic calls fire from atomic contexts (Schema import, the property-change dispatcher). So each call buffers its line in memory and schedules a single coalesced `call_out(0)`; the flush appends the buffered batch to `system.log` in a fresh, non-atomic execution where the write is legal, and echoes NOTICE-and-above lines to the operator console (via `message`) for a live view. A line logged inside a committed atomic is written after the atomic commits; a line logged inside an atomic that rolls back is discarded with the buffer — its work did not happen, so its progress log is moot. The deferral also makes logging non-throwing, which is load-bearing: the driver notifies `errord` of even caught errors, so a synchronous in-atomic write failure would feed back through `errord` into logging and storm.
+
+Two admin_console verbs, registered through `admin_console_registry`, are the operator surface:
+
+- `log [N]` — tail the last N lines of `system.log` (default 40, bounded to the final 8 KB so a large unrotated log does not load wholesale). Read-only; rides the console's existing privilege.
+- `log-level [LEVEL]` — with no argument, report the current threshold; with `debug` / `info` / `notice` / `error`, set it. The set path mutates daemon state, so it is capability-gated: the verb routes through the registry's KERNEL-elevation helper, which checks the `admin_console.caller` capability via `capabilityd` (`docs/capability.md`) before applying the change. `logd` is the first System-tier consumer of the capability library.
+
+`logd` appends and never prunes; rotation and retention are ordinary log-management tooling's responsibility — the daemon builds in no rotation policy, the same posture the property-change dispatcher's audit log takes (below).
+
 For runtime errors, the driver dispatches through three hooks before falling back to a default formatter:
 
 | Hook | When | Routed to |
@@ -89,7 +108,7 @@ For runtime errors, the driver dispatches through three hooks before falling bac
 | `atomic_error(str, atom, trace)` | Uncaught error inside an `atomic` function | `errord->atomic_error()` |
 | `compile_error(file, line, str)` | LPC compilation failure | `errord->compile_error()` |
 
-`errord` is registered via `driver->set_error_manager()`. eOS-kernellib ships an errord at `src/usr/System/sys/errord.c` that formats the trace into a readable form and sends it via `send_message` to the relevant operator. If no errord is registered or its handler raises, the driver falls back to a built-in formatter that walks the trace and emits via the same default channel; errors never silently disappear.
+`errord` is registered via `driver->set_error_manager()`. eOS-kernellib ships an errord at `src/usr/System/sys/errord.c` that formats the trace into a readable form and sends it via `send_message` to the relevant operator. In addition to the console, `errord` drains each formatted report into `logd`'s sink at ERROR level (its `persist` path), so error diagnostics are durable rather than console-transient. This is how the platform's error reporting survives the atomic barrier: an `atomic_error` is dispatched only after its failed atomic has already rolled back, so the diagnostics would otherwise vanish with the rollback — the driver carries the trace across the barrier in thread-local storage, `errord` formats it post-rollback, and the `logd` tee persists it to `system.log`. If no errord is registered or its handler raises, the driver falls back to a built-in formatter that walks the trace and emits via the same default channel; errors never silently disappear.
 
 The property-change dispatcher writes a per-failure audit line to `/usr/Merry/log/dispatch.log` on observer-cycle detection, cascade-depth overflow, and observer-source compile failures. Volume is low under normal operation (writes only on detected failures); the log is rotated by ordinary log-management tooling — the dispatcher does not build in a rotation policy. See `docs/dispatcher.md` Audit log.
 

@@ -1,6 +1,7 @@
 # include <kernel/kernel.h>
 # include <trace.h>
 # include <type.h>
+# include <log.h>
 # include "tls.h"
 
 # define SYSTEMAUTO	"/usr/System/lib/auto"
@@ -65,6 +66,23 @@ private string pad_right(mixed str, int width)
 }
 
 /*
+ * NAME:	persist()
+ * DESCRIPTION:	drain a formatted error report into logd's persistent sink so
+ *		error reporting survives the atomic barrier durably. errord
+ *		has already echoed it to the console; this is file-only.
+ *		Catch-wrapped and presence-guarded so a log failure never
+ *		disturbs error reporting.
+ */
+private void persist(string str)
+{
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	catch(logd->log_report(str));
+    }
+}
+
+/*
  * NAME:	runtime_error()
  * DESCRIPTION:	report a runtime error
  */
@@ -122,6 +140,7 @@ void runtime_error(string error, int caught, mixed **trace)
 	}
 
 	driver->message(str);
+	persist(str);
 	if (caught == 0 && (user=this_user())) {
 	    user->message(str);
 	}
@@ -180,6 +199,7 @@ void atomic_error(string error, int atom, mixed **trace)
 	}
 
 	driver->message(str);
+	persist(str);
     }
 }
 
@@ -199,6 +219,7 @@ void compile_error(string file, int line, string error)
 	}
 	str += "\n";
 	driver->message(str);
+	persist(str);
 	user = this_user();
 	if (user) {
 	    user->message(str);

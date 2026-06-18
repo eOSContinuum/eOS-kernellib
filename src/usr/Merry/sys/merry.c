@@ -107,11 +107,11 @@ int max_cascade_depth;
 int dispatch_trace;
 
 /*
- * Dispatcher log path. The logging design calls for sysLog growth so the cycle
- * chain is recoverable post-mortem; rather than wire the global
- * sysLog stub (a cross-cutting concern), the dispatcher keeps a Merry-
- * local file logger used only by the dispatcher for cycle and cascade
- * events. A future logging facility can grow sysLog wholesale.
+ * Dispatcher log path. The dispatcher keeps a Merry-local file logger used
+ * only for cycle and cascade events -- a domain-local failure-audit trail
+ * kept deliberately separate from the general logd diagnostic stream that
+ * sysLog now forwards to, because a cohesive audit reads better local than
+ * mixed into the platform-wide log.
  */
 # define MERRY_LOG_DIR	"/usr/Merry/log"
 # define MERRY_LOG_FILE	"/usr/Merry/log/dispatch.log"

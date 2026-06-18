@@ -8,14 +8,15 @@
  *
  * member:    array contains predicate.
  *
- * sysLog, info, debugLog: logging stubs. Pending a kernel-layer log
- *            facility these are no-ops with TODO markers; replace with
- *            concrete wiring (e.g., DRIVER message() or a kernel logger
- *            daemon) when one exists.
+ * sysLog, info, debugLog: logging forwarders. Each forwards to the logd
+ *            daemon (/usr/System/sys/logd) at a fixed severity
+ *            (sysLog=NOTICE, info=INFO, debugLog=DEBUG); logd owns the
+ *            threshold and the sink (see the forwarders below).
  */
 
 # include <type.h>
 # include <XML.h>
+# include <log.h>
 
 
 /*
@@ -212,23 +213,36 @@ static mapping reverseMapping(mapping m)
 }
 
 /*
- * logging stubs (no-op pending a kernel-layer log facility)
- *
- * Concrete wiring (DRIVER message(), a kernel logger daemon, etc.)
- * lands when a log story exists for the kernel layer.
+ * logging forwarders. sysLog / info / debugLog forward to the logd daemon
+ * (/usr/System/sys/logd) at fixed severity levels; logd applies the
+ * threshold and owns the sink. The find_object guard drops the message if
+ * logd is absent (the boot edge before System init loads it, or a recompile
+ * window) so a log call never breaks the caller.
  */
 
 static void info(string msg)
 {
-    /* TODO: wire to log facility */
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	logd->log(LOG_INFO, msg);
+    }
 }
 
 static void sysLog(string msg)
 {
-    /* TODO: wire to log facility */
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	logd->log(LOG_NOTICE, msg);
+    }
 }
 
 static void debugLog(string msg)
 {
-    /* TODO: wire to log facility */
+    object logd;
+
+    if ((logd=find_object(LOGD))) {
+	logd->log(LOG_DEBUG, msg);
+    }
 }

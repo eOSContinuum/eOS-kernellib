@@ -30,6 +30,7 @@
 # include <kernel/user.h>
 # include <kernel/capability.h>
 # include <Merry.h>
+# include <log.h>
 
 inherit "/kernel/lib/capability";
 
@@ -64,6 +65,12 @@ static void create() {
       "unapprove-registrar":
          ([ "path": OBJ_MERRY_ADMIN_CONSOLE_EXT,
             "method": "cmd_unapprove_registrar" ]),
+      "log":
+         ([ "path": LOGD,
+            "method": "cmd_log" ]),
+      "log-level":
+         ([ "path": LOGD,
+            "method": "cmd_log_level" ]),
    ]);
 
    /*
@@ -74,6 +81,13 @@ static void create() {
     * first consults _check_caller -- so the seed is in place in time.
     */
    CAPABILITYD->grant("admin_console.caller", LIB_MERRY_ADMIN_CONSOLE_EXT);
+
+   /*
+    * logd hosts its own operator verbs (cmd_log / cmd_log_level), so its
+    * program path is the caller of verb_set_log_threshold below and must
+    * hold admin_console.caller too.
+    */
+   CAPABILITYD->grant("admin_console.caller", LOGD);
 }
 
 /*
@@ -143,4 +157,9 @@ nomask void verb_set_max_cascade_depth(int n) {
 nomask void verb_set_dispatch_trace(int flag) {
    _check_caller(previous_program());
    MERRY->set_dispatch_trace(flag);
+}
+
+nomask void verb_set_log_threshold(int level) {
+   _check_caller(previous_program());
+   LOGD->set_threshold(level);
 }

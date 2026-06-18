@@ -66,7 +66,7 @@ What this layer deliberately does not provide:
 
 - **Sugar-tag interpretation** — see above.
 - **Typed-literal forms in `XML_BOOL`** — the serialization is a simple `true` / `false`.
-- **Logging** — the `DEBUG` / `Debug` / `XDebug` diagnostic macros are no-ops; the `dump_value` references in their args are dead code. When a kernel-layer log facility lands, these wire to it.
+- **Logging** — the `DEBUG` / `Debug` / `XDebug` diagnostic macros are no-ops; the `dump_value` references in their args are dead code. The logging facility (`logd`, `docs/operations.md`) has since landed; wiring these macros to it is unstarted.
 
 The `SID` and `DTD` daemon constants are inline-defined (`SID = /usr/Schema/sys/schema_daemon`, `DTD = /usr/Schema/sys/dtd_daemon`).
 
@@ -90,7 +90,7 @@ Public type constants: `XML_ELEMENT`, `COL_ELEMENT`, `XML_SAMREF`, `COL_SAMREF`,
 
 ### `src/usr/XML/include/XMLIn.h` (302 lines)
 
-Lexer state variables and macros for `lib/xmlparse.c`. `DEBUG(...)` macro calls expand to no-ops in the current logging story; the `dump_value` references inside those calls are dead code (never compiled). When a real kernel-layer log facility lands, `DEBUG` and `dump_value` wire here.
+Lexer state variables and macros for `lib/xmlparse.c`. `DEBUG(...)` macro calls expand to no-ops in the current logging story; the `dump_value` references inside those calls are dead code (never compiled). The logging facility (`logd`, `docs/operations.md`) has since landed; wiring `DEBUG` and `dump_value` to it is unstarted.
 
 ### `src/usr/XML/include/XMLOut.h` (88 lines)
 
