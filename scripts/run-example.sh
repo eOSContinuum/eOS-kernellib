@@ -43,25 +43,26 @@ cd "$REPO_ROOT"
 # example_profile <example> -> "deploy boots boot1 ok", or "" if unknown
 example_profile() {
     case "$1" in
-        chat-app)        echo "Chat 3 selfexit 20" ;;
-        hot-reload-demo) echo "WWW 1 timed 2" ;;
-        merry-app)       echo "MerryApp 2 selfexit 23" ;;
-        signal-app)      echo "SignalApp 1 timed 1" ;;
-        vault-app)       echo "MyApp 1 timed 6" ;;
-        *)               echo "" ;;
+        chat-app)          echo "Chat 3 selfexit 20" ;;
+        hot-reload-demo)   echo "WWW 1 timed 2" ;;
+        hot-reload-master) echo "Reload 1 timed 3" ;;
+        merry-app)         echo "MerryApp 2 selfexit 23" ;;
+        signal-app)        echo "SignalApp 1 timed 1" ;;
+        vault-app)         echo "MyApp 1 timed 6" ;;
+        *)                 echo "" ;;
     esac
 }
 
 EXAMPLE="${1:-}"
 if [ -z "$EXAMPLE" ]; then
     echo "usage: scripts/run-example.sh <example>" >&2
-    echo "known examples: chat-app hot-reload-demo merry-app signal-app vault-app" >&2
+    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app vault-app" >&2
     exit 2
 fi
 PROFILE=$(example_profile "$EXAMPLE")
 if [ -z "$PROFILE" ]; then
     echo "run-example.sh: no profile for '$EXAMPLE'; add one to example_profile()" >&2
-    echo "known examples: chat-app hot-reload-demo merry-app signal-app vault-app" >&2
+    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app vault-app" >&2
     echo "(atomic-demo and http-app verify via live HTTP probes; see their READMEs)" >&2
     exit 2
 fi
@@ -100,7 +101,7 @@ echo "== clean slate =="
 # shutdown() when its driver finishes) it tears the driver down before this
 # example's driver completes, truncating the result. Isolation requires a
 # single deployed example per boot.
-for mount in Chat MerryApp MyApp SignalApp WWW; do
+for mount in Chat MerryApp MyApp Reload SignalApp WWW; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap "$LOG_PREFIX"1.log "$LOG_PREFIX"2.log "$LOG_PREFIX"3.log
