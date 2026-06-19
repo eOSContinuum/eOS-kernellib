@@ -43,7 +43,7 @@ cd "$REPO_ROOT"
 example_profile() {
     case "$1" in
         chat-app)   echo "Chat 3 selfexit 20" ;;
-        merry-app)  echo "MerryApp 2 selfexit 22" ;;
+        merry-app)  echo "MerryApp 2 selfexit 23" ;;
         signal-app) echo "SignalApp 1 timed 1" ;;
         vault-app)  echo "MyApp 1 timed 6" ;;
         *)          echo "" ;;
