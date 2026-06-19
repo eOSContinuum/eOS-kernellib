@@ -24,9 +24,10 @@
 # Sentinels are read from the deployed domain's data/test-result.log.
 # Boot output is captured under state/run-<example>-bootN.log.
 #
-# atomic-demo, hot-reload-demo, and http-app have no profile here:
-# they verify against a running server via live HTTP probes (see each
-# example's README and bundled smoke script).
+# atomic-demo and http-app have no profile here: they verify against a
+# running server via live HTTP probes (see each example's README and
+# bundled smoke script). hot-reload-demo verifies both ways -- a headless
+# sentinel profile below, plus its bundled HTTP smoke.
 #
 # Reruns start from a clean slate: the deployed domain, any snapshot,
 # and prior boot logs are removed first, so state never carries across
@@ -42,25 +43,26 @@ cd "$REPO_ROOT"
 # example_profile <example> -> "deploy boots boot1 ok", or "" if unknown
 example_profile() {
     case "$1" in
-        chat-app)   echo "Chat 3 selfexit 20" ;;
-        merry-app)  echo "MerryApp 2 selfexit 23" ;;
-        signal-app) echo "SignalApp 1 timed 1" ;;
-        vault-app)  echo "MyApp 1 timed 6" ;;
-        *)          echo "" ;;
+        chat-app)        echo "Chat 3 selfexit 20" ;;
+        hot-reload-demo) echo "WWW 1 timed 2" ;;
+        merry-app)       echo "MerryApp 2 selfexit 23" ;;
+        signal-app)      echo "SignalApp 1 timed 1" ;;
+        vault-app)       echo "MyApp 1 timed 6" ;;
+        *)               echo "" ;;
     esac
 }
 
 EXAMPLE="${1:-}"
 if [ -z "$EXAMPLE" ]; then
     echo "usage: scripts/run-example.sh <example>" >&2
-    echo "known examples: chat-app merry-app signal-app vault-app" >&2
+    echo "known examples: chat-app hot-reload-demo merry-app signal-app vault-app" >&2
     exit 2
 fi
 PROFILE=$(example_profile "$EXAMPLE")
 if [ -z "$PROFILE" ]; then
     echo "run-example.sh: no profile for '$EXAMPLE'; add one to example_profile()" >&2
-    echo "known examples: chat-app merry-app signal-app vault-app" >&2
-    echo "(atomic-demo, hot-reload-demo, and http-app verify via live HTTP probes; see their READMEs)" >&2
+    echo "known examples: chat-app hot-reload-demo merry-app signal-app vault-app" >&2
+    echo "(atomic-demo and http-app verify via live HTTP probes; see their READMEs)" >&2
     exit 2
 fi
 set -- $PROFILE
@@ -92,7 +94,15 @@ if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
 fi
 
 echo "== clean slate =="
-rm -rf "src/usr/$DEPLOY_NAME"
+# Remove EVERY example deploy mount, not just this run's. A leftover mount
+# from a prior run is picked up by the System initd's /usr/[A-Z]*/initd.c
+# iteration and re-runs on this boot; if it is a selfexit example (it calls
+# shutdown() when its driver finishes) it tears the driver down before this
+# example's driver completes, truncating the result. Isolation requires a
+# single deployed example per boot.
+for mount in Chat MerryApp MyApp SignalApp WWW; do
+    rm -rf "src/usr/$mount"
+done
 rm -f state/snapshot state/snapshot.old state/swap "$LOG_PREFIX"1.log "$LOG_PREFIX"2.log "$LOG_PREFIX"3.log
 
 echo "== deploy $EXAMPLE as the $DEPLOY_NAME domain =="
