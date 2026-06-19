@@ -1,0 +1,46 @@
+# Logging operator verbs (log / log-level) -- regression for the logd
+# operator surface registered in admin_console_registry's dispatch_table
+# (src/kernel/sys/admin_console_registry.c; daemon at
+# src/usr/System/sys/logd.c). Exercises the log-level query, the
+# capability-gated set path (cmd_log_level -> verb_set_log_threshold ->
+# admin_console.caller check -> KERNEL-elevated LOGD->set_threshold),
+# argument validation with a refused set leaving the threshold unchanged,
+# the mutate -> verify -> undo -> verify-undo shape, and the log read verb
+# surfacing the persisted sink. The capability gate keys on the CALLING
+# PROGRAM -- always the authorized console extension here -- so the
+# unprivileged-caller denial is an LPC-level concern covered by logd's own
+# tests, not drivable from the console.
+#
+# Run against a base-booted runtime (the orchestrator boots + drives):
+#   scripts/drive-verbs-smoke.sh scripts/verbsets/logging-verbs.verbset
+
+cmd: log-level
+expect: log-level: INFO
+
+cmd: log-level notice
+expect: log-level set to NOTICE
+
+cmd: log-level
+expect: log-level: NOTICE
+
+cmd: log-level bogus
+expect: argument must be
+absent: set to
+
+cmd: log-level
+expect: log-level: NOTICE
+
+cmd: log-level debug
+expect: log-level set to DEBUG
+
+cmd: log-level
+expect: log-level: DEBUG
+
+cmd: log
+expect: NOTICE
+
+cmd: log-level info
+expect: log-level set to INFO
+
+cmd: log-level
+expect: log-level: INFO
