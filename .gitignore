@@ -19,3 +19,8 @@ src/usr/MyApp/data/
 
 # Runtime save file the Merry daemon writes during any from-checkout boot.
 src/usr/Merry/tmp/
+
+# Runtime log sinks written during any from-checkout boot: the logd facility's
+# system.log and the Merry dispatcher's dispatch.log.
+src/usr/System/log/
+src/usr/Merry/log/
