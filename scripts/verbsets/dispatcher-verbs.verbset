@@ -1,0 +1,79 @@
+# Dispatcher operator verbs -- regression baseline for the nine
+# admin-console extension verbs (src/usr/Merry/lib/admin_console_ext.c,
+# documented in docs/admin-console.md "Dispatcher operator surface").
+#
+# Mutation verbs follow the mutate -> verify -> undo -> verify-undo
+# shape where the substrate supports static targets. The
+# register-observer / unregister-observer entries assert the daemon's
+# property-bearer refusal against /usr/MerryApp/sys/test (a loaded
+# daemon WITHOUT the property API -- the daemon validates the target
+# rather than silently storing nothing); full registration semantics
+# against a property-bearing clone are exercised by the merry-app
+# in-application test phases (clone paths are not stable across
+# boots).
+#
+# Run against a restore-booted runtime with merry-app deployed:
+#   scripts/drive-verbs.py scripts/verbsets/dispatcher-verbs.verbset
+
+cmd: cascade-depth
+expect: cascade-depth: \d+
+absent: usage:
+
+cmd: cascade-depth 64
+expect: cascade-depth set to 64
+
+cmd: cascade-depth
+expect: cascade-depth: 64
+
+cmd: cascade-depth 32
+expect: cascade-depth set to 32
+
+cmd: cascade-depth
+expect: cascade-depth: 32
+
+cmd: batch-status 1
+expect: batch-status 1: \w
+absent: usage:
+
+cmd: dispatch-trace status
+expect: dispatch-trace: (on|off)
+
+cmd: dispatch-trace on
+expect: dispatch-trace on
+absent: usage:
+
+cmd: dispatch-trace status
+expect: dispatch-trace: on
+
+cmd: dispatch-trace off
+expect: dispatch-trace off
+
+cmd: dispatch-trace status
+expect: dispatch-trace: off
+
+cmd: query-approved-registrars
+expect: approved registrars:
+expect: System
+
+cmd: approve-registrar DriveVerbs
+absent: usage:
+
+cmd: query-approved-registrars
+expect: DriveVerbs
+
+cmd: unapprove-registrar DriveVerbs
+absent: usage:
+
+cmd: query-approved-registrars
+expect: System
+absent: DriveVerbs
+
+cmd: register-observer /usr/MerryApp/sys/test drive:test:prop main Set($this, "drive:test:mark", 1);
+expect: register-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
+
+cmd: observers /usr/MerryApp/sys/test drive:test:prop
+expect: /usr/MerryApp/sys/test drive:test:prop:
+expect: main:
+
+cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main
+expect: unregister-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
