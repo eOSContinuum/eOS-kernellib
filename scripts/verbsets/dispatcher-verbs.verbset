@@ -75,5 +75,23 @@ cmd: observers /usr/MerryApp/sys/test drive:test:prop
 expect: /usr/MerryApp/sys/test drive:test:prop:
 expect: main:
 
+cmd: observers /usr/MerryApp/sys/test
+expect: /usr/MerryApp/sys/test observed paths:
+absent: usage:
+
+cmd: observers /usr/MerryApp/sys/test drive:test:prop main -effective
+expect: /usr/MerryApp/sys/test drive:test:prop \(effective\):
+expect: main:
+absent: usage:
+
+cmd: observers /usr/MerryApp/sys/test -effective
+expect: observers: -effective requires a <path>
+
 cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main
 expect: unregister-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
+
+cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main 0
+expect: unregister-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
+
+cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main x
+expect: unregister-observer: index must be an integer

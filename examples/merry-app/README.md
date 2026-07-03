@@ -13,6 +13,7 @@ A minimal Merry application that runs on top of eOS-kernellib. Demonstrates the 
 - A fifth Merry script invokes `testspace::greet($who: "world");`. The test driver registers itself as the "testspace" script-space handler (exposing `query_method` / `call_method`); `LabelCall` walks the registry, finds the handler, and dispatches the named method with the inline locals overlaid on the merry-source `args` mapping.
 - The batching surface adds four more phases. Phase 6 calls `MERRY->batched_set(child, ([ "k1": 100, "k2": 200 ]))` from LPC and verifies both values land. Phase 7 exercises the atomic-mode opt-in via `MERRY->batched_set(child, mapping, ([ "atomic": 1 ]))`. Phase 8 runs `BatchedSet($this, ([ ... ]))` from a Merry-compiled script to confirm the merrynode.c surface is reachable from observer source. Phase 9 invokes `MERRY->batch(this_object(), "_throw_for_test", ({}))` against a callable that errors and verifies the catch'd-error default propagates the error AND that the daemon-local batch-status stub records a `main-aborted` entry per the batch-status contract.
 - The dispatcher adds six more phases against the same `child` host. Phase 10 (DISPATCH MAIN) registers a main-timing observer and confirms it fires on the next `set_property`. Phase 10b (DISPATCH FANOUT) registers a second observer under the same `merry:on:<path>:<timing>` key -- the property stores a list -- and confirms one write fires both, in registration order. Phase 11 (DISPATCH ORDER) registers pre + main + post observers that append to a trace string, asserting `pre|main|post` after the write per the pre->write->main->post ordering contract. Phase 12 (DISPATCH VETO) registers a pre observer that throws and verifies the propagated error AND that the underlying value did not land (the pre-veto contract). Phase 13 (DISPATCH CYCLE) registers a main observer that writes the same property and verifies the cycle detector (the cascade-bound design per-execution chain) catches the recursive dispatch. Phase 14 (DISPATCH ANCESTRY) registers an observer on the parent and writes the property on the child; find_observers walks the ur chain and fires the parent's observer with `$this` bound to the child host (the ancestry-walk design). Phase 15 (DISPATCH IMPLICIT) confirms an unbatched `set_property` enters and exits an implicit batch cleanly and records a `completed` status entry (the implicit-batch semantics).
+- The observer formalization adds four phases. Phase 15b (OBSERVER QUERY) exercises the daemon's three public read-only views: `query_observers` (the local slot, in registration order), `query_effective_observers` (the ancestry-walk view, each entry labeled with the owning ancestor -- the parent's phase-14 observer is visible from the child), and `query_observed_paths` (enumeration of the object's observed `(path, timing)` slots). Phase 15c (OBSERVER SUGAR) registers one source under an ARRAY of paths and confirms the source compiled once (both slots hold the same compiled object) and fires once per observed-path write. Phase 15d (OBSERVER REMOVE) removes the first fanout observer by index via `remove_observer`, confirms the second still fires alone, and asserts two refusals: an out-of-range index throws, and a cross-domain caller is refused by the registrar gate. Phase 15e (OBSERVER EVICT) registers an observer, destructs its compiled `/usr/Merry/merry/<md5>` program via the LRU-eviction entry point (`suicide()`), and -- post-restore -- confirms the observer still fires: the stored slot entry is the `data/merry` wrapper, which retains the source and lazily recompiles the program on the next evaluate.
 - Phases 16 and 17 verify observer-state survival across a snapshot + restore cycle. Phase 16 (PERSIST SETUP) clones a fresh parent/child pair, registers a main observer on the child for `test:persist:val`, saves the host as a `static` global on the test driver, schedules a `phase17_verify` `call_out`, then calls a System-tier helper to `dump_state(FALSE)` and `shutdown()`. The verify script restarts DGD against the snapshot. Phase 17 (PERSIST VERIFY) fires from the surviving `call_out` after restore: writes `42` to the observed path on the restored host and asserts both that the write landed (property storage survived) and that the observer fired (the compiled merry-script object reference survived and `_resolve_observer` rebound correctly). The cycle exercises five orthogonal-persistence guarantees end-to-end: LPC global variables, property storage, object references to per-app data clones (`/usr/Merry/merry/<md5>`), the dispatcher's observer-source contract, and the scheduled-`call_out` queue.
 
 ## Deployment
@@ -51,10 +52,11 @@ cp -R examples/merry-app src/usr/MerryApp
 sleep 5
 cat src/usr/MerryApp/data/test-result.log
 kill %1
-# Expect (in order; SUICIDE OK, DELAY OK and PERSIST VERIFY OK land on the
-# second boot from pre-snapshot call_outs whose scheduled times have
-# elapsed, in their scheduling order: phase 3c's verify_suicide, then
-# phase 4's verify_delay, then phase 16's phase17_verify):
+# Expect (in order; SUICIDE OK, DELAY OK, OBSERVER EVICT OK and
+# PERSIST VERIFY OK land on the second boot from pre-snapshot call_outs
+# whose scheduled times have elapsed, in their scheduling order: phase
+# 3c's verify_suicide, then phase 4's verify_delay, then phase 15e's
+# verify_evict, then phase 16's phase17_verify):
 #   MerryApp:test: starting
 #   MerryApp:test: ANCESTRY OK
 #   MerryApp:test: SANDBOX OK
@@ -75,10 +77,14 @@ kill %1
 #   MerryApp:test: DISPATCH CYCLE OK
 #   MerryApp:test: DISPATCH ANCESTRY OK
 #   MerryApp:test: DISPATCH IMPLICIT OK
+#   MerryApp:test: OBSERVER QUERY OK
+#   MerryApp:test: OBSERVER SUGAR OK
+#   MerryApp:test: OBSERVER REMOVE OK
 #   MerryApp:test: PERSIST SETUP OK
 #   --- (driver exits; restart against snapshot) ---
 #   MerryApp:test: SUICIDE OK
 #   MerryApp:test: DELAY OK
+#   MerryApp:test: OBSERVER EVICT OK
 #   MerryApp:test: PERSIST VERIFY OK
 ```
 
