@@ -78,6 +78,7 @@ Operator access: the `observers` verb exposes all three query views, and `unregi
 | Query views: local slot order, effective walk with owner labels, observed-path enumeration | merry-app `OBSERVER QUERY` phase |
 | Array-path sugar: compiles once (slots share one object), fires once per observed path | merry-app `OBSERVER SUGAR` phase |
 | By-index removal; out-of-range refusal; cross-domain caller refusal | merry-app `OBSERVER REMOVE` phase |
+| Coarse clear: slot property deleted, nothing fires afterward | merry-app `OBSERVER CLEAR` phase |
 | Eviction survival across snapshot + restore | merry-app `OBSERVER EVICT` phase |
 | Console shapes: observed-path enumeration, `-effective` (and its path-required refusal), index-argument refusals | `scripts/verbsets/dispatcher-verbs.verbset` |
 | Statedump survival of registrations | merry-app `PERSIST SETUP` / `PERSIST VERIFY` phases |
