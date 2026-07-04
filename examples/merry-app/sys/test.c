@@ -1027,6 +1027,54 @@ static void run_tests()
 	return;
     }
 
+    /* phase 15f: coarse clear -- unregister_observer's SUCCESS path.
+     * Register two observers on a fresh path, clear the whole triple,
+     * then write: nothing may fire and the slot property must be gone
+     * (the coarse clear deletes the property, matching the end state
+     * by-index removal reaches when it drains a slot). The refusal
+     * paths are console-driven by the dispatcher verbset; this is the
+     * LPC-level positive assertion. */
+
+    catch {
+	MERRY_DAEMON->register_observer(child, "test:clear:val", "main",
+	    "Set($this, \"test:clear:trace\", Get($this, \"test:clear:trace\") + \"a|\"); return TRUE;");
+	MERRY_DAEMON->register_observer(child, "test:clear:val", "main",
+	    "Set($this, \"test:clear:trace\", Get($this, \"test:clear:trace\") + \"b\"); return TRUE;");
+
+	if (sizeof(MERRY_DAEMON->query_observers(child, "test:clear:val",
+						 "main")) != 2) {
+	    log_line("MerryApp:test: FAIL: OBSERVER CLEAR setup slot expected "
+		     + "2 entries");
+	    return;
+	}
+
+	MERRY_DAEMON->unregister_observer(child, "test:clear:val", "main");
+
+	if (child->query_raw_property("merry:on:test:clear:val:main") != nil) {
+	    log_line("MerryApp:test: FAIL: OBSERVER CLEAR slot property "
+		     + "survived the coarse clear");
+	    return;
+	}
+
+	child->set_raw_property("test:clear:trace", "");
+	child->set_property("test:clear:val", 9);
+	if (child->query_raw_property("test:clear:val") != 9) {
+	    log_line("MerryApp:test: FAIL: OBSERVER CLEAR value did not land");
+	    return;
+	}
+	if (child->query_raw_property("test:clear:trace") != "") {
+	    log_line("MerryApp:test: FAIL: OBSERVER CLEAR trace was \""
+		     + (string) child->query_raw_property("test:clear:trace")
+		     + "\", expected no fire");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: OBSERVER CLEAR setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: OBSERVER CLEAR OK");
+
     /* phase 16: PERSIST SETUP -- register a persistent observer on a
      * fresh binding host, save the host so phase17_verify can find it
      * after restore, schedule the verify call_out, then trigger a

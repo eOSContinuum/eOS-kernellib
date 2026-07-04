@@ -350,6 +350,7 @@ Each documented signature is exercised by at least one phase of the MerryApp smo
 | `register_observer` (path-array sugar: compile-once sharing, fires per path) | 15c | `OBSERVER SUGAR OK` |
 | `remove_observer` (by-index; out-of-range and cross-domain refusals) | 15d | `OBSERVER REMOVE OK` |
 | Compiled-observer eviction survival (lazy recompile, across restore) | 15e | `OBSERVER EVICT OK` |
+| `unregister_observer` (coarse clear: slot property deleted, nothing fires) | 15f | `OBSERVER CLEAR OK` |
 | `unregister-observer` verb (coarse + indexed shapes; the automated verbset asserts the refusal paths -- property-bearer gate, non-integer index) | telnet-drive | `dispatcher-verbs` verbset; the operator session in `admin-console.md` |
 | `set_dispatch_trace` / `query_dispatch_trace` | telnet-drive | admin verb `dispatch-trace on|off|status` end-to-end against MerryApp |
 
