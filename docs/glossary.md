@@ -80,6 +80,10 @@ A registered application-server object at a path the kernel-layer's HTTP machine
 
 The system daemon that intercepts twelve compile-and-load lifecycle events (compiling, compile, compile_failed, clone, destruct, remove_program, etc.). Tier-D and tier-E domains MAY register an objectd-side observer for their own programs without modifying the System daemon. Load-bearing in [code-lifecycle.md](code-lifecycle.md) and [architecture.md](architecture.md) Tier-C daemons.
 
+## observer
+
+A compiled Merry script registered at a `(path, timing)` slot on a property-bearing host, fired by the dispatcher when that property is written (pre / main / post timings). Registrations live in the host's own `merry:on:<path>:<timing>` property as an ordered list -- registration order is firing order; the Merry daemon holds the gates, the lookup walk, and a cache, never the registrations themselves. Load-bearing in [dispatcher.md](dispatcher.md) (firing semantics) and [observers.md](observers.md) (the storage-and-lifecycle contract).
+
 ## orthogonal persistence
 
 The architectural property that an object's lifetime is decoupled from the lifetime of the program that created it. The same code operates on transient values and persistent values; the persistence machinery is the runtime's concern, not the application's. Atkinson and Morrison's 1995 paper is the canonical academic statement; the KeyKOS and EROS literature extends the model with capability-based access control. See [references.md](references.md) for citation details. Load-bearing in [persistence.md](persistence.md) Orthogonal persistence and [runtime-primitives.md](runtime-primitives.md) §3 (persistent state primitive).
