@@ -2,19 +2,23 @@
  * Generic property access mechanism.
  *
  * The ascii-property accessor pair (query_ascii_property /
- * set_ascii_property) that the Core:Entry schema callbacks reference is
- * not provided yet -- it depends on a richer type-coercion layer; until
- * it lands, per-app schemas with typed accessors are the marshaling
- * path for property-bearing objects.
+ * set_ascii_property) marshals property values through the
+ * /lib/util/coercion codec, so the Core:Entry schema callbacks that
+ * reference the pair give every bare property-bearing object a
+ * marshaling path over its property table -- no per-app schema
+ * required for simple values.
  *
- * Inheritors receive queryStateRoot() returning "Core:Properties" by default;
- * application objects that bind to their own schema must override (the
- * vault-app/obj/thing.c pattern: queryStateRoot() -> "MyApp:Thing").
+ * Inheritors receive queryStateRoot() returning "Core:Entries" by
+ * default (the property-table marshaling shape); applications whose
+ * durable state lives in typed member variables instead bind their own
+ * schema (the vault-app/obj/thing.c pattern: queryStateRoot() ->
+ * "MyApp:Thing").
  */
 
 # include <type.h>
 
 private inherit "/lib/util/ascii";
+private inherit "/lib/util/coercion";
 
 private mapping properties;
 
@@ -40,7 +44,7 @@ private mapping prefixed_map(mapping map, string prefix)
 }
 
 
-string queryStateRoot() { return "Core:Properties"; }
+string queryStateRoot() { return "Core:Entries"; }
 
 
 static
@@ -135,9 +139,39 @@ mixed query_property(string prop)
     return query_downcased_property(lower_case(prop));
 }
 
-mapping query_properties(varargs int derived)
+/*
+ * Ascii-property accessors: the Core:Entry schema's marshaling
+ * surface. The getter encodes the stored value through the coercion
+ * codec; the setter decodes and writes through set_property, so
+ * observers fire and the dispatch-path write gate applies to imported
+ * writes exactly as to any other write.
+ */
+string query_ascii_property(string prop)
 {
-    return properties[..];
+    return encodeValue(query_property(prop));
+}
+
+void set_ascii_property(string prop, string ascii)
+{
+    set_property(prop, decodeValue(ascii));
+}
+
+/*
+ * The property mapping. By default the reserved merry: namespace
+ * (observer registrations, scripts, dispatcher bookkeeping) is
+ * excluded: those entries are runtime wiring re-established through
+ * the gated registration surfaces, not marshalable application state.
+ * Pass a non-zero argument to include them.
+ */
+mapping query_properties(varargs int opaque)
+{
+    mapping map;
+
+    map = properties[..];
+    if (!opaque) {
+	map -= map_indices(prefixed_map(map, "merry:"));
+    }
+    return map;
 }
 
 void add_properties(mapping map)

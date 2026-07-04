@@ -193,9 +193,14 @@ private void configure_initial_nodes()
 	urChildren->add_child(urChild);
     }
 
-    /* Core:Entry primitives. The leaf type stays lpc_str; the
-     * marshaling callbacks keep the query/clear/set_ascii_property
-     * naming until a wider property-API rename lands. */
+    /* Core:Entry primitives -- the property-table marshaling shape for
+     * bare property-bearing objects. The accessors live in /lib/util/
+     * properties over the /lib/util/coercion codec; the leaf type
+     * stays lpc_str (the accessor emits the encoded string itself),
+     * and the query/clear/set_ascii_property naming stays until a
+     * wider property-API rename lands. This definition and
+     * data/schema/Entry.xml declare the same shape; keep them in
+     * step. */
 
     {
 	object entry, entries;
@@ -203,8 +208,9 @@ private void configure_initial_nodes()
 	entry = Node("Core", "Entry");
 	entry->set_leaf("lpc_str", "query_ascii_property", "key");
 	entry->add_attribute("key", LPC_STR);
-	entry->set_iterator("key", "query_property_indices");
-	entry->add_callback("set_ascii_property", "key");
+	entry->set_iterator("key", "query_property_indices", "#0");
+	entry->set_delitem("clear_property", "key");
+	entry->add_callback("set_ascii_property", "key", "CONTENT");
 
 	entries = Node("Core", "Entries");
 	entries->set_recursion_point(TRUE);
