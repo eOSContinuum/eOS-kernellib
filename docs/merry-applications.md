@@ -61,7 +61,7 @@ If a daemon-level dispatch surface is needed in the future (for cross-domain or 
 
 ## Compiling a script
 
-A Merry script is a clone of `/usr/Merry/data/merry` constructed with the source string:
+A Merry script is a light-weight instance of `/usr/Merry/data/merry` (via `new_object`) constructed with the source string:
 
 ```c
 script = new_object("/usr/Merry/data/merry",

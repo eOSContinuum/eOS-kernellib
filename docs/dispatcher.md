@@ -2,7 +2,7 @@
 
 The dispatcher routes every `set_property` write through the Merry daemon so registered observers fire at pre / main / post timings, cascading writes stay bounded, recursive cycles are caught, and multi-key writes share a batch identity. It is the kernel layer's mechanism for "any property change can have side effects, anywhere in the object graph, expressed as Merry script."
 
-For the smallest working introduction -- one observer, one write, one assertion -- start with `signal-applications.md` and `examples/signal-app/`; this page is the full reference. The substrate is small: one entry point (`dispatch_set`) on the Merry daemon, one property-layer hook in `/lib/util/properties`, one capability-gated registration LFUN (`register_observer`), two batching LFUNs (`batch` and `batched_set`), and a handful of accessors. Observers themselves are ordinary Merry scripts -- the same `/usr/Merry/data/merry` clones that `find_merry` / `run_merry` already dispatch elsewhere. The dispatcher is one application of the script-binding primitive, layered on top of it rather than parallel to it.
+For the smallest working introduction -- one observer, one write, one assertion -- start with `signal-applications.md` and `examples/signal-app/`; this page is the full reference. The substrate is small: one entry point (`dispatch_set`) on the Merry daemon, one property-layer hook in `/lib/util/properties`, capability-gated registration and removal LFUNs (`register_observer`, `unregister_observer`, `remove_observer`), three read-only query LFUNs (`query_observers`, `query_effective_observers`, `query_observed_paths`), two batching LFUNs (`batch` and `batched_set`), and a handful of accessors. Observers themselves are ordinary Merry scripts -- the same light-weight `/usr/Merry/data/merry` wrappers that `find_merry` / `run_merry` already dispatch elsewhere. The dispatcher is one application of the script-binding primitive, layered on top of it rather than parallel to it.
 
 `set_property` and the dispatcher cooperate: the property-layer hook calls `MERRY->dispatch_set(obj, path, val)` when the Merry daemon is loaded; the dispatcher's main timing then calls `obj->set_raw_property(path, val)` to perform the actual write and recurses through pre and post observers. Hosts that need to escape the dispatcher (early bootstrap, raw schema initialization) call `set_raw_property` directly.
 
@@ -14,6 +14,8 @@ This document covers two views of the dispatcher:
 - The **kernel-author view** (section "Kernel-layer internals") covers the implementation: TLS keys, observer caching, private helpers, audit-log shape, and the contracts internal helpers honor.
 
 The "Relationship to Merry script binding" and "Persistence" sections bridge the two -- both audiences need them.
+
+The storage-and-lifecycle contract -- where registrations live, how slots resolve, the query and removal surfaces, and the persistence and eviction behavior -- is `observers.md`; this page cross-references it rather than restating it.
 
 The "Verification" section maps each documented signature to the MerryApp smoke phase that exercises it, so a reviewer can step from prose to evidence.
 
@@ -50,18 +52,18 @@ The implicit batch is recorded as `completed` in the batch-status log on exit. T
 
 ## Application surface
 
-### `register_observer(object ob, string path, string timing, string source)`
+### `register_observer(object ob, mixed path, string timing, string source)`
 
 Registers a Merry-script observer at the given (`path`, `timing`) on `ob`. Stored as a property-list under `merry:on:<path>:<timing>`. Multiple observers may be registered for the same slot; they fire in registration order.
 
 - `ob` -- host object. Must be non-nil and must inherit `/lib/util/properties`; the daemon refuses a target without the property API (before that validation, such a registration reported success while storing nothing, since `call_other` on a missing function returns nil).
-- `path` -- property path (dot-notation; arbitrary string).
+- `path` -- property path (dot-notation; arbitrary string), or an array of paths: cross-property registration sugar. The source compiles once and the same compiled object is appended to each path's slot, so the observer fires once per observed-path write with `$path` disambiguating; storage stays strictly per-slot (`observers.md` states the consequences for removal). An empty array, a non-string entry, or an empty-string entry is refused.
 - `timing` -- one of `"pre"`, `"main"`, `"post"` (case-insensitive). Anything else errors; nil collapses to `"main"`.
-- `source` -- Merry source string. Compiled at registration time (a `/usr/Merry/data/merry` clone is created); the compiled object is what gets stored.
+- `source` -- Merry source string. Compiled at registration time (a light-weight `/usr/Merry/data/merry` wrapper is created); the wrapper is what gets stored.
 
-Capability-gated through `_check_registrar`: callable from `/kernel/`, from a `KERNEL()`-trusting registrar program, from any program whose creator domain holds the `merry.registrar` capability, or from a program registering on a target in its own domain (the self-domain path). The approved-registrar set lives in the capability library (`docs/capability.md`) under the `merry.registrar` capability, seeded with `System` and `admin_console` at boot; a domain is added by granting it that capability -- via the `approve-registrar` admin verb or a `/kernel/*` program -- not by a Merry-daemon LFUN (the former `add_approved_registrar` / `remove_approved_registrar` mutators moved to the capability store). Application code typically registers on its own objects (the self-domain path) or through a registered admin path. The MerryApp example registers on its own objects, so it passes via the self-domain path without being an approved registrar; its REGISTRAR REJECT phase confirms a cross-domain registration is refused.
+Capability-gated through `_check_registrar`, which passes exactly three shapes: a caller program under `/kernel/` (the console registry's verb helpers enter this way), a caller whose creator domain holds the `merry.registrar` capability, or a caller registering on a target in its own domain (the self-domain path). The approved-registrar set lives in the capability library (`docs/capability.md`) under the `merry.registrar` capability, seeded with `System` and `admin_console` at boot; a domain is added by granting it that capability -- via the `approve-registrar` admin verb or a `/kernel/*` program -- not by a Merry-daemon LFUN (the former `add_approved_registrar` / `remove_approved_registrar` mutators moved to the capability store). Application code typically registers on its own objects (the self-domain path) or through a registered admin path. The MerryApp example registers on its own objects, so it passes via the self-domain path without being an approved registrar; its REGISTRAR REJECT phase confirms a cross-domain registration is refused.
 
-Errors on: nil host, non-property-bearing host, unrecognized timing, capability-gate failure. The compile step may also error if the source has a parse failure.
+Errors on: nil host, non-property-bearing host, unrecognized timing, malformed path array, capability-gate failure. The compile step may also error if the source has a parse failure.
 
 ### `dispatch_set(object obj, string path, mixed val)`
 
@@ -147,9 +149,15 @@ The bound counts depth, not breadth -- a flat batch with many legitimate writes 
 
 ### `unregister_observer(object ob, string path, string timing)`
 
-Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`, and refuses a non-property-bearing target the same way. Asymmetric with `register_observer`'s add-one semantics; finer-grained removal (by source string or by compiled-object identity) is a future-work item.
+Removes ALL observers at the `(ob, path, timing)` triple by clearing the `merry:on:<path>:<timing>` property. Capability-gated identically to `register_observer` via `_check_registrar`, and refuses a non-property-bearing target the same way. The coarse start-fresh shape, sufficient for the common operator scenario (clear a triple during an in-flight troubleshooting session); `remove_observer` below is the surgical sibling.
 
-The coarse granularity is sufficient for the common operator scenario (clear all observers at a triple to start fresh, e.g., for an in-flight troubleshooting session). For surgical removal in a multi-observer-on-one-triple host, current options are (a) read the property value list, remove one entry by index, write back via `set_raw_property` (operator-tier surgery; admin verb `register-observer` / `unregister-observer` in `admin-console.md` does not yet expose this), or (b) clear all and re-register the keepers.
+### `remove_observer(object ob, string path, string timing, int index)`
+
+Removes ONE entry from the ordered slot list at the triple, by its position as reported by `query_observers` (registration order = firing order). An out-of-range index throws, making a stale index visible instead of silently removing the wrong entry; removing the last entry deletes the slot property, matching `unregister_observer`'s end state. Capability-gated identically to `register_observer` via `_check_registrar`. By-index rather than by-compiled-object-identity because the query surface deliberately returns descriptions, not compiled references -- an external caller has no identity to remove by. The operator surface is `unregister-observer`'s optional trailing index (`admin-console.md`).
+
+### Observer query surface
+
+Three public read-only LFUNs -- `query_observers(ob, path, timing)` (the local slot, descriptive strings in index order), `query_effective_observers(ob, path, timing)` (the ancestry-walk view the dispatcher would fire, each entry labeled with the owning ancestor), and `query_observed_paths(ob)` (enumeration of the object's observed `(path, timing)` slots). All are computed fresh from property tables, never from the daemon cache, and all return descriptive data rather than compiled observer references. `observers.md` "Query surface" states the contract, the descriptive-return rationale, and the read posture; the `observers` admin verb (`admin-console.md`) exposes all three views.
 
 ### `set_dispatch_trace(int flag)` and `query_dispatch_trace()`
 
@@ -176,7 +184,7 @@ Check-before-overwrite contract: a status entry, once written, is not overwritte
 
 ### Observer-source contract
 
-A registered observer's source is plain Merry source compiled to a `/usr/Merry/data/merry` clone. The dispatcher passes the following bindings when it invokes the script:
+A registered observer's source is plain Merry source compiled into a light-weight `/usr/Merry/data/merry` wrapper. The dispatcher passes the following bindings when it invokes the script:
 
 | Binding | Type | Meaning |
 |---|---|---|
@@ -227,9 +235,9 @@ The property convention `merry:on:<path>:<timing>` parallels `merry:<mode>:<sign
 
 The compositional consequence is that the dispatcher reuses, rather than re-implements, the merry-script lifecycle:
 
-- Source is compiled to a `/usr/Merry/data/merry` clone at registration time, the same way `find_merry`'s consumers compile scripts.
+- Source is compiled into a light-weight `/usr/Merry/data/merry` wrapper at registration time, the same way `find_merry`'s consumers compile scripts.
 - The compiled object lives at `/usr/Merry/merry/<md5>`, the same path the rest of Merry uses.
-- The on-disk compile artifact (`/usr/Merry/merry/<md5>.c`) is created the same way; DGD's standard compile-on-demand resurrects it after restore.
+- The program compiles from in-memory source (the two-argument `compile_object` form) and the wrapper retains that source, so the program is recompiled on demand after a restore or an eviction -- no on-disk `.c` artifact is written.
 - The sandbox restrictions in `merrynode.c` apply -- observers cannot escape via `clone_object`, `dump_state`, or other guarded kfuns.
 
 An application that wants to "register custom callbacks on property changes" does not learn a new mechanism. It learns the dispatcher's registration LFUN and writes Merry source. Everything else -- ancestry, sandboxing, persistence, the property storage convention -- is the script-binding mechanism it already knows.
@@ -244,8 +252,8 @@ What survives, and why:
 |---|---|
 | LPC global variables on application objects | DGD pickles them with the object's data segment. |
 | Property storage on host objects | The `merry:on:<path>:<timing>` properties are ordinary properties; property storage survives. |
-| References to the compiled Merry-script object | An LPC `object` value is an oid that DGD resurrects on restore -- the property mapping's stored reference re-attaches to the same logical clone. |
-| The on-disk compile artifact | `data/merry::get_program()` writes `/usr/Merry/merry/<md5>.c` at registration; DGD's compile-on-demand reloads the program when the resurrected oid is first dispatched against. |
+| References to the compiled Merry-script wrapper | The stored wrapper is a light-weight object living inside the host's dataspace; it persists with the host's data segment, retained source included. |
+| The compiled program behind the wrapper | The wrapper retains the observer's source as ordinary object state; `data/merry::get_program()` recompiles the `/usr/Merry/merry/<md5>` program from it in memory (two-argument `compile_object`) whenever the program is absent -- after a restore or an eviction. No on-disk `.c` file is involved. |
 | Scheduled `call_out`s | DGD's call_out queue is part of the snapshot. Call_outs scheduled before dump fire at their original wall-clock target after restore (or immediately if the target has passed). |
 | `observer_cache` and other daemon-local mappings | The Merry daemon's mappings survive as object data. The cache is conservatively invalidated by `_invalidate_observer_cache` on registration; that contract is unchanged by restore. |
 
@@ -280,7 +288,7 @@ Daemon-local mappings:
 
 The cache exists because the per-dispatch ancestry walk is O(ancestor-count) and observers don't change between registrations. `_find_observers_cached(obj, path, timing)` looks up the triple-key; on miss, runs the walk (`query_parent` from `obj` upward, reading `merry:on:<path>:<timing>` at each level), caches the result, and returns.
 
-Invalidation is conservative: `register_observer` calls `_invalidate_observer_cache(ob, path, timing)`, which removes all cache entries whose first key element matches `object_name(ob)` AND whose path matches AND whose timing matches. This is broad enough to catch ancestor-side registrations correctly (a registration on an ancestor invalidates descendant cache entries) at the cost of full mapping iteration on each registration. Acceptable at the current scale; a more targeted invalidation is future polish.
+Invalidation is broad: every registration, removal, or unregistration calls `_invalidate_observer_cache`, which clears the entire cache map -- the deliberate minimal choice. The helper's `(ob, path, timing)` arguments are carried for a future targeted-invalidation switch and are currently unused; nothing filters on them. Clearing everything is trivially correct for ancestor-side registrations (every descendant's cached walk is discarded with the rest) at the cost of re-resolving each active triple on its next dispatch. Acceptable at the current scale; targeted invalidation is future polish.
 
 ### `_resolve_observer(mixed val)`
 
@@ -302,7 +310,7 @@ The per-timing-slot fan-out. Pulls the cached observer list, advances the per-ba
 
 ### Private helpers
 
-- `_check_registrar(string caller_program, string target_name)` -- enforces the registration capability gate. Called only from `register_observer`.
+- `_check_registrar(string caller_program, string target_name)` -- enforces the registration capability gate. Called from the observer surface (`register_observer`, `unregister_observer`, `remove_observer`) and the script-space surface (`register_script_space`, `unregister_script_space`), and re-applied by the dispatch-path write gate when a dispatched `set_property` targets a `merry:on:*` / `merry:on-inherit:*` property.
 - `_push_batch_context` / `_pop_batch_context` -- batch lifecycle. Push allocates a `batch_id`, sets the atomic flag and copy-of-opts, initializes cascade_depth and seq, and stashes the previous chain on the TLS stack. Pop restores.
 - `_enter_implicit_batch` / `_exit_implicit_batch` -- the implicit-batch wrap for unbatched `set_property` writes. Returns 0 if a batch was already active (no implicit needed) or the new batch_id otherwise.
 - `_run_callable` / `_run_kv_writes` -- the non-atomic execution paths for `batch` and `batched_set`.
@@ -311,7 +319,7 @@ The per-timing-slot fan-out. Pulls the cached observer list, advances the per-ba
 
 ## Verification -- the MerryApp smoke
 
-Each documented signature is exercised by at least one phase of the 17-phase MerryApp smoke (`examples/merry-app/sys/test.c`). The map below lets a reviewer step from this document to evidence:
+Each documented signature is exercised by at least one phase of the MerryApp smoke (`examples/merry-app/sys/test.c`). The map below lets a reviewer step from this document to evidence:
 
 | Signature / behavior | Phase | Sentinel |
 |---|---|---|
@@ -319,6 +327,10 @@ Each documented signature is exercised by at least one phase of the 17-phase Mer
 | `register_observer` (pre / main / post slots) | 11 | `DISPATCH ORDER OK` |
 | `register_observer` (pre veto via throw) | 12 | `DISPATCH VETO OK` |
 | `register_observer` (ancestry walk; `$this` is dispatch host, not observer owner) | 14 | `DISPATCH ANCESTRY OK` |
+| `register_observer` (multiple observers per slot fire in registration order) | 10b | `DISPATCH FANOUT OK` |
+| `register_observer` capability gate (cross-domain registration refused) | 5b | `REGISTRAR REJECT OK` |
+| `register_observer` non-property-bearing target refused | 5c | `TARGET REJECT OK` |
+| Dispatch-path write gate on `merry:on:*` / `merry:on-inherit:*` (direct + batched) | 5d | `DISPATCH GATE OK` |
 | `dispatch_set` -- pre / main / post sequencing | 11 | `DISPATCH ORDER OK` |
 | `dispatch_set` -- pre-veto, write does not land | 12 | `DISPATCH VETO OK` |
 | `dispatch_set` -- cycle detection | 13 | `DISPATCH CYCLE OK` |
@@ -334,13 +346,18 @@ Each documented signature is exercised by at least one phase of the 17-phase Mer
 | Observer-source contract -- `Set` from observer source | 10, 11, 13, 14, 16 | various |
 | `BatchedSet` from observer source | 8 | `BATCH SOURCE OK` |
 | Observer-state survival across snapshot + restore | 16 + 17 | `PERSIST SETUP OK` + `PERSIST VERIFY OK` |
-| `unregister_observer` (clears all observers at triple) | telnet-drive | admin verb `unregister-observer` end-to-end against MerryApp |
+| `query_observers` / `query_effective_observers` / `query_observed_paths` | 15b | `OBSERVER QUERY OK` |
+| `register_observer` (path-array sugar: compile-once sharing, fires per path) | 15c | `OBSERVER SUGAR OK` |
+| `remove_observer` (by-index; out-of-range and cross-domain refusals) | 15d | `OBSERVER REMOVE OK` |
+| Compiled-observer eviction survival (lazy recompile, across restore) | 15e | `OBSERVER EVICT OK` |
+| `unregister-observer` verb (coarse + indexed shapes; the automated verbset asserts the refusal paths -- property-bearer gate, non-integer index) | telnet-drive | `dispatcher-verbs` verbset; the operator session in `admin-console.md` |
 | `set_dispatch_trace` / `query_dispatch_trace` | telnet-drive | admin verb `dispatch-trace on|off|status` end-to-end against MerryApp |
 
 A test phase that does not appear above is from the pre-dispatcher lift (phases 1-5 cover the Merry script-binding primitive itself; phase 4's `DELAY OK` covers the `$delay()` continuation path documented in `merry-applications.md`). The two telnet-drive rows reference operator-tier verification rather than smoke-phase markers: the verbs were exercised via direct telnet session against the restore-boot MerryApp; see `admin-console.md` "Dispatcher operator surface" for the full session and the verb-by-verb output format.
 
 ## See also
 
+- `observers.md` -- the observer storage-and-lifecycle contract: the storage model and slot resolution, the query and removal surfaces, persistence, and compiled-program eviction.
 - `merry-applications.md` -- the script-binding mechanism the dispatcher is layered on top of (ancestry walk, find_merry / find_merries, the merry property convention, sandbox semantics).
 - `operations.md` -- operator surface for `set_max_cascade_depth`, `set_dispatch_trace`, and the dispatch audit log.
 - `admin-console.md` -- "Dispatcher operator surface" section: the nine operator verbs that expose the dispatcher's runtime surface from the kernel admin console (`observers`, `cascade-depth`, `batch-status`, `dispatch-trace`, `register-observer`, `unregister-observer`, `query-approved-registrars`, `approve-registrar`, `unapprove-registrar`).

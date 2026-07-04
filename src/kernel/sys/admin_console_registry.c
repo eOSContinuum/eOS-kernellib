@@ -139,6 +139,12 @@ nomask void verb_unregister_observer(object ob, string path, string timing) {
    MERRY->unregister_observer(ob, path, timing);
 }
 
+nomask void verb_remove_observer(object ob, string path, string timing,
+                                 int index) {
+   _check_caller(previous_program());
+   MERRY->remove_observer(ob, path, timing, index);
+}
+
 nomask void verb_approve_registrar(string domain) {
    _check_caller(previous_program());
    CAPABILITYD->grant("merry.registrar", domain);

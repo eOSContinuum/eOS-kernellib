@@ -222,6 +222,103 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
 }
 
 /*
+ * _normalize_timing: shared timing validation for the observer
+ * registration/query surface. nil defaults to "main"; anything outside
+ * the three timing slots is refused.
+ */
+private
+string _normalize_timing(string timing) {
+   string low_timing;
+
+   low_timing = timing ? lower_case(timing) : "main";
+   if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {
+      error("MERRY: observer timing must be one of {pre, main, post}; got \"" +
+            low_timing + "\"");
+   }
+   return low_timing;
+}
+
+/*
+ * _normalize_observer_list: single-value property forms (legacy
+ * T_STRING source or a bare T_OBJECT) normalize to one-element lists;
+ * nil (or a non-property-bearing target's call_other nil) normalizes
+ * to the empty list.
+ */
+private
+mixed *_normalize_observer_list(mixed val) {
+   if (typeof(val) == T_ARRAY) {
+      return val;
+   }
+   if (typeof(val) == T_STRING || typeof(val) == T_OBJECT) {
+      return ({ val });
+   }
+   return ({ });
+}
+
+/*
+ * _observer_slot: resolve the LOCAL slot for (ob, path, timing) the
+ * way find_observers reads it -- the explicit merry:on:<path>:<timing>
+ * property first, then the timing-less alias form merry:on:<path> for
+ * main timing when the explicit form is absent. Returns
+ * ({ prop_name, list }) where prop_name is the property that actually
+ * holds the slot (so a mutation writes back to the same place the
+ * indices came from) and list is the normalized observer list.
+ */
+private
+mixed *_observer_slot(object ob, string path, string low_timing) {
+   string prop_name;
+   mixed val;
+
+   prop_name = "merry:on:" + path + ":" + low_timing;
+   val = ob->query_raw_property(prop_name);
+   if (val == nil && low_timing == "main") {
+      string alias_prop;
+
+      alias_prop = "merry:on:" + path;
+      val = ob->query_raw_property(alias_prop);
+      if (val != nil) {
+         prop_name = alias_prop;
+      }
+   }
+   return ({ prop_name, _normalize_observer_list(val) });
+}
+
+/*
+ * _describe_observer: descriptive rendering of one observer entry for
+ * the query surface. Deliberately returns strings, never the compiled
+ * observer reference itself -- a compiled object is invocable
+ * (evaluate with fabricated args), while the description leaks nothing
+ * a same-domain raw-property read does not already expose. The source
+ * text (first 60 chars, newlines flattened) is included because the
+ * object name alone does not distinguish entries within a slot.
+ */
+private
+string _describe_observer(mixed entry) {
+   string desc, src;
+
+   switch (typeof(entry)) {
+   case T_OBJECT:
+      desc = ::object_name(entry);
+      catch(src = entry->query_source());
+      break;
+   case T_STRING:
+      desc = "<source string>";
+      src = entry;
+      break;
+   default:
+      return "<unexpected type " + (string) typeof(entry) + ">";
+   }
+   if (src && strlen(src)) {
+      src = implode(explode(src, "\n"), " ");
+      if (strlen(src) > 60) {
+         src = src[.. 56] + "...";
+      }
+      desc += " {" + src + "}";
+   }
+   return desc;
+}
+
+/*
  * register_observer: procedural sugar for declarative observer
  * writes. Compiles the source at registration time (a deliberate choice:
  * store compiled merry-script OBJECTS, not source strings, so
@@ -229,6 +326,15 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
  * errors surface at registration rather than first-fire). Reads the
  * existing list, normalizes string + array + object forms, appends
  * the new compiled object, writes back via host's set_raw_property.
+ *
+ * path is a single property path or an array of paths: the array form
+ * is cross-property registration sugar -- the source compiles ONCE and
+ * the same compiled object is appended to each path's slot, so the
+ * observer fires once per observed-path write with $path
+ * disambiguating. The storage model stays strictly per-(path, timing)
+ * slot: no stored record marks the N registrations as siblings, and
+ * removal is per-slot (N remove operations to fully retire an
+ * array-registered observer).
  *
  * set_raw_property is used (not set_property) so the registration
  * write does not itself trigger the dispatcher on the merry:on:* path
@@ -242,11 +348,11 @@ void _invalidate_observer_cache(object ob, string path, string timing) {
  * `merry:on:<path>` (timing-less = implicit main) is accepted on read
  * by find_observers as the minimal lookup choice.
  */
-void register_observer(object ob, string path, string timing, string source) {
-   string caller_program, prop_name, low_timing;
+void register_observer(object ob, mixed path, string timing, string source) {
+   string caller_program, low_timing;
+   string *paths;
    object compiled;
-   mixed existing;
-   mixed *list;
+   int i;
 
    caller_program = previous_program();
    if (!ob) {
@@ -254,38 +360,49 @@ void register_observer(object ob, string path, string timing, string source) {
    }
    _check_registrar(caller_program, ::object_name(ob));
    _check_property_bearer(ob);
+   low_timing = _normalize_timing(timing);
 
-   low_timing = timing ? lower_case(timing) : "main";
-   if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {
-      error("register_observer: timing must be one of {pre, main, post}; got \"" +
-            low_timing + "\"");
+   switch (typeof(path)) {
+   case T_STRING:
+      paths = ({ path });
+      break;
+   case T_ARRAY:
+      if (sizeof(path) == 0) {
+         error("register_observer: path array is empty");
+      }
+      for (i = 0; i < sizeof(path); i ++) {
+         if (typeof(path[i]) != T_STRING || strlen(path[i]) == 0) {
+            error("register_observer: path array entries must be " +
+                  "non-empty strings");
+         }
+      }
+      paths = path;
+      break;
+   default:
+      error("register_observer: path must be a string or an array of strings");
    }
-   prop_name = "merry:on:" + path + ":" + low_timing;
 
    compiled = ::new_object("/usr/Merry/data/merry", source);
 
-   existing = ob->query_raw_property(prop_name);
-   if (typeof(existing) == T_ARRAY) {
-      list = existing;
-   } else if (typeof(existing) == T_STRING || typeof(existing) == T_OBJECT) {
-      list = ({ existing });
-   } else {
-      list = ({ });
-   }
-   list += ({ compiled });
-   ob->set_raw_property(prop_name, list);
+   for (i = 0; i < sizeof(paths); i ++) {
+      string prop_name;
+      mixed *list;
 
-   _invalidate_observer_cache(ob, path, low_timing);
+      prop_name = "merry:on:" + paths[i] + ":" + low_timing;
+      list = _normalize_observer_list(ob->query_raw_property(prop_name));
+      list += ({ compiled });
+      ob->set_raw_property(prop_name, list);
+   }
+
+   _invalidate_observer_cache(ob, nil, low_timing);
 }
 
 /*
  * unregister_observer: operator-console mutation surface paired with register_observer
  * for the admin_console_ext `unregister-observer` verb. Removes ALL
  * observers at (ob, path, timing) by clearing the merry:on:<path>:<timing>
- * property. Finer-grained removal (by source string or by compiled-object
- * identity) is future work -- the compiled-object identity
- * path is the more tractable shape (source strings don't survive compile)
- * but adds API surface beyond diagnostic-tier needs.
+ * property -- the coarse start-fresh shape; remove_observer below is
+ * the finer-grained by-index sibling.
  * Capability-gated identically to register_observer via _check_registrar.
  */
 void unregister_observer(object ob, string path, string timing) {
@@ -298,16 +415,175 @@ void unregister_observer(object ob, string path, string timing) {
    _check_registrar(caller_program, ::object_name(ob));
    _check_property_bearer(ob);
 
-   low_timing = timing ? lower_case(timing) : "main";
-   if (low_timing != "pre" && low_timing != "main" && low_timing != "post") {
-      error("unregister_observer: timing must be one of {pre, main, post}; got \"" +
-            low_timing + "\"");
-   }
+   low_timing = _normalize_timing(timing);
    prop_name = "merry:on:" + path + ":" + low_timing;
 
    ob->set_raw_property(prop_name, nil);
 
    _invalidate_observer_cache(ob, path, low_timing);
+}
+
+/*
+ * remove_observer: finer-grained unregistration -- removes ONE entry
+ * from the ordered slot list at (ob, path, timing). Indices are
+ * positions in the slot list as reported by query_observers
+ * (registration order = firing order). By-index rather than
+ * by-compiled-object-identity because the query surface deliberately
+ * returns descriptions, not compiled references, so an external caller
+ * has no identity to remove by. An out-of-range index throws -- in a
+ * single coherence domain the query-then-remove window is small, and
+ * the throw makes staleness visible instead of silently removing the
+ * wrong entry. Clearing the last entry removes the slot property
+ * entirely (matching unregister_observer's end state).
+ * Capability-gated identically to register_observer via _check_registrar.
+ */
+void remove_observer(object ob, string path, string timing, int index) {
+   string caller_program, low_timing;
+   mixed *slot;
+   mixed *list;
+
+   caller_program = previous_program();
+   if (!ob) {
+      error("remove_observer: nil host object");
+   }
+   _check_registrar(caller_program, ::object_name(ob));
+   _check_property_bearer(ob);
+   low_timing = _normalize_timing(timing);
+
+   slot = _observer_slot(ob, path, low_timing);
+   list = slot[1];
+   if (index < 0 || index >= sizeof(list)) {
+      error("remove_observer: index " + (string) index +
+            " out of range for " + slot[0] + " (" +
+            (string) sizeof(list) + " observer" +
+            (sizeof(list) == 1 ? "" : "s") + ")");
+   }
+   list = list[.. index - 1] + list[index + 1 ..];
+   ob->set_raw_property(slot[0], sizeof(list) ? list : nil);
+
+   _invalidate_observer_cache(ob, path, low_timing);
+}
+
+/*
+ * query_observers: public read-only view of the LOCAL slot at
+ * (ob, path, timing) -- ground truth from the host's property table,
+ * not the daemon cache. Returns descriptive strings in slot order;
+ * array positions are the indices remove_observer takes. Read-only and
+ * ungated, matching the query_approved_registrars precedent: the
+ * descriptions expose nothing a same-domain raw-property read does not.
+ */
+string *query_observers(object ob, string path, string timing) {
+   mixed *slot;
+   mixed *list;
+   string *out;
+   int i;
+
+   if (!ob) {
+      error("query_observers: nil host object");
+   }
+   slot = _observer_slot(ob, path, _normalize_timing(timing));
+   list = slot[1];
+   out = allocate(sizeof(list));
+   for (i = 0; i < sizeof(list); i ++) {
+      out[i] = _describe_observer(list[i]);
+   }
+   return out;
+}
+
+/*
+ * query_effective_observers: public read-only ancestry-WALK view --
+ * what the dispatcher would fire for a write of (path) on (ob) at
+ * (timing), including inherited observers and re-enable marker
+ * effects. Mirrors find_observers' declarative-dominant walk exactly
+ * (local present + no marker -> stop; marker -> continue; observer-less
+ * levels transparent) but is computed fresh from the property tables,
+ * never from the daemon cache -- this is the "why did/didn't it fire"
+ * debugging view, so it must reflect ground truth. Returns
+ * ({ owner_object_name, description }) pairs in firing order.
+ */
+mixed **query_effective_observers(object ob, string path, string timing) {
+   string dprop, iprop, alias_dprop, low_timing;
+   mixed **out;
+
+   if (!ob) {
+      error("query_effective_observers: nil host object");
+   }
+   low_timing = _normalize_timing(timing);
+   dprop = "merry:on:" + path + ":" + low_timing;
+   iprop = "merry:on-inherit:" + path + ":" + low_timing;
+   alias_dprop = (low_timing == "main") ? "merry:on:" + path : nil;
+
+   out = ({ });
+   while (ob) {
+      mixed local, marker;
+
+      local = ob->query_raw_property(dprop);
+      if (!local && alias_dprop) {
+         local = ob->query_raw_property(alias_dprop);
+      }
+      marker = ob->query_raw_property(iprop);
+
+      if (local) {
+         mixed *list;
+         int i;
+
+         list = _normalize_observer_list(local);
+         for (i = 0; i < sizeof(list); i ++) {
+            out += ({ ({ ::object_name(ob), _describe_observer(list[i]) }) });
+         }
+         if (!marker) {
+            return out;
+         }
+      }
+      ob = ob->query_parent();
+   }
+   return out;
+}
+
+/*
+ * query_observed_paths: public read-only enumeration of the object's
+ * LOCAL observed (path, timing) slots, via the property API's prefix
+ * window over "merry:on:". The window excludes the re-enable markers
+ * (merry:on-inherit:* sorts below "merry:on:"). Timing-less alias
+ * slots (merry:on:<path>) report as main. Returns ({ path, timing })
+ * pairs in property-key order.
+ */
+mixed **query_observed_paths(object ob) {
+   mapping props;
+   string *keys;
+   mixed **out;
+   int i;
+
+   if (!ob) {
+      error("query_observed_paths: nil host object");
+   }
+   props = ob->query_prefixed_properties("merry:on:");
+   if (!props) {
+      /* non-property-bearing target: call_other on a missing function
+       * returns nil; an object with no observers returns ([ ]) */
+      props = ([ ]);
+   }
+   keys = map_indices(props);
+   out = ({ });
+   for (i = 0; i < sizeof(keys); i ++) {
+      string rest, path, timing, tail;
+      int j;
+
+      rest = keys[i][9 ..];	/* strlen("merry:on:") */
+      path = rest;
+      timing = "main";
+      for (j = strlen(rest) - 1; j >= 0 && rest[j] != ':'; j --)
+         ;
+      if (j > 0) {
+         tail = rest[j + 1 ..];
+         if (tail == "pre" || tail == "main" || tail == "post") {
+            path = rest[.. j - 1];
+            timing = tail;
+         }
+      }
+      out += ({ ({ path, timing }) });
+   }
+   return out;
 }
 
 /*

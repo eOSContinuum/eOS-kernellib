@@ -90,12 +90,15 @@ inherit "/usr/Merry/lib/merryapi";
 static void run_tests();
 static void verify_delay(object child);
 static void verify_suicide();
+static void verify_evict();
 static void phase17_verify();
 private void log_line(string msg);
 
 object delay_target;	/* binding host for phase 4; checked by verify_delay */
 object suicide_prog;	/* compiled node for phase 3c; nulls on destruct */
 object persist_host;	/* binding host for phase 16/17; survives hotboot */
+object evict_host;	/* binding host for phase 15e; checked by verify_evict */
+object evict_prog;	/* compiled node for phase 15e; nulls on destruct */
 
 
 static void create()
@@ -832,6 +835,198 @@ static void run_tests()
 
     log_line("MerryApp:test: DISPATCH IMPLICIT OK");
 
+    /* phase 15b: observer query surface -- the daemon's three public
+     * read-only views. query_observers returns the local slot in
+     * registration order (phase 10b registered two observers under the
+     * fanout key); query_effective_observers walks the ur chain (the
+     * parent's test:ancestry observer from phase 14 is visible from
+     * the child, labeled with the owning ancestor);
+     * query_observed_paths enumerates the child's observed
+     * (path, timing) slots. */
+
+    catch {
+	string *descs;
+	mixed **entries, **pairs;
+	int i, found;
+
+	descs = MERRY_DAEMON->query_observers(child, "test:dispatch:fanout",
+					      "main");
+	if (sizeof(descs) != 2) {
+	    log_line("MerryApp:test: FAIL: OBSERVER QUERY local slot expected "
+		     + "2 entries, got " + (string) sizeof(descs));
+	    return;
+	}
+
+	entries = MERRY_DAEMON->query_effective_observers(child,
+							  "test:ancestry",
+							  "main");
+	if (sizeof(entries) != 1) {
+	    log_line("MerryApp:test: FAIL: OBSERVER QUERY effective walk "
+		     + "expected 1 entry, got " + (string) sizeof(entries));
+	    return;
+	}
+	if (entries[0][0] != object_name(parent)) {
+	    log_line("MerryApp:test: FAIL: OBSERVER QUERY effective owner \""
+		     + entries[0][0] + "\" is not the parent");
+	    return;
+	}
+
+	pairs = MERRY_DAEMON->query_observed_paths(child);
+	found = 0;
+	for (i = 0; i < sizeof(pairs); i ++) {
+	    if (pairs[i][0] == "test:dispatch:fanout" &&
+		pairs[i][1] == "main") {
+		found = 1;
+	    }
+	}
+	if (!found) {
+	    log_line("MerryApp:test: FAIL: OBSERVER QUERY observed-paths "
+		     + "enumeration is missing test:dispatch:fanout main");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: OBSERVER QUERY threw");
+	return;
+    }
+
+    log_line("MerryApp:test: OBSERVER QUERY OK");
+
+    /* phase 15c: cross-property registration sugar -- register_observer
+     * with an ARRAY of paths compiles the source once and appends the
+     * same compiled object to each path's slot; a write on each path
+     * fires it once per path. */
+
+    catch {
+	string *da, *db;
+
+	MERRY_DAEMON->register_observer(child,
+	    ({ "test:multi:a", "test:multi:b" }), "main",
+	    "Set($this, \"test:multi:fired\", Get($this, \"test:multi:fired\") + 1); return TRUE;");
+
+	child->set_raw_property("test:multi:fired", 0);
+	child->set_property("test:multi:a", 1);
+	child->set_property("test:multi:b", 2);
+
+	if (child->query_raw_property("test:multi:fired") != 2) {
+	    log_line("MerryApp:test: FAIL: OBSERVER SUGAR fired "
+		     + (string) child->query_raw_property("test:multi:fired")
+		     + " times, expected 2");
+	    return;
+	}
+
+	da = MERRY_DAEMON->query_observers(child, "test:multi:a", "main");
+	db = MERRY_DAEMON->query_observers(child, "test:multi:b", "main");
+	if (sizeof(da) != 1 || sizeof(db) != 1 || da[0] != db[0]) {
+	    log_line("MerryApp:test: FAIL: OBSERVER SUGAR slots do not share "
+		     + "one compiled object");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: OBSERVER SUGAR threw");
+	return;
+    }
+
+    log_line("MerryApp:test: OBSERVER SUGAR OK");
+
+    /* phase 15d: by-index removal. Remove the FIRST fanout observer;
+     * the second must remain and still fire alone. An out-of-range
+     * index must refuse (staleness made visible, never a silent
+     * wrong-entry removal), and a cross-domain caller must be refused
+     * by the same registrar gate that guards registration. */
+
+    catch {
+	string *descs;
+	int err_caught;
+
+	MERRY_DAEMON->remove_observer(child, "test:dispatch:fanout", "main", 0);
+
+	descs = MERRY_DAEMON->query_observers(child, "test:dispatch:fanout",
+					      "main");
+	if (sizeof(descs) != 1) {
+	    log_line("MerryApp:test: FAIL: OBSERVER REMOVE slot has "
+		     + (string) sizeof(descs) + " entries, expected 1");
+	    return;
+	}
+
+	child->set_raw_property("test:dispatch:fanout:trace", "");
+	child->set_property("test:dispatch:fanout", 8);
+	if (child->query_raw_property("test:dispatch:fanout:trace")
+	    != "second") {
+	    log_line("MerryApp:test: FAIL: OBSERVER REMOVE trace was \""
+		     + (string) child->query_raw_property("test:dispatch:fanout:trace")
+		     + "\", expected \"second\"");
+	    return;
+	}
+
+	err_caught = 0;
+	catch {
+	    MERRY_DAEMON->remove_observer(child, "test:dispatch:fanout",
+					  "main", 5);
+	} : {
+	    err_caught = 1;
+	}
+	if (!err_caught) {
+	    log_line("MerryApp:test: FAIL: OBSERVER REMOVE out-of-range index "
+		     + "did not throw");
+	    return;
+	}
+
+	err_caught = 0;
+	catch {
+	    MERRY_DAEMON->remove_observer(find_object(MERRY_DAEMON),
+					  "test:reject", "main", 0);
+	} : {
+	    err_caught = 1;
+	}
+	if (!err_caught) {
+	    log_line("MerryApp:test: FAIL: OBSERVER REMOVE cross-domain caller "
+		     + "was not refused");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: OBSERVER REMOVE setup threw");
+	return;
+    }
+
+    log_line("MerryApp:test: OBSERVER REMOVE OK");
+
+    /* phase 15e: OBSERVER EVICT SETUP -- eviction-survival of a
+     * registered observer. The registered slot entry is the merry-
+     * script wrapper (data/merry); the LRU eviction path (MERRY's
+     * clean_nodes -> merrynode suicide) destructs only the compiled
+     * /merry/<md5> PROGRAM, which the wrapper lazily recompiles from
+     * its retained source on the next evaluate. Drive the eviction
+     * entry point directly on the registered observer's program; the
+     * observer must still fire afterward. A distinctive source keeps
+     * the MD5-keyed program unshared. verify_evict fires post-restore
+     * (boot 1 self-exits before timed call_outs run), which also
+     * proves the recompile path survives a snapshot cycle. */
+
+    catch {
+	mixed *slot_val;
+
+	MERRY_DAEMON->register_observer(child, "test:evict", "main",
+	    "Set($this, \"test:evict:fired\", 20260703); return TRUE;");
+
+	slot_val = child->query_raw_property("merry:on:test:evict:main");
+	if (typeof(slot_val) != T_ARRAY || sizeof(slot_val) == 0) {
+	    log_line("MerryApp:test: FAIL: OBSERVER EVICT slot not stored");
+	    return;
+	}
+	evict_prog = slot_val[sizeof(slot_val) - 1]->query_program();
+	if (!evict_prog) {
+	    log_line("MerryApp:test: FAIL: OBSERVER EVICT compiled node not "
+		     + "reachable via query_program");
+	    return;
+	}
+	evict_prog->suicide();
+	evict_host = child;
+	call_out("verify_evict", 2);
+    } : {
+	log_line("MerryApp:test: FAIL: OBSERVER EVICT setup threw");
+	return;
+    }
+
     /* phase 16: PERSIST SETUP -- register a persistent observer on a
      * fresh binding host, save the host so phase17_verify can find it
      * after restore, schedule the verify call_out, then trigger a
@@ -923,6 +1118,39 @@ static void verify_suicide()
 	return;
     }
     log_line("MerryApp:test: SUICIDE OK");
+}
+
+
+/* phase 15e verification -- fires post-restore. The registered
+ * observer's compiled program was destructed via the eviction entry
+ * point before the snapshot; a write on the observed path must still
+ * fire the observer (the wrapper recompiles from retained source). */
+static void verify_evict()
+{
+    if (evict_prog) {
+	log_line("MerryApp:test: FAIL: OBSERVER EVICT compiled node survived "
+		 + "eviction");
+	return;
+    }
+    if (!evict_host) {
+	log_line("MerryApp:test: FAIL: OBSERVER EVICT host destructed before "
+		 + "verify");
+	return;
+    }
+
+    catch {
+	evict_host->set_property("test:evict", 1);
+	if (evict_host->query_raw_property("test:evict:fired") != 20260703) {
+	    log_line("MerryApp:test: FAIL: OBSERVER EVICT observer did not "
+		     + "fire after eviction");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: OBSERVER EVICT verify threw");
+	return;
+    }
+
+    log_line("MerryApp:test: OBSERVER EVICT OK");
 }
 
 

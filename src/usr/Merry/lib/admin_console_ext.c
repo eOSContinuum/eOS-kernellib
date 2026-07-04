@@ -12,14 +12,14 @@
  * Verb-set (9 verbs):
  *
  *   READ / DIAGNOSTIC (4):
- *     observers <obj_path> <path> [timing]
+ *     observers <obj_path> [<path> [timing]] [-effective]
  *     cascade-depth [N]
  *     batch-status <batch_id>
  *     dispatch-trace on|off|status
  *
  *   MUTATION (5):
  *     register-observer <obj_path> <path> <timing> <source...>
- *     unregister-observer <obj_path> <path> <timing>
+ *     unregister-observer <obj_path> <path> <timing> [index]
  *     query-approved-registrars
  *     approve-registrar <domain>
  *     unapprove-registrar <domain>
@@ -87,34 +87,72 @@ private string *_split(string str, int n_lead, int n_required) {
 }
 
 /*
- * observers <obj_path> <path> [timing]
+ * observers <obj_path> [<path> [timing]] [-effective]
  *
- * Reads merry:on:<path>:<timing> property on the target object directly
- * (bypasses the daemon cache, which is the right call for a diagnostic
- * verb -- shows ground truth, not cache state). Lists the compiled
- * observer object names per timing.
+ * All three read shapes route through MERRY's public query LFUNs,
+ * which read the target's property table directly (never the daemon
+ * cache -- ground truth for a diagnostic verb):
+ *
+ *   no <path>       enumerate the object's observed (path, timing)
+ *                   slots (query_observed_paths) -- the discovery step
+ *                   for an operator who does not know the paths.
+ *   <path> [timing] the local slot(s), indexed (query_observers); the
+ *                   indices are what unregister-observer's optional
+ *                   index argument removes by.
+ *   -effective      the ancestry-walk view (query_effective_observers):
+ *                   what the dispatcher would fire, each entry labeled
+ *                   with the owning ancestor. Requires a <path>.
  */
 void cmd_observers(object user, string cmd, string str) {
-   string *parts;
+   string *raw, *parts;
    string target_path, prop_path, timing;
    string *timings;
    object target;
-   int i;
+   int i, effective;
 
-   parts = _split(str, 3, 2);
-   if (!parts) {
-      _emit(user, "usage: observers <obj_path> <path> [timing]\n");
+   raw = str ? (explode(str, " ") - ({ "" })) : ({ });
+   parts = ({ });
+   effective = 0;
+   for (i = 0; i < sizeof(raw); i ++) {
+      if (raw[i] == "-effective") {
+         effective = 1;
+      } else {
+         parts += ({ raw[i] });
+      }
+   }
+   if (sizeof(parts) == 0) {
+      _emit(user, "usage: observers <obj_path> [<path> [timing]] [-effective]\n");
       return;
    }
    target_path = parts[0];
-   prop_path = parts[1];
-   timing = sizeof(parts) >= 3 ? lower_case(parts[2]) : nil;
 
    target = find_object(target_path);
    if (!target) {
       _emit(user, "observers: target object not loaded: " + target_path + "\n");
       return;
    }
+
+   if (sizeof(parts) == 1) {
+      mixed **pairs;
+
+      if (effective) {
+         _emit(user, "observers: -effective requires a <path>\n");
+         return;
+      }
+      pairs = MERRY->query_observed_paths(target);
+      _emit(user, target_path + " observed paths:\n");
+      if (sizeof(pairs) == 0) {
+         _emit(user, "  (none)\n");
+         return;
+      }
+      for (i = 0; i < sizeof(pairs); i ++) {
+         _emit(user, "  " + pairs[i][0] + " : " + pairs[i][1] + "\n");
+      }
+      return;
+   }
+
+   prop_path = parts[1];
+   timing = sizeof(parts) >= 3 ? lower_case(parts[2]) : nil;
 
    if (timing &&
        timing != "pre" && timing != "main" && timing != "post") {
@@ -123,40 +161,36 @@ void cmd_observers(object user, string cmd, string str) {
    }
 
    timings = timing ? ({ timing }) : ({ "pre", "main", "post" });
-   _emit(user, target_path + " " + prop_path + ":\n");
+   _emit(user, target_path + " " + prop_path +
+         (effective ? " (effective)" : "") + ":\n");
    for (i = 0; i < sizeof(timings); i ++) {
-      string prop_name;
-      mixed val;
-
-      prop_name = "merry:on:" + prop_path + ":" + timings[i];
-      val = target->query_raw_property(prop_name);
       _emit(user, "  " + timings[i] + ":\n");
-      if (val == nil) {
-         _emit(user, "    (none)\n");
-      } else if (typeof(val) == T_ARRAY) {
+      if (effective) {
+         mixed **entries;
          int j;
-         if (sizeof(val) == 0) {
-            _emit(user, "    (empty)\n");
+
+         entries = MERRY->query_effective_observers(target, prop_path,
+                                                    timings[i]);
+         if (sizeof(entries) == 0) {
+            _emit(user, "    (none)\n");
+            continue;
          }
-         for (j = 0; j < sizeof(val); j ++) {
-            mixed entry;
-            entry = val[j];
-            if (typeof(entry) == T_OBJECT) {
-               _emit(user, "    " + object_name(entry) + "\n");
-            } else if (typeof(entry) == T_STRING) {
-               _emit(user, "    <source string>\n");
-            } else {
-               _emit(user, "    <unexpected type " +
-                     (string) typeof(entry) + ">\n");
-            }
+         for (j = 0; j < sizeof(entries); j ++) {
+            _emit(user, "    [" + (string) j + "] " + entries[j][0] +
+                  " " + entries[j][1] + "\n");
          }
-      } else if (typeof(val) == T_OBJECT) {
-         _emit(user, "    " + object_name(val) + "\n");
-      } else if (typeof(val) == T_STRING) {
-         _emit(user, "    <source string>\n");
       } else {
-         _emit(user, "    <unexpected type " +
-               (string) typeof(val) + ">\n");
+         string *descs;
+         int j;
+
+         descs = MERRY->query_observers(target, prop_path, timings[i]);
+         if (sizeof(descs) == 0) {
+            _emit(user, "    (none)\n");
+            continue;
+         }
+         for (j = 0; j < sizeof(descs); j ++) {
+            _emit(user, "    [" + (string) j + "] " + descs[j] + "\n");
+         }
       }
    }
 }
@@ -297,10 +331,12 @@ void cmd_register_observer(object user, string cmd, string str) {
 }
 
 /*
- * unregister-observer <obj_path> <path> <timing>
+ * unregister-observer <obj_path> <path> <timing> [index]
  *
- * Removes all observers at (target, path, timing). Coarse
- * granularity (matches the daemon's unregister_observer signature).
+ * Without index: removes all observers at (target, path, timing) --
+ * coarse granularity (the daemon's unregister_observer). With index:
+ * removes the single slot entry at that position (the daemon's
+ * remove_observer; indices as shown by `observers <obj_path> <path>`).
  */
 void cmd_unregister_observer(object user, string cmd, string str) {
    string *parts;
@@ -308,9 +344,10 @@ void cmd_unregister_observer(object user, string cmd, string str) {
    object target;
    mixed err;
 
-   parts = _split(str, 3, 3);
-   if (!parts) {
-      _emit(user, "usage: unregister-observer <obj_path> <path> <timing>\n");
+   parts = _split(str, 4, 3);
+   if (!parts || sizeof(parts) > 4) {
+      _emit(user,
+            "usage: unregister-observer <obj_path> <path> <timing> [index]\n");
       return;
    }
    target_path = parts[0];
@@ -323,6 +360,25 @@ void cmd_unregister_observer(object user, string cmd, string str) {
             target_path + "\n");
       return;
    }
+
+   if (sizeof(parts) == 4) {
+      int index;
+
+      if (sscanf(parts[3], "%d", index) != 1) {
+         _emit(user, "unregister-observer: index must be an integer\n");
+         return;
+      }
+      err = catch(ADMIN_CONSOLE_REGISTRY->
+                  verb_remove_observer(target, prop_path, timing, index));
+      if (err) {
+         _emit(user, "unregister-observer: " + err + "\n");
+         return;
+      }
+      _emit(user, "unregister-observer: removed [" + (string) index +
+            "] from " + target_path + " " + prop_path + ":" + timing + "\n");
+      return;
+   }
+
    err = catch(ADMIN_CONSOLE_REGISTRY->
                verb_unregister_observer(target, prop_path, timing));
    if (err) {
