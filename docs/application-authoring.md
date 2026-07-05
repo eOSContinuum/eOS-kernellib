@@ -227,4 +227,4 @@ The shape is a teaching surface for the platform's individual primitives, not th
 - `docs/http-applications.md` — the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
 - `docs/operations.md` — the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
 
-[LPC.md]: https://github.com/dworkin/lpc-docs/blob/master/LPC.md
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md

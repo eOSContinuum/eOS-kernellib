@@ -210,7 +210,7 @@ For non-HTTP applications, the patterns are covered in `docs/application-authori
 - `docs/operations.md` — the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
 - `docs/application-authoring.md` — writing tier-E applications on top of this architecture.
 
-[LPC.md]: https://github.com/dworkin/lpc-docs/blob/master/LPC.md
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
 
 [DGD]: https://github.com/dworkin/dgd
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext

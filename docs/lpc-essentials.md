@@ -2,7 +2,7 @@
 
 LPC is the programming language used by the [DGD] driver and the layers built on it, including eOS-kernellib. This document is an orientation: enough to read LPC code without surprise, enough mental model to know what to look up next. The authoritative reference is [LPC.md] in [dworkin/lpc-doc] (DGD pins commit `403cd0b` as a submodule). LPC.md is a formal specification, dense and reference-shaped; this document is the bridge that makes the spec readable.
 
-For depth on a specific construct, follow the section citations into LPC.md. For the kfun catalog, see [dworkin/lpc-docs/kfun/]. For how LPC fits into eOS-kernellib's runtime platform (tier model, daemons, the auto-inheritance chain that hands every object its identity), see `docs/architecture.md`. For the patterns an application author writes on top of the platform, see `docs/application-authoring.md`.
+For depth on a specific construct, follow the section citations into LPC.md. For the kfun catalog, see [dworkin/lpc-doc/kfun/]. For how LPC fits into eOS-kernellib's runtime platform (tier model, daemons, the auto-inheritance chain that hands every object its identity), see `docs/architecture.md`. For the patterns an application author writes on top of the platform, see `docs/application-authoring.md`.
 
 **Audience**: a programmer new to LPC; familiar with at least one C-family language (C, C++, Java, Go, or similar) — or with a dynamic language (Python, TypeScript, Ruby), in which case read the "If you come from dynamic languages" section first. Reading this to gain enough LPC literacy to read platform code and write application code on top. The formal language reference at [dworkin/lpc-doc] is authoritative; this document is the bridge to it.
 
@@ -93,7 +93,7 @@ parent::foo();      /* inherited (named): foo from inherit named "parent" */
 
 Cross-object calls (`->`) go through the host runtime's kfun layer and are subject to per-tier access checks. The inherited call operators (`::` and `name::`) are language constructs and dispatch directly into the inherited program.
 
-Some functions are not defined in any LPC source — they are *kfuns*, provided by the host driver. From the calling site, kfuns look identical to local functions: `compile_object("/usr/MyApp/obj/widget")` is a kfun call, but the syntax does not say so. The catalog lives in [dworkin/lpc-docs/kfun/]. Note that kfuns split into two surfaces: the small minimalist core the host driver ships, and the optional extension modules a deployment may load (covered in `docs/architecture.md` "Host-driver extensions" and `docs/operations.md` "Loading host-driver extensions").
+Some functions are not defined in any LPC source — they are *kfuns*, provided by the host driver. From the calling site, kfuns look identical to local functions: `compile_object("/usr/MyApp/obj/widget")` is a kfun call, but the syntax does not say so. The catalog lives in [dworkin/lpc-doc/kfun/]. Note that kfuns split into two surfaces: the small minimalist core the host driver ships, and the optional extension modules a deployment may load (covered in `docs/architecture.md` "Host-driver extensions" and `docs/operations.md` "Loading host-driver extensions").
 
 ## Inheritance
 
@@ -225,7 +225,7 @@ The `examples/atomic-demo/` reference application wraps this counter in an HTTP/
 ## Where to next
 
 - **[LPC.md]** — the formal language spec, pinned by DGD at commit `403cd0b`. §3.1 lexical elements, §3.2 expressions, §3.4 declarations and types, §3.5 statements, §3.6 inheritance, §3.7 preprocessing.
-- **[dworkin/lpc-docs/kfun/]** — the kfun catalog. Every host-provided function the language calls.
+- **[dworkin/lpc-doc/kfun/]** — the kfun catalog. Every host-provided function the language calls.
 - **`docs/architecture.md`** — the platform's tier model, daemons, the auto-inheritance chain, the host-driver extension surface.
 - **`docs/application-authoring.md`** — what writing a tier-E application on top of this platform looks like: domain layout, initd, owner / access, the object-manager lifecycle, `call_touch` upgrade.
 - **`docs/kernel-libraries.md`** — the inheritable libraries shipped under `src/lib/` (String, StringBuffer, KVstore, Iterator, Continuation variants, Time).
@@ -233,5 +233,5 @@ The `examples/atomic-demo/` reference application wraps this counter in an HTTP/
 
 [DGD]: https://github.com/dworkin/dgd
 [dworkin/lpc-doc]: https://github.com/dworkin/lpc-doc
-[LPC.md]: https://github.com/dworkin/lpc-docs/blob/master/LPC.md
-[dworkin/lpc-docs/kfun/]: https://github.com/dworkin/lpc-docs/tree/master/kfun
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
+[dworkin/lpc-doc/kfun/]: https://github.com/dworkin/lpc-doc/tree/master/kfun
