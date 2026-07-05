@@ -7,10 +7,11 @@
 # register-observer / unregister-observer entries assert the daemon's
 # property-bearer refusal against /usr/MerryApp/sys/test (a loaded
 # daemon WITHOUT the property API -- the daemon validates the target
-# rather than silently storing nothing); full registration semantics
-# against a property-bearing clone are exercised by the merry-app
-# in-application test phases (clone paths are not stable across
-# boots).
+# rather than silently storing nothing). Clone paths are not stable
+# across boots, but Index logical names are: the CLONE ADDRESSING
+# section drives the full registration cycle against the
+# MerryApp:demo:parent named clone, which path-form targets cannot
+# reach (the System auto layer's find_object refuses path#index).
 #
 # Run against a restore-booted runtime with merry-app deployed:
 #   scripts/drive-verbs.py scripts/verbsets/dispatcher-verbs.verbset
@@ -95,3 +96,33 @@ expect: unregister-observer: MERRY: target /usr/MerryApp/sys/test does not carry
 
 cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main x
 expect: unregister-observer: index must be an integer
+
+# CLONE ADDRESSING -- targets resolve through the Index logical-name
+# registry (path first, Index fallback), so the mutate -> verify ->
+# undo -> verify-undo cycle runs against a property-bearing named
+# clone. Refusals assert the unified not-found diagnostic.
+
+cmd: observers MerryApp:demo:parent
+expect: MerryApp:demo:parent observed paths:
+absent: usage:
+
+cmd: register-observer MerryApp:demo:parent drive:ca:prop main Set($this, "drive:ca:mark", 1);
+expect: register-observer: registered on MerryApp:demo:parent drive:ca:prop:main
+
+cmd: observers MerryApp:demo:parent drive:ca:prop main
+expect: \[0\]
+
+cmd: unregister-observer MerryApp:demo:parent drive:ca:prop main
+expect: unregister-observer: cleared MerryApp:demo:parent drive:ca:prop:main
+
+cmd: observers MerryApp:demo:parent drive:ca:prop main
+expect: \(none\)
+
+cmd: observers No:Such:Name
+expect: observers: target not found \(no loaded object or Index name\): No:Such:Name
+
+cmd: register-observer No:Such:Name drive:ca:prop main Set($this, "drive:ca:mark", 1);
+expect: register-observer: target not found \(no loaded object or Index name\): No:Such:Name
+
+cmd: unregister-observer No:Such:Name drive:ca:prop main
+expect: unregister-observer: target not found \(no loaded object or Index name\): No:Such:Name

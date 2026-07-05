@@ -16,6 +16,7 @@ private inherit	"/lib/util/ascii";
 # define USERSERVER		"/usr/System/sys/userd"
 # define OBJECTSERVER		"/usr/System/sys/objectd"
 # define UPGRADESERVER		"/usr/System/sys/upgraded"
+# define INDEX			"/usr/Index/sys/index_daemon"
 
 # define STATE_NORMAL		0
 # define STATE_LOGIN		1
@@ -126,6 +127,101 @@ static object ident(string str)
     return USERSERVER->find_user(str);
 }
 
+/*
+ * NAME:	translate_name()
+ * DESCRIPTION:	resolve a colon-shaped verb argument: LPC object name
+ *		first, then the Index logical-name registry -- the same
+ *		order the coercion codec uses for object references.
+ *		Returns the canonical object name on resolution, or nil
+ *		after messaging when neither route resolves. Logical
+ *		names are the sanctioned address for clones, which have
+ *		no stable path-form address of their own.
+ */
+private string translate_name(string str)
+{
+    object obj, ixd;
+
+    obj = find_object(str);
+    if (!obj) {
+	ixd = find_object(INDEX);
+	if (ixd) {
+	    obj = ixd->query_object(str);
+	}
+    }
+    if (!obj) {
+	message("No such object or Index name.\n");
+	return nil;
+    }
+    return object_name(obj);
+}
+
+/*
+ * The object-taking verbs, masked to accept Index logical names --
+ * the same masks the kernel admin-console clonable carries, so both
+ * console shapes resolve names identically. Only colon-shaped
+ * arguments are translated; paths, $refs, and empty arguments pass
+ * through to the library verb byte-identical to before.
+ */
+
+/*
+ * NAME:	cmd_clone()
+ * DESCRIPTION:	clone, accepting Index logical names
+ */
+static void cmd_clone(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    admin_console::cmd_clone(user, cmd, str);
+}
+
+/*
+ * NAME:	cmd_destruct()
+ * DESCRIPTION:	destruct, accepting Index logical names
+ */
+static void cmd_destruct(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    admin_console::cmd_destruct(user, cmd, str);
+}
+
+/*
+ * NAME:	cmd_new()
+ * DESCRIPTION:	new, accepting Index logical names
+ */
+static void cmd_new(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    admin_console::cmd_new(user, cmd, str);
+}
+
+/*
+ * NAME:	cmd_status()
+ * DESCRIPTION:	status, accepting Index logical names
+ */
+static void cmd_status(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    admin_console::cmd_status(user, cmd, str);
+}
 
 /*
  * NAME:	cmd_issues()

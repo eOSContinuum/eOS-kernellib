@@ -45,6 +45,8 @@
 # include <Merry.h>
 # include <type.h>
 
+# define INDEX	"/usr/Index/sys/index_daemon"
+
 private inherit "/lib/util/ascii";	/* lower_case */
 
 /*
@@ -87,6 +89,29 @@ private string *_split(string str, int n_lead, int n_required) {
 }
 
 /*
+ * _resolve_target: turn a verb's object argument into an object. LPC
+ * path first (find_object), then the Index logical-name registry --
+ * the same resolution order the coercion codec uses for object
+ * references. Logical names are the sanctioned address for clones,
+ * which the System auto layer's find_object deliberately refuses in
+ * raw path#index form. Emits the unified not-found diagnostic and
+ * returns nil when neither route resolves.
+ */
+private object _resolve_target(object user, string verb, string target_path) {
+   object target;
+
+   target = find_object(target_path);
+   if (!target) {
+      target = INDEX->query_object(target_path);
+   }
+   if (!target) {
+      _emit(user, verb + ": target not found (no loaded object or Index name): " +
+            target_path + "\n");
+   }
+   return target;
+}
+
+/*
  * observers <obj_path> [<path> [timing]] [-effective]
  *
  * All three read shapes route through MERRY's public query LFUNs,
@@ -126,9 +151,8 @@ void cmd_observers(object user, string cmd, string str) {
    }
    target_path = parts[0];
 
-   target = find_object(target_path);
+   target = _resolve_target(user, "observers", target_path);
    if (!target) {
-      _emit(user, "observers: target object not loaded: " + target_path + "\n");
       return;
    }
 
@@ -314,10 +338,8 @@ void cmd_register_observer(object user, string cmd, string str) {
    timing = parts[2];
    source = parts[3];
 
-   target = find_object(target_path);
+   target = _resolve_target(user, "register-observer", target_path);
    if (!target) {
-      _emit(user, "register-observer: target object not loaded: " +
-            target_path + "\n");
       return;
    }
    err = catch(ADMIN_CONSOLE_REGISTRY->
@@ -354,10 +376,8 @@ void cmd_unregister_observer(object user, string cmd, string str) {
    prop_path = parts[1];
    timing = parts[2];
 
-   target = find_object(target_path);
+   target = _resolve_target(user, "unregister-observer", target_path);
    if (!target) {
-      _emit(user, "unregister-observer: target object not loaded: " +
-            target_path + "\n");
       return;
    }
 

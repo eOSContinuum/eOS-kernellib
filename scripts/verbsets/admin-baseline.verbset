@@ -12,3 +12,16 @@ expect: Logged on:.*admin
 
 cmd: code 1 + 1
 expect: \$\d+ = 2
+
+# Clone addressing: object-taking verbs resolve Index logical names.
+# Schema:Core:Entry is a schema_node CLONE registered at boot -- the
+# stable-name-for-an-unstable-clone-path case the resolution exists for.
+
+cmd: status Schema:Core:Entry
+expect: Object:      </usr/Schema/obj/schema_node#\d+>
+
+cmd: status Vault:Daemon
+expect: Object:      </usr/Vault/sys/vault>
+
+cmd: status No:Such:Name
+expect: No such object or Index name.

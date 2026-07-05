@@ -352,9 +352,10 @@ Each documented signature is exercised by at least one phase of the MerryApp smo
 | Compiled-observer eviction survival (lazy recompile, across restore) | 15e | `OBSERVER EVICT OK` |
 | `unregister_observer` (coarse clear: slot property deleted, nothing fires) | 15f | `OBSERVER CLEAR OK` |
 | `unregister-observer` verb (coarse + indexed shapes; the automated verbset asserts the refusal paths -- property-bearer gate, non-integer index) | telnet-drive | `dispatcher-verbs` verbset; the operator session in `admin-console.md` |
+| Observer verbs by Index logical name (full register -> observe -> unregister -> verify-undo cycle against a named clone; unified not-found refusal on all three verbs) | telnet-drive | `dispatcher-verbs` verbset, CLONE ADDRESSING section |
 | `set_dispatch_trace` / `query_dispatch_trace` | telnet-drive | admin verb `dispatch-trace on|off|status` end-to-end against MerryApp |
 
-A test phase that does not appear above is from the pre-dispatcher lift (phases 1-5 cover the Merry script-binding primitive itself; phase 4's `DELAY OK` covers the `$delay()` continuation path documented in `merry-applications.md`). The two telnet-drive rows reference operator-tier verification rather than smoke-phase markers: the verbs were exercised via direct telnet session against the restore-boot MerryApp; see `admin-console.md` "Dispatcher operator surface" for the full session and the verb-by-verb output format.
+A test phase that does not appear above is from the pre-dispatcher lift (phases 1-5 cover the Merry script-binding primitive itself; phase 4's `DELAY OK` covers the `$delay()` continuation path documented in `merry-applications.md`). The telnet-drive rows reference operator-tier verification rather than smoke-phase markers: the verbs were exercised via direct telnet session against the restore-boot MerryApp; see `admin-console.md` "Dispatcher operator surface" for the full session and the verb-by-verb output format.
 
 ## See also
 
