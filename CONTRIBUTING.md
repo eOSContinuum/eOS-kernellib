@@ -12,7 +12,7 @@ Thanks for your interest in eOS-kernellib. This document covers the conventions 
 
 ## Project status
 
-eOS-kernellib is the contemporary repackaging of the orthogonally-persistent kernellib lineage around a documented kernel-layer surface for builders. The doc set is content-and-form complete as of [README's Tested-against line](README.md#status); LPC and platform behavior is stable enough for application authoring to begin on top.
+eOS-kernellib is the contemporary repackaging of the orthogonally-persistent kernellib lineage around a documented kernel-layer surface for builders. The doc set is content-and-form complete as of [README's Tested-against line](README.md#quickstart); LPC and platform behavior is stable enough for application authoring to begin on top.
 
 Substantial changes are welcome but the bar for changing capability-tier discipline, kernel-auto inheritance, daemon contracts, or the eight runtime primitives is high; the bar for adding library code under `src/lib/`, documenting an empirical observation, or extending the `examples/http-app/` reference is low.
 
