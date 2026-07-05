@@ -45,6 +45,8 @@ First-connection behavior depends on whether the kernel has admin credentials pe
 
 An operator authenticated as `admin` has tier-spanning reach (kernel and System tiers, plus cross-domain visibility into user-tier code). Other authenticated operators have access bounded by their owner's directory tree and the access-daemon grants on top.
 
+The two login shapes also reach different console objects. The `admin` login (on the primary telnet port) clones the kernel console (`src/kernel/obj/admin_console.c`), whose switch-default routes the registry's extension verbs (`observers`, `log`, `dispatch-trace`, and the rest). A registered user name routes through the System userd to the System login console (`/usr/System/obj/user.c`), which inherits the same console library and additionally carries the System lifecycle verbs — `upgrade`, `issues`, `hotboot`, `halt` — that the kernel console's verb set does not list; it does not route registry-extension verbs. A verb answered with `No command` on one console shape may belong to the other.
+
 ## Security posture
 
 The admin_console is the platform's most dangerous interface and the platform's most useful interface. Two facts shape its security model:
@@ -103,7 +105,7 @@ All four object-taking verbs (`clone`, `destruct`, `new`, `status`) also accept 
   3. Verify with `code "/usr/MyApp/obj/route_handler"->probe()` (or an equivalent test invocation).
   
   No restart; no disconnect.
-- **Library upgrade**: recompiling a library (`/usr/MyApp/lib/util.c`) replaces the library master, but existing children of the library do not automatically pick up the new parent. The `upgrade [-a|-p] <file> [<file> ...]` verb — a System-tier extension to the console's verb set, carried by the operator login object (`/usr/System/obj/user.c`) — drives the platform's recompile cascade: the upgrade daemon (`/usr/System/sys/upgraded.c`) walks the object manager's inheritance graph for every direct and transitive dependent, recompiles them (`-a` for all-or-nothing atomic recompile), and with `-p` queues `call_touch` patching so clone state migrates on next reference. Manual alternatives remain:
+- **Library upgrade**: recompiling a library (`/usr/MyApp/lib/util.c`) replaces the library master, but existing children of the library do not automatically pick up the new parent. The `upgrade [-a|-p] <file> [<file> ...]` verb — carried by the System login console (`/usr/System/obj/user.c`), the console shape a registered user name logs into (see Connecting); the `admin` login's kernel console does not list it — drives the platform's recompile cascade: the upgrade daemon (`/usr/System/sys/upgraded.c`) walks the object manager's inheritance graph for every direct and transitive dependent, recompiles them (`-a` for all-or-nothing atomic recompile), and with `-p` queues `call_touch` patching so clone state migrates on next reference. Manual alternatives remain:
   - Destruct each child (`destruct /usr/MyApp/obj/foo`) and recompile (`compile /usr/MyApp/obj/foo.c`). Loses clone state.
   - Use `call_touch` (via `code`) to mark every dependent for lazy upgrade through `_F_touch()`. Preserves state.
 - **Recover from a wedged daemon**: `destruct /usr/MyApp/sys/router` then `clone /usr/MyApp/sys/router` would re-instantiate from the master — except `sys/` daemons are singletons that compile at boot, not on demand. The recovery is `destruct` followed by `compile` of the daemon source.

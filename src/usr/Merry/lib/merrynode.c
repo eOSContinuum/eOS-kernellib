@@ -402,7 +402,7 @@ object new_object(string obj, mixed args...) {
 
 # define SANDBOX(f) mixed f(mixed args...) { error("function '" + #f + "' not allowed in merry code"); }
 
-/* The historical forbidden set (37 functions). Several names
+/* The historical forbidden set. Several names
  * may not resolve to actual DGD kfuns in cloud-server (e.g.
  * add_event, event, subscribe_event, ports, open_port, this_user,
  * users, set_object_name) -- the SANDBOX entries are harmless
