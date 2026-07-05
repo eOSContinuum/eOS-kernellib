@@ -48,7 +48,7 @@ The Schema subsystem's structural primitives are bootstrapped in **two places** 
 - **`schema_daemon::configure_initial_nodes()`** — LPC code that clones a schema_node and calls `set_name(ns, tag)`, `add_attribute(...)`, `add_callback(...)` for each primitive. This is the boot-time path; the schema tree comes up before any on-disk schemas load.
 - **`data/schema/<Name>.xml`** — XML files describing the same primitives. They are the on-disk reference for the wire format and the load target for the marshaler-driven loader.
 
-The boot path uses the LPC code. `schema_daemon::load_core_schemas()` reads the XML files via `parse_xml + stateimpex::import_state` and cross-checks them against the code-defined primitives; load mismatches surface as boot-log errors. The two definitions must produce equivalent schema_node trees.
+The boot path uses the LPC code. `schema_daemon::load_core_schemas()` then reads the XML files via `parse_xml + stateimpex::import_state` and re-applies them through the schema-for-schemas tree. The XML shape **wins**: the import callbacks clear and re-add list-valued definitions (attributes, callbacks) and the made-setters replace the leaf, iterator, and delete-item, so a file that diverges from the code definition silently replaces it rather than erroring -- the two definitions are kept in step by hand, not enforced. Parse and structural failures do surface as boot-log errors, and `import_state` is idempotent on a matching node.
 
 ## Namespace vocabulary
 
@@ -66,12 +66,34 @@ The vocabulary avoids name collisions with the UR (Uniform Resource) identifier 
 
 [Blockchain Commons]: https://github.com/BlockchainCommons
 
+## Property-table marshaling (Core:Entries)
+
+Bare property-bearing objects (inheritors of `/lib/util/properties`) marshal through the built-in `Core:Entries` shape with no per-app schema: the property lib's default `queryStateRoot()` is `"Core:Entries"`, whose child `Core:Entry` iterates the property keys and moves each value through the ascii-property accessors -- `query_ascii_property(key)` on export, `set_ascii_property(key, content)` on import, `clear_property(key)` as the delete item. Applications whose durable state lives in typed member variables bind a per-app schema instead ([vault-applications.md](vault-applications.md)); the two surfaces coexist in `examples/vault-app` (`obj/thing` per-app, `obj/item` property-table).
+
+**The coercion codec.** The accessors encode and decode values through `/lib/util/coercion` (`encodeValue` / `decodeValue`), a round-trip codec over the LPC-literal grammar `dumpValue` prints:
+
+| Shape | Encoded form |
+|-------|--------------|
+| int | `42` |
+| float | `0.1` (full precision via `float2string`, unlike `dumpValue`'s rounded print) |
+| string | `"line\nwith\ttabs \"quoted\""` (backslash, quote, newline, tab escaped) |
+| object | `<MyApp:core:peer1>` (logical name when set, LPC object name otherwise; decode resolves `find_object` first, then the Index) |
+| nil | `nil` |
+| array | `({ 1, "two", ({ 2.5, nil }) })` |
+| mapping | `([ "a":({ 1, 2 }), "b":"two" ])` |
+
+The encoder emits the canonical form strictly; the decoder tolerates whitespace between tokens. Everything outside the grammar refuses loudly with `error()`: **cyclic or aliased structures** (a container reached twice -- decoding a `dumpValue`-style `#N`/`@N` backreference would reconstruct shared identity, the Wave 2 generalized serializer's concern, and expanding the alias instead would silently change semantics), **light-weight objects** (nameless; nothing to resolve on decode), and malformed input. An unencodable property value aborts the whole export rather than writing a lossy file.
+
+**Enumeration filter.** `query_property_indices()` / `query_properties()` exclude the reserved `merry:` namespace by default -- observer slots, scripts, and dispatcher bookkeeping are runtime wiring re-established through the gated registration surfaces, not marshalable state (observer slots hold light-weight wrappers the codec refuses, and re-importing scripts through the write gates would be refused anyway). A non-zero argument (`query_property_indices(1)`) includes them; the `Core:Entry` iterator passes `0`.
+
+**Write semantics.** `set_ascii_property` writes through `set_property`, so imported writes behave like any other write: observers fire, and the dispatch-path write gate applies. `import_state` is atomic -- a throwing observer aborts the whole import. A `Core:Entries` import begins with `clear_all_properties` (the `Entries` callback): a full property reset, including any `merry:` runtime wiring the export deliberately left out. That raw wipe does not pass through the dispatcher, so the Merry daemon's resolved-observer cache is not invalidated by it; import into a fresh clone -- the Vault's own respawn shape -- rather than re-importing over a live observer-bearing host.
+
 ## Boundaries
 
 What this layer deliberately does not provide:
 
 - **HTML output.** The public serialization is XML transport only; `typed_to_html` is a nil-returning passthrough kept for inherit-chain compile parity in dtd_daemon.
-- **Rich `LPC_MIXED` conversion.** Ascii conversion currently uses `dumpValue` for serialization and a string-only round-trip for deserialization; a richer type-coercion layer is a future enhancement.
+- **Rich `LPC_MIXED` conversion.** Ascii conversion uses `dumpValue` for serialization and a string-only round-trip for deserialization, deliberately: undeclared XML attributes default to `lpc_mixed`, so its string-passthrough decode is load-bearing for generic XML. Typed round-trip marshaling lives in the `/lib/util/coercion` codec (the property-table marshal above); a round-tripping DTD type would be a new type name, not a semantics change to `lpc_mixed`.
 - **Typed-literal parsing in `ascii_to_untyped`.** Only the bare-ASCII fallthrough is supported.
 - **Domain-content schemas.** Only the structural primitives ship; applications register their own schemas at boot (see the examples).
 
@@ -84,23 +106,23 @@ Schema uses two cross-cutting infrastructure pieces in eOS-kernellib's kernel la
 
 ## File-by-file reference
 
-### `lib/dtd.c` (123 lines)
+### `lib/dtd.c` (122 lines)
 
 Inheritable poor-man's abstract data type repository. Routes type-system queries to dtd_daemon's registered handlers. Inheritors: `xmlgen`, `xmlparse`, `xml_daemon`, `schema_daemon`. Surface includes `queryTypeColour(type)`, `queryColourType(colour)`, `query_ascii_enumeration(type)`, `queryCheckboxed(type)`, `defaultValue(type)`, `typedToAscii(type, val)`, `asciiToTyped(type, ascii)`, `testRawData(type, val)`.
 
-### `sys/dtd_daemon.c` (309 lines)
+### `sys/dtd_daemon.c` (307 lines)
 
 The daemon. Handlers register types and colours via `register_type(t)` / `register_colour(c)` at their own `create()`; the daemon stores `(type → handler-object)` and dispatches the lib/dtd queries to the right handler. The daemon itself handles the core LPC types (`lpc_str`, `lpc_int`, `lpc_flt`, `lpc_obj`, `lpc_mixed`).
 
-### `lib/schema_node.c` (473 lines)
+### `lib/schema_node.c` (469 lines)
 
 The structural definition of a typed element. Inheritable; the `obj/schema_node.c` clonable inherits this. Carries `space`, `tag`, `type`, `children`, `attributes`, `iterator`, `callbacks`. Surface: `set_name(ns, tag)`, `query_namespace()`, `query_tag()`, `query_type()`, `add_attribute(id, type, ...)`, `add_callback(method, ...)`, `set_iterator(attr, query)`, `add_child(node)`, `clear_element()`.
 
-### `obj/schema_node.c` (44 lines)
+### `obj/schema_node.c` (43 lines)
 
 Thin clonable wrapper. Inherits `lib/schema_node`. Each instance is a configured element in the registry. The wrapper detects master-vs-clone via the LPC-idiom `sscanf(object_name(this_object()), "%*s#")` and gives the master the `"Schema:UrNode"` logical name.
 
-### `sys/schema_daemon.c` (314 lines)
+### `sys/schema_daemon.c` (392 lines)
 
 The namespace coordinator. Holds `namespaces: mapping (namespace → mapping (tag → schema_node))`. Surface: `register_node(node)`, `query_node(ns, tag)`, `get_node(ns, tag, defaultValue)`, `clear_node(ns, tag)`, `query_namespaces()`. The Node() macro is the convenience for `configure_initial_nodes()`: find-or-clone a `Schema:<ns>:<tag>` and `set_name(ns, tag)` it.
 
@@ -110,7 +132,7 @@ Boot trigger. Compiles `sys/dtd_daemon` first, then `sys/schema_daemon`. The dae
 
 ### `data/schema/*.xml` (5 files, ~56 lines total)
 
-On-disk reference for the structural primitives (`Ur:Hierarchy`, `Ur:Child`, `Ur:Children`, `Core:Entry`, `Core:Entries`). Each is a `<object program="/usr/Schema/obj/schema_node">` wrapper around a `<Element ns="..." tag="..." ...>` body. These document the wire format and are the load-target for the future stateimpex-driven `load_core_schemas()` path.
+On-disk reference for the structural primitives (`Ur:Hierarchy`, `Ur:Child`, `Ur:Children`, `Core:Entry`, `Core:Entries`). Each is a `<object program="/usr/Schema/obj/schema_node">` wrapper around a `<Element ns="..." tag="..." ...>` body. These document the wire format and are the load target for the boot-time `load_core_schemas()` pass (see Bootstrap design above: the loaded XML replaces the code-defined shape, so keep the two in step).
 
 ## See also
 

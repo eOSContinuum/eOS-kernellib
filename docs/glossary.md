@@ -32,6 +32,10 @@ The kernel layer's consolidated authority mechanism: a store daemon (`/kernel/sy
 
 An instance of a compiled program created via `clone_object(master)`. The clone shares the master's program but has its own dataspace (its own copy of the variables). Clones live under `/obj/` by convention and carry the same owner as the master. Load-bearing in [code-lifecycle.md](code-lifecycle.md) Clone.
 
+## coercion codec
+
+The `/lib/util/coercion` round-trip codec (`encodeValue` / `decodeValue`) for simple LPC values, over the literal grammar `dumpValue` prints: ints, full-precision floats, escaped strings, `<logical-name>` object references, nil, and nested arrays/mappings. Aliased or cyclic structures and LWOs are refused loudly -- shared-identity reconstruction is the Wave 2 generalized serializer's concern. Consumed by the property layer's ascii-property accessors, which give bare property-bearing objects the `Core:Entries` marshaling path with no per-app schema. Load-bearing in [schema.md](schema.md) Property-table marshaling and [vault-applications.md](vault-applications.md) the participating-domain contract.
+
 ## compile_object
 
 The DGD kfun that compiles an LPC source file and registers the result as a program in the runtime: `compile_object(string path)` returns the master object. Calling it against a path that already has a master replaces the program in place — this is the hot-reload mechanism. Load-bearing in [code-lifecycle.md](code-lifecycle.md) Compile and [runtime-primitives.md](runtime-primitives.md) §4 (hot reload primitive).

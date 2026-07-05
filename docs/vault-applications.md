@@ -14,6 +14,8 @@ The Vault daemon (`/usr/Vault/sys/vault`) stores any object that:
 - defines `queryStateRoot()` returning a Schema namespace:tag pair that names a registered `~Schema/obj/schema_node` (the marshaler walks that schema_node's attributes to extract the value tree);
 - implements the per-attribute `query_<name>` getters and `set_<name>` setters that the schema declares.
 
+A bare property-bearing object (an inheritor of `/lib/util/properties`) satisfies the last two by default: its inherited `queryStateRoot()` returns `"Core:Entries"`, the built-in property-table shape whose ascii-property accessors marshal each property value through the `/lib/util/coercion` codec -- no per-app schema, no hand-written accessors ([schema.md](schema.md) Property-table marshaling). The per-app schema pattern this document walks through is for applications whose durable state lives in typed member variables instead of the property table; the reference application exercises both (`obj/thing` per-app, `obj/item` property-table).
+
 Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`; clones come from `clone_object(program)`. The Vault stores both, distinguished on disk by `<object program="..."/>` vs `<clone program="..."/>` root elements.
 
 ## Reference application
@@ -24,7 +26,7 @@ Paths written with a leading `~` (as in `~Schema/sys/schema_daemon`) are DGD's p
 cp -R examples/vault-app src/usr/MyApp
 ```
 
-Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects six OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), and the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`).
+Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects ten OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`), and the property-table set (`CODEC OK`, `CORE ROUND-TRIP OK`, `CORE ENCODE-REJECT OK`, `CORE FILTER OK`).
 
 The sections below explain what the reference application is doing and why. Read the code in `examples/vault-app/sys/test.c` alongside this document.
 
@@ -34,11 +36,12 @@ A minimal Vault application is four files plus an initd:
 
 ```text
 src/usr/MyApp/
-  initd.c           - domain initd; compiles obj/thing + sys/test at boot
+  initd.c           - domain initd; compiles the clonables + sys/test at boot
   lib/
     app.c           - inherits ~Vault/lib/vault_node; participates in the Vault
   obj/
-    thing.c         - property-bearing clonable
+    thing.c         - property-bearing clonable (typed members, per-app schema)
+    item.c          - bare property-bearing clonable (Core:Entries path)
   sys/
     config.c        - one-of-a-kind configuration daemon (singleton storage)
     test.c          - boot-time test driver (inherits lib/app)
@@ -88,7 +91,7 @@ void set_label(string val) { _label = val; }
 void set_count(int val)    { _count = val; }
 ```
 
-`queryStateRoot()` returns the schema name -- the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape.
+`queryStateRoot()` returns the schema name -- the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape. Overriding it binds the per-app schema; leaving it inherited keeps the `"Core:Entries"` property-table default.
 
 ## Schema registration
 
@@ -110,7 +113,7 @@ private void register_thing_schema()
 
 Each `add_attribute(attr, type, query_method)` declares one XML attribute on the `<MyApp:Thing/>` element; the marshaler invokes `query_method` on the object to extract the value. Each `add_callback(setter, ...attr-names...)` declares one setter the import path calls with the value(s) of the named attributes.
 
-The five types the lifted dtd_daemon supports are `lpc_str`, `lpc_int`, `lpc_flt`, `lpc_obj`, and `lpc_mixed`. Of these, `lpc_mixed` is currently degraded (round-trip is not exact for arrays / mappings); the typed primitives round-trip cleanly.
+The five types the lifted dtd_daemon supports are `lpc_str`, `lpc_int`, `lpc_flt`, `lpc_obj`, and `lpc_mixed`. Of these, `lpc_mixed` is deliberately degraded (its string-passthrough decode is the undeclared-attribute contract; round-trip is not exact for arrays / mappings); the typed primitives round-trip cleanly, and property-table values round-trip through the `/lib/util/coercion` codec on the `Core:Entries` path instead ([schema.md](schema.md) Property-table marshaling).
 
 ## On-disk shape
 

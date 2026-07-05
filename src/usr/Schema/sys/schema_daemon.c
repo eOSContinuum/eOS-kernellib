@@ -220,14 +220,19 @@ private void configure_initial_nodes()
 }
 
 
-/* schema-loading: cross-checks code-defined primitives against XML schema
- * files in data/schema/. Each file declares <object program="schema_node">
- * wrapping a single <Element ns="..." tag="..."> with the same structure
- * that configure_initial_nodes() produces in code. Loading via the lifted
- * stateimpex round-trips the file through schema_daemon's own structural
- * primitives -- the Element / Children / Attributes / Iterator / Callbacks
- * schema-for-schemas tree -- which validates that the XML files and the
- * code definitions agree. import_state is idempotent on a matching node:
+/* schema-loading: re-applies the XML schema files in data/schema/ over
+ * the code-defined primitives. Each file declares <object
+ * program="schema_node"> wrapping a single <Element ns="..." tag="...">
+ * with the same structure that configure_initial_nodes() produces in
+ * code. Loading via the lifted stateimpex round-trips the file through
+ * schema_daemon's own structural primitives -- the Element / Children /
+ * Attributes / Iterator / Callbacks schema-for-schemas tree. The XML
+ * shape WINS: the import callbacks clear and re-add list-valued
+ * definitions (attributes, callbacks) and the made-setters replace the
+ * leaf, iterator, and delitem, so a file that diverges from the code
+ * definition silently replaces it rather than erroring -- keep the two
+ * in step by hand. Parse and structural failures do surface as load
+ * errors in boot.log. import_state is idempotent on a matching node:
  * re-applying the same state produces the same state. Mismatches surface
  * as load errors in boot.log. */
 

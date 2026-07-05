@@ -70,9 +70,9 @@ The on-disk artifacts land under the Vault daemon's storage root, `/usr/Vault/da
 - `obj/thing.c` -- property-bearing clonable; carries `label` (string) + `count` (int) + `peer` (object reference) as typed member variables behind a per-app schema.
 - `obj/item.c` -- bare property-bearing clonable; no schema of its own, marshaled through the default `Core:Entries` property-table shape.
 - `sys/config.c` -- one-of-a-kind configuration daemon; carries `greeting` (string) + `limit` (int); exercises the singleton `<object>` storage shape.
-- `sys/test.c` -- boot-time test driver; registers the `MyApp:Thing` + `MyApp:Config` schemas and runs the round-trip, singleton, cross-reference, and property-table assertions via `call_out("run_tests", 0)`.
+- `sys/test.c` -- boot-time test driver; defers setup to `call_out("setup_and_run", 0)` (the boot-order-agnostic pattern), then registers the `MyApp:Thing` + `MyApp:Config` schemas and runs the round-trip, singleton, cross-reference, and property-table assertions.
 
 ## Notes
 
 - The example demonstrates BOTH marshaling surfaces: `obj/thing` binds a per-application schema (`MyApp:Thing`, registered at boot from `sys/test.c::create()`) because its durable state lives in typed member variables -- the natural surface for a typed property tree; `obj/item` carries its state in the property table and rides the core `Core:Entries` shape with no schema of its own, values crossing as coercion-codec literals.
-- The test driver writes assertion results to a sentinel file (`data/test-result.log`) rather than the boot log: `DRIVER->message()` requires kernel- or System-tier `previous_program`, which an application-tier daemon is not, and the platform's `sysLog` is still a no-op stub. When a real log facility lands, the driver can rely on `sysLog` alone.
+- The test driver writes assertion results to a sentinel file (`data/test-result.log`) rather than the boot log: `DRIVER->message()` requires kernel- or System-tier `previous_program`, which an application-tier daemon is not. The logd-backed `sysLog` is available to application code, but its sink is the System-owned `system.log`; the sentinel file keeps the verify command a plain `cat`.

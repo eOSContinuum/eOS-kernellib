@@ -41,9 +41,9 @@
  *
  * DRIVER->message() would surface success directly in boot.log but
  * requires KERNEL() or SYSTEM() previous_program; MyApp is neither.
- * The sentinel-file path is what an application-tier daemon can do
- * without a kernel-layer log facility (the lifted sysLog is currently
- * a no-op stub pending such a facility).
+ * The sentinel file keeps the assertions independently readable by
+ * the verify command; the logd-backed sysLog is available for
+ * diagnostics but plays no part in the assertions.
  */
 
 # include <type.h>
