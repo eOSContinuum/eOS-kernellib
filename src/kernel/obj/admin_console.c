@@ -3,6 +3,8 @@
 
 inherit LIB_ADMIN_CONSOLE;
 
+# define INDEX	"/usr/Index/sys/index_daemon"
+
 
 private object user;		/* associated user object */
 
@@ -141,4 +143,102 @@ static void process(string str)
 	}
 	break;
     }
+}
+
+/*
+ * NAME:	translate_name()
+ * DESCRIPTION:	resolve a colon-shaped verb argument: LPC object name
+ *		first, then the Index logical-name registry -- the same
+ *		order the coercion codec uses for object references.
+ *		Returns the canonical object name on resolution, or nil
+ *		after messaging when neither route resolves. Logical
+ *		names are the sanctioned address for clones, which have
+ *		no stable path-form address of their own.
+ */
+private string translate_name(string str)
+{
+    object obj, ixd;
+
+    obj = find_object(str);
+    if (!obj) {
+	ixd = find_object(INDEX);
+	if (ixd) {
+	    obj = ixd->query_object(str);
+	}
+    }
+    if (!obj) {
+	message("No such object or Index name.\n");
+	return nil;
+    }
+    return object_name(obj);
+}
+
+/*
+ * The object-taking verbs, masked to accept Index logical names.
+ * Only colon-shaped arguments (the logical-name grammar) are
+ * translated; paths, $refs, and empty arguments pass through to the
+ * library verb byte-identical to before. The library re-resolves the
+ * substituted canonical name through its own machinery, so per-verb
+ * guards (master-only for clone, LWO-master-only for new) behave
+ * unchanged.
+ */
+
+/*
+ * NAME:	cmd_clone()
+ * DESCRIPTION:	clone, accepting Index logical names
+ */
+static void cmd_clone(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    ::cmd_clone(user, cmd, str);
+}
+
+/*
+ * NAME:	cmd_destruct()
+ * DESCRIPTION:	destruct, accepting Index logical names
+ */
+static void cmd_destruct(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    ::cmd_destruct(user, cmd, str);
+}
+
+/*
+ * NAME:	cmd_new()
+ * DESCRIPTION:	new, accepting Index logical names
+ */
+static void cmd_new(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    ::cmd_new(user, cmd, str);
+}
+
+/*
+ * NAME:	cmd_status()
+ * DESCRIPTION:	status, accepting Index logical names
+ */
+static void cmd_status(object user, string cmd, string str)
+{
+    if (str && str[0] != '$' && sscanf(str, "%*s:") != 0) {
+	str = translate_name(str);
+	if (!str) {
+	    return;
+	}
+    }
+    ::cmd_status(user, cmd, str);
 }
