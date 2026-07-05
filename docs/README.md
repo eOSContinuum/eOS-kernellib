@@ -30,6 +30,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [lpc-essentials.md](lpc-essentials.md) — LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
 - [kernel-reference/](kernel-reference/README.md) -- man-page-style reference for the kernel layer's modified API surface (efun overrides, lfun and hook contracts, the kernel overview).
 - [kernel-libraries.md](kernel-libraries.md) — inheritable libraries under `src/lib/` (strings, persistent collections, iteration, asynchronous control, time, utilities).
+- [where-code-belongs.md](where-code-belongs.md) — placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility) — with the authority choke-point and composition-seam disciplines behind the choices.
 - [application-authoring.md](application-authoring.md) — general tier-E application patterns; owner/access conventions; `call_touch` upgrade model; non-HTTP transports.
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
 - [schema.md](schema.md) -- the Schema subsystem: namespace-indexed typed-element registry, type-system dispatcher, the schema-for-schemas bootstrap, namespace vocabulary, property-table marshaling (Core:Entries + the coercion codec).
@@ -68,6 +69,7 @@ Common goals and the docs that serve them.
 - **Audit the platform's authority model** — [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
+- **Decide where a new piece of behavior lives** — [where-code-belongs.md](where-code-belongs.md), then [application-authoring.md](application-authoring.md) for the mechanics of the chosen shape.
 - **React to property changes** -- [lpc-essentials.md](lpc-essentials.md), [signal-applications.md](signal-applications.md), `../examples/signal-app/`, then [dispatcher.md](dispatcher.md) for dispatch semantics and [observers.md](observers.md) for the observer lifecycle contract.
 - **Write a multi-user chat application** — [lpc-essentials.md](lpc-essentials.md), [chat-applications.md](chat-applications.md), `../examples/chat-app/`.
 - **Write a Vault-persisted application** — [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
