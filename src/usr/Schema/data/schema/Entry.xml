@@ -6,7 +6,7 @@
     </Attributes>
     <Iterator var="key" call="query_property_indices(#0)"/>
     <Callbacks>
-      <Callback call="set_ascii_property(key,CONTENT,#1)"/>
+      <Callback call="set_ascii_property(key,CONTENT)"/>
     </Callbacks>
   </Element>
 </object>

@@ -48,7 +48,7 @@ example_profile() {
         hot-reload-master) echo "Reload 1 timed 3" ;;
         merry-app)         echo "MerryApp 2 selfexit 28" ;;
         signal-app)        echo "SignalApp 1 timed 1" ;;
-        vault-app)         echo "MyApp 1 timed 6" ;;
+        vault-app)         echo "MyApp 1 timed 10" ;;
         *)                 echo "" ;;
     esac
 }

@@ -24,6 +24,14 @@
  * unloaded program), and the supported owning-domain respawn through
  * the driver's inherited vault_node spawn functions.
  *
+ * A third assertion set (run_core_tests) exercises the Core:Entries
+ * property-table marshal: the /lib/util/coercion codec round-trip
+ * (values and refusals), a bare property-bearing clonable (obj/item)
+ * storing and respawning through the default state root with no
+ * per-app schema, the loud refusal of unencodable values at store
+ * time, and the reserved-namespace filter (merry:* entries stay out
+ * of the stored XML and out of default enumeration).
+ *
  * Pass/fail is observable two ways:
  *
  *   - A sentinel file at /usr/MyApp/data/test-result.log carries the
@@ -33,9 +41,9 @@
  *
  * DRIVER->message() would surface success directly in boot.log but
  * requires KERNEL() or SYSTEM() previous_program; MyApp is neither.
- * The sentinel-file path is what an application-tier daemon can do
- * without a kernel-layer log facility (the lifted sysLog is currently
- * a no-op stub pending such a facility).
+ * The sentinel file keeps the assertions independently readable by
+ * the verify command; the logd-backed sysLog is available for
+ * diagnostics but plays no part in the assertions.
  */
 
 # include <type.h>
@@ -43,14 +51,17 @@
 
 inherit "/usr/MyApp/lib/app";
 inherit "/lib/util/named";
+private inherit "/lib/util/coercion";
 
 # define VAULT		"/usr/Vault/sys/vault"
 # define SCHEMA		"/usr/Schema/sys/schema_daemon"
 # define SCHEMA_NODE	"/usr/Schema/obj/schema_node"
 # define INDEX		"/usr/Index/sys/index_daemon"
+# define XML		"/usr/XML/sys/xml_daemon"
 
 # define ROOT		"/usr/MyApp/data/things"
 # define THING_PROG	"/usr/MyApp/obj/thing"
+# define ITEM_PROG	"/usr/MyApp/obj/item"
 # define DEMO_NAME	"MyApp:demo:thing1"
 # define CONFIG_PROG	"/usr/MyApp/sys/config"
 # define CONFIG_NAME	"MyApp:config:main"
@@ -62,6 +73,11 @@ inherit "/lib/util/named";
 static void run_tests();
 static void run_singleton_test();
 static void run_xref_test();
+static void run_core_tests();
+static void run_codec_test();
+static void run_core_roundtrip_test();
+static void run_core_reject_test();
+static void run_core_filter_test();
 private void register_thing_schema();
 private void register_config_schema();
 private void log_line(string msg);
@@ -186,6 +202,7 @@ static void run_tests()
 
     run_singleton_test();
     run_xref_test();
+    run_core_tests();
 }
 
 
@@ -418,6 +435,242 @@ static void run_xref_test()
     }
 
     log_line("MyApp:test: XREF-DANGLING OK");
+}
+
+
+static void run_core_tests()
+{
+    run_codec_test();
+    run_core_roundtrip_test();
+    run_core_reject_test();
+    run_core_filter_test();
+}
+
+
+static void run_codec_test()
+{
+    mixed *vals;
+    mixed a, b;
+    string enc;
+    int i;
+
+    /* phase 7: the coercion codec itself. Every encodable shape
+     * round-trips exactly (canonical encoding compared after a
+     * decode/encode cycle, plus value-level checks where == is
+     * meaningful), and every refusal path refuses: aliased and cyclic
+     * structures, light-weight objects, and malformed input. */
+    vals = ({ 0, -42, 123456789,
+	      0.1, -2.5, 1.0e10,
+	      "", "line\nwith\ttabs \"quotes\" and \\slashes",
+	      nil,
+	      ({ }), ({ 1, "two", ({ 2.5, nil }) }),
+	      ([ ]), ([ "k": ({ 1, 2 }), "m": ([ "x": 1 ]) ]),
+	      this_object() });
+    for (i = 0; i < sizeof(vals); i++) {
+	enc = encodeValue(vals[i]);
+	if (encodeValue(decodeValue(enc)) != enc) {
+	    log_line("MyApp:test: FAIL: codec round-trip for " + enc);
+	    return;
+	}
+    }
+    if (decodeValue(encodeValue(0.1)) != 0.1) {
+	log_line("MyApp:test: FAIL: codec float value drift");
+	return;
+    }
+    if (decodeValue(encodeValue(this_object())) != this_object()) {
+	log_line("MyApp:test: FAIL: codec object reference drift");
+	return;
+    }
+
+    a = ({ 0 });
+    a[0] = a;
+    if (!catch(encodeValue(a))) {
+	log_line("MyApp:test: FAIL: cyclic encode did not throw");
+	return;
+    }
+    b = ({ 1 });
+    if (!catch(encodeValue(({ b, b })))) {
+	log_line("MyApp:test: FAIL: aliased encode did not throw");
+	return;
+    }
+    if (!catch(encodeValue(XML->parse("<a>b</a>")))) {
+	log_line("MyApp:test: FAIL: light-weight encode did not throw");
+	return;
+    }
+
+    if (!catch(decodeValue("({ 1")) ||
+	!catch(decodeValue("\"open")) ||
+	!catch(decodeValue("<MyApp:no:such:object>")) ||
+	!catch(decodeValue("5 x")) ||
+	!catch(decodeValue(""))) {
+	log_line("MyApp:test: FAIL: malformed decode did not throw");
+	return;
+    }
+
+    log_line("MyApp:test: CODEC OK");
+}
+
+
+static void run_core_roundtrip_test()
+{
+    object item, peer, reloaded;
+
+    /* phase 8: the Core:Entries property-table marshal. A bare
+     * property-bearing clonable (obj/item, default state root) stores
+     * mixed-shape property values and a fresh respawn restores every
+     * one -- no per-app schema involved. */
+    item = clone_object(ITEM_PROG);
+    item->set_object_name("MyApp:core:item1");
+    peer = clone_object(ITEM_PROG);
+    peer->set_object_name("MyApp:core:peer1");
+
+    item->set_property("core:num", 42);
+    item->set_property("core:ratio", 0.1);
+    item->set_property("core:text", "hi \"there\"\nline2\ttab");
+    item->set_property("core:peer", peer);
+    item->set_property("core:list", ({ 1, 2.5, "three" }));
+    item->set_property("core:map", ([ "a": ({ 1, 2 }), "b": "two" ]));
+
+    catch {
+	VAULT->store(item);
+    } : {
+	log_line("MyApp:test: FAIL: core store threw");
+	return;
+    }
+    destruct_object(item);
+
+    catch {
+	VAULT->spawn_one_by_name("MyApp:core:item1");
+    } : {
+	log_line("MyApp:test: FAIL: core respawn threw");
+	return;
+    }
+    reloaded = find_named("MyApp:core:item1");
+    if (!reloaded) {
+	log_line("MyApp:test: FAIL: core item not findable after respawn");
+	return;
+    }
+    if (reloaded->query_property("core:num") != 42 ||
+	reloaded->query_property("core:ratio") != 0.1 ||
+	reloaded->query_property("core:text") != "hi \"there\"\nline2\ttab" ||
+	reloaded->query_property("core:peer") != peer) {
+	log_line("MyApp:test: FAIL: core scalar round-trip mismatch");
+	return;
+    }
+    if (encodeValue(reloaded->query_property("core:list")) !=
+				encodeValue(({ 1, 2.5, "three" })) ||
+	encodeValue(reloaded->query_property("core:map")) !=
+			encodeValue(([ "a": ({ 1, 2 }), "b": "two" ]))) {
+	log_line("MyApp:test: FAIL: core container round-trip mismatch");
+	return;
+    }
+    log_line("MyApp:test: CORE ROUND-TRIP OK");
+}
+
+
+static void run_core_reject_test()
+{
+    object item;
+    mixed a, b;
+
+    /* phase 9: unencodable property values refuse loudly at store
+     * time -- the whole export aborts rather than writing a lossy
+     * file. Cyclic, aliased, and light-weight values each throw. */
+    item = clone_object(ITEM_PROG);
+    item->set_object_name("MyApp:core:item2");
+
+    a = ({ 0 });
+    a[0] = a;
+    item->set_property("core:bad", a);
+    if (!catch(VAULT->store(item))) {
+	log_line("MyApp:test: FAIL: cyclic store did not throw");
+	return;
+    }
+    b = ({ 1 });
+    item->set_property("core:bad", ({ b, b }));
+    if (!catch(VAULT->store(item))) {
+	log_line("MyApp:test: FAIL: aliased store did not throw");
+	return;
+    }
+    item->set_property("core:bad", XML->parse("<a>b</a>"));
+    if (!catch(VAULT->store(item))) {
+	log_line("MyApp:test: FAIL: light-weight store did not throw");
+	return;
+    }
+    item->clear_property("core:bad");
+    log_line("MyApp:test: CORE ENCODE-REJECT OK");
+}
+
+
+static void run_core_filter_test()
+{
+    object item, reloaded;
+    string text;
+    string *keys;
+
+    /* phase 10: the reserved-namespace filter. merry:* entries
+     * (observer slots, scripts) stay out of default enumeration and
+     * out of the stored XML; the opaque flag still reaches them; app
+     * state crosses the marshal and the merry: entries do not. The
+     * entries are planted with set_raw_property -- the documented
+     * bypass -- because the dispatch path gates merry:* writes behind
+     * the registration capability, which is exactly what the filter
+     * spares the marshal path from on re-import. */
+    item = clone_object(ITEM_PROG);
+    item->set_object_name("MyApp:core:item3");
+    item->set_property("core:keep", 1);
+    item->set_raw_property("merry:lib:probe", "$(\"noop\")");
+    item->set_raw_property("merry:on:core.sig:main", ({ }));
+
+    keys = item->query_property_indices();
+    if (sizeof(keys & ({ "merry:lib:probe", "merry:on:core.sig:main" }))) {
+	log_line("MyApp:test: FAIL: default enumeration leaked merry: keys");
+	return;
+    }
+    keys = item->query_property_indices(1);
+    if (sizeof(keys & ({ "merry:lib:probe", "merry:on:core.sig:main" }))
+								    != 2) {
+	log_line("MyApp:test: FAIL: opaque enumeration missing merry: keys");
+	return;
+    }
+
+    catch {
+	VAULT->store(item);
+    } : {
+	log_line("MyApp:test: FAIL: filtered store threw");
+	return;
+    }
+    text = read_file("/usr/Vault/data/vault/MyApp/core/item3.xml");
+    if (!text) {
+	log_line("MyApp:test: FAIL: filtered store XML not readable");
+	return;
+    }
+    if (sscanf(text, "%*smerry:") != 0) {
+	log_line("MyApp:test: FAIL: stored XML carries merry: entries");
+	return;
+    }
+
+    destruct_object(item);
+    catch {
+	VAULT->spawn_one_by_name("MyApp:core:item3");
+    } : {
+	log_line("MyApp:test: FAIL: filtered respawn threw");
+	return;
+    }
+    reloaded = find_named("MyApp:core:item3");
+    if (!reloaded) {
+	log_line("MyApp:test: FAIL: filtered item not findable");
+	return;
+    }
+    if (reloaded->query_property("core:keep") != 1) {
+	log_line("MyApp:test: FAIL: filtered app state lost");
+	return;
+    }
+    if (reloaded->query_raw_property("merry:lib:probe") != nil) {
+	log_line("MyApp:test: FAIL: merry: entry crossed the marshal");
+	return;
+    }
+    log_line("MyApp:test: CORE FILTER OK");
 }
 
 

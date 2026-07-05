@@ -7,8 +7,12 @@
  * to the registered handler.
  *
  * LPC_MIXED ascii conversion uses dumpValue for serialization and a
- * string-only round-trip for deserialization -- a deliberate
- * degradation pending a richer type-coercion lift. typed_to_html is a
+ * string-only round-trip for deserialization. This stays deliberately
+ * degraded even though /lib/util/coercion now provides a round-trip
+ * codec (the ascii-property accessors consume it): undeclared XML
+ * attributes default to lpc_mixed, so its string-passthrough decode is
+ * load-bearing for generic XML -- a round-tripping DTD type would be a
+ * new type name, not a semantics change here. typed_to_html is a
  * nil-returning passthrough (HTML output is an admin-surface concern;
  * XML transport is the only public serialization). The type-handler
  * API is camelCase (queryTypeColour, typedToAscii, asciiToTyped,
@@ -185,9 +189,10 @@ string typedToAscii(mixed value, string type)
     }
     switch (type) {
     case LPC_MIXED:
-	/* Degraded mixed serialization via dumpValue. Round-trip not
-	 * exact for arrays / mappings; a richer type-coercion helper
-	 * in /lib/util is the future fix. */
+	/* Degraded mixed serialization via dumpValue, kept: lpc_mixed
+	 * is the undeclared-attribute default, so its semantics stay
+	 * string-shaped. Round-trip marshaling is the /lib/util/
+	 * coercion codec's job (the ascii-property accessors). */
 	return dumpValue(value);
     case LPC_STR:
 	if (value == nil) {
@@ -230,9 +235,10 @@ mixed asciiToTyped(string ascii, string type)
     }
     switch (type) {
     case LPC_MIXED:
-	/* Degraded mixed deserialization: only the string round-trip is
-	 * supported. Complex types (array, mapping) are not round-tripped
-	 * back to LPC values; the caller receives the ASCII as a string. */
+	/* Degraded mixed deserialization: the ASCII passes through as
+	 * a string -- the undeclared-attribute contract. Typed
+	 * round-trip decoding is the /lib/util/coercion codec's job
+	 * (the ascii-property accessors). */
 	return ascii;
     case LPC_STR:
 	if (!strlen(ascii)) {
