@@ -219,6 +219,7 @@ The shape is a teaching surface for the platform's individual primitives, not th
 
 ## Where to next
 
+- `docs/where-code-belongs.md` — the placement doctrine behind this document's mechanics: plain LPC versus a Merry script, and which compiled shape fits a new piece of behavior.
 - `docs/architecture.md` — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
 - `docs/runtime-primitives.md` — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
 - `docs/lpc-essentials.md` — LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
