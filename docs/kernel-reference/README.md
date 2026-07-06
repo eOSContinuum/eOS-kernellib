@@ -2,6 +2,8 @@
 
 Man-page-style reference for the kernel layer's modified API surface, organized in the upstream kernel-library convention. The pages are extensionless plain-text man pages, not Markdown -- they read best as fixed-width text.
 
+**Audience**: an LPC author needing the function-level kernel contract -- what the kernel layer changes about DGD's built-ins, and the per-object functions and hooks it calls.
+
 - [`overview`](overview) -- the kernel library's design rationale: resource control, file security, user management, and the tier discipline the platform rests on.
 - `efun/` -- kernel-layer overrides of DGD's built-in functions (the auto object wraps these, so what an application program calls differs from the raw kfun: access checks, resource accounting, path normalization). One page per function:
   [`call_limited`](efun/call_limited),

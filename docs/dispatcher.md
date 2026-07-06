@@ -357,7 +357,7 @@ Each documented signature is exercised by at least one phase of the MerryApp smo
 
 A test phase that does not appear above is from the pre-dispatcher lift (phases 1-5 cover the Merry script-binding primitive itself; phase 4's `DELAY OK` covers the `$delay()` continuation path documented in `merry-applications.md`). The telnet-drive rows reference operator-tier verification rather than smoke-phase markers: the verbs were exercised via direct telnet session against the restore-boot MerryApp; see `admin-console.md` "Dispatcher operator surface" for the full session and the verb-by-verb output format.
 
-## See also
+## Where to next
 
 - `observers.md` -- the observer storage-and-lifecycle contract: the storage model and slot resolution, the query and removal surfaces, persistence, and compiled-program eviction.
 - `merry-applications.md` -- the script-binding mechanism the dispatcher is layered on top of (ancestry walk, find_merry / find_merries, the merry property convention, sandbox semantics).

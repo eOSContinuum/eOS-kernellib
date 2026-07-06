@@ -4,6 +4,8 @@ Where dispatcher observers live and what happens to them from registration to en
 
 The short form: an observer is a compiled Merry script appended to an ordered list in a property on the host object. The Merry daemon owns no registration state -- it owns the gates, the lookup, and a cache. Everything else in this contract follows from that placement.
 
+**Audience**: an application or kernel author reasoning about what observer registration stores, how it is inspected and mutated, and when it ends; assumes [dispatcher.md](dispatcher.md) for firing semantics.
+
 ## Registration
 
 `register_observer(object ob, mixed path, string timing, string source)` on the Merry daemon:
@@ -83,7 +85,7 @@ Operator access: the `observers` verb exposes all three query views, and `unregi
 | Console shapes: observed-path enumeration, `-effective` (and its path-required refusal), index-argument refusals | `scripts/verbsets/dispatcher-verbs.verbset` |
 | Statedump survival of registrations | merry-app `PERSIST SETUP` / `PERSIST VERIFY` phases |
 
-## See also
+## Where to next
 
 - `dispatcher.md` -- the dispatch reference: firing semantics, batching, veto, bounds, the observer-source contract, kernel-layer internals.
 - `merry-applications.md` -- the script-binding mechanism observers are one application of; the `merry:inherit:*` delegation family.

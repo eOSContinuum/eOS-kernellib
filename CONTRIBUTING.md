@@ -60,7 +60,7 @@ Documentation in this repository follows a functional, present-tense voice. File
 
 Two documentation surfaces:
 
-- **Reference docs** under [`docs/`](docs/) -- the platform model, application-authoring patterns, operations surface, glossary, and citation index. Each doc opens with an `Audience` callout naming who it is for and ends with a `Where to next` section.
+- **Reference docs** under [`docs/`](docs/) -- the platform model, application-authoring patterns, operations surface, glossary, and citation index. Each doc opens with an `Audience` callout naming who it is for and ends with a `Where to next` section (the folder index `docs/README.md` carries reading paths instead).
 - **Procedural docs** outside `docs/` -- README, CONTRIBUTING, SECURITY, this file. Follow the standard OSS-repo convention.
 
 New docs added to `docs/` use lowercase-hyphenated filenames matching the existing pattern. The `docs/README.md` folder index is updated to include any new doc in the appropriate audience group.

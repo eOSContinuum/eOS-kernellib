@@ -193,3 +193,9 @@ Inheriting `~Vault/lib/vault_node` from a domain other than Vault requires Vault
 
 - The example uses `DRIVER->message()`-style logging via a sentinel file at `/usr/MyApp/data/test-result.log` because an application-tier driver has no privileged console surface (`DRIVER->message()` requires kernel/System privilege) and needs a file the smoke harness can read from outside the platform. `sysLog` now forwards to the `logd` facility (`docs/operations.md`), but its sink is the System-owned `system.log`, not a domain-readable sentinel; routing smoke results through `logd` instead of the sentinel file is test-infrastructure work.
 - The test driver's `setup_and_run` uses `make_dir("/usr/MyApp/data")` before the first `write_file` because the directory may not exist on first boot. Vault's own `paveWay` helper handles this for its own data path; application code does the same explicitly.
+
+## Where to next
+
+- [schema.md](schema.md) — the registry and marshaling pipeline under the participating-domain contract.
+- [xml.md](xml.md) — the on-disk transport Vault writes through.
+- [persistence.md](persistence.md) — the orthogonal-persistence layer beneath the structured layer.

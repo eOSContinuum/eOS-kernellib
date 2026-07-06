@@ -1,4 +1,4 @@
-# LPC Essentials
+# LPC essentials
 
 LPC is the programming language used by the [DGD] driver and the layers built on it, including eOS-kernellib. This document is an orientation: enough to read LPC code without surprise, enough mental model to know what to look up next. The authoritative reference is [LPC.md] in [dworkin/lpc-doc] (DGD pins commit `403cd0b` as a submodule). LPC.md is a formal specification, dense and reference-shaped; this document is the bridge that makes the spec readable.
 

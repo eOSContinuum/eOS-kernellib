@@ -1,4 +1,4 @@
-# Getting Started
+# Getting started
 
 This guide installs the [DGD] driver, fetches this repository, and runs an eOS-kernellib server with the bundled example configuration.
 

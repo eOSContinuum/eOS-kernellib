@@ -1,4 +1,4 @@
-# Changing a Running System
+# Changing a running system
 
 The platform takes every kind of change — a one-line bug fix, a library upgrade with dependents, a data-shape migration, new behavior added by an end user's script, even a new host binary — without a restart and without a deploy step. The mechanisms live in separate references (`docs/code-lifecycle.md`, `docs/dispatcher.md`, `docs/persistence.md`, `docs/operations.md`); this document is the consolidated story: the ladder of change, ordered by blast radius, and the safety net under all of it.
 

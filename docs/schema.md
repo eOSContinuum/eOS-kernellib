@@ -4,6 +4,8 @@ The semantic-vocabulary registry. Schema holds typed element definitions — nam
 
 Schema is one of five subsystems in the cohesive Vault layout (Vault / Marshal / Schema / XML / Index). It is format-neutral identity: the schema_node tree describes what elements exist regardless of which marshal format encodes them. Future format bindings (CBOR, Gordian Envelope, triple-store) consume the same Schema registry.
 
+**Audience**: an application author declaring state shapes for the structured-persistence pipeline, or a kernel author extending the type system; arrives from [vault-applications.md](vault-applications.md) or the doc map.
+
 ## What this subsystem provides
 
 - **A namespace-indexed registry** of typed elements. Callers resolve `query_node(ns, tag)` → schema_node; the schema_node carries the type, child rules, attribute set, and callback hooks for that element.
@@ -134,7 +136,7 @@ Boot trigger. Compiles `sys/dtd_daemon` first, then `sys/schema_daemon`. The dae
 
 On-disk reference for the structural primitives (`Ur:Hierarchy`, `Ur:Child`, `Ur:Children`, `Core:Entry`, `Core:Entries`). Each is a `<object program="/usr/Schema/obj/schema_node">` wrapper around a `<Element ns="..." tag="..." ...>` body. These document the wire format and are the load target for the boot-time `load_core_schemas()` pass (see Bootstrap design above: the loaded XML replaces the code-defined shape, so keep the two in step).
 
-## See also
+## Where to next
 
 - [xml.md](xml.md) — the transport layer Schema uses for the on-disk format (`src/usr/XML/`)
 - `src/usr/Marshal/` — XmlBinding/stateimpex consumes Schema's `dtd_daemon` for type-handler dispatch during marshal

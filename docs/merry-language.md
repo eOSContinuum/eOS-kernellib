@@ -1,4 +1,4 @@
-# Merry Language
+# Merry language
 
 Merry is the safe-sublanguage of LPC used inside eOS-kernellib for code that is loaded, compiled, and executed at runtime under a sandbox. A Merry source string is parsed by a yacc grammar derived from LPC's, translated to LPC, and compiled into a clonable object whose inheritor chain installs the sandbox. The result is an LPC object whose body cannot reach the kfuns the sandbox forbids and whose extensions over LPC (`$arg` argument refs, `${name}` object refs, `$delay()` continuation, `space::method(...)` cross-namespace calls) compile down to property reads, writes, and runtime LFUN dispatches against the binding host.
 

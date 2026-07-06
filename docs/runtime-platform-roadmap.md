@@ -1,4 +1,4 @@
-# Runtime Platform Roadmap
+# Runtime platform roadmap
 
 eOS-kernellib's roadmap is a set of committed platform surfaces organized into dependency-ordered waves, each item gated by an activation trigger. The integrated programming model the platform set out to ship — structured-object persistence, typed addressable properties, data-shaped inheritance, a sandboxed scripting sublanguage, and a property-change dispatcher binding them together — ships today and is documented in `docs/runtime-primitives.md` and `docs/dispatcher.md`. This document is the forward statement: which surfaces the platform commits to next, in what dependency order, and what observable condition activates each one.
 

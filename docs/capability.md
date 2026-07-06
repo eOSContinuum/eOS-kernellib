@@ -1,4 +1,4 @@
-# Capability Library
+# Capability library
 
 The capability library is the kernel layer's single authority choke-point: one store and one membership check behind every gating surface that asks "may this caller do this?" It consolidates what would otherwise be heterogeneous per-subsystem gates — each surface carrying its own allowlist, its own mutator, and its own denial posture — into a shared store (`/kernel/sys/capabilityd`) and an inheritable check face (`/kernel/lib/capability`). Six gating surfaces route through it.
 

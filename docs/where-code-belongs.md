@@ -1,4 +1,4 @@
-# Where Code Belongs
+# Where code belongs
 
 An author adding behavior to this platform chooses twice: first between the two languages — plain LPC compiled at a capability tier, or a Merry script bound to a property — and then, for plain LPC, among several placement shapes (an inheritable library, a daemon, a clonable, a pure-function utility). Each choice has a structural answer, not a stylistic one: the host driver's inheritance rules, the sandbox boundary, and the platform's authority discipline decide most cases. This document is the decision guidance, distilled from the choices the platform itself made while building its own surfaces.
 

@@ -1,4 +1,4 @@
-# Admin Console
+# Admin console
 
 The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `docs/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
 

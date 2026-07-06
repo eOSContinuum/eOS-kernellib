@@ -4,6 +4,8 @@ The XML transport layer. XML parses ASCII XML to an internal XMD tree, generates
 
 XML is one of five subsystems in the cohesive Vault layout (Vault / Marshal / Schema / XML / Index). It is the format-implementation layer: where Schema defines what elements exist (format-neutral), XML defines how to wire-encode them. Future formats (CBOR, Gordian Envelope) would sit alongside as sibling format implementations, each registering its types with `dtd_daemon`.
 
+**Audience**: a kernel or application author reading or extending the XML transport beneath the Vault pipeline; most application authors touch it only through [vault-applications.md](vault-applications.md).
+
 ## What this subsystem provides
 
 - **XML parser** — converts ASCII XML to XMD, the internal binary form. All-LPC lexer; slow but flexible, and inheritable so callers can parse inline.
@@ -131,7 +133,7 @@ XML depends on Schema being loaded first (`dtd_daemon` must exist when `xml_daem
 
 XML's libraries (`xmd`, `xmlgen`, `xmlparse`, `entities`) are inheritable, so Vault, Marshal, and other downstream consumers pick up XML parse / generate capability by inheriting from `/usr/XML/lib/*`. Cross-domain access is granted via `set_global_access("XML", TRUE)` in `System/initd.c`.
 
-## See also
+## Where to next
 
 - [schema.md](schema.md) — `dtd_daemon` is the registry XML registers with; `lib/dtd` is what XML inherits to query types
 - `src/usr/Marshal/` — XmlBinding/stateimpex builds on top of this XML transport for state import/export
