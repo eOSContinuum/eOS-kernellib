@@ -15,5 +15,9 @@ DESCRIPTION
 	path component.
 	If the file doesn't exist, nil is returned.
 
+ACCESS
+	Unless the creator of the current object is "System", the current
+	object must have read access to the file.
+
 SEE ALSO
 	efun/get_dir

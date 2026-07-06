@@ -33,7 +33,7 @@ void set_object_manager(object objectd)	[System only]
     * void clone(string owner, object obj)
 
 	The given object has just been cloned.  Called just before the object
-	is initialized with create(1).
+	is initialized with create().
 
     * void destruct(string owner, string path)
 
@@ -48,7 +48,7 @@ void set_object_manager(object objectd)	[System only]
 	The flag `priv' indicates that inheritance is private.  Return either
 	a string for an alternate path of the inherited file, or an array of
 	strings, representing the source code of the inherited file itself.
-	Anu other return value will prevent inheritance of the file `path'.
+	Any other return value will prevent inheritance of the file `path'.
 
     * mixed include_file(string compiled, string from, string path)
 

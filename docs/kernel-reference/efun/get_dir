@@ -33,5 +33,9 @@ DESCRIPTION
 	Only as many files as specified by status()[ST_ARRAYSIZE], with
 	ST_ARRAYSIZE defined in the include file <status.h>, will be collected.
 
+ACCESS
+	Unless the creator of the current object is "System", the current
+	object must have read access to the file.
+
 SEE ALSO
-	efun/file_info, kfun/make_dir, kfun/remove_dir
+	efun/file_info

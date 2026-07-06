@@ -10,7 +10,9 @@ DESCRIPTION
 	atomic rollback occurs.
 
 ERRORS
-	If the message contains any \0 characters, an error will result.
+	If the message starts with the character "*" and also contains a \0
+	character, an error will result.  A \0 character elsewhere in the
+	message is not rejected.
 
 SEE ALSO
 	efun/retrieve_atomic_messages

@@ -135,13 +135,14 @@ contain hooks that allow routing of some calls to different objects.
 When you begin building, start with making a new user object.  This object
 should reside in /usr/System/obj.  The user object must inherit
 /kernel/lib/user.  Next, create a telnet connection manager which can be
-installed using "/kernel/sys/userd"->set_telnet_manager(obj).  Finally,
-create /usr/System/initd.c which handles system-specific initialization
-(for instance, the telnet connection manager must be installed from its
-create() function).
+installed using "/kernel/sys/userd"->set_telnet_manager(port, obj).
+Finally, create /usr/System/initd.c which handles system-specific
+initialization (for instance, the telnet connection manager must be
+installed from its create() function).
 
-If you want your mud to be persistent, activate the define for
-SYS_PERSISTENT in /include/std.h.
+Persistence is on by default: SYS_PERSISTENT is defined in
+/include/config.h.  If you want a non-persistent mud instead, remove
+that define.
 
 Next step: reboot.  If everything works, you can start extending your
 user object, over which you now have full control.

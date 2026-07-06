@@ -16,7 +16,11 @@ DESCRIPTION
 ERRORS
 	Calling a function that does not exist, or a function that cannot be
 	called with call_out_other() because it is private or static, results
-	in an error.
+	in an error.  Starting a callout for a function defined in the
+	kernel's auto object (other than create()), or in a light-weight
+	object (one with a name of the form "object_name#-1"), also results
+	in an error.  The callout itself executes through the kernel's
+	resource-limited execution gate, the same as call_out().
 
 SEE ALSO
 	efun/call_limited, efun/call_other, kfun/call_out
