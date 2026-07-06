@@ -62,6 +62,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - `../examples/atomic-demo/` — the atomicity demonstration: a counter mutates inside an `atomic` function that errors, and the runtime rolls the mutation back. The empirical evidence behind [runtime-primitives.md](runtime-primitives.md) §1.
 - `../examples/hot-reload-demo/` — the hot-reload demonstration: new LPC source recompiled into the live runtime via `compile_object`, the next dispatch picking up the new program. The evidence behind [runtime-primitives.md](runtime-primitives.md) §4.
 - `../examples/hot-reload-master/` — clone-upgrade demonstration: recompiling a clonable master propagates the new program to existing clones while each keeps its state. Read alongside [code-lifecycle.md](code-lifecycle.md).
+- `../examples/upgrade-cascade/` — library-upgrade demonstration: upgrading a parent library through the upgrade daemon recompiles its inheritors and `call_touch`-patches their existing clones, each keeping its state. Read alongside [code-lifecycle.md](code-lifecycle.md) Library upgrade.
 
 ### Reference
 
@@ -86,7 +87,7 @@ Common goals and the docs that serve them.
 - **Add scripted, sandboxed behavior to an object** — [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Write Merry source** — [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
-- **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), [changing-a-running-system.md](changing-a-running-system.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md) and the `../examples/hot-reload-demo/` and `../examples/hot-reload-master/` demonstrations.
+- **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), [changing-a-running-system.md](changing-a-running-system.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md) and the `../examples/hot-reload-demo/`, `../examples/hot-reload-master/`, and `../examples/upgrade-cascade/` demonstrations.
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
 - **Debug a misbehaving application** — [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
 - **Cross-reference an unfamiliar term mid-document** — [glossary.md](glossary.md).

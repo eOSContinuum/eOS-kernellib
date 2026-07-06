@@ -4,7 +4,7 @@
 
 A minimal headless example. `obj/counter` is a clonable master with a `count` variable and a `version()` string. The boot-time driver `sys/test` clones it, advances the count, recompiles the master with new source whose `version()` returns a different value, and — from the next dispatch — confirms the existing clone runs the new program (`PROPAGATE`) while still reporting its old count (`STATE SURVIVED`).
 
-This complements `hot-reload-demo`, which shows single-object replacement over HTTP. Neither exercises the library-inheritance cascade — a recompiled parent library re-touching its inheritors through the upgrade daemon (`/usr/System/sys/upgraded.c`); that is a separate, heavier mechanism.
+This complements `hot-reload-demo`, which shows single-object replacement over HTTP. Neither exercises the library-inheritance cascade — a recompiled parent library re-touching its inheritors through the upgrade daemon (`/usr/System/sys/upgraded.c`); that separate, heavier mechanism is demonstrated by `examples/upgrade-cascade/`.
 
 ## Layout
 
