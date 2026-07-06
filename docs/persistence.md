@@ -246,12 +246,12 @@ For the question of how extension-loaded codepaths interact with the platform's 
 
 ## Where to next
 
-- **`docs/runtime-primitives.md`** §3 — the per-primitive foundation-and-status statement for persistent state.
-- **`docs/admin-console.md`** Snapshot, restore, and shutdown — operator verbs for driving the persistence cycle interactively.
-- **`docs/operations.md`** — `.dgd` configuration fields (`dump_file`, `dump_interval`, `swap_file`, `hotboot` tuple), boot modes, failure-mode table.
-- **`docs/lpc-essentials.md`** Type modifiers — language semantics for `static` and how it interacts with persistence.
-- **`docs/architecture.md`** Boot sequence — the three boot modes (cold, statedump-restore, hot boot) at the platform level.
-- **`docs/vault-applications.md`** — Vault subsystem for per-domain typed-property persistence on top of the snapshot cycle: participating-domain contract, on-disk XML shape, round-trip cycle.
-- **`src/kernel/sys/driver.c`** — the `restored(int hotboot)` hook implementation.
+- **[`docs/runtime-primitives.md`](runtime-primitives.md)** §3 — the per-primitive foundation-and-status statement for persistent state.
+- **[`docs/admin-console.md`](admin-console.md)** Snapshot, restore, and shutdown — operator verbs for driving the persistence cycle interactively.
+- **[`docs/operations.md`](operations.md)** — `.dgd` configuration fields (`dump_file`, `dump_interval`, `swap_file`, `hotboot` tuple), boot modes, failure-mode table.
+- **[`docs/lpc-essentials.md`](lpc-essentials.md)** Type modifiers — language semantics for `static` and how it interacts with persistence.
+- **[`docs/architecture.md`](architecture.md)** Boot sequence — the three boot modes (cold, statedump-restore, hot boot) at the platform level.
+- **[`docs/vault-applications.md`](vault-applications.md)** — Vault subsystem for per-domain typed-property persistence on top of the snapshot cycle: participating-domain contract, on-disk XML shape, round-trip cycle.
+- **[`src/kernel/sys/driver.c`](../src/kernel/sys/driver.c)** — the `restored(int hotboot)` hook implementation.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html

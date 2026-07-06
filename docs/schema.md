@@ -138,6 +138,6 @@ On-disk reference for the structural primitives (`Ur:Hierarchy`, `Ur:Child`, `Ur
 
 ## Where to next
 
-- [xml.md](xml.md) — the transport layer Schema uses for the on-disk format (`src/usr/XML/`)
-- `src/usr/Marshal/` — XmlBinding/stateimpex consumes Schema's `dtd_daemon` for type-handler dispatch during marshal
-- `src/usr/Vault/` — uses Schema's namespace registry for per-element marshaling rules; [vault-applications.md](vault-applications.md) walks the application surface
+- [xml.md](xml.md) — the transport layer Schema uses for the on-disk format ([`src/usr/XML/`](../src/usr/XML/))
+- [`src/usr/Marshal/`](../src/usr/Marshal/) — XmlBinding/stateimpex consumes Schema's `dtd_daemon` for type-handler dispatch during marshal
+- [`src/usr/Vault/`](../src/usr/Vault/) — uses Schema's namespace registry for per-element marshaling rules; [vault-applications.md](vault-applications.md) walks the application surface

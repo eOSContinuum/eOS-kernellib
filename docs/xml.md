@@ -136,5 +136,5 @@ XML's libraries (`xmd`, `xmlgen`, `xmlparse`, `entities`) are inheritable, so Va
 ## Where to next
 
 - [schema.md](schema.md) — `dtd_daemon` is the registry XML registers with; `lib/dtd` is what XML inherits to query types
-- `src/usr/Marshal/` — XmlBinding/stateimpex builds on top of this XML transport for state import/export
-- `src/lib/util/ascii.c` and `src/lib/util/lpc.c` — the helper libs the XML transport uses
+- [`src/usr/Marshal/`](../src/usr/Marshal/) — XmlBinding/stateimpex builds on top of this XML transport for state import/export
+- [`src/lib/util/ascii.c`](../src/lib/util/ascii.c) and [`src/lib/util/lpc.c`](../src/lib/util/lpc.c) — the helper libs the XML transport uses

@@ -237,9 +237,9 @@ Both questions are open. Empirical verification requires running the platform un
 
 ## Where to next
 
-- **`docs/architecture.md`** — platform tier model, daemons, boot sequence in detail.
-- **`docs/runtime-primitives.md`** — the platform's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
-- **`docs/application-authoring.md`** — writing a tier-E application on top of this platform.
+- **[`docs/architecture.md`](architecture.md)** — platform tier model, daemons, boot sequence in detail.
+- **[`docs/runtime-primitives.md`](runtime-primitives.md)** — the platform's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
+- **[`docs/application-authoring.md`](application-authoring.md)** — writing a tier-E application on top of this platform.
 - **DGD upstream reference** at <https://github.com/dworkin/dgd> — full kfun reference, `.dgd` field reference, host-binary build instructions.
 
 [dworkin/lpc-ext]: https://github.com/dworkin/lpc-ext

@@ -40,6 +40,6 @@ A `call_out` scheduled during a task does not run inside that task, however shor
 
 ## Where to next
 
-- `docs/runtime-primitives.md` §7 — the multi-agent-coherence primitive this serialization point provides, with its demonstration and open work.
-- `docs/application-authoring.md` Writing tick-aware code — the tick budget mechanics and the `call_out` chunking idiom in full.
-- `docs/dispatcher.md` — batching, cascade bounds, and `$delay` continuations built on top of the task boundary.
+- [`docs/runtime-primitives.md`](runtime-primitives.md) §7 — the multi-agent-coherence primitive this serialization point provides, with its demonstration and open work.
+- [`docs/application-authoring.md`](application-authoring.md) Writing tick-aware code — the tick budget mechanics and the `call_out` chunking idiom in full.
+- [`docs/dispatcher.md`](dispatcher.md) — batching, cascade bounds, and `$delay` continuations built on top of the task boundary.

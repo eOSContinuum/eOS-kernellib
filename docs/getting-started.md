@@ -68,13 +68,13 @@ The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no a
 
 ## Where to next
 
-- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels — the fastest way to see the runtime primitives pass on your machine. `scripts/README.md` documents the harness.
-- `docs/first-hour.md` is the natural next step: a hands-on hour from this booted platform to the persistence loop — your own objects, state, and reactions surviving a process restart.
-- `docs/coming-from-contemporary-infrastructure.md` maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
-- `examples/http-app/README.md` and `docs/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
-- `docs/admin-console.md` covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
-- `docs/architecture.md` covers the platform's tier model, daemons, and boot sequence; `docs/runtime-primitives.md` covers the per-primitive foundation-and-proof statement.
-- `docs/application-authoring.md` covers writing a tier-E application on top of the platform (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
-- `docs/building.md` covers DGD build details and platform-specific notes.
+- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels — the fastest way to see the runtime primitives pass on your machine. [`scripts/README.md`](../scripts/README.md) documents the harness.
+- [`docs/first-hour.md`](first-hour.md) is the natural next step: a hands-on hour from this booted platform to the persistence loop — your own objects, state, and reactions surviving a process restart.
+- [`docs/coming-from-contemporary-infrastructure.md`](coming-from-contemporary-infrastructure.md) maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
+- [`examples/http-app/README.md`](../examples/http-app/README.md) and [`docs/http-applications.md`](http-applications.md) cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
+- [`docs/admin-console.md`](admin-console.md) covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.
+- [`docs/architecture.md`](architecture.md) covers the platform's tier model, daemons, and boot sequence; [`docs/runtime-primitives.md`](runtime-primitives.md) covers the per-primitive foundation-and-proof statement.
+- [`docs/application-authoring.md`](application-authoring.md) covers writing a tier-E application on top of the platform (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
+- [`docs/building.md`](building.md) covers DGD build details and platform-specific notes.
 
 [DGD]: https://github.com/dworkin/dgd

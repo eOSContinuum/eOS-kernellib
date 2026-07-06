@@ -208,5 +208,5 @@ The marker went 0 → 1 on this side of the restart: the compiled observer scrip
 - **[persistence.md](persistence.md)** — why step 8 works, what exactly survives, and the boundaries (connections, external resources, time).
 - **[coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md)** — what this replaces in a service-stack mental model.
 - **[lpc-essentials.md](lpc-essentials.md)** — the language, now that you've compiled some.
-- **`examples/signal-app/`** and **[signal-applications.md](signal-applications.md)** — step 7 as a proper application.
+- **[`examples/signal-app/`](../examples/signal-app/)** and **[signal-applications.md](signal-applications.md)** — step 7 as a proper application.
 - **[admin-console.md](admin-console.md)** — the console you just drove, in full.

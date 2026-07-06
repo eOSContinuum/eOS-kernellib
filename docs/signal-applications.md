@@ -52,7 +52,7 @@ The honest boundaries: synchronous-in-write means a heavy reaction extends the w
 
 This example is deliberately the floor. Each capability it omits is demonstrated by a sibling:
 
-- **Timings and ordering** (pre/main/post, veto, multi-observer fan-out, cascade bounds, batching): `dispatcher.md` and `examples/merry-app/`.
-- **Observer inheritance** (one registration on an ancestor covering a cohort of descendants): `merry-applications.md` ancestry walk; demonstrated in `examples/merry-app/` and `examples/chat-app/`.
-- **A full application around the dispatcher** (multi-user chat with capability gates, persistence across boots, sandboxed reactions, cross-user notification): `chat-applications.md`.
-- **Persistence to on-disk XML** (schema-backed export/import of property state): `vault-applications.md`.
+- **Timings and ordering** (pre/main/post, veto, multi-observer fan-out, cascade bounds, batching): [`dispatcher.md`](dispatcher.md) and [`examples/merry-app/`](../examples/merry-app/).
+- **Observer inheritance** (one registration on an ancestor covering a cohort of descendants): [`merry-applications.md`](merry-applications.md) ancestry walk; demonstrated in [`examples/merry-app/`](../examples/merry-app/) and [`examples/chat-app/`](../examples/chat-app/).
+- **A full application around the dispatcher** (multi-user chat with capability gates, persistence across boots, sandboxed reactions, cross-user notification): [`chat-applications.md`](chat-applications.md).
+- **Persistence to on-disk XML** (schema-backed export/import of property state): [`vault-applications.md`](vault-applications.md).

@@ -352,7 +352,7 @@ To reset the admin password from outside the console: the kernel's auth state li
 
 ## Where to next
 
-- `docs/operations.md` — the deployment surface: `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.
-- `docs/architecture.md` — the platform's tier model, daemons, and inheritance chain that the console verbs operate against.
-- `docs/runtime-primitives.md` — the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
-- `src/kernel/lib/admin_console.c` — the authoritative LPC source for every verb's exact dispatch.
+- [`docs/operations.md`](operations.md) — the deployment surface: `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.
+- [`docs/architecture.md`](architecture.md) — the platform's tier model, daemons, and inheritance chain that the console verbs operate against.
+- [`docs/runtime-primitives.md`](runtime-primitives.md) — the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
+- [`src/kernel/lib/admin_console.c`](../src/kernel/lib/admin_console.c) — the authoritative LPC source for every verb's exact dispatch.
