@@ -221,10 +221,10 @@ The 0-second `call_out` runs after the System initd commits, which is after ever
 
 ## Where to next
 
-- `docs/getting-started.md` — install DGD, run the example configuration.
-- `docs/architecture.md` — capability tiers, daemons, kernel-layer libraries.
-- `docs/application-authoring.md` — general tier-E patterns for non-HTTP transports.
-- `docs/runtime-primitives.md` — the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
-- `examples/http-app/` — runnable reference application.
-- `src/usr/System/sys/http_server.c` — the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the platform-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
-- `src/usr/HTTP/api/lib/Server1.c` and `src/usr/HTTP/lib/Connection1.c` — the HTTP/1 library implementation that an application server inherits and overrides.
+- [`docs/getting-started.md`](getting-started.md) — install DGD, run the example configuration.
+- [`docs/architecture.md`](architecture.md) — capability tiers, daemons, kernel-layer libraries.
+- [`docs/application-authoring.md`](application-authoring.md) — general tier-E patterns for non-HTTP transports.
+- [`docs/runtime-primitives.md`](runtime-primitives.md) — the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+- [`examples/http-app/`](../examples/http-app/) — runnable reference application.
+- [`src/usr/System/sys/http_server.c`](../src/usr/System/sys/http_server.c) — the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the platform-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
+- [`src/usr/HTTP/api/lib/Server1.c`](../src/usr/HTTP/api/lib/Server1.c) and [`src/usr/HTTP/lib/Connection1.c`](../src/usr/HTTP/lib/Connection1.c) — the HTTP/1 library implementation that an application server inherits and overrides.

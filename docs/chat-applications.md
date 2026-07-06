@@ -347,8 +347,8 @@ The chat-app reference is the multi-user messaging surface, not a MUD. The follo
 
 ## Where to next
 
-- `examples/chat-app/sys/test.c` -- the canonical boot-time test driver.
-- `docs/dispatcher.md` -- the property-change dispatcher (referenced by sandboxed-reaction and async-event phases).
-- `docs/persistence.md` -- the durable-state primitives.
-- `docs/architecture.md` -- the capability tiers and daemon contracts that frame this application.
-- `docs/runtime-primitives.md` -- the runtime primitives the chat application exercises.
+- [`examples/chat-app/sys/test.c`](../examples/chat-app/sys/test.c) -- the canonical boot-time test driver.
+- [`docs/dispatcher.md`](dispatcher.md) -- the property-change dispatcher (referenced by sandboxed-reaction and async-event phases).
+- [`docs/persistence.md`](persistence.md) -- the durable-state primitives.
+- [`docs/architecture.md`](architecture.md) -- the capability tiers and daemon contracts that frame this application.
+- [`docs/runtime-primitives.md`](runtime-primitives.md) -- the runtime primitives the chat application exercises.

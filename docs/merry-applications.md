@@ -249,4 +249,4 @@ The composite "scripted persistent object" is the natural next example -- compos
 - **[dispatcher.md](dispatcher.md)** -- the property-change dispatcher, which reuses this document's `merry:<mode>:<signal>` storage convention and ancestry walk for `merry:on:<path>:<timing>` observers.
 - **[vault-applications.md](vault-applications.md)** -- persistent-state participation for a property-bearing object, including the on-disk Vault round-trip the Storage and round-trip section above describes.
 - **[runtime-primitives.md](runtime-primitives.md)** -- sandboxed code-load and the ur-hierarchy as platform properties.
-- **`examples/merry-app/`** -- the runnable reference application walked through above.
+- **[`examples/merry-app/`](../examples/merry-app/)** -- the runnable reference application walked through above.

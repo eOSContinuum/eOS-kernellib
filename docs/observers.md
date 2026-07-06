@@ -87,8 +87,8 @@ Operator access: the `observers` verb exposes all three query views, and `unregi
 
 ## Where to next
 
-- `dispatcher.md` -- the dispatch reference: firing semantics, batching, veto, bounds, the observer-source contract, kernel-layer internals.
-- `merry-applications.md` -- the script-binding mechanism observers are one application of; the `merry:inherit:*` delegation family.
-- `admin-console.md` -- the operator verbs (`observers`, `register-observer`, `unregister-observer`).
-- `capability.md` -- the `merry.registrar` capability and the gating model the mutation surface routes through.
-- `runtime-platform-roadmap.md` -- where the observer surface sits on the platform roadmap.
+- [`dispatcher.md`](dispatcher.md) -- the dispatch reference: firing semantics, batching, veto, bounds, the observer-source contract, kernel-layer internals.
+- [`merry-applications.md`](merry-applications.md) -- the script-binding mechanism observers are one application of; the `merry:inherit:*` delegation family.
+- [`admin-console.md`](admin-console.md) -- the operator verbs (`observers`, `register-observer`, `unregister-observer`).
+- [`capability.md`](capability.md) -- the `merry.registrar` capability and the gating model the mutation surface routes through.
+- [`runtime-platform-roadmap.md`](runtime-platform-roadmap.md) -- where the observer surface sits on the platform roadmap.

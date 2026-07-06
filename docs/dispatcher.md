@@ -359,9 +359,9 @@ A test phase that does not appear above is from the pre-dispatcher lift (phases 
 
 ## Where to next
 
-- `observers.md` -- the observer storage-and-lifecycle contract: the storage model and slot resolution, the query and removal surfaces, persistence, and compiled-program eviction.
-- `merry-applications.md` -- the script-binding mechanism the dispatcher is layered on top of (ancestry walk, find_merry / find_merries, the merry property convention, sandbox semantics).
-- `operations.md` -- operator surface for `set_max_cascade_depth`, `set_dispatch_trace`, and the dispatch audit log.
-- `admin-console.md` -- "Dispatcher operator surface" section: the nine operator verbs that expose the dispatcher's runtime surface from the kernel admin console (`observers`, `cascade-depth`, `batch-status`, `dispatch-trace`, `register-observer`, `unregister-observer`, `query-approved-registrars`, `approve-registrar`, `unapprove-registrar`).
-- `runtime-primitives.md` -- the architectural framing (the dispatcher is the substrate that makes richer persistent state and async events first-class in the kernel layer).
-- `examples/merry-app/` -- the executable verification anchor; each documented signature is exercised by a phase marker.
+- [`observers.md`](observers.md) -- the observer storage-and-lifecycle contract: the storage model and slot resolution, the query and removal surfaces, persistence, and compiled-program eviction.
+- [`merry-applications.md`](merry-applications.md) -- the script-binding mechanism the dispatcher is layered on top of (ancestry walk, find_merry / find_merries, the merry property convention, sandbox semantics).
+- [`operations.md`](operations.md) -- operator surface for `set_max_cascade_depth`, `set_dispatch_trace`, and the dispatch audit log.
+- [`admin-console.md`](admin-console.md) -- "Dispatcher operator surface" section: the nine operator verbs that expose the dispatcher's runtime surface from the kernel admin console (`observers`, `cascade-depth`, `batch-status`, `dispatch-trace`, `register-observer`, `unregister-observer`, `query-approved-registrars`, `approve-registrar`, `unapprove-registrar`).
+- [`runtime-primitives.md`](runtime-primitives.md) -- the architectural framing (the dispatcher is the substrate that makes richer persistent state and async events first-class in the kernel layer).
+- [`examples/merry-app/`](../examples/merry-app/) -- the executable verification anchor; each documented signature is exercised by a phase marker.

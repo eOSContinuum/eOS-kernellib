@@ -226,10 +226,10 @@ The `examples/atomic-demo/` reference application wraps this counter in an HTTP/
 
 - **[LPC.md]** — the formal language spec, pinned by DGD at commit `403cd0b`. §3.1 lexical elements, §3.2 expressions, §3.4 declarations and types, §3.5 statements, §3.6 inheritance, §3.7 preprocessing.
 - **[dworkin/lpc-doc/kfun/]** — the kfun catalog. Every host-provided function the language calls.
-- **`docs/architecture.md`** — the platform's tier model, daemons, the auto-inheritance chain, the host-driver extension surface.
-- **`docs/application-authoring.md`** — what writing a tier-E application on top of this platform looks like: domain layout, initd, owner / access, the object-manager lifecycle, `call_touch` upgrade.
-- **`docs/kernel-libraries.md`** — the inheritable libraries shipped under `src/lib/` (String, StringBuffer, KVstore, Iterator, Continuation variants, Time).
-- **`docs/runtime-primitives.md`** — per-primitive foundation-and-status statement (atomicity, persistent state, hot reload, capability separation, etc.).
+- **[`docs/architecture.md`](architecture.md)** — the platform's tier model, daemons, the auto-inheritance chain, the host-driver extension surface.
+- **[`docs/application-authoring.md`](application-authoring.md)** — what writing a tier-E application on top of this platform looks like: domain layout, initd, owner / access, the object-manager lifecycle, `call_touch` upgrade.
+- **[`docs/kernel-libraries.md`](kernel-libraries.md)** — the inheritable libraries shipped under [`src/lib/`](../src/lib/) (String, StringBuffer, KVstore, Iterator, Continuation variants, Time).
+- **[`docs/runtime-primitives.md`](runtime-primitives.md)** — per-primitive foundation-and-status statement (atomicity, persistent state, hot reload, capability separation, etc.).
 
 [DGD]: https://github.com/dworkin/dgd
 [dworkin/lpc-doc]: https://github.com/dworkin/lpc-doc

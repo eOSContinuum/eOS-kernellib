@@ -96,6 +96,6 @@ These are inherited via `inherit "/lib/util/<name>"`. Because the wrapped functi
 
 ## Where to next
 
-- **`docs/lpc-essentials.md`** — LPC mechanics: inherit syntax, type modifiers, kfun calls, the patterns these libraries assume the reader knows.
-- **`docs/architecture.md`** — the platform's tier model and where `src/lib/` fits in it.
-- **`docs/application-authoring.md`** — how an application's LPC source consumes these libraries from a tier-E domain.
+- **[`docs/lpc-essentials.md`](lpc-essentials.md)** — LPC mechanics: inherit syntax, type modifiers, kfun calls, the patterns these libraries assume the reader knows.
+- **[`docs/architecture.md`](architecture.md)** — the platform's tier model and where [`src/lib/`](../src/lib/) fits in it.
+- **[`docs/application-authoring.md`](application-authoring.md)** — how an application's LPC source consumes these libraries from a tier-E domain.

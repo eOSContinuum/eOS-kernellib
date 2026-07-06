@@ -59,6 +59,6 @@ Automated tests are boot-time sentinel drivers, not a separate test runner: a `s
 
 ## Where to next
 
-- `docs/operations.md` -- Logging and diagnostics: the full errord/logd/console path, threshold semantics, and the dispatcher's audit log.
-- `docs/dispatcher.md` -- the property-change dispatcher reference: registration, timing slots, cascade and cycle bounds, the observer-source contract.
-- `docs/admin-console.md` -- the operator surface used throughout this document: `log`, `log-level`, the Dispatcher operator surface verbs, and Inspecting runtime state / Hot-fixing code in production.
+- [`docs/operations.md`](operations.md) -- Logging and diagnostics: the full errord/logd/console path, threshold semantics, and the dispatcher's audit log.
+- [`docs/dispatcher.md`](dispatcher.md) -- the property-change dispatcher reference: registration, timing slots, cascade and cycle bounds, the observer-source contract.
+- [`docs/admin-console.md`](admin-console.md) -- the operator surface used throughout this document: `log`, `log-level`, the Dispatcher operator surface verbs, and Inspecting runtime state / Hot-fixing code in production.

@@ -251,12 +251,12 @@ A driver that asserts survival across a restart follows the two-boot recipe `mer
 
 ## Where to next
 
-- `docs/where-code-belongs.md` — the placement doctrine behind this document's mechanics: plain LPC versus a Merry script, and which compiled shape fits a new piece of behavior.
-- `docs/architecture.md` — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
-- `docs/runtime-primitives.md` — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
-- `docs/lpc-essentials.md` — LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
-- `docs/kernel-libraries.md` — inheritable libraries shipped under `src/lib/`: String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
-- `docs/http-applications.md` — the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
-- `docs/operations.md` — the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
+- [`docs/where-code-belongs.md`](where-code-belongs.md) — the placement doctrine behind this document's mechanics: plain LPC versus a Merry script, and which compiled shape fits a new piece of behavior.
+- [`docs/architecture.md`](architecture.md) — the tier model, daemons, boot sequence, and auto-inheritance chain this document builds on.
+- [`docs/runtime-primitives.md`](runtime-primitives.md) — the per-primitive foundation-and-proof statement (atomicity, persistence, hot reload, capability separation, the rest).
+- [`docs/lpc-essentials.md`](lpc-essentials.md) — LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
+- [`docs/kernel-libraries.md`](kernel-libraries.md) — inheritable libraries shipped under [`src/lib/`](../src/lib/): String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
+- [`docs/http-applications.md`](http-applications.md) — the HTTP/1-specific application pattern with [`examples/http-app/`](../examples/http-app/) as the runnable reference.
+- [`docs/operations.md`](operations.md) — the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
 
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md

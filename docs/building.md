@@ -53,8 +53,8 @@ Verify the kernel layer compiles by running the driver against `example.dgd` per
 
 ## Where to next
 
-- `docs/getting-started.md` — run the example configuration once the driver is built.
-- `docs/operations.md` — the `.dgd` configuration field reference, boot modes, and operator surface.
-- `docs/architecture.md` — the platform's tier model and where the build fits.
+- [`docs/getting-started.md`](getting-started.md) — run the example configuration once the driver is built.
+- [`docs/operations.md`](operations.md) — the `.dgd` configuration field reference, boot modes, and operator surface.
+- [`docs/architecture.md`](architecture.md) — the platform's tier model and where the build fits.
 
 [DGD]: https://github.com/dworkin/dgd

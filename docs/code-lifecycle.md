@@ -202,11 +202,11 @@ An application that needs additional behavior typically registers a daemon that 
 
 ## Where to next
 
-- **`docs/lpc-essentials.md`** — the language constructs (`create()`, `inherit`, `static`, `nomask`) the transitions above invoke.
-- **`docs/runtime-primitives.md`** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
-- **`docs/admin-console.md`** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running platform.
-- **`docs/application-authoring.md`** — how an application's code consumes the lifecycle (initd, call_touch upgrade, object tracking patterns).
-- **`src/kernel/lib/auto.c`** — the authoritative source for `_F_create` and the inheritance-discipline enforcement. `_F_touch` is defined in `src/usr/System/lib/auto.c`.
-- **`src/usr/System/sys/objectd.c`** — the shipped object manager's implementation of the event surface above.
+- **[`docs/lpc-essentials.md`](lpc-essentials.md)** — the language constructs (`create()`, `inherit`, `static`, `nomask`) the transitions above invoke.
+- **[`docs/runtime-primitives.md`](runtime-primitives.md)** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
+- **[`docs/admin-console.md`](admin-console.md)** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running platform.
+- **[`docs/application-authoring.md`](application-authoring.md)** — how an application's code consumes the lifecycle (initd, call_touch upgrade, object tracking patterns).
+- **[`src/kernel/lib/auto.c`](../src/kernel/lib/auto.c)** — the authoritative source for `_F_create` and the inheritance-discipline enforcement. `_F_touch` is defined in [`src/usr/System/lib/auto.c`](../src/usr/System/lib/auto.c).
+- **[`src/usr/System/sys/objectd.c`](../src/usr/System/sys/objectd.c)** — the shipped object manager's implementation of the event surface above.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html

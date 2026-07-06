@@ -189,7 +189,7 @@ The LFUNs that make these examples work split by home: the binding host's `delay
 - **[merry-applications.md](merry-applications.md)** — the application-author perspective: writing a script-bearing object, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the LPC-side invocation surface.
 - **[lpc-essentials.md](lpc-essentials.md)** — LPC language orientation. Read this if `inherit`, `clone_object`, `call_out`, `atomic`, or the per-call atomicity model are unfamiliar.
 - **[runtime-primitives.md](runtime-primitives.md)** — the sandboxed-code-load primitive that Merry provides, and how it composes with the other runtime primitives.
-- **`src/usr/Merry/grammar/merry.y`** — the authoritative grammar. Read this when a parse error is unexplained or when extending the language.
-- **`src/usr/Merry/lib/merrynode.c`** — the sandbox installer and merryfun implementations. Read this when a runtime error from inside a Merry script needs tracing.
-- **`src/usr/Merry/lib/merryapi.c`** — the `find_merry` / `run_merry` / `find_merries` / `run_merries` invocation API used by LPC code that calls into bound scripts.
-- **`examples/merry-app/`** — the seventeen-phase reference application that exercises the ancestry walk, sandbox firing, Spawn, $delay, and LabelCall.
+- **[`src/usr/Merry/grammar/merry.y`](../src/usr/Merry/grammar/merry.y)** — the authoritative grammar. Read this when a parse error is unexplained or when extending the language.
+- **[`src/usr/Merry/lib/merrynode.c`](../src/usr/Merry/lib/merrynode.c)** — the sandbox installer and merryfun implementations. Read this when a runtime error from inside a Merry script needs tracing.
+- **[`src/usr/Merry/lib/merryapi.c`](../src/usr/Merry/lib/merryapi.c)** — the `find_merry` / `run_merry` / `find_merries` / `run_merries` invocation API used by LPC code that calls into bound scripts.
+- **[`examples/merry-app/`](../examples/merry-app/)** — the seventeen-phase reference application that exercises the ancestry walk, sandbox firing, Spawn, $delay, and LabelCall.

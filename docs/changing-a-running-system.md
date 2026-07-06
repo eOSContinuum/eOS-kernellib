@@ -61,8 +61,8 @@ Two properties hold under every rung above:
 
 ## Where to next
 
-- `docs/code-lifecycle.md` — the mechanism reference for rungs 1-3.
-- `docs/dispatcher.md` — the mechanism reference for rung 4.
-- `docs/merry-applications.md` — the mechanism reference for rung 5.
-- `docs/operations.md` — deployment configuration, including hotboot.
-- `docs/runtime-platform-roadmap.md` — committed forward surfaces, including the demonstration and registry gaps still open around the upgrade cascade.
+- [`docs/code-lifecycle.md`](code-lifecycle.md) — the mechanism reference for rungs 1-3.
+- [`docs/dispatcher.md`](dispatcher.md) — the mechanism reference for rung 4.
+- [`docs/merry-applications.md`](merry-applications.md) — the mechanism reference for rung 5.
+- [`docs/operations.md`](operations.md) — deployment configuration, including hotboot.
+- [`docs/runtime-platform-roadmap.md`](runtime-platform-roadmap.md) — committed forward surfaces, including the demonstration and registry gaps still open around the upgrade cascade.

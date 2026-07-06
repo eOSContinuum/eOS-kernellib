@@ -206,11 +206,11 @@ For non-HTTP applications, the patterns are covered in `docs/application-authori
 
 ## Where to next
 
-- `docs/runtime-primitives.md` — per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
-- `docs/persistence.md` — the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
-- `docs/code-lifecycle.md` — compile, clone, destruct, recompile, and the object-manager event surface in detail.
-- `docs/operations.md` — the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
-- `docs/application-authoring.md` — writing tier-E applications on top of this architecture.
+- [`docs/runtime-primitives.md`](runtime-primitives.md) — per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
+- [`docs/persistence.md`](persistence.md) — the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
+- [`docs/code-lifecycle.md`](code-lifecycle.md) — compile, clone, destruct, recompile, and the object-manager event surface in detail.
+- [`docs/operations.md`](operations.md) — the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
+- [`docs/application-authoring.md`](application-authoring.md) — writing tier-E applications on top of this architecture.
 
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
 
