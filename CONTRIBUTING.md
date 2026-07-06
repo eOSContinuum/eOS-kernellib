@@ -67,7 +67,7 @@ New docs added to `docs/` use lowercase-hyphenated filenames matching the existi
 
 ## Testing
 
-Platform behavior is exercised through the `examples/http-app/` reference application and the `state/` checked-in statedump that confirms boot-and-restore semantics. Changes to capability tiers, daemons, or the primitive surfaces should include:
+Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. Changes to capability tiers, daemons, or the primitive surfaces should include:
 
 - Reproducible boot evidence (cold boot, statedump restore, hot boot as applicable to the change).
 - An empirical Observation in the relevant doc when the change demonstrates a previously-unverified primitive behavior.

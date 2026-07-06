@@ -2,7 +2,7 @@
 
 This directory contains the reference documentation for eOS-kernellib — the kernel layer for orthogonally-persistent servers built on the [DGD] driver. The root `README.md` introduces the project and what the runtime platform provides; the docs here cover the platform's model, operator surface, and application-authoring patterns in depth.
 
-**Audience**: a reader entering the documentation directly — either to set up the platform, understand its architecture, write an application on top, or operate a running deployment.
+**Audience**: a reader entering the documentation directly — to set up the platform, evaluate whether it fits, understand its architecture, write an application on top, operate a running deployment, or contribute to the kernel layer itself.
 
 ## Documentation map
 
@@ -24,6 +24,8 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [persistence.md](persistence.md) — orthogonal persistence as architectural property; the statedump cycle; hot boot; per-variable persistence semantics; persistence boundaries.
 - [code-lifecycle.md](code-lifecycle.md) — compile, clone, destruct, hot reload, `call_touch`, and the object-manager event surface.
 - [changing-a-running-system.md](changing-a-running-system.md) — the consolidated change story: the ladder from one-object hot fix through library cascade, live state migration, reactive data change, sandboxed behavior, and host-binary swap, with the atomicity safety net under all of it.
+- [dispatcher.md](dispatcher.md) — the property-change dispatcher: registration and registrar approval, pre/main/post timings, batching, cascade bounds and cycle detection, persistence across snapshot restore, and the verification table.
+- [observers.md](observers.md) — the observer lifecycle contract: storage encoding, registration and removal surfaces, the query views, eviction, and end-of-life.
 
 ### Writing applications
 
@@ -38,7 +40,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [vault-applications.md](vault-applications.md) — Vault-specific patterns: participating-domain contract, property-bearing clonables, per-application schema registration, on-disk XML shape, round-trip cycle, cross-domain access requirements.
 - [signal-applications.md](signal-applications.md) -- the smallest signal-on-property demonstration: one observer, one write, the reaction done when the write returns; why reacting to state change is a runtime primitive here rather than assembled queue/poller/worker glue.
 - [merry-applications.md](merry-applications.md) — Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
-- [chat-applications.md](chat-applications.md) — multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, the planned growth path across capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
+- [chat-applications.md](chat-applications.md) — multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, and the shipped demonstrations spanning capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
 - [merry-language.md](merry-language.md) — Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fifteen merryfuns with full signatures. Read this when writing Merry source, not just binding it.
 
 ### Operations
@@ -53,6 +55,9 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - `../examples/signal-app/` -- minimal signal application: a one-inherit property host, one Merry observer, a synchronous-fire assertion. Read alongside [signal-applications.md](signal-applications.md).
 - `../examples/merry-app/` — minimal Merry application: a property + ur-bearing clonable, an ancestry-walk assertion through `run_merry`, and a sandbox-firing assertion. Read alongside [merry-applications.md](merry-applications.md).
 - `../examples/chat-app/` — multi-user chat application: Room and User clonables, an admin-token LWO, capability-gated admin verbs, a three-boot test driver whose twenty assertions span the runtime-primitive demonstrations (capability gates, persistence, sandboxed reactions, atomic events, multi-agent coherence). Read alongside [chat-applications.md](chat-applications.md).
+- `../examples/atomic-demo/` — the atomicity demonstration: a counter mutates inside an `atomic` function that errors, and the runtime rolls the mutation back. The empirical evidence behind [runtime-primitives.md](runtime-primitives.md) §1.
+- `../examples/hot-reload-demo/` — the hot-reload demonstration: new LPC source recompiled into the live runtime via `compile_object`, the next dispatch picking up the new program. The evidence behind [runtime-primitives.md](runtime-primitives.md) §4.
+- `../examples/hot-reload-master/` — clone-upgrade demonstration: recompiling a clonable master propagates the new program to existing clones while each keeps its state. Read alongside [code-lifecycle.md](code-lifecycle.md).
 
 ### Reference
 
@@ -64,6 +69,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 Common goals and the docs that serve them.
 
 - **Run the platform and see it work** — [getting-started.md](getting-started.md), then [first-hour.md](first-hour.md), then `../examples/http-app/README.md`.
+- **Evaluate whether the platform fits** — [runtime-primitives.md](runtime-primitives.md) for what is proven today, [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces.
 - **Arriving from a cloud-services stack** — [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
 - **Audit the platform's authority model** — [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
@@ -76,10 +82,11 @@ Common goals and the docs that serve them.
 - **Add scripted, sandboxed behavior to an object** — [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Write Merry source** — [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
-- **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md).
+- **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), [changing-a-running-system.md](changing-a-running-system.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md) and the `../examples/hot-reload-demo/` and `../examples/hot-reload-master/` demonstrations.
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
 - **Cross-reference an unfamiliar term mid-document** — [glossary.md](glossary.md).
 - **Follow a citation back to its source** — [references.md](references.md).
+- **Contribute to the kernel layer** — `../CONTRIBUTING.md`, then [architecture.md](architecture.md), [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference/](kernel-reference/README.md) for the modified API surface.
 
 [DGD]: https://github.com/dworkin/dgd
 [lpc-doc]: https://github.com/dworkin/lpc-doc
