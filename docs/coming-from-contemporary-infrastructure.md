@@ -50,7 +50,7 @@ Honesty about the other direction — needs the service stack serves that this p
 
 ## Where to next
 
-- **[persistence.md](persistence.md)** — the model underneath everything in this table: why orthogonal persistence, what persists, the statedump cycle, the boundaries.
+- **[persistence.md](persistence.md)** — the model underneath everything in this table: why orthogonal persistence, what persists, the statedump cycle, the boundaries — and Getting data out, for the exit-cost question.
 - **[getting-started.md](getting-started.md)** — boot the platform and see the properties firsthand.
 - **[lpc-essentials.md](lpc-essentials.md)** — the language bridge, including the "if you come from dynamic languages" notes.
 - **[runtime-primitives.md](runtime-primitives.md)** — the per-primitive foundation-and-evidence statement for the eight runtime guarantees.
