@@ -73,6 +73,8 @@ Platform behavior is exercised through the bundled examples and the regression h
 - An empirical Observation in the relevant doc when the change demonstrates a previously-unverified primitive behavior.
 - LPC-level evidence (admin-console transcript or HTTP probe transcript) where the change affects an externally-visible surface.
 
+An empirical Observation is a dated statement, in the doc it supports, naming the command that ran and the output marker it produced -- a sentinel line, a response body, a status field -- specific enough that a later reader can rerun the command and check for the same marker. `docs/runtime-primitives.md`'s Demonstration entries set the citation shape: each names the exercising example or script and the sentinel or transcript line that constitutes the evidence, though they read as continuous platform-model prose rather than individually dated entries -- a new Observation adds the date.
+
 ## Code style
 
 LPC code follows the conventions visible across `src/`:

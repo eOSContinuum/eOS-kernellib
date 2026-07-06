@@ -217,6 +217,38 @@ When to adapt the shape:
 
 The shape is a teaching surface for the platform's individual primitives, not the recommended posture for a tier-E application that means to do useful work. Read `docs/runtime-primitives.md` for what each example assumes about the runtime; read this document's earlier sections (`Domain layout`, `The initd's role`, `Owner and access`, `Live code upgrade through call_touch`) for the patterns that apply regardless of primitive count.
 
+## Testing your application
+
+### The sentinel-driver pattern
+
+Six of the eight bundled examples ship their regression as a boot-time test driver at `sys/test.c` (`atomic-demo` and `http-app` verify over live HTTP instead), deferred to a `call_out` from `create()` so every domain's `initd` has finished before it calls cross-domain daemons. Each phase of the driver is wrapped in `catch{}` and appends one line to a result-log file (conventionally `/usr/<App>/data/test-result.log`): `"<App>:test: <PHASE> OK"` on success, `"<App>:test: FAIL: <reason>"` on failure. Wrapping each phase separately means one phase's failure does not mask a different failure in another. `scripts/run-example.sh` (`scripts/README.md`) reads the result log back, counts `" OK"` lines against a per-example expected count, and fails the run on any `FAIL` line or a count mismatch.
+
+`examples/chat-app/sys/test.c` is the most heavily annotated of the bundled drivers — its header comment enumerates every phase by sentinel name and what it exercises, and each phase in the body carries an inline comment naming the primitive under test. It is the reference to read first when writing a new one. The shared `log_line` helper every driver repeats:
+
+```c
+private void log_line(string msg)
+{
+    mixed *info;
+    int size;
+
+    catch {
+        info = file_info(RESULT_FILE);
+        size = info ? info[0] : 0;
+        write_file(RESULT_FILE, msg + "\n", size);
+    }
+}
+```
+
+### Two-boot snapshot-restore
+
+A driver that asserts survival across a restart follows the two-boot recipe `merry-app` and `chat-app` use for their restart phases (`vault-app`'s round-trip phases stay within one boot -- they exercise export/import, not process death). `/usr/System/sys/persist_helper::trigger_dump_and_exit()` schedules a full `dump_state(FALSE)` plus `shutdown()` via a `call_out`, so the caller's stack unwinds before the snapshot is taken. Boot 1 runs its phases, keeps whatever objects need to survive as non-static globals (so the dump captures them), schedules a verify `call_out` far enough out to still be pending at dump time, then calls `trigger_dump_and_exit`; the process exits when `shutdown()` runs. Boot 2 restarts DGD against the written snapshot (`state/snapshot`); DGD's orthogonal persistence restores the object graph including the pending call_out, which fires as soon as the system is back up and asserts the restored state.
+
+`examples/merry-app/sys/test.c` (phases 16/17, PERSIST SETUP / PERSIST VERIFY) and `examples/chat-app/sys/test.c` (phases 10/11, PERSIST-SETUP / PERSIST-VERIFY) both follow this shape; chat-app adds a third, cold, no-snapshot boot afterward to show the contrast — an on-disk marker file survives, but the in-image session does not, without a snapshot to restore from.
+
+### Adapting run-example.sh to a new domain
+
+`scripts/run-example.sh` resolves each example's boot recipe through its `example_profile()` shell function — one hardcoded case line per example naming the deploy directory, boot count, boot-1 mode, and expected OK count. There is no directory-convention or config-file discovery: pointing the runner at a new domain means adding a case to `example_profile()` in `scripts/run-example.sh` itself, which is exactly what its own error message says when the profile is missing: `no profile for '<example>'; add one to example_profile()`. The rest of the script — clean-slate deploy, boot orchestration, sentinel counting — needs no change.
+
 ## Where to next
 
 - `docs/where-code-belongs.md` — the placement doctrine behind this document's mechanics: plain LPC versus a Merry script, and which compiled shape fits a new piece of behavior.
