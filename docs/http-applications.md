@@ -164,7 +164,7 @@ Four platform contracts apply to every HTTP/1 application server. The reference 
 
 ### Inherit from `/lib/`, not from `/obj/`
 
-`Http1Server` is the library form of the HTTP/1 server; `Server1` (under `/obj/`) is the clonable form. Applications inherit the **library** form (`/usr/HTTP/api/lib/Server1`, aliased as `Http1Server`). DGD's `inherit_program` kfun rejects inheritance from a path that does not contain `/lib/` — a discipline that separates inheritable libraries from clonable objects across the kernel layer. The library form of every HTTP/1 component lives under `/usr/HTTP/api/lib/`; the clonable forms under `/usr/HTTP/api/obj/` are not inheritable.
+`Http1Server` is the library form of the HTTP/1 server; `Server1` (under `/obj/`) is the clonable form. Applications inherit the **library** form (`/usr/HTTP/api/lib/Server1`, aliased as `Http1Server`). The driver object's `inherit_program` hook (kernel-layer LPC, `src/kernel/sys/driver.c`) rejects inheritance from a path that does not contain `/lib/` — a discipline that separates inheritable libraries from clonable objects across the kernel layer. The library form of every HTTP/1 component lives under `/usr/HTTP/api/lib/`; the clonable forms under `/usr/HTTP/api/obj/` are not inheritable.
 
 The consequence is that the binary-manager glue in `/usr/HTTP/api/obj/server1.c` cannot be inherited and must be replicated in the application server. The six methods listed above are that replication.
 

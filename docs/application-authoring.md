@@ -68,7 +68,7 @@ Three identities matter in tier-E code, all derived from the object's path:
 - **Creator** — typically the same as owner for tier-E. The creator is the user identity granted the privilege to compile, clone, and modify the object.
 - **Clone owner** — for cloned objects, the runtime tracks which object did the cloning. The clone's path is `/usr/<App>/obj/X#N` where `N` is the unique clone index; the clone owner is the caller of `clone_object`, which may differ from the master's owner.
 
-The System auto's access checks use these identities at every kfun call. An application running under owner `<App>` cannot, by default, read or write files in another tier-E domain; cross-domain access is per-call mediated by the access daemon, not blanket-granted.
+The kernel layer's access checks use these identities on the masked file and compile operations. An application running under owner `<App>` cannot, by default, read or write files in another tier-E domain; it reads another domain only when that domain is published for global read (as the shipped structured-state domains are at boot) or through a specific access-daemon grant.
 
 `previous_object()` and `previous_program()` (host-driver kfuns) report which object and program made the current call. Capability-bounded API surfaces use these to check the caller's tier before dispatching: a System-tier-only function can guard with `if (sscanf(previous_program(), "/usr/System/%*s") != 1) error("permission denied")`.
 
@@ -78,7 +78,7 @@ The default access posture for a tier-E domain at boot:
 
 - The domain's owner has read+write to its own directory tree, established by the System initd's `add_owner(<App>)` call before the domain's own `initd.c` runs.
 - Other domains have no access to this domain's files without explicit grant.
-- The System tier has cross-domain reach via its `set_global_access("System", TRUE)` grant; other user tiers do not get blanket cross-domain access.
+- The System tier's cross-domain reach is ambient (the kernel auto's checks exempt System-creator code); `set_global_access` runs the other way, publishing a named domain's own tree for global read — the System initd publishes `/usr/System` and the shipped structured-state domains at boot. Other user tiers read across domains only via specific grants.
 
 Cross-domain reach for tier-E code is mediated at every relevant kfun call by the access daemon at `/kernel/sys/access_daemon.c`. The access primitives themselves (the `set_access`, `query_user_access`, `query_file_access`, `set_global_access` methods on `/kernel/lib/api/access.c`) are kernel-tier; an application that needs to expose a public read-only library typically requests the access grant through a System-tier helper rather than calling kernel access primitives directly. Applications that ship a binary or HTTP service do not need to manipulate access bits at all — the platform routes cross-tier calls through the System-tier libraries the application inherits, and access checks happen automatically inside those.
 
