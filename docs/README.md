@@ -19,6 +19,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [architecture.md](architecture.md) — capability tiers, daemons, boot sequence, auto-inheritance, System global-access, host-driver extensions. The structural reference for the platform.
 - [runtime-primitives.md](runtime-primitives.md) — the eight runtime primitives (atomicity, capability separation, persistent state, hot reload, sandboxed code load, asynchronous events, multi-agent coherence, state introspection), each with foundation, demonstration status, supporting extensions, and open work.
+- [execution-model.md](execution-model.md) — the task model: what starts a task, run-to-completion serialization, the head-of-line latency price and its `call_out` chunking mitigation, and where the atomic envelope sits.
 - [capability.md](capability.md) — the capability library (`capabilityd` store + inheritable check face) behind the capability-separation primitive: the mechanism, the six gating surfaces, what "capability" means here (tier-mediation, not strict object-capability) and does not, the lifecycle, and the limitations.
 - [runtime-platform-roadmap.md](runtime-platform-roadmap.md) — the committed forward surfaces in dependency-ordered waves, each with an activation trigger; the transport posture; the application-tier boundary.
 - [persistence.md](persistence.md) — orthogonal persistence as architectural property; the statedump cycle; hot boot; per-variable persistence semantics; persistence boundaries.
@@ -34,6 +35,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [kernel-libraries.md](kernel-libraries.md) — inheritable libraries under `src/lib/` (strings, persistent collections, iteration, asynchronous control, time, utilities).
 - [where-code-belongs.md](where-code-belongs.md) — placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility) — with the authority choke-point and composition-seam disciplines behind the choices.
 - [application-authoring.md](application-authoring.md) — general tier-E application patterns; owner/access conventions; `call_touch` upgrade model; non-HTTP transports.
+- [debugging-applications.md](debugging-applications.md) — reading error traces, where diagnostics land, the observer-didn't-fire checklist, and the day-to-day working environment.
 - [http-applications.md](http-applications.md) — HTTP/1-specific patterns: mount-point convention, application layout, the server object's role, body-bearing methods, the four platform contracts.
 - [schema.md](schema.md) -- the Schema subsystem: namespace-indexed typed-element registry, type-system dispatcher, the schema-for-schemas bootstrap, namespace vocabulary, property-table marshaling (Core:Entries + the coercion codec).
 - [xml.md](xml.md) -- the XML transport subsystem: parser, generator, XMD internal form, type registration with the Schema dispatcher, naming conventions.
@@ -45,10 +47,12 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 ### Operations
 
-- [operations.md](operations.md) — the `.dgd` configuration, boot modes, state persistence, logging and diagnostics, resource limits, host-driver extension loading. The deployment surface.
+- [operations.md](operations.md) — the `.dgd` configuration, boot modes, state persistence, backup and restore, the availability and data-loss model, logging and diagnostics, resource limits and capacity, host-driver extension loading. The deployment surface.
 - [admin-console.md](admin-console.md) — the operator's console (verb-based REPL on `telnet_port`): connecting, security posture, per-task operational reference, verb appendix.
 
 ### Working examples
+
+`../examples/README.md` is the in-directory index; `../scripts/README.md` documents the one-command harness that drives the sentinel-bearing examples.
 
 - `../examples/http-app/` — minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
 - `../examples/vault-app/` — minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
@@ -68,10 +72,10 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 Common goals and the docs that serve them.
 
-- **Run the platform and see it work** — [getting-started.md](getting-started.md), then [first-hour.md](first-hour.md), then `../examples/http-app/README.md`.
-- **Evaluate whether the platform fits** — [runtime-primitives.md](runtime-primitives.md) for what is proven today, [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces.
+- **Run the platform and see it work** — [getting-started.md](getting-started.md), then `DGD_BIN=... ../scripts/run-example.sh merry-app` to watch the assertion sentinels pass, then [first-hour.md](first-hour.md), then `../examples/http-app/README.md`.
+- **Evaluate whether the platform fits** — [runtime-primitives.md](runtime-primitives.md) for what is proven today (`../scripts/run-example.sh` runs the proofs), [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [operations.md](operations.md) Limits and capacity for the envelope, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces.
 - **Arriving from a cloud-services stack** — [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
-- **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md).
+- **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md), then [execution-model.md](execution-model.md) for the concurrency and latency model.
 - **Audit the platform's authority model** — [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
@@ -84,9 +88,10 @@ Common goals and the docs that serve them.
 - **Operate a running deployment** — [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
 - **Reason about hot reload and code evolution** — [code-lifecycle.md](code-lifecycle.md), [changing-a-running-system.md](changing-a-running-system.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md) and the `../examples/hot-reload-demo/` and `../examples/hot-reload-master/` demonstrations.
 - **Understand what survives a restart** — [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
+- **Debug a misbehaving application** — [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
 - **Cross-reference an unfamiliar term mid-document** — [glossary.md](glossary.md).
 - **Follow a citation back to its source** — [references.md](references.md).
-- **Contribute to the kernel layer** — `../CONTRIBUTING.md`, then [architecture.md](architecture.md), [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference/](kernel-reference/README.md) for the modified API surface.
+- **Contribute to the kernel layer** — `../CONTRIBUTING.md`, then [architecture.md](architecture.md), [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference/](kernel-reference/README.md) for the modified API surface; `../scripts/README.md` documents the regression harness a change must keep green.
 
 [DGD]: https://github.com/dworkin/dgd
 [lpc-doc]: https://github.com/dworkin/lpc-doc
