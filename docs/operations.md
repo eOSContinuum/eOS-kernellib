@@ -1,6 +1,6 @@
 # Operations
 
-This document covers running an eOS-kernellib instance: configuring it via the `.dgd` file, booting and re-booting it, snapshotting and restoring its persistent state, monitoring its output, diagnosing failures, and loading optional host-driver extensions. The architecture document (`docs/architecture.md`) covers the platform's structural model; this document covers the operator's surface for keeping it running.
+This document covers running an eOS-kernellib instance: configuring it via the `.dgd` file, booting and re-booting it, snapshotting, backing up, and restoring its persistent state, its availability and data-loss model, monitoring its output, diagnosing failures, sizing it within the platform's limits, and loading optional host-driver extensions. The architecture document (`docs/architecture.md`) covers the platform's structural model; this document covers the operator's surface for keeping it running.
 
 **Audience**: someone running the platform — responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `docs/application-authoring.md` and `docs/http-applications.md`.
 
@@ -71,6 +71,55 @@ The driver also takes automatic snapshots at the interval set by `dump_interval`
 
 A snapshot captures the persistent object graph: every object's variables, every clone's dataspace, every pending `call_out`. It does not capture open connections. On snapshot restore, connections must be re-established by clients; on hot boot, connections survive via the inherited file descriptors. After a snapshot restore, the driver invokes the registered `restored(int hotboot)` hook (see `src/kernel/sys/driver.c`) which emits a "State restored" message and gives the platform a place to re-attach managers and re-arm any external resources the snapshot did not preserve.
 
+## Backing up and restoring state
+
+A complete backup covers more than the dump file:
+
+| Item | Why | Notes |
+|---|---|---|
+| `dump_file` and `<dump_file>.old` | The statedump pair | Rotation moves the previous file to `.old` before the new one is written (State persistence above) — copy both together, not `dump_file` alone |
+| `src/kernel/data/` | Admin credentials and access bits | File-backed independently of the snapshot cycle — the admin password and access grants are "written to host files the moment they changed ... deliberately file-backed, so they survive even without a snapshot" (`docs/first-hour.md`) |
+| Vault data directories (the Vault daemon's on-disk store, `/usr/Vault/data/vault/<Domain>/...`) | Schema-exported per-domain state | The Vault daemon's own XML storage root, kept separately from the object graph's in-memory copy (`docs/vault-applications.md`) |
+| Loaded extension binaries and the `.dgd` `modules` mapping | Restore precondition, not a file to copy | "statedumps created with a specific kfun extension in effect will require the the same kfun extension on restore" (Loading host-driver extensions below, quoting the 2010 Hydra note) — without the same extensions available, a snapshot will not restore at all |
+
+**Safe copy.** Copy after a dump completes, not against a swap file mid-write — `dump_state` briefly blocks the platform while it runs (`docs/persistence.md` The statedump cycle), and the rotation is a rename rather than an in-place edit, but the window is still real. Take a deliberate full dump first (the `snapshot` verb) so the backup generation is self-sufficient, then copy `dump_file` and `<dump_file>.old` together — keeping the pair costs one extra file and removes any question of which generation is on disk.
+
+**Restore.** Two forms, both invoked as `dgd config_file [restore files]`:
+
+- **Full restore** — `dgd config_file dump_file`. Works when `dump_file` holds a full snapshot: the `snapshot` verb (`dump_state(FALSE)`, `src/kernel/lib/admin_console.c` `cmd_snapshot`) and the console dump-and-exit path (`dump_state(FALSE)`, `src/usr/System/sys/persist_helper.c:54`) both leave one.
+- **Two-file (incremental) restore** — `dgd config_file dump_file dump_file.old`. Required when `dump_file` holds an incremental snapshot written by `dump_state(1)`/`dump_state(TRUE)`. The argument order — the current dump file first, its full base second — is verified from the DGD driver's own usage line, `Usage: dgd config_file [[partial_snapshot] snapshot]`, and from `Config::restore(fd, fd2)`: the header read from the first file is checked for the partial flag, and the second file is opened only to back it. This is the same order already documented for the `.dgd` file's `hotboot` tuple (`{ binary, config, snapshot, snapshot.old }`, The .dgd configuration file above) — an unset second argument on a partial primary fails at boot with "Missing secondary snapshot".
+
+This two-file form is a different recovery than the corrupt-snapshot fallback in Common failure modes below, which discards the newer `dump_file` outright and restores from `<dump_file>.old` alone as a self-contained snapshot. The two-file form instead restores using both files together, applying the incremental on top of its base.
+
+Which stop path leaves which case:
+
+| Stop path | Call | Restore needs |
+|---|---|---|
+| Kill signal (SIGINT) | `prepare_reboot()` then `dump_state(1)` (`src/kernel/sys/driver.c:757-766`) | `dump_file` + `dump_file.old` (in practice; see below) |
+| `reboot` verb | `dump_state(TRUE)` then `shutdown()` (`cmd_reboot`, `src/kernel/lib/admin_console.c`) | `dump_file` + `dump_file.old` (in practice; see below) |
+| `snapshot` verb | `dump_state(FALSE)` (`cmd_snapshot`) | `dump_file` alone |
+| Console dump-and-exit path | `dump_state(FALSE)` then `shutdown()` (`src/usr/System/sys/persist_helper.c:54`) | `dump_file` alone |
+
+A supervisor sending SIGINT — the ordinary "stop the service" path outside admin_console — and the `reboot` verb both write an incremental. Strictly, a `dump_state(1)` dump is written as a partial only when swapped-out objects are pending at dump time; a small freshly-booted image can produce a self-contained file (which is why the tutorial's single-file restore succeeds after its first `reboot`), but on a long-running image the partial case is the norm. Routine operator practice should keep `<dump_file>.old` alongside `dump_file` rather than treat it as disposable; a restore attempted with only `dump_file` after either path is the likely cause of a "Missing secondary snapshot" failure at boot.
+
+## Availability and data-loss model
+
+The platform is a single process on a single machine — there is no replica to fail over to and no distributed consensus to reason about (`docs/persistence.md`: "this platform is deliberately single-coherence-domain"). Availability and data loss are properties of one process's dump-and-restore cycle, not of a cluster.
+
+**Recovery point.** The RPO is `dump_interval` (The .dgd configuration file above) — a sizing decision the operator makes, not a platform-supplied guarantee. Work committed after the last completed dump and lost on an unclean stop is bounded by that interval; the prior snapshot is untouched by a failed or interrupted dump attempt and remains a valid restore point (Backing up and restoring state above).
+
+**Crash semantics.** A crash — process killed before any dump runs, host power loss, a `dump_state` failure mid-write (Common failure modes below) — loses everything committed since the last completed dump. The platform does not partially apply an interrupted dump.
+
+**Downtime taxonomy.**
+
+| Mode | Trigger | Connections | State |
+|---|---|---|---|
+| Hot boot | `shutdown(1)` + `execv`, with a `hotboot` tuple configured (Booting above) | Survive — inherited file descriptors | Survives — dump plus immediate reload |
+| Statedump restore | Cold start with `dump_file` present (full or the two-file incremental form) | Drop — clients reconnect | Survives, from the dump file(s) |
+| Cold boot | Cold start with no usable `dump_file` | Drop | Rebuilt from source — only what the initd cascade recreates; nothing carried over |
+
+**Portability.** A snapshot restores only against a driver started with the same `auto_object` and `driver_object`, and with the same `modules` extensions loaded (Common failure modes below; the same conditions `docs/persistence.md` states for hot boot). It is a resume point for a specific configuration, not a portable backup format across incompatible driver configurations.
+
 ## Logging and diagnostics
 
 The driver provides a `message(string)` function that timestamps and emits diagnostic output:
@@ -123,6 +172,33 @@ Per-owner limits are managed by the resource daemon at `/kernel/sys/resource_dae
 The property-change dispatcher (`docs/dispatcher.md`) exposes a runtime-configurable cascade-depth bound via `MERRY->set_max_cascade_depth(int n)` (KERNEL-gated) and `MERRY->query_max_cascade_depth()` (public read-only). Default is `32`. The bound counts depth, not breadth — a flat batched write with many keys does not increment the counter; an observer-triggered chain of further writes does. Hitting the bound throws `merry: cascade depth N exceeded ...` and records `cascade-aborted` in the dispatcher's batch-status log.
 
 The admin verb `cascade-depth [N]` (see `docs/admin-console.md` Dispatcher operator surface) is the operator-facing read/write surface; the no-arg form reports the current value, the integer-arg form sets it via the registry's KERNEL-elevation helper. The dispatcher exposes nine operator verbs from the admin console in total; `cascade-depth` and `dispatch-trace` are covered above, and the remaining seven cover runtime inspection and mutation of dispatcher state (observers, batch-status, observer-registration, approved-registrar set); `docs/admin-console.md` enumerates the full set and the worked-example operator session.
+
+## Limits and capacity
+
+`example.dgd`'s numbers are demo-scale, not sizing guidance. Read against the driver's own compiled bounds (`dworkin/dgd` `src/config.cpp`'s config-field range table and `src/config.h`'s index-type defaults):
+
+| `.dgd` field | `example.dgd` | Driver's compiled range (stock build) | Reading |
+|---|---|---|---|
+| `array_size` | 32767 | 1-32767 (`USHRT_MAX / 2`) | Already at the driver's ceiling — raising it needs a driver built with a wider array-size type, not a config edit |
+| `users` | 255 | 0-255 (`EINDEX_MAX`, a one-byte count) | Already at the stock build's ceiling, for the same reason |
+| `editors` | 10 | 0-255 (`EINDEX_MAX`) | Demo-scale; real deployments have headroom to 255 with no rebuild |
+| `objects` | 10000 | 2-65535 (`UINDEX_MAX`) | Demo-scale; headroom to 65535 with no rebuild |
+| `call_outs` | 10000 | 0-65534 (`CINDEX_MAX - 1`) | Demo-scale; headroom to 65534 with no rebuild |
+| `swap_size` × `sector_size` | 65535 × 1024 bytes | — | About 64 MiB of pageable object storage, sized to the example's tiny working set rather than a production footprint |
+
+The stock driver build's index widths (matching the driver's own header comment: "default: 64K objects, 64K swap sectors, 255 users, max string length 64K") set the ceilings above. A driver rebuilt with wider `uindex`/`eindex` types raises them, at the cost of a larger per-object memory footprint; eOS-kernellib runs against a stock build, so the table above is the practical ceiling until that changes.
+
+Ceilings that are not `.dgd` fields:
+
+| Ceiling | Value | Source |
+|---|---|---|
+| Host driver's core kfun set | Capped at 256, by the 1-byte kfun numbering | `docs/architecture.md` Host-driver extensions |
+| Per-execution tick budget | 20,000,000 ticks, default | Set at boot in `src/kernel/sys/driver.c`; raised or lowered per owner via `quota <owner> ticks <limit>` (Resource limits above) |
+| LPC `int` width | 32-bit signed | `docs/lpc-essentials.md` Types and values |
+
+**Snapshot-pause scaling.** The dump-time pause scales with in-memory image size, not with the config caps above — "a multi-gigabyte image can take seconds to write; the runtime briefly blocks during the dump" (`docs/persistence.md` The statedump cycle). No number here substitutes for measuring a specific workload; `scripts/run-example.sh` — the harness that boots and drives each bundled example end-to-end — is the natural rig to extend for a workload-shaped pause measurement.
+
+**Unmeasured today.** Actual dump-pause duration at realistic image sizes, sustained throughput near the `objects` / `call_outs` / `array_size` ceilings, and the memory cost of a driver rebuilt with wider index types are not measured against this codebase. Treat the tables above as compiled-in ceilings and documented defaults, not throughput guarantees.
 
 ## Loading host-driver extensions
 
