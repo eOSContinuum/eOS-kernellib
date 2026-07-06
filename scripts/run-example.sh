@@ -48,6 +48,7 @@ example_profile() {
         hot-reload-master) echo "Reload 1 timed 3" ;;
         merry-app)         echo "MerryApp 2 selfexit 28" ;;
         signal-app)        echo "SignalApp 1 timed 1" ;;
+        upgrade-cascade)   echo "Cascade 1 timed 7" ;;
         vault-app)         echo "MyApp 1 timed 10" ;;
         *)                 echo "" ;;
     esac
@@ -56,13 +57,13 @@ example_profile() {
 EXAMPLE="${1:-}"
 if [ -z "$EXAMPLE" ]; then
     echo "usage: scripts/run-example.sh <example>" >&2
-    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app vault-app" >&2
+    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app" >&2
     exit 2
 fi
 PROFILE=$(example_profile "$EXAMPLE")
 if [ -z "$PROFILE" ]; then
     echo "run-example.sh: no profile for '$EXAMPLE'; add one to example_profile()" >&2
-    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app vault-app" >&2
+    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app" >&2
     echo "(atomic-demo and http-app verify via live HTTP probes; see their READMEs)" >&2
     exit 2
 fi
@@ -101,7 +102,7 @@ echo "== clean slate =="
 # shutdown() when its driver finishes) it tears the driver down before this
 # example's driver completes, truncating the result. Isolation requires a
 # single deployed example per boot.
-for mount in Chat MerryApp MyApp Reload SignalApp WWW; do
+for mount in Cascade Chat MerryApp MyApp Reload SignalApp WWW; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap "$LOG_PREFIX"1.log "$LOG_PREFIX"2.log "$LOG_PREFIX"3.log

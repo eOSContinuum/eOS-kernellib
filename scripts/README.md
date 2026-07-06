@@ -20,6 +20,7 @@ Deploys the named example fresh under `src/usr/<Deploy>`, runs its boot sequence
 | hot-reload-master | Reload | 1 | timed | 3 |
 | merry-app | MerryApp | 2 | selfexit | 28 |
 | signal-app | SignalApp | 1 | timed | 1 |
+| upgrade-cascade | Cascade | 1 | timed | 7 |
 | vault-app | MyApp | 1 | timed | 10 |
 
 `atomic-demo` and `http-app` have no profile here -- they verify over live HTTP (see each README and bundled `smoke.sh`).
