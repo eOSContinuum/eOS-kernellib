@@ -24,13 +24,13 @@ Reference: `docs/code-lifecycle.md` Library upgrade.
 
 ### 3. Migrate live state without a maintenance window
 
-When an upgrade changes an object's data shape, existing clones carry the old shape. The `-p` flag on `upgrade` queues `call_touch` patching: each live clone is marked, and the patch function runs the next time the clone is naturally referenced. State migrates lazily, invisibly, with no downtime and no global sweep-and-stop.
+When an upgrade changes an object's data shape, existing clones carry the old shape. The `-p` flag on `upgrade` queues `call_touch` patching: the upgrade daemon sweeps the object table to mark every live clone, then forces each one through the patch function immediately afterward via chained callouts, rather than waiting for the clone's next natural reference. Migration completes with no downtime, though it is an active sweep, not a lazy background process.
 
 Reference: `docs/code-lifecycle.md` `call_touch` and `_F_touch`; `docs/application-authoring.md` Live code upgrade through call_touch.
 
 ### 4. Change data and let the system react
 
-Not every change is code. Writing a typed property is itself a change-entry point: the property-change dispatcher fires registered observers — before the write (which can refuse it), at commit, and after — within the same atomic envelope as the write. Reactive behavior changes by changing the data that drives it, with no code touched.
+Not every change is code. Writing a typed property is itself a change-entry point: the property-change dispatcher fires registered observers — before the write (which can refuse it), during it, and after — within the same atomic envelope as the write. Reactive behavior changes by changing the data that drives it, with no code touched.
 
 Reference: `docs/dispatcher.md`; `docs/signal-applications.md` for the smallest working example.
 

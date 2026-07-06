@@ -20,7 +20,7 @@ Five properties make LPC behave differently from most other languages a builder 
 
 **Source files are recompiled into the live runtime.** Calling `compile_object("/usr/MyApp/obj/widget", new_source)` replaces the master object's program with the new source. Existing references to the old master continue to function for the in-flight call; subsequent calls dispatch to the new version. There is no separate "deploy" step.
 
-**No manual memory management.** No `malloc` / `free`, no `delete`. Objects are reference-counted by the host driver and garbage-collected when references drop to zero. Programs do not own memory; the host owns it.
+**No manual memory management.** No `malloc` / `free`, no `delete`. Masters and clones persist until explicitly removed with `destruct_object()`; only lightweight objects (LWOs, see below) are reference-counted and deallocated when the last reference drops. Programs do not own memory; the host owns it.
 
 **Cross-object calls and inherited calls have their own operators.** `obj->func(arg)` calls `func` on a different object (the call traverses the kfun layer and goes through access checks). `::func()` calls the inherited version of `func` from this object's parent class. `name::func()` calls the inherited version when the inherit was given a name. A bare `func()` call is local to the current object.
 
@@ -166,7 +166,7 @@ LPC has no threads. Concurrency is single-threaded with cooperative scheduling. 
 int call_out(string func, mixed delay, mixed... args);
 ```
 
-Returns a handle. Schedules `func` to be called on `this_object()` after `delay` seconds (zero is permitted; the call fires on the next event-loop pass after the current call returns). Each fired call_out runs in its own atomic context.
+Returns a handle. Schedules `func` to be called on `this_object()` after `delay` seconds (zero is permitted; the call fires on the next event-loop pass after the current call returns). Each fired call_out runs as an ordinary, non-atomic call; it gets function-body rollback only if `func` itself is declared `atomic`.
 
 Common shapes:
 
@@ -174,7 +174,7 @@ Common shapes:
 - `call_out("flush", 0)` — defer work to after the current call returns; the caller commits a consistent state before the deferred work runs
 - `call_out("tick", 1)` — schedule recurring work; the called function re-arms the call_out before returning
 
-A call_out fired from inside an `atomic` function does not extend the caller's atomic context — the deferred call is its own transaction, runs after the caller commits. This is the platform's only mechanism for async work and the only way to escape a single atomic context's tick budget.
+A call_out fired from inside an `atomic` function does not extend the caller's atomic context — the deferred call runs after the caller commits, as an ordinary, non-atomic call unless the called function is itself declared `atomic`. This is the platform's only mechanism for async work and the only way to escape a single atomic context's tick budget.
 
 ## Error handling
 

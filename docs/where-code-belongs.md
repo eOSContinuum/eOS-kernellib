@@ -1,6 +1,6 @@
 # Where Code Belongs
 
-An author adding behavior to this platform chooses twice: first between the two languages — plain LPC compiled at a capability tier, or a Merry script bound to a property — and then, for plain LPC, among several placement shapes (an inheritable library, a daemon, a cloneable, a pure-function utility). Each choice has a structural answer, not a stylistic one: the host driver's inheritance rules, the sandbox boundary, and the platform's authority discipline decide most cases. This document is the decision guidance, distilled from the choices the platform itself made while building its own surfaces.
+An author adding behavior to this platform chooses twice: first between the two languages — plain LPC compiled at a capability tier, or a Merry script bound to a property — and then, for plain LPC, among several placement shapes (an inheritable library, a daemon, a clonable, a pure-function utility). Each choice has a structural answer, not a stylistic one: the host driver's inheritance rules, the sandbox boundary, and the platform's authority discipline decide most cases. This document is the decision guidance, distilled from the choices the platform itself made while building its own surfaces.
 
 **Audience**: an application author deciding where a new piece of behavior should live, and a platform contributor placing a new kernel- or System-tier facility. Assumes the tier vocabulary from `docs/architecture.md`; `docs/application-authoring.md` covers the mechanics of each shape (domain layout, initd, access) once the placement is chosen.
 
@@ -13,7 +13,7 @@ Everything on the platform is ultimately LPC — a Merry script compiles to a wr
 - **It belongs to an object, not to the code base.** A script lives in the object's own property table (`merry:<mode>:<signal>`), travels with the object through statedump and restore, and is inherited by every descendant through the UrHierarchy ancestry walk. Behavior that varies per-object or per-subtree — a reaction here, a policy there — is property data, and Merry is the platform's format for behavior-as-data.
 - **It reacts to state change.** The property-change dispatcher's observer surface *is* Merry: `register_observer` compiles Merry source and binds it under `merry:on:<path>:<timing>` (`docs/signal-applications.md`, `docs/observers.md`). Reacting to a write is the canonical script-shaped job.
 - **It changes at runtime without compile access.** A script is installed by writing a property — from the console, from other code, from an operator session — with no file under `src/`, no recompile, no deploy step. Behavior that operators or the application's own users author lands here.
-- **It must not be trusted with the platform.** The sandbox denies the escape- and effect-shaped kfuns — object lifecycle, filesystem, networking, `call_other` on objects — with a 51-entry deny set enforced at evaluation (`docs/merry-language.md` The sandbox surface). A script author can compute over the arguments and the bound object's state, call whitelisted merryfuns, and schedule timers; nothing else. That containment is the point: script-shaped behavior is the platform's surface for code whose author does not hold tier authority.
+- **It must not be trusted with the platform.** The sandbox denies the escape- and effect-shaped kfuns — object lifecycle, filesystem, networking — with a 51-entry deny set, plus a separate shadow that refuses `call_other` on objects, both enforced at evaluation (`docs/merry-language.md` The sandbox surface). A script author can compute over the arguments and the bound object's state, call whitelisted merryfuns, and schedule timers; nothing else. That containment is the point: script-shaped behavior is the platform's surface for code whose author does not hold tier authority.
 
 **Write plain LPC when the behavior is structure-shaped:**
 
@@ -29,7 +29,7 @@ Four shapes, and the deciding question for each is *who calls it, and how*.
 
 ### Pure functions: a `/lib/util` library
 
-Stateless helpers — encoding, parsing, string and value manipulation — belong in a private-inherit library under `/lib/util/`, beside `ascii`, `lpc`, and `coercion`. Consumers inherit the library and the `static` helpers become part of their own program; there is no daemon to boot-order against, no `call_other` overhead, and no shared state to protect. The coercion codec chose this shape over a daemon precisely because pure functions gain nothing from a process-like home (`docs/kernel-libraries.md` Utility libraries).
+Stateless helpers — encoding, parsing, string and value manipulation — belong in a private-inherit library under `/lib/util/`, beside `ascii`, `lpc`, and `coercion`. Consumers inherit the library and the `static` helpers become part of their own program; there is no daemon to boot-order against, no `call_other` overhead, and no shared state to protect. The coercion codec chose this shape over a daemon precisely because pure functions gain nothing from a process-like home (`docs/kernel-libraries.md` Utilities).
 
 ### Facilities `/usr`-domain code must reach: a daemon, not an inheritable kernel library
 
@@ -41,7 +41,7 @@ An inheritable library remains right when its consumers are all System- or kerne
 
 ### Instances and singletons: the directory conventions
 
-Cloneables under `obj/`, singleton daemons under `sys/`, LWO value types under `data/`, inheritables under `lib/` — the driver and kernel enforce these, and `docs/application-authoring.md` Domain layout covers them. Placement doctrine adds one steer: state that must exist once per domain is a `sys/` daemon; state that exists per-instance is a clonable plus the properties it carries; and a value that crosses dataspaces is an LWO, copied rather than shared (`docs/code-lifecycle.md` LWO instantiation).
+Clonables under `obj/`, singleton daemons under `sys/`, LWO value types under `data/`, inheritables under `lib/` — the driver and kernel enforce these, and `docs/application-authoring.md` Domain layout covers them. Placement doctrine adds one steer: state that must exist once per domain is a `sys/` daemon; state that exists per-instance is a clonable plus the properties it carries; and a value that crosses dataspaces is an LWO, copied rather than shared (`docs/code-lifecycle.md` LWO instantiation).
 
 ## Authority: one choke-point, never inline checks
 
@@ -56,7 +56,7 @@ LPC's function binding decides where an extension point can live, and it is easy
 - **An undefined prototype.** A library that declares `int message(string str);` without a body forces every internal call through the inheritor's implementation — the console library's pattern for delegating output to whatever object inherits it.
 - **`call_other` self-dispatch.** `call_other(this_object(), "cmd_" + verb, ...)` resolves through the object's function table at call time, so the most-derived `cmd_*` definition wins regardless of where the dispatch loop lives.
 
-The consequence for placing an extension: **interpose where the call already crosses one of those seams.** The console is the platform's worked example — the ~250-line cloneable that self-dispatches verbs is where the clone-addressing masks landed (each mask translates its argument and delegates to the inherited `::cmd_*`), while the ~2,300-line console library underneath stayed untouched and composition-free (`docs/admin-console.md` Target resolution). Extending a large library by inheriting it and redefining its internals looks equivalent and is not: the library's own internal calls will keep binding to the original definitions, and the "override" silently applies only to external entry points.
+The consequence for placing an extension: **interpose where the call already crosses one of those seams.** The console is the platform's worked example — the ~250-line clonable that self-dispatches verbs is where the clone-addressing masks landed (each mask translates its argument and delegates to the inherited `::cmd_*`), while the ~2,300-line console library underneath stayed untouched and composition-free (`docs/admin-console.md` Target resolution). Extending a large library by inheriting it and redefining its internals looks equivalent and is not: the library's own internal calls will keep binding to the original definitions, and the "override" silently applies only to external entry points.
 
 So the doctrine: keep large libraries free of composition assumptions, keep the composition seam in the small object that inherits them, and when adding an extension point to new code, make the seam explicit — a prototype the inheritor must supply, or a self-dispatching `call_other` — rather than relying on redefinition.
 

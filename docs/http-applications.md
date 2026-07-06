@@ -198,7 +198,7 @@ This is a higher-level pattern than the single-application reference. The kernel
 
 ## Cross-domain initialization order
 
-The System initd compiles `/usr/[A-Z]*/initd.c` in alphabetical order. An application initd that needs to call into another user-layer domain at compile time may run before that domain's initd has compiled. To defer registration until the System initd has finished iterating all domains, use a `call_out` of duration 0:
+The System initd compiles `/usr/[A-Z]*/initd.c` alphabetically, after a fixed `TLS`, `HTTP`, `LPC` prefix. An application initd that needs to call into another user-layer domain at compile time may run before that domain's initd has compiled. To defer registration until the System initd has finished iterating all domains, use a `call_out` of duration 0:
 
 ```c
 /* src/usr/Counter/initd.c — registers with the WWW router */
@@ -217,7 +217,7 @@ static void registerWithWWW()
 }
 ```
 
-The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where alphabetical compilation order would otherwise leave a dependency unsatisfied.
+The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where compilation order — the `TLS`, `HTTP`, `LPC` prefix followed by the alphabetical remainder — would otherwise leave a dependency unsatisfied.
 
 ## Where to next
 

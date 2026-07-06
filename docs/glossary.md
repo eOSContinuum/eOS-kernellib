@@ -14,7 +14,7 @@ The implicit `inherit` relationship every compiled LPC source carries against th
 
 ## call_out
 
-The DGD kfun for scheduling a delayed callback: `call_out(string fn, mixed delay, mixed... args)`. Returns an integer handle the caller can pass to `remove_call_out` for cancellation. The callback fires in its own atomic context after the delay elapses; it does NOT extend the caller's atomic context. Load-bearing in [lpc-essentials.md](lpc-essentials.md) call_out and [runtime-primitives.md](runtime-primitives.md) §6 (asynchronous events).
+The DGD kfun for scheduling a delayed callback: `call_out(string fn, mixed delay, mixed... args)`. Returns an integer handle the caller can pass to `remove_call_out` for cancellation. The callback fires as an ordinary, non-atomic call after the delay elapses -- it gets function-body rollback only if the called function is itself declared `atomic` -- and it does not extend the caller's atomic context. Load-bearing in [lpc-essentials.md](lpc-essentials.md) call_out and [runtime-primitives.md](runtime-primitives.md) §6 (asynchronous events).
 
 ## call_touch
 
@@ -26,7 +26,7 @@ One of the five layered access levels (A, B, C, D, E) that bound what loaded cod
 
 ## capability library
 
-The kernel layer's consolidated authority mechanism: a store daemon (`/kernel/sys/capabilityd`) holding namespaced approved-sets, plus an inheritable check face (`/kernel/lib/capability`), behind which six gating surfaces share one `is_allowed` / `require_member` choke-point. The platform's capability model is tier and owner-identity mediation — capability-*shaped* (privileged operations reachable only through mediating `/kernel/` objects) but enforced by **ambient authority** (the caller's tier, owning domain, and `previous_program()` chain), not strict no-ambient-authority object-capability, which LPC cannot reach without host-driver changes. The term "capability" across the doc set carries this meaning unless explicitly qualified. Load-bearing in [capability.md](capability.md) and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
+The kernel layer's consolidated authority mechanism: a store daemon (`/kernel/sys/capabilityd`) holding namespaced approved-sets, plus an inheritable check face (`/kernel/lib/capability`), behind which the gating surfaces share one choke-point: five consult the store via `is_allowed` / `require_member`, and the persistence dump-and-exit gate uses the check face's fixed-principal `require()` with no stored set. The platform's capability model is tier and owner-identity mediation — capability-*shaped* (privileged operations reachable only through mediating `/kernel/` objects) but enforced by **ambient authority** (the caller's tier, owning domain, and `previous_program()` chain), not strict no-ambient-authority object-capability, which LPC cannot reach without host-driver changes. The term "capability" across the doc set carries this meaning unless explicitly qualified. Load-bearing in [capability.md](capability.md) and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
 
 ## clone
 
@@ -62,7 +62,7 @@ The system daemon at `/usr/System/sys/errord` registered via `set_error_manager(
 
 ## _F_create
 
-The compile-time-generated wrapper around an LPC source's `create()` function. The kernel layer's auto-inheritance generates `_F_create` to dispatch the right `create(...)` call depending on whether the object is a master or a clone. Load-bearing in [code-lifecycle.md](code-lifecycle.md) _F_create dispatch.
+The hand-written `nomask` function in the kernel auto (`src/kernel/lib/auto.c`) that every compiled program inherits via auto-inheritance and that the host driver invokes on an object's first function call, before the object's own `create()` runs. It sets the object's creator and owner (registering the clone with the driver's clone manager if the object is a clone) and then calls `create()` -- the same dispatch for a master or a clone. Load-bearing in [code-lifecycle.md](code-lifecycle.md) _F_create dispatch.
 
 ## hot boot / hotboot
 
@@ -78,7 +78,7 @@ An object created via `new_object` rather than `clone_object`, living inside a h
 
 ## master
 
-The compiled program object at a given path. A master is created by `compile_object(path)` and serves as the template clones are made from. The master's master/clone distinction governs how `_F_create` dispatches to `create(...)`. Load-bearing in [code-lifecycle.md](code-lifecycle.md) and throughout the doc set.
+The compiled program object at a given path. A master is created by `compile_object(path)` and serves as the template clones are made from. A master and each of its clones take the same `_F_create` identity pass before their own `create()` runs. Load-bearing in [code-lifecycle.md](code-lifecycle.md) and throughout the doc set.
 
 ## mount point
 
@@ -86,7 +86,7 @@ A registered application-server object at a path the kernel-layer's HTTP machine
 
 ## objectd
 
-The system daemon that intercepts twelve compile-and-load lifecycle events (compiling, compile, compile_failed, clone, destruct, remove_program, etc.). Tier-D and tier-E domains MAY register an objectd-side observer for their own programs without modifying the System daemon. Load-bearing in [code-lifecycle.md](code-lifecycle.md) and [architecture.md](architecture.md) Tier-C daemons.
+The system daemon that intercepts the object-manager hooks the host driver dispatches (`compile`, `compile_failed`, `destruct`, `touch`, `call_object`, `remove_program`, `inherit_program`, `include_file`). Tier-D and tier-E domains MAY register an objectd-side observer for their own programs without modifying the System daemon. Load-bearing in [code-lifecycle.md](code-lifecycle.md) and [architecture.md](architecture.md) Tier-C daemons.
 
 ## observer
 

@@ -4,7 +4,7 @@ A Vault application on eOS-kernellib supplies a participating domain whose clone
 
 **Audience**: an application author building a persistent-state service on eOS-kernellib; comfortable with LPC syntax (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
 
-`docs/architecture.md` covers the capability tiers and the Schema / Marshal / Vault / Index subsystems that make typed persistence possible. `docs/persistence.md` covers the durable-state primitives a Vault-participating object inherits (atomic mutation, dump_state survival, hot reload). `docs/runtime-primitives.md` covers the platform properties.
+`docs/architecture.md` covers the capability tiers and (under Modules under src/usr/) the Schema / Marshal / Vault / Index subsystems that make typed persistence possible. `docs/persistence.md` covers the durable-state primitives a Vault-participating object inherits (atomic mutation, dump_state survival, hot reload). `docs/runtime-primitives.md` covers the platform properties.
 
 ## The participating-domain contract
 
@@ -26,7 +26,7 @@ Paths written with a leading `~` (as in `~Schema/sys/schema_daemon`) are DGD's p
 cp -R examples/vault-app src/usr/MyApp
 ```
 
-Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README cats `src/usr/MyApp/data/test-result.log` and expects ten OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`), and the property-table set (`CODEC OK`, `CORE ROUND-TRIP OK`, `CORE ENCODE-REJECT OK`, `CORE FILTER OK`).
+Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README runs `scripts/run-example.sh vault-app` (the manual sequence it automates cats `src/usr/MyApp/data/test-result.log`) and expects ten OK sentinels: `ROUND-TRIP OK`, the three singleton assertions (`SINGLETON OK`, `XDOMAIN-RESPAWN-REJECT OK`, `NODE-RESPAWN OK`), the cross-reference pair (`XREF OK`, `XREF-DANGLING OK`), and the property-table set (`CODEC OK`, `CORE ROUND-TRIP OK`, `CORE ENCODE-REJECT OK`, `CORE FILTER OK`).
 
 The sections below explain what the reference application is doing and why. Read the code in `examples/vault-app/sys/test.c` alongside this document.
 
@@ -47,7 +47,7 @@ src/usr/MyApp/
     test.c          - boot-time test driver (inherits lib/app)
 ```
 
-`lib/app.c` is the thin layer over `~Vault/lib/vault_node`. Any application daemon that needs to register a filesystem root with the Vault inherits this lib and calls `::create("/usr/MyApp/data/<store>")` from its own create. The participating domain's per-daemon state lives under that root as `<store>/<name-with-colons-as-slashes>.xml`.
+`lib/app.c` is the thin layer over `~Vault/lib/vault_node`. Any application daemon that participates in the Vault inherits this lib and calls `::create("/usr/MyApp/data/<store>")` from its own create to register with the Vault daemon. That path is not where state lands: every participating domain's per-daemon state lives under the Vault daemon's own storage root as `<name-with-colons-as-slashes>.xml`, regardless of what was passed to `::create()`.
 
 ## Boot-order constraint
 
@@ -72,13 +72,14 @@ A real application with a stable boot-order position (alphabetically after Vault
 
 ## Property-bearing clonable
 
-`obj/thing.c` carries one string-typed `label` and one int-typed `count`. The schema layer drives marshaling through the per-attribute `query_<name>` getters; import drives `set_<name>` setters:
+`obj/thing.c` carries one string-typed `label`, one int-typed `count`, and one object-typed `peer` (a cross-object reference). The schema layer drives marshaling through the per-attribute `query_<name>` getters; import drives `set_<name>` setters:
 
 ```c
 inherit "/lib/util/named";
 
 private string _label;
 private int _count;
+private object _peer;
 
 static void create() { }   /* clones only -- master is a template */
 
@@ -86,9 +87,11 @@ string queryStateRoot() { return "MyApp:Thing"; }
 
 string query_label()  { return _label; }
 int    query_count()  { return _count; }
+object query_peer()   { return _peer; }
 
 void set_label(string val) { _label = val; }
 void set_count(int val)    { _count = val; }
+void set_peer(object val)  { _peer = val; }
 ```
 
 `queryStateRoot()` returns the schema name -- the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape. Overriding it binds the per-app schema; leaving it inherited keeps the `"Core:Entries"` property-table default.
@@ -106,8 +109,10 @@ private void register_thing_schema()
     node->set_name("MyApp", "Thing");
     node->add_attribute("label", "lpc_str", "query_label");
     node->add_attribute("count", "lpc_int", "query_count");
+    node->add_attribute("peer", "lpc_obj", "query_peer");
     node->add_callback("set_label", "label");
     node->add_callback("set_count", "count");
+    node->add_callback("set_peer", "peer");
 }
 ```
 

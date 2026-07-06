@@ -8,7 +8,7 @@ Schema is one of five subsystems in the cohesive Vault layout (Vault / Marshal /
 
 - **A namespace-indexed registry** of typed elements. Callers resolve `query_node(ns, tag)` → schema_node; the schema_node carries the type, child rules, attribute set, and callback hooks for that element.
 - **A type-system dispatcher**. `dtd_daemon` registers type handlers (xml_daemon registers the core XML types; the daemon itself handles the LPC primitives). Callers ask "what's the colour of `lpc_str`?" or "convert this ascii to typed value" and the daemon routes to the handler.
-- **The schema-for-schemas tree**. The structural primitives (`Schema:Element`, `Schema:Children`, `Schema:Attribute`, `Schema:Attributes`, `Schema:Callback`, `Schema:Callbacks`, `Schema:Iterator`) are themselves schema_node instances, defined in code by `schema_daemon::configure_initial_nodes()`. The schema_daemon bootstraps its own type tree before any external schema loads.
+- **The schema-for-schemas tree**. The structural primitives (`Schema:Element`, `Schema:Child`, `Schema:Children`, `Schema:Attribute`, `Schema:Attributes`, `Schema:Callback`, `Schema:Callbacks`, `Schema:Iterator`) are themselves schema_node instances, defined in code by `schema_daemon::configure_initial_nodes()`. The schema_daemon bootstraps its own type tree before any external schema loads.
 
 ## Layout
 
@@ -56,7 +56,7 @@ Schema uses three namespaces for the structural primitives plus their content-do
 
 | Namespace | Purpose | Members at boot |
 |-----------|---------|-----------------|
-| `Schema:` | Schema-for-schemas — the meta-tree describing what schema_nodes look like | `Element`, `Children`, `Attribute`, `Attributes`, `Callback`, `Callbacks`, `Iterator` |
+| `Schema:` | Schema-for-schemas — the meta-tree describing what schema_nodes look like | `Element`, `Child`, `Children`, `Attribute`, `Attributes`, `Callback`, `Callbacks`, `Iterator` |
 | `Ur:` | Ur-hierarchy primitives — parent/child structural elements applicable to any domain | `Hierarchy`, `Child`, `Children` |
 | `Core:` | Property-bag primitives for key-value structured data | `Entry`, `Entries` |
 
@@ -108,7 +108,7 @@ Schema uses two cross-cutting infrastructure pieces in eOS-kernellib's kernel la
 
 ### `lib/dtd.c` (122 lines)
 
-Inheritable poor-man's abstract data type repository. Routes type-system queries to dtd_daemon's registered handlers. Inheritors: `xmlgen`, `xmlparse`, `xml_daemon`, `schema_daemon`. Surface includes `queryTypeColour(type)`, `queryColourType(colour)`, `query_ascii_enumeration(type)`, `queryCheckboxed(type)`, `defaultValue(type)`, `typedToAscii(type, val)`, `asciiToTyped(type, ascii)`, `testRawData(type, val)`.
+Inheritable poor-man's abstract data type repository. Routes type-system queries to dtd_daemon's registered handlers. Inheritors: `xmlgen`, `xmlparse`, `schema_node`, `dtd_daemon`, `schema_daemon`, `stateimpex`. Surface includes `queryTypeColour(type)`, `queryColourType(colour)`, `query_ascii_enumeration(type)`, `queryCheckboxed(type)`, `defaultValue(type)`, `typedToAscii(type, val)`, `asciiToTyped(type, ascii)`, `testRawData(type, val)`.
 
 ### `sys/dtd_daemon.c` (307 lines)
 
@@ -124,7 +124,7 @@ Thin clonable wrapper. Inherits `lib/schema_node`. Each instance is a configured
 
 ### `sys/schema_daemon.c` (392 lines)
 
-The namespace coordinator. Holds `namespaces: mapping (namespace → mapping (tag → schema_node))`. Surface: `register_node(node)`, `query_node(ns, tag)`, `get_node(ns, tag, defaultValue)`, `clear_node(ns, tag)`, `query_namespaces()`. The Node() macro is the convenience for `configure_initial_nodes()`: find-or-clone a `Schema:<ns>:<tag>` and `set_name(ns, tag)` it.
+The namespace coordinator. Holds `namespaces: mapping (namespace → mapping (tag → schema_node))`. Surface: `register(sp, t)` (a node's own `set_name()` calls this via `previous_object()` -- there is no `register_node(node)` call shape), `deregister(sp, t)`, `query_node(ns, tag)`, `get_node(ns, tag)` (like `query_node` but raises `error()` on a miss instead of returning a default), `query_namespaces()`, `query_tags(sp)`. The Node() macro is the convenience for `configure_initial_nodes()`: find-or-clone a `Schema:<ns>:<tag>` and `set_name(ns, tag)` it.
 
 ### `initd.c` (27 lines)
 

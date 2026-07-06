@@ -19,10 +19,10 @@ For the LPC mechanics that make these libraries work (inherit syntax, type modif
 
 | Class | File | Header | Role |
 |---|---|---|---|
-| `KVstore` | `src/lib/KVstore.c` | `<KVstore.h>` | Persistent key-value store with structural sharing |
+| `KVstore` | `src/lib/KVstore.c` | `<KVstore.h>` | Persistent key-value store backed by a B+ tree |
 | `KVnode` | `src/lib/KVnode.c` | `<KVstore.h>` | Internal tree-node implementation backing `KVstore` |
 
-`KVstore` is the supported backing for application-level persistent collections beyond the host's built-in `mapping`. The structural-sharing layout means insertions and deletions share unchanged subtrees with prior versions, useful when an application keeps versioned snapshots of a collection in memory. The shipped `obj/kvnode.c` is the cloneable instantiation; the `KVNODE` macro in `<KVstore.h>` resolves to its path.
+`KVstore` is the supported backing for application-level persistent collections beyond the host's built-in `mapping`. It is implemented as a B+ tree whose nodes mutate in place on insert and delete; it holds a single current root and does not retain prior versions or share subtrees across versions. The shipped `obj/kvnode.c` is the cloneable instantiation; the `KVNODE` macro in `<KVstore.h>` resolves to its path.
 
 ## Property storage, identity, and inheritance
 
@@ -30,7 +30,7 @@ Three sibling libraries compose into the script-bearing-object pattern (`inherit
 
 ### `/lib/util/properties.c`
 
-An inheritable keyed property store on a host object. Inheriting hosts gain raw-key (case-preserving) and downcased-key access via `set_property` / `query_property` / `query_raw_property` / `query_prefixed_properties` / `set_raw_property`. The default `set_property` routes through the Merry daemon when loaded — `find_object("/usr/Merry/sys/merry")` returning non-nil triggers `MERRY->dispatch_set(this_object(), path, val)` for pre/main/post observer fan-out, cascade-depth bounding, and cycle detection; otherwise the call falls through to `set_raw_property` directly (the storage-only path used during early bootstrap and by callers that need to bypass the dispatcher). The dispatcher integration is documented in `docs/dispatcher.md`. The property store is also where observer bindings live (`merry:on:<path>:<timing>` keys), which is why the dispatcher requires its registration targets to carry this library.
+An inheritable keyed property store on a host object. Inheriting hosts gain raw-key (case-preserving) and downcased-key access via `set_property` / `query_property` / `query_raw_property` / `query_prefixed_properties` / `set_raw_property`. The default `set_property` routes through the Merry daemon when loaded — `find_object("/usr/Merry/sys/merry")` returning non-nil triggers `MERRY->dispatch_set(this_object(), path, val)` for pre/main/post observer fan-out, cascade-depth bounding, and cycle detection; otherwise the call falls through to `set_downcased_property` directly (the storage-only path used during early bootstrap and by callers that need to bypass the dispatcher). The dispatcher integration is documented in `docs/dispatcher.md`. The property store is also where observer bindings live (`merry:on:<path>:<timing>` keys), which is why the dispatcher requires its registration targets to carry this library.
 
 ### `/lib/util/ur.c`
 
@@ -85,6 +85,7 @@ The `src/lib/util/` subdirectory holds small utility libraries that wrap kfun-le
 | `src/lib/util/parse.c` | `parse_string` | Parser-runner over a yacc-shape grammar compiled to a scratch object |
 | `src/lib/util/asn.c` | host kfuns `asn_*` | Big-integer (arbitrary-precision) arithmetic |
 | `src/lib/util/base64.c` | character encoding | Base64 encode and decode |
+| `src/lib/util/coercion.c` | LPC-literal grammar | Round-trip codec for simple LPC values (ints, floats, strings, object references, nil, arrays, mappings); the marshaling path behind `properties.c`'s `query_ascii_property` / `set_ascii_property` |
 | `src/lib/util/hex.c` | character encoding | Hexadecimal encode and decode |
 | `src/lib/util/json.c` | `/sys/jsonencode`, `/sys/jsondecode` | JSON encode and decode |
 | `src/lib/util/random.c` | host kfun `random` | Pseudo-random string generation |

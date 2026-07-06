@@ -25,7 +25,7 @@ src/usr/<App>/
         <record>.c
 ```
 
-The four subdirectory conventions (`lib`, `obj`, `sys`, `data`) are not just style. The host driver enforces the `/lib/` requirement on `inherit_program`; the System auto's `find_object` discipline depends on path-based type recognition; and the kernel's `clone_object` only accepts paths containing `/obj/`. An application that puts a cloneable under `lib/` cannot clone it; an application that tries to inherit from an object under `obj/` will get a compile-time rejection.
+The four subdirectory conventions (`lib`, `obj`, `sys`, `data`) are not just style. The host driver enforces the `/lib/` requirement on `inherit_program`; the System auto's `find_object` discipline depends on path-based type recognition; and the System auto's `clone_object` wrapper only accepts paths containing `/obj/`. An application that puts a cloneable under `lib/` cannot clone it; an application that tries to inherit from an object under `obj/` will get a compile-time rejection.
 
 ## The initd's role
 
@@ -155,9 +155,9 @@ The connection-handling contract for non-HTTP applications is the binary-manager
 - **`/usr/System/lib/user.c`** — the System user library; inherits the kernel user library plus the System auto.
 - **`/usr/System/sys/userd.c`** — the System userd; handles the binary-manager protocol on the kernel's behalf.
 
-For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `logout`, `flow_*`, `timeout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
+For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `flow_*`, `timeout`, `_logout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
 
-For datagram-shaped applications (UDP), datagram support is a port candidate listed in `docs/runtime-primitives.md` Supporting surfaces; the platform ships the transport scaffolding but no canonical datagram application yet.
+For datagram-shaped applications (UDP), the platform ships the datagram transport scaffolding (`docs/runtime-primitives.md` Supporting surfaces), but no canonical datagram application yet.
 
 ## Worked example sketch: an in-memory KV service
 
@@ -183,7 +183,7 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 ## Reference applications
 
-Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat src/usr/<Domain>/data/test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
+This section walks through three of the examples that ship under `examples/` (eight in total; the rest are documented in `docs/runtime-primitives.md`, `docs/chat-applications.md`, and `docs/signal-applications.md`). Each one exercises **one** runtime primitive end-to-end. `examples/vault-app/` and `examples/merry-app/` verify against a sentinel-file assertion the operator can check with `cat src/usr/<Domain>/data/test-result.log` after cold boot; `examples/http-app/` verifies over HTTP instead (see its table entry). They are deliberately minimal: the sentinel-file examples' test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
 
 | Example | Primitive demonstrated | Walkthrough |
 |---|---|---|
@@ -191,7 +191,7 @@ Three runnable examples ship under `examples/`. Each one exercises **one** runti
 | `examples/vault-app/` | Persistent state (XML round-trip via stateimpex; restart-survival) | `docs/vault-applications.md` |
 | `examples/merry-app/` | Sandboxed code load (Merry source bound to a property; ancestry walk; five-phase exercise of sandbox firing, Spawn, $delay, LabelCall) | `docs/merry-applications.md` |
 
-All three share a layout shape:
+`examples/vault-app/` and `examples/merry-app/` share a layout shape (`examples/http-app/` is simpler — just `initd.c`, `obj/server.c`, and `README.md`; see `docs/http-applications.md`):
 
 ```text
 examples/<name>/

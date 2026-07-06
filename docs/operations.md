@@ -33,7 +33,7 @@ A minimal example is included at `example.dgd` in the repository root.
 
 The platform has three boot modes; `docs/architecture.md` covers the dispatch in detail. Briefly:
 
-- **Cold boot**: started with no snapshot present. The driver compiles `/kernel/sys/driver`, runs the kernel auto's initd cascade through every `/usr/[A-Z]*/initd.c`, and reaches the running state. This is the path for first-time bring-up and after intentional state wipe.
+- **Cold boot**: started with no snapshot present. The driver compiles `/kernel/sys/driver`, which compiles the System initd; the System initd's `create()` iterates and loads every `/usr/[A-Z]*/initd.c`, and the platform reaches the running state. This is the path for first-time bring-up and after intentional state wipe.
 - **Snapshot restore**: started with a snapshot file present at `dump_file`. The driver reloads the snapshotted object graph and dataspaces, then calls the registered `restored(int hotboot)` driver hook. Initd cascades do not run; the platform resumes the state captured at the snapshot.
 - **Hot boot**: `shutdown(1)` followed by `execv` (when the `.dgd` file's `hotboot` tuple is set). Open file descriptors and connections are inherited by the replacement process; the snapshot is written and reloaded but external connections survive the transition. Used for upgrading the host binary or `.dgd` config without dropping live work.
 
@@ -122,7 +122,7 @@ Per-owner limits are managed by the resource daemon at `/kernel/sys/resource_dae
 
 The property-change dispatcher (`docs/dispatcher.md`) exposes a runtime-configurable cascade-depth bound via `MERRY->set_max_cascade_depth(int n)` (KERNEL-gated) and `MERRY->query_max_cascade_depth()` (public read-only). Default is `32`. The bound counts depth, not breadth — a flat batched write with many keys does not increment the counter; an observer-triggered chain of further writes does. Hitting the bound throws `merry: cascade depth N exceeded ...` and records `cascade-aborted` in the dispatcher's batch-status log.
 
-The admin verb `cascade-depth [N]` (see `docs/admin-console.md` Dispatcher operator surface) is the operator-facing read/write surface; the no-arg form reports the current value, the integer-arg form sets it via the registry's KERNEL-elevation helper. The dispatcher additionally exposes nine operator verbs from the admin console for runtime inspection and mutation of dispatcher state (observers, batch-status, observer-registration, approved-registrar set); `docs/admin-console.md` enumerates the full set and the worked-example operator session.
+The admin verb `cascade-depth [N]` (see `docs/admin-console.md` Dispatcher operator surface) is the operator-facing read/write surface; the no-arg form reports the current value, the integer-arg form sets it via the registry's KERNEL-elevation helper. The dispatcher exposes nine operator verbs from the admin console in total; `cascade-depth` and `dispatch-trace` are covered above, and the remaining seven cover runtime inspection and mutation of dispatcher state (observers, batch-status, observer-registration, approved-registrar set); `docs/admin-console.md` enumerates the full set and the worked-example operator session.
 
 ## Loading host-driver extensions
 

@@ -65,7 +65,7 @@ Capability-gated through `_check_registrar`, which passes exactly three shapes: 
 
 Errors on: nil host, non-property-bearing host, unrecognized timing, malformed path array, capability-gate failure. The compile step may also error if the source has a parse failure.
 
-### `dispatch_set(object obj, string path, mixed val)`
+### `dispatch_set(object obj, string path, mixed val, varargs string caller_program)`
 
 The single entry point that property writes route through when the Merry daemon is loaded. `/lib/util/properties::set_property` calls it; application code rarely calls it directly. Documented here so the application-author can read failure modes that originate in dispatch and the cascade / cycle / veto behaviors.
 
@@ -259,11 +259,11 @@ What survives, and why:
 
 What is verified by the MerryApp smoke (phases 16 and 17):
 
-- Phase 16 clones a fresh parent / child pair, registers a main observer on the child for `test:persist:val`, saves the child as a `static` global on the test driver, schedules a `phase17_verify` call_out three seconds out, and calls `/usr/System/sys/persist_helper->trigger_dump_and_exit()`. The helper writes a full snapshot via `dump_state(FALSE)` and `shutdown()`s the driver.
+- Phase 16 clones a fresh parent / child pair, registers a main observer on the child for `test:persist:val`, saves the child as an object global on the test driver, schedules a `phase17_verify` call_out three seconds out, and calls `/usr/System/sys/persist_helper->trigger_dump_and_exit()`. The helper writes a full snapshot via `dump_state(FALSE)` and `shutdown()`s the driver.
 - An external restart -- `dgd example.dgd state/snapshot` -- restores. The pre-snapshot `call_out` fires after restore.
 - Phase 17 reads the saved `persist_host`, writes `42` to `test:persist:val`, and asserts that both the value landed (property storage survived) and that `test:persist:fired` became `1` (the observer's compiled source ran against the restored object reference).
 
-The smoke is the first end-to-end empirical confirmation that the dispatcher's substrate composes correctly with DGD's persistence. The earlier driver phases verified each runtime primitive in isolation against cold-boot; phase 17 verifies their composition across restore. Any future regression in the persistence contract -- e.g., a change to how the compiled merry-script artifact is named, a change to property-mapping pickling, an observer cache that fails to rebuild after restore -- surfaces here as a `PERSIST VERIFY FAIL: ...` sentinel.
+The smoke is the first end-to-end empirical confirmation that the dispatcher's substrate composes correctly with DGD's persistence. The earlier driver phases verified each runtime primitive in isolation against cold-boot; phase 17 verifies their composition across restore. Any future regression in the persistence contract -- e.g., a change to how the compiled merry-script artifact is named, a change to property-mapping pickling, an observer cache that fails to rebuild after restore -- surfaces here as a `FAIL: PERSIST VERIFY ...` sentinel.
 
 ## Kernel-layer internals
 
@@ -341,7 +341,7 @@ Each documented signature is exercised by at least one phase of the MerryApp smo
 | `batched_set` (from Merry source via `BatchedSet`) | 8 | `BATCH SOURCE OK` |
 | Batch status -- `completed` | 6, 7, 8, 15 | various |
 | Batch status -- `main-aborted` | 9 | `BATCH ABORT OK` |
-| `max_cascade_depth` bound | (the cycle-detection phase hits the default bound; an explicit test phase covering `cascade-aborted` is future work) | -- |
+| `max_cascade_depth` bound | (no phase exercises the depth bound directly; an explicit test phase covering `cascade-aborted` is future work) | -- |
 | Observer-source contract -- `$this` binding to dispatch host | 14 | `DISPATCH ANCESTRY OK` |
 | Observer-source contract -- `Set` from observer source | 10, 11, 13, 14, 16 | various |
 | `BatchedSet` from observer source | 8 | `BATCH SOURCE OK` |

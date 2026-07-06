@@ -8,11 +8,12 @@ A Merry application on eOS-kernellib runs sandboxed scripts against an object hi
 
 ## The script-bearing-object contract
 
-A Merry-dispatching object only needs three things:
+A Merry-dispatching object needs four things:
 
 - a property store that distinguishes raw (case-preserving) and downcased keys -- inherit `/lib/util/properties` to get `set_property` / `query_raw_property` / `query_prefixed_properties`;
 - an ur-parent / ur-child relationship that `find_merry` can walk -- inherit `/lib/util/ur` to get `set_ur_object` / `query_parent`;
-- a logical name registration so the script's `Get(obj, "...")` and `Set(obj, "...", ...)` calls have a stable identity to reach -- inherit `/lib/util/named` and call `set_object_name(name)` at create.
+- a logical name registration so the script's `Get(obj, "...")` and `Set(obj, "...", ...)` calls have a stable identity to reach -- inherit `/lib/util/named` and call `set_object_name(name)` at create;
+- the `delayed_call` / `perform_delayed_call` pair a bound script's `$delay()` needs to schedule a continuation against the host -- inherit `/lib/util/delayed` (see Phase 4 below). Every script-bearing object needs this, since any script bound to it may call `$delay()`.
 
 Both `/lib/util/properties` and `/lib/util/ur` define `static void create()`; cloud-server's inherit resolution requires labels to disambiguate them in any inheritor that combines both. The reference application uses:
 
@@ -20,6 +21,7 @@ Both `/lib/util/properties` and `/lib/util/ur` define `static void create()`; cl
 inherit "/lib/util/named";
 inherit properties "/lib/util/properties";
 inherit ur "/lib/util/ur";
+inherit "/lib/util/delayed";
 
 static void create()
 {
@@ -55,7 +57,7 @@ Merry's invocation API is a static surface in `/usr/Merry/lib/merryapi`:
 | `find_merries(ob, signal, mode)` | Returns a mapping of every script bound under `<dprop>` or `<dprop>%`-prefix or delegated via `merry:inherit:*` keys across the full ancestry. |
 | `run_merries(ob, signal, mode, args, [label])` | Calls each script in the `find_merries` mapping, anding their results. |
 
-The methods are `static`. Daemons that want to dispatch a Merry script inherit `merryapi` rather than calling `SYS_MERRY->run_merry(...)`. The static qualifier preserves the inheritance-based invocation convention the API was authored against: call sites go through an inheriting daemon, not through the daemon object via `->`.
+The methods are `static`. Daemons that want to dispatch a Merry script inherit `merryapi` rather than calling `MERRY->run_merry(...)`. The static qualifier preserves the inheritance-based invocation convention the API was authored against: call sites go through an inheriting daemon, not through the daemon object via `->`.
 
 If a daemon-level dispatch surface is needed in the future (for cross-domain or stateless callers), a public delegator added to `sys/merry.c` is the natural extension point; the static merryapi stays as the inheritance-target.
 
@@ -68,7 +70,7 @@ script = new_object("/usr/Merry/data/merry",
                     "return \"hello, world\";");
 ```
 
-The clonable's `create(string lpc)` invokes the parser (`SYS_MERRY->parse_merry`), generates a wrapped LPC function (`mixed merry(string mode, string signal, string label) { switch(label) { case "virgin": { <source> } } }`), MD5-hashes the wrapper source, and compiles it to `/usr/Merry/merry/<md5>` via `compile_object(name, source)`. Identical sources share the same compiled object (the `4*NODE_COUNT` LRU registered through `SYS_MERRY->new_merry_node` evicts stale entries when the cache fills).
+The clonable's `create(string lpc)` invokes the parser (`MERRY->parse_merry`), generates a wrapped LPC function (`mixed merry(string mode, string signal, string label) { switch(label) { case "virgin": { <source> } } }`), MD5-hashes the wrapper source, and compiles it to `/usr/Merry/merry/<md5>` via `compile_object(name, source)`. Identical sources share the same compiled object (the `4*NODE_COUNT` LRU registered through `MERRY->new_merry_node` evicts stale entries when the cache fills).
 
 Bind the script to the target's property store with the convention key:
 
@@ -82,7 +84,7 @@ target->set_property("merry:lib:greet", script);
 
 `merrynode.c` defines a 51-function deny set via the `SANDBOX(f)` macro. Each entry shadows the underlying kfun with an error-throwing local: any Merry source that calls one fails with `function '<name>' not allowed in merry code`.
 
-The list covers escape-shape and external-effect-shape kfuns: object lifecycle (`clone_object`, `destruct_object`, `destruct_program`, `compile_object`, `restore_object`, `dump_state`, `dump_file`, `dump_interval`, `swapout`, `remove_program`), filesystem (`read_file`, `write_file`, `make_dir`, `remove_dir`, `remove_file`, `rename_file`, `get_dir`, `file_info`, `editor`, `query_editor`), networking (`open_port`, `connect`, `ports`, `send_datagram`, `send_message`, `send_close`, `connect_datagram`, `datagram_*` 6 entries, `telnet_connect`, `telnet_port`), input/output (`block_input`, `subscribe_event`, `unsubscribe_event`, `add_event`, `event`, `event_except`, `remove_event`, `this_user`, `users`), call-out manipulation (`remove_call_out`), object identity (`set_object_name`, `set_originator`, `query_originator`), execution (`execute_program`, `function_object`, `call_touch`), and the shutdown kfun. `call_other` and `new_object` are wrapped: object-typed callees error; non-object callees pass through.
+The list covers escape-shape and external-effect-shape kfuns: object lifecycle (`clone_object`, `destruct_object`, `destruct_program`, `compile_object`, `restore_object`, `dump_state`, `dump_file`, `dump_interval`, `swapout`, `remove_program`), filesystem (`read_file`, `write_file`, `make_dir`, `remove_dir`, `remove_file`, `rename_file`, `get_dir`, `file_info`, `editor`, `query_editor`), networking (`open_port`, `connect`, `ports`, `send_datagram`, `send_message`, `send_close`, `connect_datagram`, `datagram_*` 6 entries, `telnet_connect`, `telnet_port`), input/output (`block_input`, `subscribe_event`, `unsubscribe_event`, `add_event`, `event`, `event_except`, `remove_event`, `this_user`, `users`), call-out manipulation (`remove_call_out`), object identity (`set_object_name`, `set_originator`, `query_originator`), execution (`execute_program`, `function_object`, `call_touch`), and the shutdown kfun. `call_other` and `new_object` are wrapped: `call_other` passes through only `nil`, `int`, `float`, array, and mapping callees, and errors on both object- and string-typed callees (so the plain object-name-string invocation form errors too); `new_object` errors unconditionally, with no callee ever allowed through.
 
 `call_out` is allowed -- Merry scripts may schedule timers via `In(signal, seconds)` and `Every(signal, seconds)`.
 
@@ -96,13 +98,15 @@ The list covers escape-shape and external-effect-shape kfuns: object lifecycle (
 cp -R examples/merry-app src/usr/MerryApp
 ```
 
-Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README cats `src/usr/MerryApp/data/test-result.log` and expects three lines, in order:
+Then boot DGD against the configuration from `docs/getting-started.md` (`example.dgd`). The verify command in the example's README is `scripts/run-example.sh merry-app`, which drives a two-boot cycle: the cold boot runs phases 1 through 16, dumps a snapshot once `PERSIST SETUP OK` lands, and exits on its own; the second boot restarts against that snapshot, and the call_outs still pending from the first boot fire in turn, ending in phase 17's `PERSIST VERIFY OK`. The runner asserts 29 lines total in `src/usr/MerryApp/data/test-result.log`, starting with:
 
 ```
 MerryApp:test: starting
 MerryApp:test: ANCESTRY OK
 MerryApp:test: SANDBOX OK
 ```
+
+The full sentinel sequence, including the pending call_outs that resolve after the restart, is listed in `examples/merry-app/README.md`.
 
 The sections below explain what the reference application does and why. Read the code in `examples/merry-app/sys/test.c` alongside this document.
 
@@ -187,7 +191,7 @@ result = run_merry(child, "make_one", "lib", ([ ]));
 
 Merry source has no LPC-style variable declarations -- `object o = Spawn(...)` is a parse error. Compose the call inline.
 
-### Phase 4 -- $delay() and the 4-arg mcontext dispatch
+### Phase 4 -- $delay() and the 5-arg mcontext dispatch
 
 ```c
 delay_script = new_object(MERRY_DATA,
@@ -199,9 +203,9 @@ run_merry(child, "delay_test", "lib", ([ ]));
 /* schedules verify_delay call_out at t=+2 sec */
 ```
 
-The grammar expands `$delay(1, FALSE)` to `{ do_delay(mode, signal, 1, "<label>"); return FALSE; case "<label>": ; }`. `do_delay` calls `::call_other(this, "delayed_call", new_object("/usr/Merry/data/mcontext", signal, mode, label, args), "merry_continuation", 1, this)`. The binding host's `delayed_call` LFUN (inherited from `/lib/util/delayed`) wraps that in `call_out("perform_delayed_call", 1, mcontext, "merry_continuation", ({ this }))`. After one second, `perform_delayed_call` fires `merry_continuation` on the mcontext LWO, which calls `run_merries(this, signal, mode, args, label)` -- the second pass resumes execution at the case label and the `Set($this, "delay_fired", 1)` line runs. A `verify_delay` call_out polls `query_raw_property("delay_fired")` at t=+2 and logs the sentinel.
+The grammar expands `$delay(1, FALSE)` to `{ do_delay(mode, signal, 1, "<label>"); return FALSE; case "<label>": ; }`. `do_delay` calls `::call_other(this, "delayed_call", new_object("/usr/Merry/data/mcontext", signal, mode, label, args, this_object()), "merry_continuation", 1, this)`. The binding host's `delayed_call` LFUN (inherited from `/lib/util/delayed`) wraps that in `call_out("perform_delayed_call", 1, mcontext, "merry_continuation", ({ this }))`. After one second, `perform_delayed_call` fires `merry_continuation` on the mcontext LWO, which calls `run_merries(this, signal, mode, args, label)` -- the second pass resumes execution at the case label and the `Set($this, "delay_fired", 1)` line runs. A `verify_delay` call_out polls `query_raw_property("delay_fired")` at t=+2 and logs the sentinel.
 
-The path validates cloud-server's `new_object(path, args...)` -> `_F_init` -> `create(args...)` 4-arg dispatch (mcontext's `create(string m, string s, string l, mapping a)`).
+The path validates cloud-server's `new_object(path, args...)` -> `_F_init` -> `create(args...)` 5-arg dispatch (mcontext's `create(string m, string s, string l, mapping a, varargs object c)`, where the fifth, varargs `c` carries the running compiled merry object so a resumed continuation -- including a dispatcher-fired observer's -- can call back into it directly).
 
 Every script-bearing object (a class passed as `this` at `run_merry` / `run_merries`) must expose `delayed_call(object ob, string fun, mixed delay, mixed args...)` and a `static void perform_delayed_call(object ob, string fun, mixed *args)` companion. Both come from `/lib/util/delayed`; a script-bearing object inherits that lib to gain the pair (`examples/merry-app/obj/thing.c` and `examples/chat-app/obj/room.c` both do).
 
@@ -230,9 +234,19 @@ The earlier deferred list (Spawn/Duplicate, $delay, LabelCall/LabelRef) is now e
 
 ## Storage and round-trip
 
-The reference application binds scripts to in-memory clones; statedump survival of the binding requires Schema participation that `examples/merry-app/obj/thing.c` deliberately omits to keep the example focused on the runtime path. A Schema-registered version of the same thing would have:
+The reference application binds scripts to in-memory clones, and statedump survival of that binding needs no Schema or Vault participation: phases 16 and 17 of `examples/merry-app/sys/test.c` register an observer script on a `Thing` clone, `dump_state`, restart against the snapshot, and confirm the observer still fires -- no Schema registration, no on-disk Vault round-trip (`docs/dispatcher.md` Persistence walks the mechanism). `examples/merry-app/obj/thing.c` does register a `MerryApp:Thing` schema node, but that participation backs the `Duplicate` merryfun's state export/import, not the property-bound script's own statedump survival.
 
-- a per-app `MerryApp:Thing` schema_node with `merry:*` attributes typed as `lpc_obj` (so the marshaler can record the bound script clonable's program path on dump and re-resolve on restore);
-- Vault registration via inheriting `~Vault/lib/vault_node` (the `examples/vault-app/` pattern), so the property tree survives `dump_state`.
+On-disk durability across a full data loss is a separate concern from statedump survival, and does need Schema/Vault participation. A Schema-registered version of the same thing would additionally have:
+
+- `merry:*` attributes on the `MerryApp:Thing` schema_node typed as `lpc_obj` (so the marshaler can record the bound script clonable's program path on dump and re-resolve on restore);
+- Vault registration via inheriting `~Vault/lib/vault_node` (the `examples/vault-app/` pattern), so the property tree survives an on-disk Vault round-trip.
 
 The composite "scripted persistent object" is the natural next example -- composing `merry-app` and `vault-app` into a single demonstrator -- and is a natural follow-on.
+
+## Where to next
+
+- **[merry-language.md](merry-language.md)** -- the dialect itself: the four extensions over LPC, the compile pipeline, AST nodes, the merryfun catalog, and the full sandbox surface this document only summarizes.
+- **[dispatcher.md](dispatcher.md)** -- the property-change dispatcher, which reuses this document's `merry:<mode>:<signal>` storage convention and ancestry walk for `merry:on:<path>:<timing>` observers.
+- **[vault-applications.md](vault-applications.md)** -- persistent-state participation for a property-bearing object, including the on-disk Vault round-trip the Storage and round-trip section above describes.
+- **[runtime-primitives.md](runtime-primitives.md)** -- sandboxed code-load and the ur-hierarchy as platform properties.
+- **`examples/merry-app/`** -- the runnable reference application walked through above.

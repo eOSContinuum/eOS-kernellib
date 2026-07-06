@@ -117,7 +117,7 @@ Prerequisites: the `.dgd` configuration carries a `hotboot` tuple naming the new
 hotboot = ({ "/path/to/new/dgd", "/path/to/new/config.dgd", "/path/to/dump_file", "/path/to/dump_file.old" });
 ```
 
-Trigger: `shutdown(1)` from the kernel driver (operator-facing: a hot-boot script invoking `code "/usr/System/..."->hotboot()` or equivalent).
+Trigger: `shutdown(1)` from the kernel driver (operator-facing: the `hotboot` verb on the System login console; see `docs/admin-console.md`).
 
 Sequence:
 
@@ -211,7 +211,7 @@ The platform's persistence contract is exercised by the bundled examples. The ri
 - An external restart against the snapshot (`dgd example.dgd state/snapshot`) restores the image; the pre-snapshot `call_out` fires after restore.
 - Phase 17 reads the saved LPC global, writes the observed property, and asserts that the value landed and that the observer's compiled source ran against the resurrected host.
 
-Five orthogonal-persistence guarantees compose in the same verification: LPC global variables, property storage on host objects, references to compiled Merry-script clones at `/usr/Merry/merry/<md5>`, the observer-source contract (`$this` binding to the dispatch host, `Set` re-entry), and the scheduled call_out queue. Any future regression in those guarantees surfaces here as a `PERSIST VERIFY FAIL:` sentinel on the second-boot run.
+Five orthogonal-persistence guarantees compose in the same verification: LPC global variables, property storage on host objects, references to compiled Merry-script clones at `/usr/Merry/merry/<md5>`, the observer-source contract (`$this` binding to the dispatch host, `Set` re-entry), and the scheduled call_out queue. Any future regression in those guarantees surfaces here as a `FAIL: PERSIST VERIFY ...` sentinel on the second-boot run.
 
 `/usr/System/sys/persist_helper` is reusable: any future kernel-layer subsystem (Vault, schema, marshal) needing the same snapshot+restore verification harness calls `trigger_dump_and_exit()` from a test driver and follows the same two-boot pattern.
 
