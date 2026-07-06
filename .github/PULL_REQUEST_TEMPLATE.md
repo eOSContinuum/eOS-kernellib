@@ -49,6 +49,6 @@ If this PR touches load-bearing platform commitments, name them:
 - [ ] Commits are atomic and signed (`git commit -S -s`).
 - [ ] Commit messages are ASCII only; no AI co-author attribution.
 - [ ] [CONTRIBUTING.md](../CONTRIBUTING.md) conventions followed.
-- [ ] Empirical evidence included for behavior changes (Observation node, transcript, statedump round-trip).
+- [ ] Empirical evidence included for behavior changes (an empirical Observation in the relevant doc, a transcript, a statedump round-trip).
 - [ ] Documentation updated where reader expectations change.
 - [ ] If a primitive's behavior changed, [docs/runtime-primitives.md](../docs/runtime-primitives.md) updated.
