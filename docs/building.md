@@ -12,7 +12,9 @@ DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib t
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
-cd dgd/src
+cd dgd
+git checkout 1.7.9    # the release this platform is tested against
+cd src
 make install
 ```
 

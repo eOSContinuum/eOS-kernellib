@@ -16,11 +16,13 @@ Clone the DGD source, build the driver, and install the binary:
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
-cd dgd/src
+cd dgd
+git checkout 1.7.9    # the release this platform is tested against
+cd src
 make install
 ```
 
-The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes.
+The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the released driver as-is, and the Tested-against line above names the release it is validated on — building upstream `master` usually works but is not what the doc set's transcripts were captured against.
 
 ## Fetch eOS-kernellib
 
@@ -66,6 +68,7 @@ The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no a
 
 ## Where to next
 
+- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels — the fastest way to see the runtime primitives pass on your machine. `scripts/README.md` documents the harness.
 - `docs/first-hour.md` is the natural next step: a hands-on hour from this booted platform to the persistence loop — your own objects, state, and reactions surviving a process restart.
 - `docs/coming-from-contemporary-infrastructure.md` maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
 - `examples/http-app/README.md` and `docs/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.

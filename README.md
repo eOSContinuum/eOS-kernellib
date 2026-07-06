@@ -32,6 +32,14 @@ Treating these eight as runtime primitives is the architectural commitment of eO
 
 New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime.
 
+**See it proven in one command.** With DGD built, the regression harness deploys an example, boots the platform, exercises it — including a full snapshot-and-restart persistence cycle — and counts the assertion sentinels:
+
+```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
+```
+
+A passing run ends with the expected `OK` sentinel count. `scripts/README.md` documents the harness; each example under `examples/` names its own profile.
+
 **Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated as of 2026-05-15. Other POSIX-compatible systems should work; `docs/building.md` covers platform-specific build notes.
 
 ## Documentation
