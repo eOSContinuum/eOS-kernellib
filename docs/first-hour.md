@@ -2,7 +2,7 @@
 
 A hands-on tutorial. In the next hour you will boot the platform, create a living object from the operator console, give it state, watch the platform react to a state change, then kill the process and watch everything come back. No theory beyond one sentence per step — the reading-path docs carry the depth; this is the part where you see it.
 
-**Audience**: a newcomer who has completed [getting-started.md](getting-started.md) (DGD built, `example.dgd` pointing at this repository's `src/`, a `state/` directory created) and has not yet written any LPC. Every command is shown with its expected output.
+**Audience**: a newcomer who has completed [getting-started.md](getting-started.md) (DGD built, `example.dgd` pointing at this repository's `src/`; the `state/` directory ships with the checkout) and has not yet written any LPC. Every command is shown with its expected output.
 
 **What you'll have at the end**: a domain you created, a singleton and a clone you compiled, properties you set, an observer that fired the instant a property changed, and — the point of the whole platform — all of it alive after the process was stopped and restarted.
 
@@ -12,19 +12,19 @@ A hands-on tutorial. In the next hour you will boot the platform, create a livin
 /path/to/dgd/bin/dgd example.dgd
 ```
 
-The boot log ends with:
+The boot log prints:
 
 ```text
 ** Initializing...
 ** Initialization complete.
 ```
 
-The driver compiled the kernel and platform domains and is now listening. Leave it running; open a second terminal for everything below.
+followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work: `DTD:: Registered ...` registrations, several `Warning:: Schema node ... not found!` lines (one per bundled core-schema file), and a `Schema:Daemon: cross-checked ...` summary. The warnings are part of a normal cold boot, not breakage. The driver compiled the kernel and platform domains and is now listening. Leave it running; open a second terminal for everything below.
 
 ## 2. Connect and claim the console
 
 ```sh
-telnet localhost 8023
+telnet localhost 8023    # or: nc localhost 8023
 ```
 
 A welcome banner prints, then the login prompt. On the very first cold boot the platform has no administrator yet, so logging in as `admin` makes you one:
@@ -56,7 +56,13 @@ Pet has no special access.
 
 ## 4. Write two small files
 
-In your editor (on the host, in the repository you booted from), create two files.
+The grant created `/usr/Pet` itself but not its conventional subdirectories, so create those first (on the host, in the repository you booted from):
+
+```sh
+mkdir -p src/usr/Pet/obj src/usr/Pet/sys
+```
+
+Then, in your editor, create two files.
 
 `src/usr/Pet/obj/pet.c` — a clonable:
 
@@ -117,10 +123,12 @@ register-observer: registered on /usr/Pet/sys/keeper pet:mood:main
   pre:
     (none)
   main:
-    /usr/Merry/data/merry#-1
+    [0] /usr/Merry/data/merry#-1 {Set($this, "pet:mood-noted", 1);}
   post:
     (none)
 ```
+
+(The `[0]` is the slot index; the `{...}` tail echoes the script source, re-expanded from its parse tree, so its spacing may differ slightly from what you typed.)
 
 Now trip it:
 
@@ -141,7 +149,7 @@ Stop the platform — snapshot and exit in one verb:
 # reboot
 ```
 
-The telnet session drops and the `dgd` process in your first terminal exits. The platform is now **not running**. Everything it had — your domain, your programs, your clone, Fred's name, the keeper's reference, the registered observer, your admin password — exists only in `state/snapshot`.
+The telnet session drops and the `dgd` process in your first terminal exits. The platform is now **not running**. Your programs, your clone, Fred's name, the keeper's reference, and the registered observer exist only in `state/snapshot`. (Two things were also written to host files the moment they changed: the admin password and the `Pet` access grant live under `src/kernel/data/` — credentials and access bits are deliberately file-backed, so they survive even without a snapshot.)
 
 Start it again, restoring from the snapshot:
 
@@ -152,7 +160,7 @@ Start it again, restoring from the snapshot:
 The boot log says `** State restored.` — no initialization, no recompiles; the image is back. Reconnect:
 
 ```sh
-telnet localhost 8023
+telnet localhost 8023    # or: nc localhost 8023
 ```
 
 ```text
@@ -161,7 +169,7 @@ Password:
 # 
 ```
 
-It asked for your password instead of offering to set one — first survival: the credential. Now the rest:
+It asked for your password instead of offering to set one — the credential survived (via its host file, as noted above). Now the snapshot-carried state:
 
 ```text
 # code "/usr/Pet/sys/keeper"->query_property("pet:companion")

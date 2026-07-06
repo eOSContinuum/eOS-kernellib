@@ -8,7 +8,7 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 ## Prerequisites
 
-A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`.
+A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`. For the administrative telnet port you also need a line-mode TCP client: `telnet` where available, or `nc` (netcat), which macOS ships (macOS has not shipped `telnet` since 10.13).
 
 ## Install DGD
 
@@ -41,11 +41,7 @@ Edit `example.dgd` to set `directory` to the absolute path of `eOS-kernellib/src
 directory       = "/absolute/path/to/eOS-kernellib/src";
 ```
 
-Create the state directory referenced by the `swap_file` and `dump_file` settings:
-
-```sh
-mkdir -p state
-```
+The `state/` directory referenced by the `swap_file` and `dump_file` settings ships with the checkout (it holds a tracked `.gitignore`); if you relocated those paths in the config, create the directory they point at.
 
 Run the driver against the configuration:
 
@@ -60,13 +56,13 @@ The driver compiles the kernel objects and binds two ports:
 
 ## Connect
 
-Telnet to the administrative port:
+Connect a line-mode TCP client to the administrative port:
 
 ```sh
-telnet localhost 8023
+telnet localhost 8023    # or: nc localhost 8023
 ```
 
-The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an application mounted on top, the server returns errors for routes it does not handle.
+The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no application mounted on top there is nothing to answer them: the kernel's HTTP server clones an application server at `/usr/WWW/obj/server` per connection, and when that path is absent the connection is dropped without a response (a client like `curl` waits until its own timeout). Mounting an application there — `examples/http-app/README.md` is the walkthrough — is what makes 8080 respond.
 
 ## Where to next
 
