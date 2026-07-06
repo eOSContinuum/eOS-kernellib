@@ -1,4 +1,4 @@
-# Merry Language
+# Merry language
 
 Merry is the safe-sublanguage of LPC used inside eOS-kernellib for code that is loaded, compiled, and executed at runtime under a sandbox. A Merry source string is parsed by a yacc grammar derived from LPC's, translated to LPC, and compiled into a clonable object whose inheritor chain installs the sandbox. The result is an LPC object whose body cannot reach the kfuns the sandbox forbids and whose extensions over LPC (`$arg` argument refs, `${name}` object refs, `$delay()` continuation, `space::method(...)` cross-namespace calls) compile down to property reads, writes, and runtime LFUN dispatches against the binding host.
 
@@ -16,13 +16,13 @@ Merry source compiles to LPC source by the parser-runner pair (`/lib/util/parse`
 
 Restrictions exist at three layers: grammar (the parser refuses the form), translator (the AST-to-LPC step refuses the construct), and sandbox (the compiled object's local namespace shadows the kfun and raises at runtime).
 
-**Cross-object call uses `Call()`, not `->`.** The `obj->func(args)` operator is forbidden at the grammar level (`grammar/merry.y` line 325). A Merry source that contains `->` raises a parse error. The replacement is the `Call(obj, "func", "key", value, ...)` merryfun, which dispatches through `merrynode.c::Call` and obeys the sandbox's filter on which methods may be called on which objects.
+**Cross-object call uses `Call()`, not `->`.** The `obj->func(args)` operator is forbidden at the grammar level (`grammar/merry.y` lines 323-324). A Merry source that contains `->` raises a parse error. The replacement is the `Call(obj, "func", "key", value, ...)` merryfun, which dispatches through `merrynode.c::Call` and obeys the sandbox's filter on which methods may be called on which objects.
 
-**No `rlimits` blocks.** The `rlimits` statement is grammar-recognized and immediately errors (`grammar/merry.y` line 186). Merry code runs under the binding host's resource budget; a script cannot escalate its own tick or call budget.
+**No `rlimits` blocks.** The `rlimits` statement is grammar-recognized and immediately errors (`grammar/merry.y` lines 184-185). Merry code runs under the binding host's resource budget; a script cannot escalate its own tick or call budget.
 
 **No local variable declarations.** Merry is an expression/statement language closer to TCL than to C: `object o = Spawn($this); ...; return Set(o, "name", "x");` does not parse. The grammar permits only `constant_declaration` (`constant IDENT = expression;`) for compile-time constants and `local_data_declaration` for parameter-like declarations at the top of a `compound_stmt`. State threads through `args` (the inherited argument mapping) and through properties on the binding host; intermediate values compose inline. The reference application's `examples/merry-app/sys/test.c` phase 3 illustrates: `"return object_name(Spawn($this));"` rather than a multi-statement let-and-return.
 
-**Adjacent string literals do not concatenate.** Plain LPC permits `"foo" "bar"` to mean `"foobar"`. Merry does not. The translator's `imp()` pass (`grammar/merry.y` lines 36-69) merges adjacent string elements only in argument-list positions, not in the general expression position. For cross-line string composition, use explicit `+`: `"first " + "second"`.
+**Adjacent string literals do not concatenate.** Plain LPC permits `"foo" "bar"` to mean `"foobar"`. Merry does not: no grammar rule permits a string literal (`STRING_CONST`) to appear adjacent to another expression element, so the construct is a parse error rather than a silent no-op. The translator's `imp()` pass (`grammar/merry.y` lines 34-67) is unrelated to literal concatenation; it merges adjacent string elements in the emitted-source fragment array wherever a rule invokes it (`? imp` is attached at general statement and expression positions throughout the grammar, not just argument lists). For cross-line string composition, use explicit `+`: `"first " + "second"`.
 
 **Narrow allowed-kfun set.** The Merry-recognized kfun catalog (`merryapi.c::categorize_merry_word`) lists the kfuns a Merry source may name. The set covers safe arithmetic, string, mapping, array, time, and reflection kfuns: `acos`, `allocate`, `allocate_float`, `allocate_int`, `asin`, `atan`, `atan2`, `call_trace`, `ceil`, `cos`, `cosh`, `crypt`, `ctime`, `error`, `exp`, `explode`, `fabs`, `find_object`, `floor`, `fmod`, `frexp`, `function_object`, `implode`, `ldexp`, `log`, `log10`, `map_indices`, `map_sizeof`, `map_values`, `millitime`, `modf`, `object_name`, `parse_string`, `pow`, `previous_object`, `previous_program`, `random`, `sin`, `sinh`, `sizeof`, `sqrt`, `sscanf`, `status`, `strlen`, `tan`, `tanh`, `this_object`, `time`, `typeof`. Notably absent: every kfun that touches the network (`open_port`, `connect`, `send_datagram`), the file system (`read_file`, `write_file`, `make_dir`, `remove_file`, `rename_file`, `get_dir`, `file_info`), the process (`shutdown`, `dump_state`, `restore_object`, `swapout`), the event surface (`add_event`, `subscribe_event`, `event`, `block_input`), and the code-loading surface (`clone_object`, `compile_object`, `destruct_object`, `call_touch`).
 
@@ -34,7 +34,7 @@ Four extensions over plain LPC carry Merry's semantics for property-bound script
 
 **`$arg`** — argument reference. Inside a Merry source bound as a script, `$signal` or `$mode` reference values inherited from the invocation context (the LPC caller's `run_merry(ob, signal, mode, args, ...)` populates an `args` mapping that the Merry source sees). The grammar lowers `$arg` to a `VAL_ARGREF` AST node which compiles to a mapping lookup against the inherited `args`.
 
-**`${name}`** — object reference. Resolved at parse time by the `MOB_CONST` rule (`grammar/merry.y` line 262): the parser calls `find_object(name)` immediately, captures the returned object reference into the per-script `obarr`, and emits a `VAL_OBJREF` AST node carrying an index into `obarr`. The compiled LPC reads `obarr[index]` at runtime; the resolution is done once at compile, not per invocation.
+**`${name}`** — object reference. Resolved at parse time by the `MOB_CONST` rule (`grammar/merry.y` line 260): the parser calls `find_object(name)` immediately, captures the returned object reference into the per-script `obarr`, and emits a `VAL_OBJREF` AST node carrying an index into `obarr`. The compiled LPC reads `obarr[index]` at runtime; the resolution is done once at compile, not per invocation.
 
 **`$delay(seconds, retval, label?)`** — schedules a continuation. The Merry source `$delay(1, FALSE); Set($this, "delay_fired", 1); return TRUE;` evaluates the body synchronously (Set fires immediately), the `$delay` statement returns control to the binding host's `delayed_call` LFUN with a `merry_continuation` callback. `delay` seconds later, `perform_delayed_call` re-enters the same Merry source at a labeled resume point. The host-side glue (`delayed_call` + `perform_delayed_call`) lives in `/lib/util/delayed`, which any script-bearing object inherits. The first call returns the `retval` synchronously; the resume continues from after the `$delay()`.
 
@@ -52,7 +52,7 @@ A Merry source string travels:
 4. **Clone** — application code calling `new_object(MERRY_DATA, source_string)` invokes the daemon to parse + compile + clone, receiving an LWO suitable for binding to a property via `set_property("merry:<mode>:<signal>", lwo)`.
 5. **Invoke** — application LPC calls `run_merry(ob, signal, mode, args)`, which walks `ob`'s UrHierarchy ancestry, finds the bound script via `find_merry`, and calls `script->evaluate(...)`. The evaluate LFUN is generated by the AST-to-LPC translator; it runs the compiled body under the sandbox.
 
-The `examples/merry-app/sys/test.c` driver shows the full pipeline end-to-end across five phases.
+The `examples/merry-app/sys/test.c` driver shows the full pipeline end-to-end across seventeen numbered phases (several with lettered sub-phases).
 
 ## AST node types
 
@@ -79,9 +79,9 @@ There is no `VAL_SAM` tag (the `$"..."` SAM-token surface is a game-content exte
 
 The sandbox lives in `src/usr/Merry/lib/merrynode.c`. The compiled Merry object inherits `merrynode`, which provides:
 
-- **`call_other` filter** — the local `call_other` shadow (lines 357-370) accepts non-object arguments (calls into pseudo-objects: `nil`, ints, floats, arrays, mappings) and refuses object arguments with `"function 'call_other' not allowed in merry code"`. Cross-object calls must go through `Call(obj, "name", args...)` instead.
-- **`new_object` deny** — the local `new_object` shadow (lines 372-375) refuses unconditionally. Cloning new objects is a `Spawn`-merryfun privilege, not a general Merry capability.
-- **51-entry kfun deny list** — the `SANDBOX(f)` macro (line 377) defines a function `f` that errors with `"function '<name>' not allowed in merry code"`. Every named kfun is locally shadowed by its sandbox stub. Compiled Merry source that calls one of these names dispatches to the local shadow and raises at runtime.
+- **`call_other` filter** — the local `call_other` shadow (lines 384-396) accepts non-object arguments (calls into pseudo-objects: `nil`, ints, floats, arrays, mappings) and refuses object arguments with `"function 'call_other' not allowed in merry code"`. Cross-object calls must go through `Call(obj, "name", args...)` instead.
+- **`new_object` deny** — the local `new_object` shadow (lines 398-401) refuses unconditionally. Cloning new objects is a `Spawn`-merryfun privilege, not a general Merry capability.
+- **51-entry kfun deny list** — the `SANDBOX(f)` macro (line 403) defines a function `f` that errors with `"function '<name>' not allowed in merry code"`. Every named kfun is locally shadowed by its sandbox stub. Compiled Merry source that calls one of these names dispatches to the local shadow and raises at runtime.
 
 The full sandbox list, grouped:
 
@@ -93,7 +93,7 @@ The full sandbox list, grouped:
 - **Identity and originator** (5): `set_object_name`, `set_originator`, `query_originator`, `this_user`, `users`
 - **Other** (6): `block_input`, `call_touch`, `editor`, `query_editor`, `function_object`, `remove_call_out`
 
-The `call_out` kfun is **not** sandboxed (line 388: `/* SANDBOX(call_out) */`). Merry source may schedule deferred work via `call_out`, but the called function still runs under the sandbox.
+The `call_out` kfun is **not** sandboxed (line 414: `/* SANDBOX(call_out) */`). Merry source may schedule deferred work via `call_out`, but the called function still runs under the sandbox.
 
 The merrynode's own merryfuns escape sandbox shadowing using LPC's `::` operator: `::clone_object`, `::destruct_object`, `::new_object`, `::call_other` reach the kfun past the local shadow. The `Spawn` and `Duplicate` merryfuns use `::clone_object` to clone; `Slay` uses `::call_other` to invoke `suicide`. This is the standard escape idiom; Merry source has no `::` escape itself.
 
@@ -127,7 +127,7 @@ The `Set(obj, "*", mapping)` and `Get(obj, "*")` forms are bulk: the wildcard `"
 
 ## A short worked example
 
-The reference application (`examples/merry-app/`) binds five Merry sources during boot. The simplest is the ancestry-walk assertion:
+The reference application (`examples/merry-app/`) binds seven Merry sources during boot. The simplest is the ancestry-walk assertion:
 
 ```lpc
 /* LPC side: bind a Merry source to the parent's "lib:greet" property */
@@ -192,4 +192,4 @@ The LFUNs that make these examples work split by home: the binding host's `delay
 - **`src/usr/Merry/grammar/merry.y`** — the authoritative grammar. Read this when a parse error is unexplained or when extending the language.
 - **`src/usr/Merry/lib/merrynode.c`** — the sandbox installer and merryfun implementations. Read this when a runtime error from inside a Merry script needs tracing.
 - **`src/usr/Merry/lib/merryapi.c`** — the `find_merry` / `run_merry` / `find_merries` / `run_merries` invocation API used by LPC code that calls into bound scripts.
-- **`examples/merry-app/`** — the five-phase reference application that exercises the ancestry walk, sandbox firing, Spawn, $delay, and LabelCall.
+- **`examples/merry-app/`** — the seventeen-phase reference application that exercises the ancestry walk, sandbox firing, Spawn, $delay, and LabelCall.

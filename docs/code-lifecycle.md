@@ -1,4 +1,4 @@
-# Code Lifecycle
+# Code lifecycle
 
 LPC code in the platform moves through these states: source becomes a master, a master spawns clones, `create()` runs, recompilation replaces a running master in place, `call_touch` schedules lazy upgrades, and `destruct_object` removes objects from the runtime. The object-manager event surface lets the platform observe each transition. The sections below cover each in turn.
 
@@ -38,7 +38,7 @@ The two-argument form, `compile_object(path, source)`, compiles from an in-memor
 
 Compilation runs in atomic context. If the source has a syntax error or fails type-check, the compile errors and the platform's prior state (including any prior master at `path`) is unchanged. The atomicity guarantee (`docs/runtime-primitives.md` §1) covers the compile transition itself: either the new program installs cleanly or the runtime rolls back as if the call never happened.
 
-After successful compile, the master sits idle. Its `create()` does not run until the first function call against the master. The object manager (see below) receives a `compile` event with the master object and the inherited paths; this is the platform's hook for tracking the dependency graph.
+After successful compile, the master sits idle. Its `create()` does not run until the first function call against the master. The object manager (see below) receives a `compile` event with the owner, the master's path, the source mapping, and the inherited paths; this is the platform's hook for tracking the dependency graph.
 
 ## _F_create: the create-hook dispatch
 
@@ -72,7 +72,7 @@ A clone's `create()` runs in its own dataspace at clone time. The master's `crea
 
 Constraints:
 
-- The master must be a clonable. By platform convention this means a path under `/usr/.../obj/` rather than `/usr/.../lib/`. The kernel's `clone_object` kfun enforces the `/obj/` rule.
+- The master must be a clonable. By platform convention this means a path under `/usr/.../obj/` rather than `/usr/.../lib/`. The kernel's `clone_object` kfun does not check for `/obj/`; it rejects a `/lib/` path (and, for non-kernel callers, any `/kernel/` path). The `/obj/` convention is enforced one layer up, by the System-tier auto (`src/usr/System/lib/auto.c`), not by the kernel.
 - Clones cannot be cloned. `clone_object(clone)` errors.
 - A clone's owner is the **clone-time caller's owner**, not the master's owner. Two clones of the same master can have different owners if their callers do.
 
@@ -129,7 +129,7 @@ Key guarantees and limits:
 | Inheriting children | Their code is NOT automatically recompiled. See Library upgrade below. |
 | Atomic context of the recompile | If the recompile errors (syntax, type-check), the old master remains; the platform rolls back as for any failed atomic operation. |
 
-The object manager receives a `compile` event (or `compile_lib` for libraries) with the inherited path list, allowing it to track the dependency graph for downstream cascade decisions.
+The object manager receives a `compile` event with the inherited path list, allowing it to track the dependency graph for downstream cascade decisions.
 
 Hot reload is the operator-facing form (`compile` verb in `admin_console`); the platform-internal form is the same kfun called from any LPC code with sufficient access. The `examples/hot-reload-demo/` reference application exposes the platform-internal form through an HTTP route: `POST /compile` with new LPC source as the request body calls `compile_object(target_path, body)`, and the next `GET /greet` returns the recompiled program's output.
 
@@ -146,11 +146,11 @@ When a library is recompiled, its inheriting children do NOT automatically pick 
 2. The object manager calls `obj->_F_touch()` on the marked object.
 3. After `_F_touch()` returns, the originally-intended call proceeds.
 
-The application-author hook is `_F_touch()`. Applications that need per-instance migration logic implement this method. The platform guarantees:
+The application-author hook is `patch()`. Applications that need per-instance migration logic implement this method. `_F_touch()` itself is `nomask` (`src/usr/System/lib/auto.c`) — applications cannot implement or override it; it is the platform's dispatch gate, and its body calls `this_object()->patch()`. The platform guarantees:
 
-- `_F_touch()` runs at most once per `call_touch`.
-- `_F_touch()` runs **before** the next call against the object.
-- `_F_touch()` runs inside the calling context's atomic envelope — failures roll back.
+- `patch()` runs at most once per `call_touch`.
+- `patch()` runs **before** the next call against the object.
+- `patch()` runs inside the calling context's atomic envelope — failures roll back.
 
 Why not eager upgrade on library recompile? Two reasons rooted in cost:
 
@@ -162,13 +162,13 @@ The trade-off: long-idle objects can accumulate multiple pending upgrades. If th
 - **Periodic global touch.** A scheduled `call_out` walks every owner's objects at low frequency (daily, weekly) and ensures each is touched at least once per cycle.
 - **Snapshot rotation with explicit touch.** A planned snapshot-and-restore cycle pairs with a touch pass during the restore phase.
 
-**Terminology note**: SkotOS-derived deployments often call the application hook `patch()` rather than `_F_touch()`. The platform dispatch is the same; the name is convention. Operators arriving from a SkotOS background should expect the eOS-kernellib codebase to use `_F_touch()`.
+**Terminology note**: the application hook here is `patch()`, the same name SkotOS-derived deployments use. `_F_touch()` is not an application-level name to reach for — it is the `nomask` platform gate that dispatches to `patch()`. Operators arriving from a SkotOS background should feel at home with `patch()`.
 
 ## Library upgrade: recompile cascade through dependents
 
 When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/MyApp/obj/*` continue to run against the old parent's slot layout until each is either destructed-and-recompiled or marked via `call_touch`. The platform ships the cascade coordination for this:
 
-- The object manager (`/usr/System/sys/objectd.c`) tracks the inheritance and include graph as it builds, via the `compile` and `compile_lib` events.
+- The object manager (`/usr/System/sys/objectd.c`) tracks the inheritance and include graph as it builds, via the `compile` event.
 - The upgrade daemon (`/usr/System/sys/upgraded.c`) takes one or more source files, walks the graph for every direct and transitive dependent, destructs stale library issues, and recompiles dependents — optionally as one all-or-nothing atomic operation. When a patch tool is supplied, the daemon additionally queues `call_touch` patching so live clones migrate state on next reference instead of being destructed.
 - The operator `upgrade [-a|-p] <file> [<file> ...]` verb on the System operator login (`/usr/System/obj/user.c`) drives the flow interactively: `-a` selects the atomic recompile, `-p` supplies the patch tool and runs the `call_touch` patch flow.
 
@@ -178,22 +178,19 @@ One piece the cascade lacks is a stored per-master clone list: clone patching sw
 
 The platform dispatches lifecycle events to a registered object manager (`driver->set_object_manager(<obj>)`). The shipped manager at `src/usr/System/sys/objectd.c` consumes these events to maintain a registry of live objects, their owners, their inherits, and their includes.
 
-The event surface (a thin restatement of the kernellib-doc convention):
+The event surface this kernel actually dispatches:
 
 | Event | Signature | When | Used for |
 |---|---|---|---|
-| `compiling` | `void compiling(string path)` | Just before compile | Pre-compile interception (security, validation) |
-| `compile` | `void compile(string owner, object obj, string *source, string inherited...)` | After successful compile of a clonable | Inheritance graph maintenance; create-call preparation |
-| `compile_lib` | `void compile_lib(string owner, string path, string *source, string inherited...)` | After successful compile of a library | Library inheritance graph; cascade target tracking |
-| `compile_failed` | `void compile_failed(string owner, string path)` | On compile error | Cleanup of any pre-compile registration |
-| `clone` | `void clone(string owner, object obj)` | Just before clone's `create(1)` | Clone tracking; per-master clone-list maintenance |
-| `destruct` | `void destruct(string owner, object obj)` | Just before destruct | Invalidate cached references |
-| `destruct_lib` | `void destruct_lib(string owner, string path)` | Just before library destruct | Inheritance graph cleanup |
-| `remove_program` | `void remove_program(string owner, string path, int timestamp, int index)` | Last reference released | Garbage collection of inherit graph entries |
-| `include_file` | `mixed include_file(string compiled, string from, string path)` | During compile, per `#include` | Include translation; security; path rewriting |
-| `touch` | `int touch(object obj, string function)` | call_touch dispatch interception | Routes to `_F_touch()`; preserves "untouched" status if return value is nonzero |
-| `forbid_call` | `int forbid_call(string path)` | Per `call_other` | Block cross-object calls to specific paths |
-| `forbid_inherit` | `int forbid_inherit(string from, string path, int priv)` | Per inherit | Block specific inheritance patterns |
+| `compile` | `void compile(string owner, string path, mapping source, string inherits...)` | After a successful compile (clonable or library alike) | Registers the object's owner, path, includes, and inherits for the dependency graph |
+| `compile_failed` | `void compile_failed(string owner, string path)` | On compile error | Records the failed path |
+| `clone` | `void clone(string owner, object obj)` | After a clone is created | Dispatched by the driver, but the shipped `objectd.c` defines no `clone()` handler — the call lands on an undefined function and has no effect |
+| `destruct` | `void destruct(string owner, string path)` | Just before destruct | Unregisters the object from the dependency graph |
+| `remove_program` | `void remove_program(string owner, string path, int timestamp, int index)` | Last reference to a library's program released | Unregisters library entries from the dependency graph |
+| `call_object` | `string call_object(string path)` | Resolving `call_other`'s first (string) argument | Blocks direct `call_other` into a clone master's path or a generated leaf object |
+| `inherit_program` | `string inherit_program(string from, string path, int priv)` | Per `inherit` of a `/lib/` path | Rejects inheriting a library path that itself looks like `/obj/`, `/@@@/`, or `/sys/` |
+| `include_file` | `mixed include_file(string compiled, string from, string path)` | During compile, per `#include` | Injects the System-tier auto inherit for non-System creators |
+| `touch` | `int touch(object obj, string func)` | `call_touch` dispatch interception | Routes to `obj->_F_touch()`, which forwards to the application's `patch()`; preserves "untouched" status if the return value is nonzero |
 
 An application that needs additional behavior typically registers a daemon that **calls into** objectd or wraps its event stream, rather than replacing the shipped manager. Replacement is possible (`driver->set_object_manager(<replacement>)`) but rare; objectd handles the platform's common cases, and replacements risk losing those.
 
@@ -209,7 +206,7 @@ An application that needs additional behavior typically registers a daemon that 
 - **`docs/runtime-primitives.md`** §1 (atomicity), §4 (hot reload), §5 (sandboxed code load) — the per-primitive guarantees that bound the lifecycle.
 - **`docs/admin-console.md`** Hot-fixing code in production — operator-facing workflow for compile / clone / destruct in a running platform.
 - **`docs/application-authoring.md`** — how an application's code consumes the lifecycle (initd, call_touch upgrade, object tracking patterns).
-- **`src/kernel/lib/auto.c`** — the authoritative source for `_F_create`, `_F_touch`, and the inheritance-discipline enforcement.
+- **`src/kernel/lib/auto.c`** — the authoritative source for `_F_create` and the inheritance-discipline enforcement. `_F_touch` is defined in `src/usr/System/lib/auto.c`.
 - **`src/usr/System/sys/objectd.c`** — the shipped object manager's implementation of the event surface above.
 
 [allen-dgd-2000]: https://mail.dworkin.nl/pipermail/mud-dev-archive/2000-April/013083.html

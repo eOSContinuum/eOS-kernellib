@@ -117,7 +117,7 @@ Prerequisites: the `.dgd` configuration carries a `hotboot` tuple naming the new
 hotboot = ({ "/path/to/new/dgd", "/path/to/new/config.dgd", "/path/to/dump_file", "/path/to/dump_file.old" });
 ```
 
-Trigger: `shutdown(1)` from the kernel driver (operator-facing: a hot-boot script invoking `code "/usr/System/..."->hotboot()` or equivalent).
+Trigger: `shutdown(1)` from the kernel driver (operator-facing: the `hotboot` verb on the System login console; see `docs/admin-console.md`).
 
 Sequence:
 
@@ -203,6 +203,25 @@ The platform's persistence model has explicit boundaries. Each requires applicat
 
 For operator-level recovery procedures when any of these boundaries are hit, see `docs/operations.md` Common failure modes (table of symptoms and diagnoses) and `docs/admin-console.md` for the `snapshot`, `reboot`, and `shutdown` verbs that manage the persistence cycle.
 
+## Getting data out
+
+Three paths move platform state to a portable, external representation today:
+
+| Path | Covers | Format |
+|---|---|---|
+| `save_object` / `restore_object` | One object's non-static variables | Structured text, human-readable and portable (see save_object / restore_object above) |
+| Vault + Schema | Any object with a registered per-app schema (`queryStateRoot()` names a `schema_node`) | XML, round-trips through Vault's store / spawn cycle (`docs/vault-applications.md`) |
+| Property-table ascii marshal | A bare property-bearing object with no per-app schema, via the built-in `Core:Entries` schema | XML; values through `query_ascii_property` / `set_ascii_property` and the `/lib/util/coercion` codec (`docs/schema.md` Property-table marshaling) |
+
+Outside these three, there is no export path today:
+
+- **Non-schematized object graphs**: typed members with no registered schema and no property-table shape have nothing to walk them without one.
+- **Observer slots carrying light-weight objects**: the `/lib/util/coercion` codec behind the property-table route refuses light-weight objects by design, not as an oversight (`docs/schema.md` Property-table marshaling).
+
+The full-image statedump still captures this state, but its versioned snapshot format is for restoring into another DGD host, not for portable export outside the platform.
+
+The committed direction is the Wave 2 generalized value serializer (`docs/runtime-platform-roadmap.md` Wave 2): round-trip serialization for any LPC value, schema-free, including recursive structures and light-weight objects. It is trigger-gated on the first cross-system transfer or non-schema marshal need — not yet built.
+
 ## Substrate verification
 
 The platform's persistence contract is exercised by the bundled examples. The richer-state composition that lands with the property-change dispatcher (`docs/dispatcher.md` Persistence; `docs/runtime-primitives.md` §3 Extensions) is verified end-to-end by `examples/merry-app/sys/test.c` phases 16 and 17:
@@ -211,7 +230,7 @@ The platform's persistence contract is exercised by the bundled examples. The ri
 - An external restart against the snapshot (`dgd example.dgd state/snapshot`) restores the image; the pre-snapshot `call_out` fires after restore.
 - Phase 17 reads the saved LPC global, writes the observed property, and asserts that the value landed and that the observer's compiled source ran against the resurrected host.
 
-Five orthogonal-persistence guarantees compose in the same verification: LPC global variables, property storage on host objects, references to compiled Merry-script clones at `/usr/Merry/merry/<md5>`, the observer-source contract (`$this` binding to the dispatch host, `Set` re-entry), and the scheduled call_out queue. Any future regression in those guarantees surfaces here as a `PERSIST VERIFY FAIL:` sentinel on the second-boot run.
+Five orthogonal-persistence guarantees compose in the same verification: LPC global variables, property storage on host objects, references to compiled Merry-script clones at `/usr/Merry/merry/<md5>`, the observer-source contract (`$this` binding to the dispatch host, `Set` re-entry), and the scheduled call_out queue. Any future regression in those guarantees surfaces here as a `FAIL: PERSIST VERIFY ...` sentinel on the second-boot run.
 
 `/usr/System/sys/persist_helper` is reusable: any future kernel-layer subsystem (Vault, schema, marshal) needing the same snapshot+restore verification harness calls `trigger_dump_and_exit()` from a test driver and follows the same two-boot pattern.
 

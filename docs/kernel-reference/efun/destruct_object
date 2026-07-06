@@ -12,7 +12,8 @@ DESCRIPTION
 	If an object destructs itself, it will cease to exist as soon as
 	execution leaves it.  If the last reference to a master object is
 	removed (including cloned objects and inheriting objects), the
-	function remove_program(objname) will be called in the driver object.
+	function remove_program(path, timestamp, index) will be called in the
+	driver object.
 	Return 1 if the object existed and was destructed, 0 otherwise.
 
 ACCESS

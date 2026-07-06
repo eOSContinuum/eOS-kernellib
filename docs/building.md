@@ -12,15 +12,18 @@ DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib t
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
-cd dgd/src
+cd dgd
+git checkout 1.7.9    # the release this platform is tested against
+cd src
 make install
 ```
 
 The driver binary lands at `dgd/bin/dgd`. Run `make clean` from `dgd/src` to start over if a build dirties the tree.
 
-Verify the driver built by running it without arguments; it prints a usage line.
+Verify the driver built by running it without arguments from the `dgd` repository root (the build installs to the repo root's `bin/`, not `src/bin/`); it prints a usage line.
 
 ```sh
+cd ..        # back to the dgd repository root
 ./bin/dgd
 ```
 
@@ -46,13 +49,7 @@ Verify the kernel layer compiles by running the driver against `example.dgd` per
 
 ## State and snapshot files
 
-`example.dgd` references swap and snapshot files under `../state/`. Create the directory before starting the driver:
-
-```sh
-mkdir -p state
-```
-
-The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph at the last `dump_interval` checkpoint.
+`example.dgd` references swap and snapshot files under `../state/`. The `state/` directory ships with the checkout (it holds a tracked `.gitignore`); if you point those settings elsewhere, create the directory they name before starting the driver. The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph at the last `dump_interval` checkpoint.
 
 ## Where to next
 

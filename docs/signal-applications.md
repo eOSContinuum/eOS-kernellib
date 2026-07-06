@@ -1,6 +1,8 @@
-# Signal applications
+# Writing signal applications
 
 The smallest thing the property-change dispatcher can do for an application: bind a reaction to a property, write the property, and have the reaction already done when the write returns. `examples/signal-app/` carries the working demonstration -- one property host, one observer, one write, one assertion -- and this page walks it and explains why the pattern is a runtime primitive here rather than infrastructure you assemble.
+
+**Audience**: an application author wanting the smallest working reactive pattern before the full dispatcher reference; has the platform running per [getting-started.md](getting-started.md).
 
 ## The example
 
@@ -46,7 +48,7 @@ Here the decomposition never happens, because the runtime already provides each 
 
 The honest boundaries: synchronous-in-write means a heavy reaction extends the write that triggered it; cascades are depth-bounded and cycle-detected rather than unbounded; and the sandbox deliberately refuses I/O and lifecycle functions inside reactions. Those are design positions, documented in `dispatcher.md`, not accidents.
 
-## Where to go from here
+## Where to next
 
 This example is deliberately the floor. Each capability it omits is demonstrated by a sibling:
 

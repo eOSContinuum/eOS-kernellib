@@ -47,7 +47,7 @@ The example's `README.md` lists the expected result-log contents per boot. For a
 
 ## Application layout
 
-The minimum chat application is eight files plus an initd:
+The minimum chat application is eight files:
 
 ```text
 src/usr/Chat/
@@ -69,7 +69,7 @@ The `obj/` / `sys/` / `data/` / `lib/` discipline matches `docs/architecture.md`
 
 ## Boot-order constraint
 
-`/usr/System/initd::create()` iterates `/usr/[A-Z]*/initd.c` alphabetically. The Chat domain fires earlier than Merry, Schema, and Vault, so a cross-domain call from `sys/chat::create()` into one of those daemons at compile-time would hit a not-yet-loaded master. The test driver defers all cross-domain work to a `call_out("setup_and_run", 0)` from its `create()`; that call_out fires after every per-domain initd has returned.
+`/usr/System/initd::create()` iterates `/usr/[A-Z]*/initd.c` alphabetically after a fixed `TLS`, `HTTP`, `LPC` prefix. The Chat domain fires earlier than Merry, Schema, and Vault, so a cross-domain call from `sys/chat::create()` into one of those daemons at compile-time would hit a not-yet-loaded master. The test driver defers all cross-domain work to a `call_out("setup_and_run", 0)` from its `create()`; that call_out fires after every per-domain initd has returned.
 
 The chat and admin daemons themselves do not call into other domains during their `create()`. They are inert until the test driver invokes them (or, in a real deployment, until a transport-layer handler routes a request to them).
 
@@ -96,11 +96,11 @@ The boot.log carries the `[caught]` annotation that DGD writes for any error-tha
 ```text
 ** admin: actor bob not authorized for kick in room ChatApp:Room:LobbyA [caught]
                        /usr/Chat/sys/test
-   58   setup_and_run         /usr/Chat/sys/test
-   96 * run_tests             /usr/Chat/sys/test
+  202   setup_and_run         /usr/Chat/sys/test
+  240 * run_tests             /usr/Chat/sys/test
                        /usr/Chat/sys/admin
-   52   kick                  /usr/Chat/sys/admin
-  148   _check_admin_token    /usr/Chat/sys/admin
+   53   kick                  /usr/Chat/sys/admin
+  149   _check_admin_token    /usr/Chat/sys/admin
 ```
 
 The `[caught]` suffix confirms the error did not propagate to the runtime -- the test driver's `catch{}` swallowed it. DGD's convention is to log every error regardless of `catch{}` so the platform retains a trace; the caught/uncaught distinction is in the suffix.
@@ -195,7 +195,7 @@ Registration **succeeds**: the Merry compiler resolves `write_file` to the local
 ** function 'write_file' not allowed in merry code [caught]
 ```
 
-The boot log carries the full call stack down to `merrynode.c` line 448 (the `SANDBOX(write_file)` shadow). The driver's `catch{}` converts the throw into a `SANDBOX-REJECT OK` sentinel and asserts that no `hack.txt` was created:
+The boot log carries the full call stack down to `merrynode.c` line 449 (the `SANDBOX(write_file)` shadow). The driver's `catch{}` converts the throw into a `SANDBOX-REJECT OK` sentinel and asserts that no `hack.txt` was created:
 
 ```text
 ChatApp:test: SANDBOX-REJECT OK

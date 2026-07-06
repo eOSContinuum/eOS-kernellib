@@ -2,7 +2,7 @@ NAME
 	call_trace - return the function call trace
 
 SYNOPSIS
-	mixed **call_trace()
+	mixed *call_trace(varargs mixed index)
 
 
 DESCRIPTION
@@ -17,10 +17,14 @@ DESCRIPTION
 	The offsets in the array are named in the include file <trace.h>.
 	The last element of the returned array is the trace of the
 	current function.
+	If the optional index argument is given, only the trace frame at
+	that offset is returned, as a single array in the format above,
+	rather than the full array of frames.
 
 ACCESS
-	If the owner of the current object is not the same as the creator
-	of the program containing a function, the arguments are omitted.
+	Unless the creator of the current object is "System", if the creator
+	of the current object is not the same as the creator of the program
+	containing a function, the arguments are omitted.
 
 SEE ALSO
 	kfun/previous_object, kfun/previous_program

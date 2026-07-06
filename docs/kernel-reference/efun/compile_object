@@ -17,11 +17,14 @@ DESCRIPTION
 	initialized to nil.  The actual upgrading is done immediately upon
 	completion of the current task.
 	If the new object has "lib" as a path component, it can only be
-	inherited and nil is returned.  Otherwise, if the object has "obj" as a
-	path component, it can be cloned.
+	inherited and nil is returned.  Otherwise, it can be cloned.
 
 ACCESS
-	The current object must have write access to the file to be compiled.
+	Unless the current object's creator is "System", the current object
+	needs write access to the file to be compiled; read access is enough
+	when the file has "lib" as a path component or has no creator, no
+	inline source is supplied, and the file is not under /kernel/.  Supplying inline source for a file under
+	/kernel/ is denied even to "System"-creator objects.
 
 SEE ALSO
 	kfun/object_name

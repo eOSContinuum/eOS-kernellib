@@ -1,4 +1,4 @@
-# Application Authoring
+# Application authoring
 
 A tier-E application on eOS-kernellib lives in a single directory under `src/usr/`, declares its bootstrap in an `initd.c`, and inherits the platform's System auto to gain owner identity and cross-tier API access. The patterns below apply regardless of transport: domain layout, owner / creator / access conventions, the object-manager event lifecycle, code upgrade through `call_touch`, and non-HTTP transport bindings.
 
@@ -25,7 +25,7 @@ src/usr/<App>/
         <record>.c
 ```
 
-The four subdirectory conventions (`lib`, `obj`, `sys`, `data`) are not just style. The host driver enforces the `/lib/` requirement on `inherit_program`; the System auto's `find_object` discipline depends on path-based type recognition; and the kernel's `clone_object` only accepts paths containing `/obj/`. An application that puts a cloneable under `lib/` cannot clone it; an application that tries to inherit from an object under `obj/` will get a compile-time rejection.
+The four subdirectory conventions (`lib`, `obj`, `sys`, `data`) are not just style. The host driver enforces the `/lib/` requirement on `inherit_program`; the System auto's `find_object` discipline depends on path-based type recognition; and the System auto's `clone_object` wrapper only accepts paths containing `/obj/`. An application that puts a cloneable under `lib/` cannot clone it; an application that tries to inherit from an object under `obj/` will get a compile-time rejection.
 
 ## The initd's role
 
@@ -68,7 +68,7 @@ Three identities matter in tier-E code, all derived from the object's path:
 - **Creator** — typically the same as owner for tier-E. The creator is the user identity granted the privilege to compile, clone, and modify the object.
 - **Clone owner** — for cloned objects, the runtime tracks which object did the cloning. The clone's path is `/usr/<App>/obj/X#N` where `N` is the unique clone index; the clone owner is the caller of `clone_object`, which may differ from the master's owner.
 
-The System auto's access checks use these identities at every kfun call. An application running under owner `<App>` cannot, by default, read or write files in another tier-E domain; cross-domain access is per-call mediated by the access daemon, not blanket-granted.
+The kernel layer's access checks use these identities on the masked file and compile operations. An application running under owner `<App>` cannot, by default, read or write files in another tier-E domain; it reads another domain only when that domain is published for global read (as the shipped structured-state domains are at boot) or through a specific access-daemon grant.
 
 `previous_object()` and `previous_program()` (host-driver kfuns) report which object and program made the current call. Capability-bounded API surfaces use these to check the caller's tier before dispatching: a System-tier-only function can guard with `if (sscanf(previous_program(), "/usr/System/%*s") != 1) error("permission denied")`.
 
@@ -78,7 +78,7 @@ The default access posture for a tier-E domain at boot:
 
 - The domain's owner has read+write to its own directory tree, established by the System initd's `add_owner(<App>)` call before the domain's own `initd.c` runs.
 - Other domains have no access to this domain's files without explicit grant.
-- The System tier has cross-domain reach via its `set_global_access("System", TRUE)` grant; other user tiers do not get blanket cross-domain access.
+- The System tier's cross-domain reach is ambient (the kernel auto's checks exempt System-creator code); `set_global_access` runs the other way, publishing a named domain's own tree for global read — the System initd publishes `/usr/System` and the shipped structured-state domains at boot. Other user tiers read across domains only via specific grants.
 
 Cross-domain reach for tier-E code is mediated at every relevant kfun call by the access daemon at `/kernel/sys/access_daemon.c`. The access primitives themselves (the `set_access`, `query_user_access`, `query_file_access`, `set_global_access` methods on `/kernel/lib/api/access.c`) are kernel-tier; an application that needs to expose a public read-only library typically requests the access grant through a System-tier helper rather than calling kernel access primitives directly. Applications that ship a binary or HTTP service do not need to manipulate access bits at all — the platform routes cross-tier calls through the System-tier libraries the application inherits, and access checks happen automatically inside those.
 
@@ -155,9 +155,9 @@ The connection-handling contract for non-HTTP applications is the binary-manager
 - **`/usr/System/lib/user.c`** — the System user library; inherits the kernel user library plus the System auto.
 - **`/usr/System/sys/userd.c`** — the System userd; handles the binary-manager protocol on the kernel's behalf.
 
-For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `logout`, `flow_*`, `timeout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
+For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/obj/server.c`: an application server that inherits `/usr/HTTP/api/lib/Server1` plus `/usr/System/lib/user`, replicates the binary-manager glue (`login`, `flow_*`, `timeout`, `_logout`), and uses the kernel's mode-switching to consume HTTP requests. The same shape generalizes to other line- or frame-oriented protocols.
 
-For datagram-shaped applications (UDP), datagram support is a port candidate listed in `docs/runtime-primitives.md` Supporting surfaces; the platform ships the transport scaffolding but no canonical datagram application yet.
+For datagram-shaped applications (UDP), the platform ships the datagram transport scaffolding (`docs/runtime-primitives.md` Supporting surfaces), but no canonical datagram application yet.
 
 ## Worked example sketch: an in-memory KV service
 
@@ -183,7 +183,7 @@ A counter-with-deliberate-failure variant (the canonical atomicity demonstration
 
 ## Reference applications
 
-Three runnable examples ship under `examples/`. Each one exercises **one** runtime primitive end-to-end against a sentinel-file assertion the operator can verify with `cat src/usr/<Domain>/data/test-result.log` after cold boot. They are deliberately minimal: the test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
+This section walks through three of the examples that ship under `examples/` (eight in total; the rest are documented in `docs/runtime-primitives.md`, `docs/chat-applications.md`, and `docs/signal-applications.md`). Each one exercises **one** runtime primitive end-to-end. `examples/vault-app/` and `examples/merry-app/` verify against a sentinel-file assertion the operator can check with `cat src/usr/<Domain>/data/test-result.log` after cold boot; `examples/http-app/` verifies over HTTP instead (see its table entry). They are deliberately minimal: the sentinel-file examples' test driver writes a log line, not a network packet; the data persisted is contrived; the demonstration target is one property at a time.
 
 | Example | Primitive demonstrated | Walkthrough |
 |---|---|---|
@@ -191,7 +191,7 @@ Three runnable examples ship under `examples/`. Each one exercises **one** runti
 | `examples/vault-app/` | Persistent state (XML round-trip via stateimpex; restart-survival) | `docs/vault-applications.md` |
 | `examples/merry-app/` | Sandboxed code load (Merry source bound to a property; ancestry walk; five-phase exercise of sandbox firing, Spawn, $delay, LabelCall) | `docs/merry-applications.md` |
 
-All three share a layout shape:
+`examples/vault-app/` and `examples/merry-app/` share a layout shape (`examples/http-app/` is simpler — just `initd.c`, `obj/server.c`, and `README.md`; see `docs/http-applications.md`):
 
 ```text
 examples/<name>/
@@ -217,6 +217,38 @@ When to adapt the shape:
 
 The shape is a teaching surface for the platform's individual primitives, not the recommended posture for a tier-E application that means to do useful work. Read `docs/runtime-primitives.md` for what each example assumes about the runtime; read this document's earlier sections (`Domain layout`, `The initd's role`, `Owner and access`, `Live code upgrade through call_touch`) for the patterns that apply regardless of primitive count.
 
+## Testing your application
+
+### The sentinel-driver pattern
+
+Six of the eight bundled examples ship their regression as a boot-time test driver at `sys/test.c` (`atomic-demo` and `http-app` verify over live HTTP instead), deferred to a `call_out` from `create()` so every domain's `initd` has finished before it calls cross-domain daemons. Each phase of the driver is wrapped in `catch{}` and appends one line to a result-log file (conventionally `/usr/<App>/data/test-result.log`): `"<App>:test: <PHASE> OK"` on success, `"<App>:test: FAIL: <reason>"` on failure. Wrapping each phase separately means one phase's failure does not mask a different failure in another. `scripts/run-example.sh` (`scripts/README.md`) reads the result log back, counts `" OK"` lines against a per-example expected count, and fails the run on any `FAIL` line or a count mismatch.
+
+`examples/chat-app/sys/test.c` is the most heavily annotated of the bundled drivers — its header comment enumerates every phase by sentinel name and what it exercises, and each phase in the body carries an inline comment naming the primitive under test. It is the reference to read first when writing a new one. The shared `log_line` helper every driver repeats:
+
+```c
+private void log_line(string msg)
+{
+    mixed *info;
+    int size;
+
+    catch {
+        info = file_info(RESULT_FILE);
+        size = info ? info[0] : 0;
+        write_file(RESULT_FILE, msg + "\n", size);
+    }
+}
+```
+
+### Two-boot snapshot-restore
+
+A driver that asserts survival across a restart follows the two-boot recipe `merry-app` and `chat-app` use for their restart phases (`vault-app`'s round-trip phases stay within one boot -- they exercise export/import, not process death). `/usr/System/sys/persist_helper::trigger_dump_and_exit()` schedules a full `dump_state(FALSE)` plus `shutdown()` via a `call_out`, so the caller's stack unwinds before the snapshot is taken. Boot 1 runs its phases, keeps whatever objects need to survive as non-static globals (so the dump captures them), schedules a verify `call_out` far enough out to still be pending at dump time, then calls `trigger_dump_and_exit`; the process exits when `shutdown()` runs. Boot 2 restarts DGD against the written snapshot (`state/snapshot`); DGD's orthogonal persistence restores the object graph including the pending call_out, which fires as soon as the system is back up and asserts the restored state.
+
+`examples/merry-app/sys/test.c` (phases 16/17, PERSIST SETUP / PERSIST VERIFY) and `examples/chat-app/sys/test.c` (phases 10/11, PERSIST-SETUP / PERSIST-VERIFY) both follow this shape; chat-app adds a third, cold, no-snapshot boot afterward to show the contrast — an on-disk marker file survives, but the in-image session does not, without a snapshot to restore from.
+
+### Adapting run-example.sh to a new domain
+
+`scripts/run-example.sh` resolves each example's boot recipe through its `example_profile()` shell function — one hardcoded case line per example naming the deploy directory, boot count, boot-1 mode, and expected OK count. There is no directory-convention or config-file discovery: pointing the runner at a new domain means adding a case to `example_profile()` in `scripts/run-example.sh` itself, which is exactly what its own error message says when the profile is missing: `no profile for '<example>'; add one to example_profile()`. The rest of the script — clean-slate deploy, boot orchestration, sentinel counting — needs no change.
+
 ## Where to next
 
 - `docs/where-code-belongs.md` — the placement doctrine behind this document's mechanics: plain LPC versus a Merry script, and which compiled shape fits a new piece of behavior.
@@ -227,4 +259,4 @@ The shape is a teaching surface for the platform's individual primitives, not th
 - `docs/http-applications.md` — the HTTP/1-specific application pattern with `examples/http-app/` as the runnable reference.
 - `docs/operations.md` — the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
 
-[LPC.md]: https://github.com/dworkin/lpc-docs/blob/master/LPC.md
+[LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md

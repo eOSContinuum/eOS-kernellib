@@ -164,7 +164,7 @@ Four platform contracts apply to every HTTP/1 application server. The reference 
 
 ### Inherit from `/lib/`, not from `/obj/`
 
-`Http1Server` is the library form of the HTTP/1 server; `Server1` (under `/obj/`) is the clonable form. Applications inherit the **library** form (`/usr/HTTP/api/lib/Server1`, aliased as `Http1Server`). DGD's `inherit_program` kfun rejects inheritance from a path that does not contain `/lib/` — a discipline that separates inheritable libraries from clonable objects across the kernel layer. The library form of every HTTP/1 component lives under `/usr/HTTP/api/lib/`; the clonable forms under `/usr/HTTP/api/obj/` are not inheritable.
+`Http1Server` is the library form of the HTTP/1 server; `Server1` (under `/obj/`) is the clonable form. Applications inherit the **library** form (`/usr/HTTP/api/lib/Server1`, aliased as `Http1Server`). The driver object's `inherit_program` hook (kernel-layer LPC, `src/kernel/sys/driver.c`) rejects inheritance from a path that does not contain `/lib/` — a discipline that separates inheritable libraries from clonable objects across the kernel layer. The library form of every HTTP/1 component lives under `/usr/HTTP/api/lib/`; the clonable forms under `/usr/HTTP/api/obj/` are not inheritable.
 
 The consequence is that the binary-manager glue in `/usr/HTTP/api/obj/server1.c` cannot be inherited and must be replicated in the application server. The six methods listed above are that replication.
 
@@ -198,7 +198,7 @@ This is a higher-level pattern than the single-application reference. The kernel
 
 ## Cross-domain initialization order
 
-The System initd compiles `/usr/[A-Z]*/initd.c` in alphabetical order. An application initd that needs to call into another user-layer domain at compile time may run before that domain's initd has compiled. To defer registration until the System initd has finished iterating all domains, use a `call_out` of duration 0:
+The System initd compiles `/usr/[A-Z]*/initd.c` alphabetically, after a fixed `TLS`, `HTTP`, `LPC` prefix. An application initd that needs to call into another user-layer domain at compile time may run before that domain's initd has compiled. To defer registration until the System initd has finished iterating all domains, use a `call_out` of duration 0:
 
 ```c
 /* src/usr/Counter/initd.c — registers with the WWW router */
@@ -217,7 +217,7 @@ static void registerWithWWW()
 }
 ```
 
-The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where alphabetical compilation order would otherwise leave a dependency unsatisfied.
+The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where compilation order — the `TLS`, `HTTP`, `LPC` prefix followed by the alphabetical remainder — would otherwise leave a dependency unsatisfied.
 
 ## Where to next
 

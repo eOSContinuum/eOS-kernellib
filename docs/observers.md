@@ -4,6 +4,8 @@ Where dispatcher observers live and what happens to them from registration to en
 
 The short form: an observer is a compiled Merry script appended to an ordered list in a property on the host object. The Merry daemon owns no registration state -- it owns the gates, the lookup, and a cache. Everything else in this contract follows from that placement.
 
+**Audience**: an application or kernel author reasoning about what observer registration stores, how it is inspected and mutated, and when it ends; assumes [dispatcher.md](dispatcher.md) for firing semantics.
+
 ## Registration
 
 `register_observer(object ob, mixed path, string timing, string source)` on the Merry daemon:
@@ -23,7 +25,7 @@ The short form: an observer is a compiled Merry script appended to an ordered li
 | `merry:on:<path>` | Read-side alias, treated as the `main` slot when the explicit form is absent. Registration always writes the explicit form; alias slots arise only from manual raw-property writes. |
 | `merry:on-inherit:<path>:<timing>` | Boolean re-enable marker for the ancestry walk. An ordinary property the host sets on itself. |
 
-- The slot lives on the **host's** property table, not in daemon state. Legacy single-value forms (a bare compiled object, a source string) normalize to one-element lists on read.
+- The slot lives on the **host's** property table, not in daemon state. Compact single-value forms (a bare compiled object, a source string) normalize to one-element lists on read.
 - The query and by-index removal surfaces resolve a slot the same way -- explicit form first, then the timing-less alias for `main` -- so the indices `query_observers` reports are always the indices `remove_observer` removes by, whichever property actually holds the slot. The coarse `unregister_observer` clears the explicit slot property; a hand-written alias slot is cleared by writing that property directly or drained through by-index removal, which resolves it.
 - **Two `inherit` families, two types.** The walk marker `merry:on-inherit:<path>:<timing>` is a host-local boolean. The script-binding delegation properties `merry:inherit:<mode>:<signal>` (`merry-applications.md`) hold object pointers forming a delegation chain. Same word, different families; nothing is shared between them.
 - **Write gating.** The slot and marker properties are themselves protected on the dispatched write path: a `set_property` of `merry:on:*` or `merry:on-inherit:*` re-applies the registrar gate and fails closed. `set_raw_property` remains the deliberate bypass -- bounded by object-reference access control and stated here as a limitation, not a guarantee.
@@ -83,7 +85,7 @@ Operator access: the `observers` verb exposes all three query views, and `unregi
 | Console shapes: observed-path enumeration, `-effective` (and its path-required refusal), index-argument refusals | `scripts/verbsets/dispatcher-verbs.verbset` |
 | Statedump survival of registrations | merry-app `PERSIST SETUP` / `PERSIST VERIFY` phases |
 
-## See also
+## Where to next
 
 - `dispatcher.md` -- the dispatch reference: firing semantics, batching, veto, bounds, the observer-source contract, kernel-layer internals.
 - `merry-applications.md` -- the script-binding mechanism observers are one application of; the `merry:inherit:*` delegation family.

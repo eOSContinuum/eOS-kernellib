@@ -1,4 +1,4 @@
-# Getting Started
+# Getting started
 
 This guide installs the [DGD] driver, fetches this repository, and runs an eOS-kernellib server with the bundled example configuration.
 
@@ -8,7 +8,7 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 ## Prerequisites
 
-A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`.
+A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`. For the administrative telnet port you also need a line-mode TCP client: `telnet` where available, or `nc` (netcat), which macOS ships (macOS has not shipped `telnet` since 10.13).
 
 ## Install DGD
 
@@ -16,11 +16,13 @@ Clone the DGD source, build the driver, and install the binary:
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
-cd dgd/src
+cd dgd
+git checkout 1.7.9    # the release this platform is tested against
+cd src
 make install
 ```
 
-The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes.
+The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the released driver as-is, and the Tested-against line above names the release it is validated on — building upstream `master` usually works but is not what the doc set's transcripts were captured against.
 
 ## Fetch eOS-kernellib
 
@@ -41,11 +43,7 @@ Edit `example.dgd` to set `directory` to the absolute path of `eOS-kernellib/src
 directory       = "/absolute/path/to/eOS-kernellib/src";
 ```
 
-Create the state directory referenced by the `swap_file` and `dump_file` settings:
-
-```sh
-mkdir -p state
-```
+The `state/` directory referenced by the `swap_file` and `dump_file` settings ships with the checkout (it holds a tracked `.gitignore`); if you relocated those paths in the config, create the directory they point at.
 
 Run the driver against the configuration:
 
@@ -60,16 +58,17 @@ The driver compiles the kernel objects and binds two ports:
 
 ## Connect
 
-Telnet to the administrative port:
+Connect a line-mode TCP client to the administrative port:
 
 ```sh
-telnet localhost 8023
+telnet localhost 8023    # or: nc localhost 8023
 ```
 
-The HTTP/1 port (8080) accepts requests from any HTTP/1 client. Without an application mounted on top, the server returns errors for routes it does not handle.
+The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no application mounted on top there is nothing to answer them: the kernel's HTTP server clones an application server at `/usr/WWW/obj/server` per connection, and when that path is absent the connection is dropped without a response (a client like `curl` waits until its own timeout). Mounting an application there — `examples/http-app/README.md` is the walkthrough — is what makes 8080 respond.
 
 ## Where to next
 
+- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels — the fastest way to see the runtime primitives pass on your machine. `scripts/README.md` documents the harness.
 - `docs/first-hour.md` is the natural next step: a hands-on hour from this booted platform to the persistence loop — your own objects, state, and reactions surviving a process restart.
 - `docs/coming-from-contemporary-infrastructure.md` maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
 - `examples/http-app/README.md` and `docs/http-applications.md` cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.

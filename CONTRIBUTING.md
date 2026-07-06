@@ -12,7 +12,7 @@ Thanks for your interest in eOS-kernellib. This document covers the conventions 
 
 ## Project status
 
-eOS-kernellib is the contemporary repackaging of the orthogonally-persistent kernellib lineage around a documented kernel-layer surface for builders. The doc set is content-and-form complete as of [README's Tested-against line](README.md#status); LPC and platform behavior is stable enough for application authoring to begin on top.
+eOS-kernellib is the contemporary repackaging of the orthogonally-persistent kernellib lineage around a documented kernel-layer surface for builders. The doc set is content-and-form complete as of [README's Tested-against line](README.md#quickstart); LPC and platform behavior is stable enough for application authoring to begin on top.
 
 Substantial changes are welcome but the bar for changing capability-tier discipline, kernel-auto inheritance, daemon contracts, or the eight runtime primitives is high; the bar for adding library code under `src/lib/`, documenting an empirical observation, or extending the `examples/http-app/` reference is low.
 
@@ -60,18 +60,20 @@ Documentation in this repository follows a functional, present-tense voice. File
 
 Two documentation surfaces:
 
-- **Reference docs** under [`docs/`](docs/) -- the platform model, application-authoring patterns, operations surface, glossary, and citation index. Each doc opens with an `Audience` callout naming who it is for and ends with a `Where to next` section.
+- **Reference docs** under [`docs/`](docs/) -- the platform model, application-authoring patterns, operations surface, glossary, and citation index. Each doc opens with an `Audience` callout naming who it is for and ends with a `Where to next` section (the folder index `docs/README.md` carries reading paths instead).
 - **Procedural docs** outside `docs/` -- README, CONTRIBUTING, SECURITY, this file. Follow the standard OSS-repo convention.
 
 New docs added to `docs/` use lowercase-hyphenated filenames matching the existing pattern. The `docs/README.md` folder index is updated to include any new doc in the appropriate audience group.
 
 ## Testing
 
-Platform behavior is exercised through the `examples/http-app/` reference application and the `state/` checked-in statedump that confirms boot-and-restore semantics. Changes to capability tiers, daemons, or the primitive surfaces should include:
+Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. Changes to capability tiers, daemons, or the primitive surfaces should include:
 
 - Reproducible boot evidence (cold boot, statedump restore, hot boot as applicable to the change).
 - An empirical Observation in the relevant doc when the change demonstrates a previously-unverified primitive behavior.
 - LPC-level evidence (admin-console transcript or HTTP probe transcript) where the change affects an externally-visible surface.
+
+An empirical Observation is a dated statement, in the doc it supports, naming the command that ran and the output marker it produced -- a sentinel line, a response body, a status field -- specific enough that a later reader can rerun the command and check for the same marker. `docs/runtime-primitives.md`'s Demonstration entries set the citation shape: each names the exercising example or script and the sentinel or transcript line that constitutes the evidence, though they read as continuous platform-model prose rather than individually dated entries -- a new Observation adds the date.
 
 ## Code style
 

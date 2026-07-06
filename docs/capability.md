@@ -1,6 +1,6 @@
-# Capability Library
+# Capability library
 
-The capability library is the kernel layer's single authority choke-point: one store and one membership check behind every gating surface that asks "may this caller do this?" It replaces the heterogeneous per-subsystem gates the platform shipped with — each surface previously carried its own allowlist, its own mutator, and its own denial posture — with a shared store (`/kernel/sys/capabilityd`) and an inheritable check face (`/kernel/lib/capability`). Six gating surfaces route through it.
+The capability library is the kernel layer's single authority choke-point: one store and one membership check behind every gating surface that asks "may this caller do this?" It consolidates what would otherwise be heterogeneous per-subsystem gates — each surface carrying its own allowlist, its own mutator, and its own denial posture — into a shared store (`/kernel/sys/capabilityd`) and an inheritable check face (`/kernel/lib/capability`). Six gating surfaces route through it.
 
 This document covers what the library is, what "capability" means here and what it does not mean, the mechanism, the tier-split access path the kernel's own inheritance rules force, the bootstrap and persistence lifecycle, the design choices behind the shape, and the limitations a reader auditing the platform's authority model should know.
 
@@ -51,7 +51,7 @@ One store, one membership function, one denial message; only the path to it diff
 | HTTP acceptor binding | `http.binary_manager` | `is_allowed` against the manager's object name | silent nil |
 | Console verb-elevation callers | `admin_console.caller` | `require_member` | throw |
 
-Two postures coexist by design. Five surfaces throw — the daemon-diagnostic posture, where an unauthorized call is a programming error worth surfacing. The HTTP acceptor keeps a **silent nil**: erroring on every unauthorized connection attempt, port-scan probes included, buys nothing, so the accept path drops the connection quietly. The dual-check API (`require_member` for the throwers, `is_allowed` for the silent path) serves both with one mechanism, and the migration changed no surface's observable behavior.
+Two postures coexist by design. Five surfaces throw — the daemon-diagnostic posture, where an unauthorized call is a programming error worth surfacing. The HTTP acceptor keeps a **silent nil**: erroring on every unauthorized connection attempt, port-scan probes included, buys nothing, so the accept path drops the connection quietly. The dual-check API (`require_member` for the throwers, `is_allowed` for the silent path) serves both with one mechanism.
 
 The observer-property gate deserves a note. A direct write to a `merry:on:*` (or `merry:on-inherit:*`) property — the keys that store observer registrations — is gated by the *same* registrar capability as `register_observer`, applied on the dispatched-write path. The writer's program is captured at the public `set_property` / `batched_set` entry and threaded to the dispatcher, which fails closed if it is absent. This closes the path where a raw property write would otherwise install an observer registration that `register_observer`'s own gate would have refused.
 
@@ -70,8 +70,8 @@ The store persists like the per-surface sets it replaced. It survives statedumps
 
 ## Design choices
 
-- **A hybrid of an inheritable check and a shared store**, rather than a per-surface library or a single central daemon owning every check. The shared store gives cross-surface introspection and the dynamic registration the console registry had anticipated; keeping the check inheritable (where inheritance is allowed) avoids normalizing four heterogeneous principal types into one key, and let the migration proceed surface by surface.
-- **Uniform `KERNEL()` mutation authority**, rather than a per-capability grantor list or an ambient-domain self-grant. A single narrow elevation point — only `/kernel/*` grants or revokes — avoids the confused-deputy surface that spreading mutation authority across domains would reintroduce, and it preserves the pre-migration behavior of the set-bearing surfaces exactly.
+- **A hybrid of an inheritable check and a shared store**, rather than a per-surface library or a single central daemon owning every check. The shared store gives cross-surface introspection and dynamic registration; keeping the check inheritable (where inheritance is allowed) avoids normalizing four heterogeneous principal types into one key, and lets each surface adopt the check independently.
+- **Uniform `KERNEL()` mutation authority**, rather than a per-capability grantor list or an ambient-domain self-grant. A single narrow elevation point — only `/kernel/*` grants or revokes — avoids the confused-deputy surface that spreading mutation authority across domains would introduce, and it is exactly the elevation the set-bearing surfaces' own gates demand.
 - **A dual-check API with per-surface posture preserved.** Every surface that threw still throws (now with one uniform message for the store-backed checks); the one surface that dropped silently still does. No observable behavior changed.
 
 ## Limitations

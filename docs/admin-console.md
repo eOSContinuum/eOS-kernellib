@@ -1,4 +1,4 @@
-# admin_console
+# Admin console
 
 The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `docs/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
 
@@ -9,7 +9,7 @@ The console is implemented in two files:
 - `src/kernel/lib/admin_console.c` — the library (~2,300 lines of LPC). Defines every verb, the parser, the history table, the dispatch.
 - `src/kernel/obj/admin_console.c` — the clonable. Each operator connection clones this object; the clone holds per-session state (current directory, code-history values, the inherited library's user-tier configuration). The clonable is also the console's composition point with the wider platform: its switch-default routes registry-extension verbs, and it masks the object-taking verbs (`clone`, `destruct`, `new`, `status`) to resolve Index logical names before delegating to the library — the library itself stays composition-free.
 
-A System-tier subclass at `/usr/System/sys/userd.c` registers the console as the connection handler bound to the kernel's telnet port (named `telnet_port` in the `.dgd` configuration).
+The kernel's telnet port (named `telnet_port` in the `.dgd` configuration) is bound through two paths, detailed under Connecting below: the `admin` login clones the kernel console directly, and a registered user name routes through the System-tier telnet manager at `/usr/System/sys/userd.c` to the console-inheriting subclass at `/usr/System/obj/user.c`.
 
 ## Why a console at all
 
