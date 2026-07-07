@@ -44,7 +44,7 @@ PORT=8023
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
-    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset"
+    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset"
     # The dispatcher-verbs clone-addressing cycle drives the named clone
     # the vault-app boot driver creates; honor an explicit DEPLOY over
     # this default.
