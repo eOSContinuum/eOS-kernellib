@@ -54,6 +54,7 @@ void create()
 }
 
 
+static
 void clear_downcased_property(string prop)
 {
     properties[prop] = nil;
@@ -65,11 +66,21 @@ void clear_property(string prop)
     clear_downcased_property(lower_case(prop));
 }
 
+/*
+ * Reset the property table, preserving merry:* runtime wiring
+ * (observer registrations and dispatcher state). Registrations are
+ * capability-gated on the dispatch path and excluded from schema
+ * exports, so a public wipe that stripped them would bypass the gate
+ * and leave the Merry daemon's resolved-observer cache stale; keeping
+ * them makes a live re-import coherent with what the export carried.
+ * Registration teardown goes through the daemon's unregister path.
+ */
 void clear_all_properties()
 {
-    properties = ([ ]);
+    properties = prefixed_map(properties, "merry:");
 }
 
+static
 mixed set_downcased_property(string prop, mixed val, varargs mixed extra...)
 {
     properties[prop] = val;
