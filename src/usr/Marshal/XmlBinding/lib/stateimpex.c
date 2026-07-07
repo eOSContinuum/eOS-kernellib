@@ -28,7 +28,8 @@ private inherit "~XML/lib/xmd";
 
 private mixed *export_element(object ob, object el, mapping args,
 			       mapping context, int vaultflag);
-private void import_element(object ob, mixed state, mapping args);
+private void import_element(object ob, mixed state, mapping args,
+			    object parent_el);
 
 static
 mixed export_state(object ob, varargs object el, mapping args,
@@ -58,7 +59,7 @@ mixed export_state(object ob, varargs object el, mapping args,
 
 static atomic
 void import_state(object ob, mixed state, varargs mapping args) {
-   import_element(ob, state, args ? args : ([ ]));
+   import_element(ob, state, args ? args : ([ ]), nil);
 }
 
 static
@@ -281,23 +282,63 @@ mixed *export_element(object ob, object el, mapping args,
     return out;
 }
 
+/*
+ * _resolve_import_node: element-name -> schema_node lookup for import.
+ * A qualified name (ns:tag) resolves through the registry directly. An
+ * unqualified name resolves in context: the parent element's namespace
+ * for descendants, the object's declared root node's namespace for the
+ * root. Hand-authored schema XML omits the namespace qualification the
+ * exporter emits (query_name is always ns:tag), and the registry
+ * defaults bare names to the unused X namespace -- context supplies
+ * the real one.
+ */
 private
-void import_element(object ob, mixed state, mapping args) {
+object _resolve_import_node(object ob, string tag, object parent_el) {
+   object el, root;
+
+   if (el = SID->query_node(tag)) {
+      return el;
+   }
+   if (!sscanf(tag, "%*s:%*s")) {
+      if (parent_el) {
+	 return SID->query_node(parent_el->query_namespace(), tag);
+      }
+      catch(root = SID->get_root_node(ob));
+      if (root) {
+	 return SID->query_node(root->query_namespace(), tag);
+      }
+   }
+}
+
+private
+void import_element(object ob, mixed state, mapping args,
+		    object parent_el) {
    mixed *def, arr, content;
    string **callbacks;
    object el;
    int i, j;
 
-   el = SID->query_node(xmdElement(state));
+   el = _resolve_import_node(ob, xmdElement(state), parent_el);
 
    if (!el) {
       sysLog("Warning:: Schema node " + xmdElement(state) + " not found!");
       return;
    }
 
+   /* Decode string attribute values by the element's declared
+    * attribute type (undeclared attributes keep the lpc_mixed string
+    * passthrough) so typed callbacks -- booleans, object refs --
+    * receive real values, not ASCII. Values the parser has already
+    * decoded past string (its untyped pass resolves OBJ(...) literals
+    * at parse time) pass through as-is. */
    if (arr = xmdAttributes(state)) {
       for (i = 0; i < sizeof(arr); i += 2) {
-	 args[arr[i]] = arr[i+1];
+	 if (typeof(arr[i+1]) == T_STRING) {
+	    args[arr[i]] = asciiToTyped(arr[i+1],
+					el->query_attribute_type(arr[i]));
+	 } else {
+	    args[arr[i]] = arr[i+1];
+	 }
       }
    }
 
@@ -331,7 +372,7 @@ void import_element(object ob, mixed state, mapping args) {
    if (el->is_parent()) {
       if (arr = queryColourValue(xmdForceToData(xmdContent(state)))) {
 	 for (i = 0; i < sizeof(arr); i ++) {
-	    import_element(ob, arr[i], args[..]);
+	    import_element(ob, arr[i], args[..], el);
 	 }
       }
    }
