@@ -2,26 +2,42 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 """Drive admin-console verbs over telnet and check responses.
 
-Connects to a running DGD instance's telnet port, logs in as the admin
-user (auto-detecting the first-connect set-a-password flow vs the
-returning password flow from the prompt text), drives each entry in a
-verbset file, checks the response against the entry's expectations, and
-prints a PASS/FAIL summary. The full session transcript is written to a
-log file for forensics.
+Connects to a running DGD instance's telnet port, logs in (auto-detecting
+the first-connect set-a-password flow vs the returning password flow from
+the prompt text), drives each entry in a verbset file, checks the
+response against the entry's expectations, and prints a PASS/FAIL
+summary. The full session transcript is written to a log file for
+forensics.
+
+The session user defaults to admin; a verbset that must run as a
+registered non-admin operator declares its user with file-level
+directives (see below). The login flow is the same either way -- the
+System user object walks every registered user through the identical
+password states -- but a non-admin name must already be on the kernel
+access list when the session connects (cold boots register no one:
+provision first via the admin console's `grant <user> access`, e.g.
+scripts/verbsets/operator-provision.verbset).
 
 Usage:
     scripts/drive-verbs.py <verbset-file> [options]
 
-Verbset file format -- blocks separated by blank lines, one verb per
-block; '#' lines are comments:
+Verbset file format -- optional file-level directives first, then blocks
+separated by blank lines, one verb per block; '#' lines are comments:
+
+    user: testop
+    password: drive-verbs
 
     cmd: cascade-depth
     expect: cascade-depth: \\d+
     absent: usage:
 
-  cmd:     (required) the verb line to send
-  expect:  (repeatable) regex that must match the response (re.search)
-  absent:  (repeatable) regex that must NOT match the response
+  user:     (optional, before the first cmd) session login name;
+            --user overrides, default admin
+  password: (optional, before the first cmd) session password;
+            --password overrides, default drive-verbs
+  cmd:      (required) the verb line to send
+  expect:   (repeatable) regex that must match the response (re.search)
+  absent:   (repeatable) regex that must NOT match the response
 
 A block with only expect/absent failures reports FAIL; the run exits
 non-zero if any entry fails. Entries run in file order, so a verbset can
@@ -146,8 +162,12 @@ def login(sess: Session, user: str, password: str) -> None:
 
 
 def parse_verbset(path: str):
-    """Parse the block-per-entry verbset format."""
+    """Parse the block-per-entry verbset format.
+
+    Returns (meta, entries): meta holds the file-level 'user'/'password'
+    directives (empty when absent), entries the cmd blocks."""
     entries = []
+    meta = {}
     block = {"cmd": None, "expect": [], "absent": []}
 
     def flush():
@@ -167,6 +187,13 @@ def parse_verbset(path: str):
             key, sep, value = line.partition(":")
             key = key.strip()
             value = value.strip()
+            if sep and key in ("user", "password"):
+                if entries or block["cmd"]:
+                    raise ValueError(f"{path}:{lineno}: '{key}:' is a "
+                                     f"file-level directive; it must precede "
+                                     f"the first cmd block")
+                meta[key] = value
+                continue
             if not sep or key not in ("cmd", "expect", "absent"):
                 raise ValueError(f"{path}:{lineno}: expected "
                                  f"'cmd:'/'expect:'/'absent:', got: {line}")
@@ -179,7 +206,7 @@ def parse_verbset(path: str):
     flush()
     if not entries:
         raise ValueError(f"{path}: no entries")
-    return entries
+    return meta, entries
 
 
 def drive(sess: Session, entries) -> int:
@@ -220,16 +247,22 @@ def main():
     ap.add_argument("verbset", help="verbset file (see module docstring)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8023)
-    ap.add_argument("--user", default="admin")
-    ap.add_argument("--password", default="drive-verbs")
+    ap.add_argument("--user", default=None,
+                    help="session login name (overrides the verbset's "
+                         "user: directive; default admin)")
+    ap.add_argument("--password", default=None,
+                    help="session password (overrides the verbset's "
+                         "password: directive; default drive-verbs)")
     ap.add_argument("--transcript", default=None,
                     help="optional path to write the full session transcript")
     args = ap.parse_args()
 
-    entries = parse_verbset(args.verbset)
+    meta, entries = parse_verbset(args.verbset)
+    user = args.user or meta.get("user") or "admin"
+    password = args.password or meta.get("password") or "drive-verbs"
     sess = Session(args.host, args.port, args.transcript)
     try:
-        login(sess, args.user, args.password)
+        login(sess, user, password)
         failures = drive(sess, entries)
     finally:
         sess.close()
