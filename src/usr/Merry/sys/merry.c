@@ -1385,7 +1385,12 @@ void new_merry_node(object program) {
    }
 }
 
-atomic
+/*
+ * static: eviction runs only from the pool-bound call_out in
+ * new_merry_node -- cross-domain call_other cannot force recompile
+ * churn on the node pool.
+ */
+static atomic
 void clean_nodes(varargs int all) {
    mapping sort;
    object *nodes;
