@@ -45,6 +45,7 @@ expect: dispatch-trace: (on|off)
 
 cmd: dispatch-trace on
 expect: dispatch-trace on
+expect: note: trace lines emit at DEBUG
 absent: usage:
 
 cmd: dispatch-trace status
@@ -130,3 +131,28 @@ expect: register-observer: target not found \(no loaded object or Index name\): 
 
 cmd: unregister-observer No:Such:Name drive:ca:prop main
 expect: unregister-observer: target not found \(no loaded object or Index name\): No:Such:Name
+
+# TRACE VISIBILITY -- dispatch-trace routes to the general logd stream
+# at DEBUG level: with the flag on and the threshold lowered, a
+# set_property write leaves a MERRY trace line readable via the log
+# verb. Suppressed-by-default is asserted by the hint on `on` (the
+# threshold is INFO here); both knobs are restored afterward.
+
+cmd: dispatch-trace on
+expect: dispatch-trace on
+expect: note: trace lines emit at DEBUG
+
+cmd: log-level debug
+expect: log-level set to DEBUG
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("MyApp:core:item1")->set_property("drive:tv:prop", 1)
+absent: usage:
+
+cmd: log
+expect: MERRY trace: dispatch_set .*drive:tv:prop
+
+cmd: log-level info
+expect: log-level set to INFO
+
+cmd: dispatch-trace off
+expect: dispatch-trace off
