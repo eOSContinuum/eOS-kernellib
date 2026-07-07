@@ -1,0 +1,22 @@
+/*
+ * Staged v3 library source for the operator console cycle
+ * (scripts/verbsets/operator-upgrade.verbset): the operator copies this
+ * file over lib/shape.c from the System console and drives `upgrade -p`,
+ * repeating live what sys/test does programmatically at boot with the
+ * v2 source it stages itself. The .v3 suffix keeps this file outside
+ * every compile path until that copy: only lib/shape.c is ever
+ * compiled, and only when the widget master (or an upgrade of the
+ * library) pulls it in.
+ */
+
+inherit "/usr/System/lib/auto";
+
+string shape_version()
+{
+    return "v3";
+}
+
+int scale(int n)
+{
+    return n * 5;
+}

@@ -9,8 +9,9 @@ This complements `hot-reload-master`, which recompiles a single clonable master 
 ## Layout
 
 - `lib/shape.c` — parent library: `shape_version()`, `scale()`. The upgraded unit; its source is replaced live by the driver.
-- `obj/widget.c` — clonable inheritor: per-clone `count`, `describe()` composed with the library, and the `patch()` hook the `call_touch` gate reaches. Clonable objects live under `obj/` (the kernel's `clone_object` only accepts paths containing `/obj/`).
-- `sys/test.c` — boot-time driver and patchtool; writes sentinels to `data/test-result.log`.
+- `lib/shape.c.v3` — staged v3 source for the console cycle below; never compiled until an operator copies it over `lib/shape.c`.
+- `obj/widget.c` — clonable inheritor: per-clone `count`, `describe()` composed with the library, and the `patch()` hook the `call_touch` gate reaches. Clonable objects live under `obj/` (the kernel's `clone_object` only accepts paths containing `/obj/`). Inherits `/lib/util/named` so each clone carries an Index logical name.
+- `sys/test.c` — boot-time driver and patchtool; registers the clones as `Cascade:demo:widget1`/`widget2` and writes sentinels to `data/test-result.log`.
 - `initd.c` — compiles the widget (pulling in the library) and the driver at boot.
 
 ## Deployment
@@ -41,3 +42,20 @@ Cascade:test: LIB BEHAVIOR OK
 Cascade:test: CLONE STATE SURVIVED OK
 Cascade:test: CLONE PATCH OK
 ```
+
+## Console cycle: the operator `upgrade -p` path
+
+The boot driver reaches the upgrade daemon programmatically, through the
+System auto library's `upgrade()` wrapper. The same cascade is also an
+operator workflow: the System console's `upgrade -p` verb
+(`docs/code-lifecycle.md`), whose per-owner access checks and
+console-side patchtool the wrapper never touches.
+`scripts/verbsets/operator-upgrade.verbset` covers that path against
+this example: a registered non-admin operator (provisioned live by
+`scripts/verbsets/operator-provision.verbset` — cold boots register no
+users beyond admin) stages `lib/shape.c.v3` over the live library with
+the console `cp` verb and drives `upgrade -p`, then asserts against the
+Index-named clones that the boot-time cascade's end state (v2, counts
+3/5, patched once) advanced to v3 with counts intact and `patch()` run
+exactly once more. The default `scripts/drive-verbs-smoke.sh` run
+includes both verbsets over a deploy of this example.
