@@ -44,6 +44,7 @@
 # include <kernel/user.h>
 # include <Merry.h>
 # include <type.h>
+# include <log.h>
 
 # define INDEX	"/usr/Index/sys/index_daemon"
 
@@ -282,8 +283,10 @@ void cmd_batch_status(object user, string cmd, string str) {
  * dispatch-trace on|off|status
  *
  * Toggles dispatch_trace flag via registry helper, or reports current
- * state. When on, _trace_dispatch in MERRY appends entry events to
- * MERRY_LOG_FILE; when off (the default), trace sites elide their I/O.
+ * state. When on, _trace_dispatch in MERRY emits entry events to the
+ * general logd stream at DEBUG level; when off (the default), trace
+ * sites elide their I/O. Turning trace on while logd's threshold is
+ * above DEBUG earns a hint, since the lines would be silently dropped.
  */
 void cmd_dispatch_trace(object user, string cmd, string str) {
    string *parts;
@@ -312,6 +315,14 @@ void cmd_dispatch_trace(object user, string cmd, string str) {
       return;
    }
    _emit(user, "dispatch-trace " + arg + "\n");
+   if (arg == "on") {
+      object logd;
+
+      if ((logd=find_object(LOGD)) && logd->query_threshold() > LOG_DEBUG) {
+         _emit(user, "note: trace lines emit at DEBUG and the current " +
+               "log-level suppresses them; `log-level debug` to see them\n");
+      }
+   }
 }
 
 /*

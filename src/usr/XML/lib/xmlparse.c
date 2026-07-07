@@ -5,26 +5,37 @@
  * Inheritable by callers that need to parse XML inline (the Marshal /
  * stateimpex marshaling path is one such caller).
  *
- * Diagnostic macros are no-ops; the logd facility now exists but these
- * are not yet wired to it. The `{ ... | ... }` legacy
+ * Diagnostic macros forward to the logd facility at DEBUG level, guarded
+ * by xml_diag() so their argument expressions are never built when DEBUG
+ * lines would be dropped anyway. The `{ ... | ... }` legacy
  * sugar syntax raises LexErr at this transport layer.
  */
 
 # include <type.h>
 # include <XML.h>
+# include <log.h>
 
 # define SID		"/usr/Schema/sys/schema_daemon"
 
-/* DEBUG/Debug/XDebug: no-op macros; not yet wired to the logd facility */
-# define DEBUG(_str)
-# define Debug(_str)
-# define XDebug(_str)
+/*
+ * DEBUG/Debug/XDebug: diagnostic macros, forwarded to logd at DEBUG level
+ * (the historical three verbosity tiers collapse into one). xml_diag()
+ * consults logd's threshold BEFORE the argument expression is evaluated,
+ * so the dumpValue calls in the args cost nothing on the parse path under
+ * the default INFO threshold. xml_diag()'s declaration follows the
+ * inherits below (declarations may not precede them).
+ */
+# define DEBUG(_str)	if (xml_diag()) { debugLog(_str); }
+# define Debug(_str)	if (xml_diag()) { debugLog(_str); }
+# define XDebug(_str)	if (xml_diag()) { debugLog(_str); }
 
 private inherit "/lib/util/ascii";
 private inherit "/lib/util/lpc";
 inherit "/usr/XML/lib/entities";
 private inherit "/usr/XML/lib/xmd";
 private inherit "/usr/Schema/lib/dtd";
+
+private int xml_diag();
 
 private int peek, loose;
 
@@ -43,6 +54,17 @@ private void p_ref();
 private void p_tag();
 private void p_attr(varargs int ref);
 
+
+/*
+ * xml_diag: cheap pre-check for the diagnostic macros -- true only when
+ * logd exists and its threshold admits DEBUG lines.
+ */
+private int xml_diag()
+{
+    object logd;
+
+    return ((logd=find_object(LOGD)) && logd->query_threshold() <= LOG_DEBUG);
+}
 
 
 static void create()

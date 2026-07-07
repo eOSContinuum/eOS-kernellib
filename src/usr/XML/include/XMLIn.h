@@ -1,11 +1,9 @@
 /*
  * XML lexer state vars + macros. Included by ~XML/lib/xmlparse.c.
  *
- * The `DEBUG(...)` calls in ScanMerry expand to no-ops in the current
- * logging story (defined as empty in xmlparse.c); the dump_value
- * references inside those calls are dead code and never compiled. When
- * a real kernel-layer log facility lands, DEBUG and dump_value get
- * wired here.
+ * The `DEBUG(...)` calls in ScanMerry forward to the logd facility at
+ * DEBUG level (macros defined in xmlparse.c, guarded so the argument
+ * expressions are not built when DEBUG lines would be dropped).
  */
 
 /* input state */
@@ -155,7 +153,7 @@ string ScanMerry() {
    for (;;) {
       switch(char) {
       case EOF:
-	 DEBUG("ScanMerry: str = " + dump_value(str));
+	 DEBUG("ScanMerry: str = " + dumpValue(str));
 	 LexErr("unexpected EOF in Merry");
 	 break;
       case '\\':
@@ -170,11 +168,11 @@ string ScanMerry() {
 	 while (char != stop) {
 	    switch(char) {
 	    case EOF:
-	       DEBUG("ScanMerry: str = " + dump_value(str));
+	       DEBUG("ScanMerry: str = " + dumpValue(str));
 	       LexErr("unexpected EOF in Merry string");
 	       break;
 	    case '\n':
-	       DEBUG("ScanMerry: str = " + dump_value(str));
+	       DEBUG("ScanMerry: str = " + dumpValue(str));
 	       LexErr("unexpected newline in Merry string");
 	       break;
 	    case '\\':
@@ -200,7 +198,7 @@ string ScanMerry() {
 	    while (!found) {
 	       switch (char) {
 	       case EOF:
-		  DEBUG("ScanMerry: str = " + dump_value(str));
+		  DEBUG("ScanMerry: str = " + dumpValue(str));
 		  LexErr("unexpected EOF in Merry comment");
 		  break;
 	       case '*':
