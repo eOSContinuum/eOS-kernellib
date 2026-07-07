@@ -52,7 +52,7 @@ fi
 
 echo "== clean slate (base boot) =="
 # A single coherent base boot: no leftover example deploy mount may run.
-for mount in Chat MerryApp MyApp Reload SignalApp WWW; do
+for mount in Cascade Chat MerryApp MyApp Reload SignalApp WWW; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap state/drive-verbs-boot.log

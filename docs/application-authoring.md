@@ -127,7 +127,7 @@ Applications also do not normally manipulate the driver's lifecycle callbacks di
 
 `call_touch(obj)` (wrapped in the kernel auto at `/kernel/lib/auto.c::call_touch`) marks an object as needing an upgrade. The next time `obj` is called, the kernel driver intercepts the call, dispatches `touch(obj, function)` to the object manager (objectd), and objectd in turn calls `obj->_F_touch()` on the marked object. Only after `_F_touch()` returns does the originally-intended call proceed.
 
-The application-implemented hook is `_F_touch()` on the object's class. Applications that need pre-upgrade migration logic implement this method; the platform guarantees it runs at most once per `call_touch`, before the next call against the object.
+The application-implemented hook is `patch()`. `_F_touch()` itself is the `nomask` platform gate in the System auto library (`src/usr/System/lib/auto.c`) — applications cannot override it; its body calls `this_object()->patch()`. Applications that need pre-upgrade migration logic implement `patch()`; the platform guarantees it runs at most once per `call_touch`, before the next call against the object (`docs/code-lifecycle.md` `call_touch` and `_F_touch`). The working demonstration is `examples/upgrade-cascade/`.
 
 Why not upgrade immediately when a library recompiles? Two reasons:
 
@@ -139,7 +139,7 @@ The trade-off: long-idle objects can accumulate multiple pending upgrades withou
 - **Periodic global touch.** A scheduled job (via `call_out`) walks all objects within a domain at low frequency (daily, weekly) and ensures each has been touched at least once per cycle.
 - **Snapshot-and-restore.** Statedump preserves all object state; a planned restart cycle that statedumps and restores can pair with an explicit touch pass during the restore phase.
 
-The `call_touch` primitive itself is host-driver-level (tier A); the kernel auto wraps it; objectd dispatches it; the `_F_touch()` method is the application hook.
+The `call_touch` primitive itself is host-driver-level (tier A); the kernel auto wraps it; objectd dispatches it; the System auto's `_F_touch()` gate forwards to the application's `patch()` hook.
 
 ## Non-HTTP transports
 

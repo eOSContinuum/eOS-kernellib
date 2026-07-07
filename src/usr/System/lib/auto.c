@@ -223,6 +223,28 @@ nomask int _F_touch()
     return FALSE;
 }
 
+/*
+ * NAME:	upgrade()
+ * DESCRIPTION:	upgrade source files and everything that depends on them,
+ *		on behalf of this object's owner; the upgrade server
+ *		verifies write access to every affected source, so an owner
+ *		can only upgrade what it could edit.  With a patchtool,
+ *		existing clones of recompiled masters are call_touch-marked
+ *		and visited (patchtool->do_patch(obj) per object); each
+ *		visit reaches the object's patch() function through the
+ *		touch gate above.
+ */
+static mixed upgrade(string *sources, varargs int atom, object patchtool)
+{
+    int i;
+
+    sources = sources[..];
+    for (i = sizeof(sources); --i >= 0; ) {
+	sources[i] = DRIVER->normalize_path(sources[i]);
+    }
+    return UPGRADE_SERVER->upgrade(query_owner(), sources, atom, patchtool);
+}
+
 
 # define REF_CONT	0	/* continuation */
 # define REF_COUNT	1	/* callback countdown */

@@ -171,6 +171,9 @@ When a library at `/usr/MyApp/lib/util.c` recompiles, its dependents in `/usr/My
 - The object manager (`/usr/System/sys/objectd.c`) tracks the inheritance and include graph as it builds, via the `compile` event.
 - The upgrade daemon (`/usr/System/sys/upgraded.c`) takes one or more source files, walks the graph for every direct and transitive dependent, destructs stale library issues, and recompiles dependents — optionally as one all-or-nothing atomic operation. When a patch tool is supplied, the daemon additionally queues `call_touch` patching so live clones migrate state on next reference instead of being destructed.
 - The operator `upgrade [-a|-p] <file> [<file> ...]` verb on the System operator login (`/usr/System/obj/user.c`) drives the flow interactively: `-a` selects the atomic recompile, `-p` supplies the patch tool and runs the `call_touch` patch flow.
+- The System auto library's `upgrade(sources, atom, patchtool)` function (`src/usr/System/lib/auto.c`) drives the same flow programmatically, on behalf of the calling object's owner; the daemon verifies write access to every affected source, so an owner can only upgrade what it could edit. The patch tool is any object implementing `do_patch(obj)` — the daemon visits each touched object through it, one zero-delay callout per object, and the visit reaches the object's `patch()` hook through the touch gate.
+
+The working demonstration is `examples/upgrade-cascade/`: a parent library upgraded live through the daemon, its inheritor recompiled, the inheritor's existing clones reporting the new library's version and behavior with their per-clone state intact and `patch()` run exactly once each.
 
 One piece the cascade lacks is a stored per-master clone list: clone patching sweeps the object table rather than enumerating a registry (`docs/runtime-primitives.md` §4 and §8 name the gap and the `objregd` port candidate).
 

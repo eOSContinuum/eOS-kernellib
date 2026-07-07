@@ -20,8 +20,8 @@
  * calls finish on the old program (docs/code-lifecycle.md). This covers
  * the clone-propagation half of the primitive; the library-inheritance
  * cascade (a recompiled parent lib re-touching its inheritors through
- * the upgrade daemon) is a separate, heavier mechanism not exercised
- * here.
+ * the upgrade daemon) is a separate, heavier mechanism, exercised by
+ * the upgrade-cascade regression.
  *
  * Pass/fail via /usr/Reload/data/test-result.log, the application-tier
  * convention shared by the bundled examples. Assertions target the
