@@ -5,16 +5,20 @@
 # Mutation verbs follow the mutate -> verify -> undo -> verify-undo
 # shape where the substrate supports static targets. The
 # register-observer / unregister-observer entries assert the daemon's
-# property-bearer refusal against /usr/MerryApp/sys/test (a loaded
-# daemon WITHOUT the property API -- the daemon validates the target
-# rather than silently storing nothing). Clone paths are not stable
-# across boots, but Index logical names are: the CLONE ADDRESSING
-# section drives the full registration cycle against the
-# MerryApp:demo:parent named clone, which path-form targets cannot
-# reach (the System auto layer's find_object refuses path#index).
+# property-bearer refusal against /usr/System/sys/logd (a daemon
+# loaded on every base boot WITHOUT the property API -- the Merry
+# daemon validates the target rather than silently storing nothing).
+# Clone paths are not stable across boots, but Index logical names
+# are: the CLONE ADDRESSING section drives the full registration
+# cycle against MyApp:core:item1, the property-bearing named clone
+# the vault-app boot driver creates -- path-form targets cannot reach
+# a clone (the System auto layer's find_object refuses path#index).
 #
-# Run against a restore-booted runtime with merry-app deployed:
-#   scripts/drive-verbs.py scripts/verbsets/dispatcher-verbs.verbset
+# Runs in drive-verbs-smoke.sh's DEFAULT set, which deploys vault-app
+# as the MyApp domain (a non-selfexit example, so the console stays
+# up). To drive it alone:
+#   DEPLOY=vault-app:MyApp scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/dispatcher-verbs.verbset
 
 cmd: cascade-depth
 expect: cascade-depth: \d+
@@ -69,32 +73,32 @@ cmd: query-approved-registrars
 expect: System
 absent: DriveVerbs
 
-cmd: register-observer /usr/MerryApp/sys/test drive:test:prop main Set($this, "drive:test:mark", 1);
-expect: register-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
+cmd: register-observer /usr/System/sys/logd drive:test:prop main Set($this, "drive:test:mark", 1);
+expect: register-observer: MERRY: target /usr/System/sys/logd does not carry the property API
 
-cmd: observers /usr/MerryApp/sys/test drive:test:prop
-expect: /usr/MerryApp/sys/test drive:test:prop:
+cmd: observers /usr/System/sys/logd drive:test:prop
+expect: /usr/System/sys/logd drive:test:prop:
 expect: main:
 
-cmd: observers /usr/MerryApp/sys/test
-expect: /usr/MerryApp/sys/test observed paths:
+cmd: observers /usr/System/sys/logd
+expect: /usr/System/sys/logd observed paths:
 absent: usage:
 
-cmd: observers /usr/MerryApp/sys/test drive:test:prop main -effective
-expect: /usr/MerryApp/sys/test drive:test:prop \(effective\):
+cmd: observers /usr/System/sys/logd drive:test:prop main -effective
+expect: /usr/System/sys/logd drive:test:prop \(effective\):
 expect: main:
 absent: usage:
 
-cmd: observers /usr/MerryApp/sys/test -effective
+cmd: observers /usr/System/sys/logd -effective
 expect: observers: -effective requires a <path>
 
-cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main
-expect: unregister-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
+cmd: unregister-observer /usr/System/sys/logd drive:test:prop main
+expect: unregister-observer: MERRY: target /usr/System/sys/logd does not carry the property API
 
-cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main 0
-expect: unregister-observer: MERRY: target /usr/MerryApp/sys/test does not carry the property API
+cmd: unregister-observer /usr/System/sys/logd drive:test:prop main 0
+expect: unregister-observer: MERRY: target /usr/System/sys/logd does not carry the property API
 
-cmd: unregister-observer /usr/MerryApp/sys/test drive:test:prop main x
+cmd: unregister-observer /usr/System/sys/logd drive:test:prop main x
 expect: unregister-observer: index must be an integer
 
 # CLONE ADDRESSING -- targets resolve through the Index logical-name
@@ -102,20 +106,20 @@ expect: unregister-observer: index must be an integer
 # undo -> verify-undo cycle runs against a property-bearing named
 # clone. Refusals assert the unified not-found diagnostic.
 
-cmd: observers MerryApp:demo:parent
-expect: MerryApp:demo:parent observed paths:
+cmd: observers MyApp:core:item1
+expect: MyApp:core:item1 observed paths:
 absent: usage:
 
-cmd: register-observer MerryApp:demo:parent drive:ca:prop main Set($this, "drive:ca:mark", 1);
-expect: register-observer: registered on MerryApp:demo:parent drive:ca:prop:main
+cmd: register-observer MyApp:core:item1 drive:ca:prop main Set($this, "drive:ca:mark", 1);
+expect: register-observer: registered on MyApp:core:item1 drive:ca:prop:main
 
-cmd: observers MerryApp:demo:parent drive:ca:prop main
+cmd: observers MyApp:core:item1 drive:ca:prop main
 expect: \[0\]
 
-cmd: unregister-observer MerryApp:demo:parent drive:ca:prop main
-expect: unregister-observer: cleared MerryApp:demo:parent drive:ca:prop:main
+cmd: unregister-observer MyApp:core:item1 drive:ca:prop main
+expect: unregister-observer: cleared MyApp:core:item1 drive:ca:prop:main
 
-cmd: observers MerryApp:demo:parent drive:ca:prop main
+cmd: observers MyApp:core:item1 drive:ca:prop main
 expect: \(none\)
 
 cmd: observers No:Such:Name
