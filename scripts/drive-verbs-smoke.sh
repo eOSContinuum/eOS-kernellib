@@ -11,16 +11,19 @@
 #   scripts/drive-verbs-smoke.sh                       # default verbsets
 #   DEPLOY=<example>:<Mount> scripts/drive-verbs-smoke.sh <verbset>
 #
-# Defaults to the admin-baseline and logging-verbs verbsets, which run
-# against a base boot (no example). DEPLOY=<example>:<Mount> deploys an
-# example first, for verbsets that exercise its objects.
+# Defaults to the admin-baseline, logging-verbs, and dispatcher-verbs
+# verbsets, deploying vault-app as the MyApp domain first: the
+# dispatcher-verbs clone-addressing cycle needs the named
+# property-bearing clone (MyApp:core:item1) the vault-app boot driver
+# creates, and vault-app does not self-exit, so the console stays up.
+# With explicit verbset arguments no example is deployed unless
+# DEPLOY=<example>:<Mount> asks for one; DEPLOY also overrides the
+# default run's deployment.
 #
 # Caveat: a SELFEXIT example -- one whose boot-time driver calls shutdown()
 # when it finishes (e.g. merry-app, chat-app) -- tears the server down
 # before verbs can be driven. Drive against a non-selfexit deployment, or
-# rely on that example's own in-application test phases. The dispatcher-verbs
-# observer-refusal entry needs /usr/MerryApp, so it is covered by the
-# merry-app phases rather than driven here.
+# rely on that example's own in-application test phases.
 #
 # Exits non-zero if the console never accepts telnet or any verbset fails.
 
@@ -41,7 +44,11 @@ PORT=8023
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
-    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset"
+    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset"
+    # The dispatcher-verbs clone-addressing cycle drives the named clone
+    # the vault-app boot driver creates; honor an explicit DEPLOY over
+    # this default.
+    DEPLOY=${DEPLOY:-vault-app:MyApp}
 fi
 
 if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
