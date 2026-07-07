@@ -9,16 +9,19 @@
 # Usage:
 #   DGD_BIN=/path/to/dgd/bin/dgd scripts/drive-verbs-smoke.sh [verbset ...]
 #   scripts/drive-verbs-smoke.sh                       # default verbsets
-#   DEPLOY=<example>:<Mount> scripts/drive-verbs-smoke.sh <verbset>
+#   DEPLOY="<example>:<Mount> ..." scripts/drive-verbs-smoke.sh <verbset>
 #
-# Defaults to the admin-baseline, logging-verbs, and dispatcher-verbs
-# verbsets, deploying vault-app as the MyApp domain first: the
-# dispatcher-verbs clone-addressing cycle needs the named
-# property-bearing clone (MyApp:core:item1) the vault-app boot driver
-# creates, and vault-app does not self-exit, so the console stays up.
-# With explicit verbset arguments no example is deployed unless
-# DEPLOY=<example>:<Mount> asks for one; DEPLOY also overrides the
-# default run's deployment.
+# The default run drives the admin-baseline, logging-verbs, schema-verbs,
+# dispatcher-verbs, operator-provision, and operator-upgrade verbsets in
+# one boot, deploying vault-app as the MyApp domain and upgrade-cascade
+# as the Cascade domain first: the dispatcher-verbs clone-addressing
+# cycle needs the named property-bearing clone (MyApp:core:item1) the
+# vault-app boot driver creates, the operator cycle needs the settled
+# cascade deploy (and neither example self-exits, so the console stays
+# up). With explicit verbset arguments no example is deployed unless
+# DEPLOY asks for one; DEPLOY -- a space-separated list of
+# <example>:<Mount> pairs -- also overrides the default run's
+# deployment.
 #
 # Caveat: a SELFEXIT example -- one whose boot-time driver calls shutdown()
 # when it finishes (e.g. merry-app, chat-app) -- tears the server down
@@ -44,11 +47,12 @@ PORT=8023
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
-    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset"
+    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
     # The dispatcher-verbs clone-addressing cycle drives the named clone
-    # the vault-app boot driver creates; honor an explicit DEPLOY over
-    # this default.
-    DEPLOY=${DEPLOY:-vault-app:MyApp}
+    # the vault-app boot driver creates; the operator cycle drives
+    # `upgrade -p` against the cascade deploy. Honor an explicit DEPLOY
+    # over this default.
+    DEPLOY=${DEPLOY:-"vault-app:MyApp upgrade-cascade:Cascade"}
 fi
 
 if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
@@ -58,23 +62,28 @@ if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
 fi
 
 echo "== clean slate (base boot) =="
-# A single coherent base boot: no leftover example deploy mount may run.
-for mount in Cascade Chat MerryApp MyApp Reload SignalApp WWW; do
+# A single coherent base boot: no leftover example deploy mount may run,
+# and no operator provisioned by a prior run may still be registered
+# (operator-provision.verbset asserts the cold-boot registration flow,
+# so the granted user's directory and the kernel's persisted access list
+# must both go).
+for mount in Cascade Chat MerryApp MyApp Reload SignalApp WWW testop; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap state/drive-verbs-boot.log
+rm -f src/kernel/data/access.data
 rm -rf src/usr/System/log src/usr/Merry/log src/usr/Merry/tmp
 
-if [ -n "${DEPLOY:-}" ]; then
-    ex=${DEPLOY%%:*}
-    mount=${DEPLOY##*:}
+for dep in ${DEPLOY:-}; do
+    ex=${dep%%:*}
+    mount=${dep##*:}
     if [ ! -d "examples/$ex" ]; then
         echo "drive-verbs-smoke.sh: example not found: examples/$ex" >&2
         exit 2
     fi
     echo "== deploy $ex as the $mount domain =="
     cp -R "examples/$ex" "src/usr/$mount"
-fi
+done
 
 # example.dgd ships a placeholder base directory; localize it under state/.
 CONFIG=state/run-example.dgd

@@ -1,0 +1,29 @@
+# Provision the registered operator that operator-upgrade.verbset logs
+# in as. Cold boots register no System users beyond admin: the System
+# user daemon accepts only names on the kernel access list, so the
+# operator is created live from the admin console. `grant testop access`
+# registers the name (and creates /usr/testop); the directory grant
+# scopes upgrade rights to the deployed cascade domain, which is exactly
+# what the upgrade daemon's per-owner write checks test. Runs as admin
+# (no user: directive). Precondition: upgrade-cascade deployed as the
+# Cascade domain (the default drive-verbs-smoke.sh run does both).
+
+# Successful grants are silent; a usage or refusal message is a failure.
+cmd: grant testop access
+absent: Usage:
+absent: Invalid user name
+absent: already has
+absent: Insufficient
+
+cmd: grant testop /usr/Cascade write
+absent: Usage:
+absent: has no file access
+absent: already has
+
+# The admin telnet session is the KERNEL console (/kernel/sys/userd.c
+# routes the name "admin" on the telnet port past the System telnet
+# manager), so the response is the kernel cmd_access's uncapitalized
+# shape -- registered non-admin users get the System console instead.
+cmd: access testop
+expect: testop has access to
+expect: /usr/Cascade
