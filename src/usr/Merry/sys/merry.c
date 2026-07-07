@@ -101,8 +101,9 @@ int max_cascade_depth;
  * toggled by admin_console_ext's `dispatch-trace on|off` verb (routed
  * through ADMIN_CONSOLE_REGISTRY's KERNEL-tier helper) or set directly
  * via set_dispatch_trace (KERNEL-gated). When non-zero, _trace_dispatch
- * appends entry events to MERRY_LOG_FILE alongside the always-logged
- * cycle/cascade events from _log_dispatch. Statedump-persistent.
+ * emits entry events to the general logd stream at DEBUG level; the
+ * always-logged cycle/cascade events from _log_dispatch stay in the
+ * Merry-local audit file. Statedump-persistent.
  */
 int dispatch_trace;
 
@@ -1059,17 +1060,22 @@ void _log_dispatch(string msg) {
 
 /*
  * _trace_dispatch is the optional fine-grain trace surface gated by
- * dispatch_trace. Identical write path to _log_dispatch but elides the
- * file I/O entirely when the flag is unset (the common case). The operator surface
- * threads this into dispatch_set entry; future work may add
- * batch-entry, observer-fire, and cascade-depth-increment trace sites.
+ * dispatch_trace. Trace is general diagnostics, not audit, so it routes
+ * to logd at DEBUG level (debugLog) rather than the Merry-local audit
+ * file -- which also means trace lines survive atomic-mode dispatch via
+ * logd's deferred flush, where a direct write_file would be refused.
+ * Emission is elided entirely when the flag is unset (the common case),
+ * and logd's threshold must admit DEBUG lines for them to reach the
+ * sink. The operator surface threads this into dispatch_set entry;
+ * future work may add batch-entry, observer-fire, and
+ * cascade-depth-increment trace sites.
  */
 private
 void _trace_dispatch(string msg) {
    if (!dispatch_trace) {
       return;
    }
-   _log_dispatch("trace: " + msg);
+   debugLog("MERRY trace: " + msg);
 }
 
 /*
@@ -1521,9 +1527,18 @@ void shuffle(string id) {
    last_update[id] = now;
 }
 
+/*
+ * update_resource: profiler hook for sandbox resource accounting. No
+ * in-tree caller feeds it yet; when one arrives its reports route to the
+ * general logd stream at DEBUG level (threshold-gated, so a high-volume
+ * caller is suppressed under the default INFO threshold), not the
+ * Merry-local audit file.
+ */
 void update_resource(object home, string signal, string mode, string label,
 		     int ticks) {
-   /* profiler hook; body left empty pending a logger story */
+   debugLog("MERRY resource: " + (home ? ::object_name(home) : "nil") +
+	    " " + signal + ":" + mode + " " + label + " ticks=" +
+	    (string) ticks);
 }
 
 mapping *query_mappings() {
