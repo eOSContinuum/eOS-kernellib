@@ -1,0 +1,67 @@
+# Operator coverage for the console `upgrade -p` verb
+# (docs/code-lifecycle.md; docs/runtime-primitives.md section 4): a
+# registered non-admin operator drives the library-upgrade cascade live,
+# the path the upgrade-cascade example's boot driver reaches only
+# programmatically through the System auto library's upgrade() wrapper.
+#
+# Preconditions: upgrade-cascade deployed as the Cascade domain with its
+# boot cycle settled (existing clones on v2, counts 3/5, patch() run
+# once), and operator-provision.verbset run first in the same boot --
+# the default drive-verbs-smoke.sh run arranges all of it. The session
+# logs in as the provisioned operator; the first connect walks the
+# set-a-password flow.
+
+user: testop
+password: drive-verbs
+
+# The upgrade surface is per-owner access-checked: a domain outside the
+# operator's grant is refused at name expansion.
+cmd: upgrade -p /usr/Merry/sys/merry.c
+expect: Access denied
+absent: Successfully upgraded
+
+# Stage the shipped v3 source over the live library. The write grant on
+# /usr/Cascade covers it; a successful cp is silent.
+cmd: cp /usr/Cascade/lib/shape.c.v3 /usr/Cascade/lib/shape.c
+absent: No such file
+absent: Access denied
+absent: Directory
+
+# A source-file write alone changes nothing live: the existing clones
+# still run v2 (the boot driver proved the same for its v2 staging).
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget1")->describe()
+expect: = "shape v2"
+
+# The console upgrade: recompile the library's inheritors and, with -p,
+# call_touch-patch their existing clones through the console patchtool.
+cmd: upgrade -p /usr/Cascade/lib/shape.c
+expect: Successfully upgraded:
+expect: /usr/Cascade/lib/shape\.c
+absent: Access denied
+absent: Errors occured
+
+# The existing clones follow the upgraded library from their next
+# dispatch: new version, new behavior...
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget1")->describe()
+expect: = "shape v3"
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget2")->describe()
+expect: = "shape v3"
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget1")->scale(2)
+expect: = 10
+
+# ...per-clone state intact...
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget1")->query()
+expect: = 3
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget2")->query()
+expect: = 5
+
+# ...and patch() run through the call_touch gate exactly once more (once
+# at the boot-driver upgrade, once now).
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget1")->query_patched()
+expect: = 2
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Cascade:demo:widget2")->query_patched()
+expect: = 2

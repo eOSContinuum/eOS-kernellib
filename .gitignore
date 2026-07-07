@@ -16,6 +16,7 @@ src/usr/MerryApp/
 src/usr/Chat/
 src/usr/WWW/
 src/usr/Reload/
+src/usr/Cascade/
 src/usr/Vault/data/
 src/usr/MyApp/data/
 
@@ -26,3 +27,7 @@ src/usr/Merry/tmp/
 # system.log and the Merry dispatcher's dispatch.log.
 src/usr/System/log/
 src/usr/Merry/log/
+
+# Operator account directory created live by the console `grant testop
+# access` in scripts/verbsets/operator-provision.verbset.
+src/usr/testop/

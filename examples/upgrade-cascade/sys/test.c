@@ -89,6 +89,11 @@ static void setup_and_run()
 		 "\"shape v1\", scale(2) == 4)");
 	return;
     }
+    /* Index logical names: the console cycle
+     * (scripts/verbsets/operator-upgrade.verbset) addresses these exact
+     * clones by name to assert its own upgrade landed on them. */
+    clone1->set_object_name("Cascade:demo:widget1");
+    clone2->set_object_name("Cascade:demo:widget2");
     log_line("Cascade:test: CLONE SETUP OK");
 
     /* Step 2: stage the v2 library source. The file write alone must not

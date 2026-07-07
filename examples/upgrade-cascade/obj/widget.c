@@ -16,9 +16,16 @@
  *
  * Clonable objects live under obj/ (the kernel's clone_object only
  * accepts paths containing /obj/).
+ *
+ * The named layer gives each clone an Index logical name
+ * (Cascade:demo:widget1/2, registered by sys/test): clones have no
+ * stable path-form address, and the console cycle in
+ * scripts/verbsets/operator-upgrade.verbset must reach these exact
+ * clones to assert the cascade landed on them.
  */
 
 inherit "/usr/Cascade/lib/shape";
+inherit "/lib/util/named";
 
 int count;		/* per-clone state; must survive the upgrade */
 int patched;		/* times patch() ran; 1 after the upgrade */
