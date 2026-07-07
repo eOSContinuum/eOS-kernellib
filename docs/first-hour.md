@@ -19,7 +19,7 @@ The boot log prints:
 ** Initialization complete.
 ```
 
-followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work: `DTD:: Registered ...` registrations, several `Warning:: Schema node ... not found!` lines (one per bundled core-schema file), and a `Schema:Daemon: cross-checked ...` summary. The warnings are part of a normal cold boot, not breakage. The driver compiled the kernel and platform domains and is now listening. Leave it running; open a second terminal for everything below.
+followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work: `DTD:: Registered ...` registrations and one `Schema:Daemon: cross-checked ...` line per bundled core-schema file. A `Warning:: Schema node ... not found!` or `import_state FAILED` line here is NOT normal -- it means a schema file names an element the registry cannot resolve, or its import errored. The driver compiled the kernel and platform domains and is now listening. Leave it running; open a second terminal for everything below.
 
 ## 2. Connect and claim the console
 

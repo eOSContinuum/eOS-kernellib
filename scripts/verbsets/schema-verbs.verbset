@@ -1,0 +1,26 @@
+# Schema cross-check -- regression for the boot-time load_core_schemas
+# import (src/usr/Schema/sys/schema_daemon.c) over the stateimpex
+# context-aware element resolution. Asserts the cold boot cross-checked
+# every core schema file with no unresolved-node warnings, and that the
+# import genuinely applied by probing the two definitions the XML files
+# carry beyond the code-defined nodes: the Core:Entries newitem spec and
+# the Ur:Hierarchy parent-attribute comment. If either probe returns
+# nil, the cross-check import silently stopped applying.
+#
+# Runs in drive-verbs-smoke.sh's DEFAULT set; needs only a base boot
+# (schema nodes and their Index names exist before any deploy):
+#   scripts/drive-verbs-smoke.sh scripts/verbsets/schema-verbs.verbset
+
+cmd: log 40
+expect: cross-checked Core:Entries
+expect: cross-checked Ur:Children
+absent: not found!
+absent: import_state FAILED
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Schema:Core:Entries")->query_newitem()
+expect: set_property
+absent: \$\d+ = nil
+
+cmd: code "/usr/Index/sys/index_daemon"->query_object("Schema:Ur:Hierarchy")->query_attribute_comment("parent")
+expect: parent object
+absent: \$\d+ = nil
