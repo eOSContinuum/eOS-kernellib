@@ -161,7 +161,7 @@ Three public read-only LFUNs -- `query_observers(ob, path, timing)` (the local s
 
 ### `set_dispatch_trace(int flag)` and `query_dispatch_trace()`
 
-Toggle the optional verbose dispatcher trace logging. `set_dispatch_trace` is `KERNEL()`-gated; `query_dispatch_trace` is public read-only. Default is `0` (off). When `1`, the `_trace_dispatch` private helper writes per-entry trace events to `/usr/Merry/log/dispatch.log` alongside the always-on cycle and cascade events from `_log_dispatch`. The flag is statedump-persistent.
+Toggle the optional verbose dispatcher trace logging. `set_dispatch_trace` is `KERNEL()`-gated; `query_dispatch_trace` is public read-only. Default is `0` (off). When `1`, the `_trace_dispatch` private helper emits per-entry trace events to the general `logd` stream at DEBUG level (`docs/operations.md` Logging and diagnostics); the always-on cycle and cascade events from `_log_dispatch` stay in the Merry-local audit file, `/usr/Merry/log/dispatch.log`. Trace lines reach the sink only when `logd`'s threshold admits DEBUG (default is INFO, so pair the flag with `log-level debug`). The flag is statedump-persistent.
 
 Current trace coverage is the `dispatch_set` entry site only. Additional trace sites (batch-entry/exit, observer-fire, cascade-depth-increment, cycle-chain mutation, observer-cache hit/miss) are future-work. The flag-gating contract is established; site additions are mechanical.
 

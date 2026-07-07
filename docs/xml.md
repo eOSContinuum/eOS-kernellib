@@ -69,7 +69,7 @@ What this layer deliberately does not provide:
 
 - **Sugar-tag interpretation** — see above.
 - **Typed-literal forms in `XML_BOOL`** — the serialization is a simple `true` / `false`.
-- **Logging** — the `DEBUG` / `Debug` / `XDebug` diagnostic macros are no-ops; the `dump_value` references in their args are dead code. The logging facility (`logd`, `docs/operations.md`) has since landed; wiring these macros to it is unstarted.
+- **A logging surface of its own** — the `DEBUG` / `Debug` / `XDebug` diagnostic macros forward to the platform's `logd` facility (`docs/operations.md`) at DEBUG level, threshold-guarded so their argument expressions are not built under the default INFO threshold; `log-level debug` makes the parse trace visible.
 
 The `SID` and `DTD` daemon constants are inline-defined (`SID = /usr/Schema/sys/schema_daemon`, `DTD = /usr/Schema/sys/dtd_daemon`).
 
@@ -91,9 +91,9 @@ Two boundaries retain `snake_case`: the schema_node query surface (`query_attrib
 
 Public type constants: `XML_ELEMENT`, `COL_ELEMENT`, `XML_SAMREF`, `COL_SAMREF`, `XML_PCDATA`, `COL_PCDATA`, `XML_MIXED`, `XML_BOOL`, plus the `XML` constant pointing at `/usr/XML/sys/xml_daemon`. Included by callers that need to reference XML types by name.
 
-### `src/usr/XML/include/XMLIn.h` (302 lines)
+### `src/usr/XML/include/XMLIn.h` (300 lines)
 
-Lexer state variables and macros for `lib/xmlparse.c`. `DEBUG(...)` macro calls expand to no-ops in the current logging story; the `dump_value` references inside those calls are dead code (never compiled). The logging facility (`logd`, `docs/operations.md`) has since landed; wiring `DEBUG` and `dump_value` to it is unstarted.
+Lexer state variables and macros for `lib/xmlparse.c`. `DEBUG(...)` macro calls forward to the `logd` facility at DEBUG level (macros defined in `xmlparse.c`, guarded so the `dumpValue` argument expressions are not built when DEBUG lines would be dropped).
 
 ### `src/usr/XML/include/XMLOut.h` (86 lines)
 
@@ -111,7 +111,7 @@ XMD tree construction and query helpers. Surface: `xmdElts`, `xmdText`, `xmdElem
 
 ASCII XML generation. Walks an XMD tree and appends serialized output via the caller-supplied `append(string)` sink. Surface: `generate_xml(mixed data, object res, varargs string indent)`, `generate_pcdata`, plus the private helpers `xml_attr` and `xml_head`. `RIGHT_MARGIN = 70` controls line wrap.
 
-### `lib/xmlparse.c` (674 lines)
+### `lib/xmlparse.c` (696 lines)
 
 ASCII XML parser. All-LPC lexer + recursive-descent parser. Returns an XMD tree or raises `LexErr` on invalid input. Surface: `parse_xml(mixed str, varargs string file, int peekflag, int looseflag)` is the entry point, wrapped publicly by `xml_daemon`'s `parse(string str)`; internally `Scan` / `ScanMerry` and the `p_virgin` / `p_oneof` / `p_ref` / `p_tag` / `p_attr` parse-state functions handle the lex/parse states. `convert(mixed content, varargs string ltype, int strip)` is a private helper that folds parsed content into its final XMD shape.
 
