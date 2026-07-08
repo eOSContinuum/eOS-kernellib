@@ -12,6 +12,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [getting-started.md](getting-started.md) — first-time install of DGD and eOS-kernellib; run the bundled example configuration. Start here if the platform is not yet booted on your machine.
 - [first-hour.md](first-hour.md) — hands-on tutorial from a fresh boot to the persistence loop: create a domain, compile and clone live objects, watch an observer fire, and verify everything survives a process restart. The natural next step after `getting-started.md`.
+- [first-application.md](first-application.md) -- the second tutorial: author your own application (a key-value service) end to end -- an initd and a daemon you write, verbs you drive, an atomic rollback, a hot-fix without a restart, and its store surviving a restart. Follows `first-hour.md`, before the reference patterns in `application-authoring.md`.
 - [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) — the translation bridge for developers arriving from an application language plus managed services: what replaces the database, the queue, the deploy pipeline, and the identity provider, plus the habits to unlearn.
 - [building.md](building.md) — DGD build details and platform-specific notes. Read this if `getting-started.md` does not fit your platform or you need to customize the build.
 
@@ -73,13 +74,13 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 Common goals and the docs that serve them.
 
-- **Run the platform and see it work** — [getting-started.md](getting-started.md), then `DGD_BIN=... ../scripts/run-example.sh merry-app` to watch the assertion sentinels pass, then [first-hour.md](first-hour.md), then `../examples/http-app/README.md`.
+- **Run the platform and see it work** — [getting-started.md](getting-started.md), then `DGD_BIN=... ../scripts/run-example.sh merry-app` to watch the assertion sentinels pass, then [first-hour.md](first-hour.md) and [first-application.md](first-application.md), then `../examples/http-app/README.md`.
 - **Evaluate whether the platform fits** — [runtime-primitives.md](runtime-primitives.md) for what is proven today (`../scripts/run-example.sh` runs the proofs), [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [operations.md](operations.md) Limits and capacity for the envelope, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces.
 - **Arriving from a cloud-services stack** — [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
 - **Understand the platform's architectural commitments** — [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md), then [execution-model.md](execution-model.md) for the concurrency and latency model.
 - **Audit the platform's authority model** — [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
 - **Write an HTTP application** — [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
-- **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [application-authoring.md](application-authoring.md).
+- **Write a non-HTTP application** — [lpc-essentials.md](lpc-essentials.md), [first-application.md](first-application.md) for a worked build from an empty domain, then [application-authoring.md](application-authoring.md) for the patterns at reference depth.
 - **Decide where a new piece of behavior lives** — [where-code-belongs.md](where-code-belongs.md), then [application-authoring.md](application-authoring.md) for the mechanics of the chosen shape.
 - **React to property changes** -- [lpc-essentials.md](lpc-essentials.md), [signal-applications.md](signal-applications.md), `../examples/signal-app/`, then [dispatcher.md](dispatcher.md) for dispatch semantics and [observers.md](observers.md) for the observer lifecycle contract.
 - **Write a multi-user chat application** — [lpc-essentials.md](lpc-essentials.md), [chat-applications.md](chat-applications.md), `../examples/chat-app/`.
