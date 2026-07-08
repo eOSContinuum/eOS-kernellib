@@ -205,6 +205,7 @@ The marker went 0 → 1 on this side of the restart: the compiled observer scrip
 
 ## Where to next
 
+- **[first-application.md](first-application.md)** -- the next tutorial: author your own application (a key-value service) from an empty domain to running verbs, an atomic failure that rolls back cleanly, a hot-fix without a restart, and its data surviving a restart.
 - **[persistence.md](persistence.md)** — why step 8 works, what exactly survives, and the boundaries (connections, external resources, time).
 - **[coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md)** — what this replaces in a service-stack mental model.
 - **[lpc-essentials.md](lpc-essentials.md)** — the language, now that you've compiled some.
