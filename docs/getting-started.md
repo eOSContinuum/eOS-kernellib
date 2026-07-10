@@ -22,7 +22,7 @@ cd src
 make install
 ```
 
-The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the released driver as-is, and the Tested-against line above names the release it is validated on — building upstream `master` usually works but is not what the doc set's transcripts were captured against.
+The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the released driver as-is, and the Tested-against line above names the release it is validated on. Building upstream `master` usually works, but it is not what the doc set's transcripts were captured against.
 
 ## Fetch eOS-kernellib
 
@@ -53,8 +53,8 @@ Run the driver against the configuration:
 
 The driver compiles the kernel objects and binds two ports:
 
-- `8023` — telnet port for administrative access
-- `8080` — HTTP/1 port
+- `8023`: telnet port for administrative access
+- `8080`: HTTP/1 port
 
 ## Connect
 
@@ -64,12 +64,12 @@ Connect a line-mode TCP client to the administrative port:
 telnet localhost 8023    # or: nc localhost 8023
 ```
 
-The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no application mounted on top there is nothing to answer them: the kernel's HTTP server clones an application server at `/usr/WWW/obj/server` per connection, and when that path is absent the connection is dropped without a response (a client like `curl` waits until its own timeout). Mounting an application there — `examples/http-app/README.md` is the walkthrough — is what makes 8080 respond.
+The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no application mounted on top there is nothing to answer them: the kernel's HTTP server clones an application server at `/usr/WWW/obj/server` per connection, and when that path is absent the connection is dropped without a response (a client like `curl` waits until its own timeout). Mounting an application there (`examples/http-app/README.md` is the walkthrough) is what makes 8080 respond.
 
 ## Where to next
 
-- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels — the fastest way to see the runtime primitives pass on your machine. [`scripts/README.md`](../scripts/README.md) documents the harness.
-- [`docs/first-hour.md`](first-hour.md) is the natural next step: a hands-on hour from this booted platform to the persistence loop — your own objects, state, and reactions surviving a process restart.
+- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels. This is the fastest way to see the runtime primitives pass on your machine. [`scripts/README.md`](../scripts/README.md) documents the harness.
+- [`docs/first-hour.md`](first-hour.md) is the natural next step: a hands-on hour from this booted platform to the persistence loop (your own objects, state, and reactions surviving a process restart).
 - [`docs/coming-from-contemporary-infrastructure.md`](coming-from-contemporary-infrastructure.md) maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
 - [`examples/http-app/README.md`](../examples/http-app/README.md) and [`docs/http-applications.md`](http-applications.md) cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
 - [`docs/admin-console.md`](admin-console.md) covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.

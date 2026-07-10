@@ -6,7 +6,7 @@ Definitions for terms used inline across the eOS-kernellib doc set. Each entry n
 
 ## atomic / atomic operation / atomic context
 
-A function or call envelope whose state mutations either all commit together (on normal return) or all roll back together (on error). DGD's host runtime enforces atomicity at the function-call boundary; an `atomic`-modifier function or a `call_limited` envelope establishes an atomic context. Load-bearing in [runtime-primitives.md](runtime-primitives.md) §1 (atomicity primitive) and [lpc-essentials.md](lpc-essentials.md) Type modifiers.
+A function or call envelope whose state mutations either all commit together (on normal return) or all roll back together (on error). DGD's host runtime enforces atomicity at the function-call boundary. An `atomic`-modifier function or a `call_limited` envelope establishes an atomic context. Load-bearing in [runtime-primitives.md](runtime-primitives.md) §1 (atomicity primitive) and [lpc-essentials.md](lpc-essentials.md) Type modifiers.
 
 ## auto-inheritance
 
@@ -14,7 +14,7 @@ The implicit `inherit` relationship every compiled LPC source carries against th
 
 ## call_out
 
-The DGD kfun for scheduling a delayed callback: `call_out(string fn, mixed delay, mixed... args)`. Returns an integer handle the caller can pass to `remove_call_out` for cancellation. The callback fires as an ordinary, non-atomic call after the delay elapses -- it gets function-body rollback only if the called function is itself declared `atomic` -- and it does not extend the caller's atomic context. Load-bearing in [lpc-essentials.md](lpc-essentials.md) call_out and [runtime-primitives.md](runtime-primitives.md) §6 (asynchronous events).
+The DGD kfun for scheduling a delayed callback: `call_out(string fn, mixed delay, mixed... args)`. Returns an integer handle the caller can pass to `remove_call_out` for cancellation. The callback fires as an ordinary, non-atomic call after the delay elapses (it gets function-body rollback only if the called function is itself declared `atomic`), and it does not extend the caller's atomic context. Load-bearing in [lpc-essentials.md](lpc-essentials.md) call_out and [runtime-primitives.md](runtime-primitives.md) §6 (asynchronous events).
 
 ## call_touch
 
@@ -22,11 +22,11 @@ The kfun that triggers an `_F_touch` upgrade dispatch on an object whose master 
 
 ## capability tier
 
-One of the five layered access levels (A, B, C, D, E) that bound what loaded code can call. Tier A is the host driver and extensions; tier B is the kernel layer; tier C is system daemons; tier D is privileged user domains; tier E is application code. The `previous_program()` call-chain mechanism is the runtime enforcement point. Load-bearing in [architecture.md](architecture.md) Capability tiers and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
+One of the five layered access levels (A, B, C, D, E) that bound what loaded code can call. Tier A is the host driver and extensions. Tier B is the kernel layer. Tier C is system daemons. Tier D is privileged user domains. Tier E is application code. The `previous_program()` call-chain mechanism is the runtime enforcement point. Load-bearing in [architecture.md](architecture.md) Capability tiers and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
 
 ## capability library
 
-The kernel layer's consolidated authority mechanism: a store daemon (`/kernel/sys/capabilityd`) holding namespaced approved-sets, plus an inheritable check face (`/kernel/lib/capability`), behind which the gating surfaces share one choke-point: five consult the store via `is_allowed` / `require_member`, and the persistence dump-and-exit gate uses the check face's fixed-principal `require()` with no stored set. The platform's capability model is tier and owner-identity mediation — capability-*shaped* (privileged operations reachable only through mediating `/kernel/` objects) but enforced by **ambient authority** (the caller's tier, owning domain, and `previous_program()` chain), not strict no-ambient-authority object-capability, which LPC cannot reach without host-driver changes. The term "capability" across the doc set carries this meaning unless explicitly qualified. Load-bearing in [capability.md](capability.md) and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
+The kernel layer's consolidated authority mechanism: a store daemon (`/kernel/sys/capabilityd`) holding namespaced approved-sets, plus an inheritable check face (`/kernel/lib/capability`), behind which the gating surfaces share one choke-point: five consult the store via `is_allowed` / `require_member`, and the persistence dump-and-exit gate uses the check face's fixed-principal `require()` with no stored set. The platform's capability model is tier and owner-identity mediation: capability-*shaped* (privileged operations reachable only through mediating `/kernel/` objects) but enforced by **ambient authority** (the caller's tier, owning domain, and `previous_program()` chain), not strict no-ambient-authority object-capability, which LPC cannot reach without host-driver changes. The term "capability" across the doc set carries this meaning unless explicitly qualified. Load-bearing in [capability.md](capability.md) and [runtime-primitives.md](runtime-primitives.md) §2 (capability separation primitive).
 
 ## clone
 
@@ -34,19 +34,19 @@ An instance of a compiled program created via `clone_object(master)`. The clone 
 
 ## clone addressing
 
-The console's resolution of Index logical names in object-taking verb arguments: colon-shaped arguments resolve path-first, then through the logical-name registry, giving clones a boot-stable operator-facing address (their `path#index` form changes across boots, and the System auto layer's `find_object` refuses it). Carried by masks in the console clonable and the observer-verb extension's shared resolver; the console library stays Index-unaware. Load-bearing in [admin-console.md](admin-console.md) target resolution.
+The console's resolution of Index logical names in object-taking verb arguments: colon-shaped arguments resolve path-first, then through the logical-name registry, giving clones a boot-stable operator-facing address (their `path#index` form changes across boots, and the System auto layer's `find_object` refuses it). Carried by masks in the console clonable and the observer-verb extension's shared resolver. The console library stays Index-unaware. Load-bearing in [admin-console.md](admin-console.md) target resolution.
 
 ## coercion codec
 
-The `/lib/util/coercion` round-trip codec (`encodeValue` / `decodeValue`) for simple LPC values, over the literal grammar `dumpValue` prints: ints, full-precision floats, escaped strings, `<logical-name>` object references, nil, and nested arrays/mappings. Aliased or cyclic structures and LWOs are refused loudly -- shared-identity reconstruction is the Wave 2 generalized serializer's concern. Consumed by the property layer's ascii-property accessors, which give bare property-bearing objects the `Core:Entries` marshaling path with no per-app schema. Load-bearing in [schema.md](schema.md) Property-table marshaling and [vault-applications.md](vault-applications.md) the participating-domain contract.
+The `/lib/util/coercion` round-trip codec (`encodeValue` / `decodeValue`) for simple LPC values, over the literal grammar `dumpValue` prints: ints, full-precision floats, escaped strings, `<logical-name>` object references, nil, and nested arrays/mappings. Aliased or cyclic structures and LWOs are refused loudly: shared-identity reconstruction is the Wave 2 generalized serializer's concern. Consumed by the property layer's ascii-property accessors, which give bare property-bearing objects the `Core:Entries` marshaling path with no per-app schema. Load-bearing in [schema.md](schema.md) Property-table marshaling and [vault-applications.md](vault-applications.md) the participating-domain contract.
 
 ## compile_object
 
-The DGD kfun that compiles an LPC source file and registers the result as a program in the runtime: `compile_object(string path)` returns the master object. Calling it against a path that already has a master replaces the program in place — this is the hot-reload mechanism. Load-bearing in [code-lifecycle.md](code-lifecycle.md) Compile and [runtime-primitives.md](runtime-primitives.md) §4 (hot reload primitive).
+The DGD kfun that compiles an LPC source file and registers the result as a program in the runtime: `compile_object(string path)` returns the master object. Calling it against a path that already has a master replaces the program in place. This is the hot-reload mechanism. Load-bearing in [code-lifecycle.md](code-lifecycle.md) Compile and [runtime-primitives.md](runtime-primitives.md) §4 (hot reload primitive).
 
 ## dataspace
 
-The set of variables owned by a specific object instance (master or clone or LWO). Each object has its own dataspace; functions called in that object's context read and write the object's dataspace. Atomic rollback restores the dataspace to its pre-call values on error. Load-bearing in [persistence.md](persistence.md) What persists.
+The set of variables owned by a specific object instance (master or clone or LWO). Each object has its own dataspace. Functions called in that object's context read and write the object's dataspace. Atomic rollback restores the dataspace to its pre-call values on error. Load-bearing in [persistence.md](persistence.md) What persists.
 
 ## dump_file
 
@@ -62,7 +62,7 @@ The system daemon at `/usr/System/sys/errord` registered via `set_error_manager(
 
 ## _F_create
 
-The hand-written `nomask` function in the kernel auto (`src/kernel/lib/auto.c`) that every compiled program inherits via auto-inheritance and that the host driver invokes on an object's first function call, before the object's own `create()` runs. It sets the object's creator and owner (registering the clone with the driver's clone manager if the object is a clone) and then calls `create()` -- the same dispatch for a master or a clone. Load-bearing in [code-lifecycle.md](code-lifecycle.md) _F_create dispatch.
+The hand-written `nomask` function in the kernel auto (`src/kernel/lib/auto.c`) that every compiled program inherits via auto-inheritance and that the host driver invokes on an object's first function call, before the object's own `create()` runs. It sets the object's creator and owner (registering the clone with the driver's clone manager if the object is a clone) and then calls `create()`, the same dispatch for a master or a clone. Load-bearing in [code-lifecycle.md](code-lifecycle.md) _F_create dispatch.
 
 ## hot boot / hotboot
 
@@ -74,7 +74,7 @@ A domain's initialization daemon. The System initd at `/usr/System/initd.c` orch
 
 ## LWO (lightweight object)
 
-An object created via `new_object` rather than `clone_object`, living inside a holder's dataspace rather than in the object table. Cannot be destructed; collected when the last reference is dropped. References alias within one dataspace; a reference exported to another object's dataspace becomes that dataspace's own copy, so cross-object handoff behaves as pass-by-value. Consolidated treatment in [code-lifecycle.md](code-lifecycle.md) LWO instantiation.
+An object created via `new_object` rather than `clone_object`, living inside a holder's dataspace rather than in the object table. Cannot be destructed. Collected when the last reference is dropped. References alias within one dataspace. A reference exported to another object's dataspace becomes that dataspace's own copy, so cross-object handoff behaves as pass-by-value. Consolidated treatment in [code-lifecycle.md](code-lifecycle.md) LWO instantiation.
 
 ## master
 
@@ -82,7 +82,7 @@ The compiled program object at a given path. A master is created by `compile_obj
 
 ## mount point
 
-A registered application-server object at a path the kernel-layer's HTTP machinery looks up via `status(O_INDEX)`. The convention is `/usr/WWW/obj/server` for the HTTP/1 mount point; the server object receives parsed requests and returns responses. Load-bearing in [http-applications.md](http-applications.md) Application server mount.
+A registered application-server object at a path the kernel-layer's HTTP machinery looks up via `status(O_INDEX)`. The convention is `/usr/WWW/obj/server` for the HTTP/1 mount point. The server object receives parsed requests and returns responses. Load-bearing in [http-applications.md](http-applications.md) Application server mount.
 
 ## objectd
 
@@ -90,15 +90,15 @@ The system daemon that intercepts the object-manager hooks the host driver dispa
 
 ## observer
 
-A compiled Merry script registered at a `(path, timing)` slot on a property-bearing host, fired by the dispatcher when that property is written (pre / main / post timings). Registrations live in the host's own `merry:on:<path>:<timing>` property as an ordered list -- registration order is firing order; the Merry daemon holds the gates, the lookup walk, and a cache, never the registrations themselves. Load-bearing in [dispatcher.md](dispatcher.md) (firing semantics) and [observers.md](observers.md) (the storage-and-lifecycle contract).
+A compiled Merry script registered at a `(path, timing)` slot on a property-bearing host, fired by the dispatcher when that property is written (pre / main / post timings). Registrations live in the host's own `merry:on:<path>:<timing>` property as an ordered list: registration order is firing order. The Merry daemon holds the gates, the lookup walk, and a cache, never the registrations themselves. Load-bearing in [dispatcher.md](dispatcher.md) (firing semantics) and [observers.md](observers.md) (the storage-and-lifecycle contract).
 
 ## orthogonal persistence
 
-The architectural property that an object's lifetime is decoupled from the lifetime of the program that created it. The same code operates on transient values and persistent values; the persistence machinery is the runtime's concern, not the application's. Atkinson and Morrison's 1995 paper is the canonical academic statement; the KeyKOS and EROS literature extends the model with capability-based access control. See [references.md](references.md) for citation details. Load-bearing in [persistence.md](persistence.md) Orthogonal persistence and [runtime-primitives.md](runtime-primitives.md) §3 (persistent state primitive).
+The architectural property that an object's lifetime is decoupled from the lifetime of the program that created it. The same code operates on transient values and persistent values. The persistence machinery is the runtime's concern, not the application's. Atkinson and Morrison's 1995 paper is the canonical academic statement. The KeyKOS and EROS literature extends the model with capability-based access control. See [references.md](references.md) for citation details. Load-bearing in [persistence.md](persistence.md) Orthogonal persistence and [runtime-primitives.md](runtime-primitives.md) §3 (persistent state primitive).
 
 ## principal
 
-The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it); the `previous_program()` chain is how a callee determines the caller's principal. In the capability library a principal is the opaque string key a grant is recorded under — a domain, a caller-program path, or an object name — supplied by the gating surface, never inferred by the store. Load-bearing in [architecture.md](architecture.md) Capability tiers and [capability.md](capability.md).
+The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it). The `previous_program()` chain is how a callee determines the caller's principal. In the capability library a principal is the opaque string key a grant is recorded under (a domain, a caller-program path, or an object name), supplied by the gating surface, never inferred by the store. Load-bearing in [architecture.md](architecture.md) Capability tiers and [capability.md](capability.md).
 
 ## restore_object
 
@@ -106,7 +106,7 @@ The DGD kfun that reads a single-object save file (written by `save_object`) and
 
 ## rollback
 
-The discarding of state mutations performed inside an atomic operation that errored. The host runtime restores the dataspaces of every object touched in the failed envelope to their pre-call values; the runtime guarantees atomic-or-nothing semantics. Load-bearing in [runtime-primitives.md](runtime-primitives.md) §1 (atomicity).
+The discarding of state mutations performed inside an atomic operation that errored. The host runtime restores the dataspaces of every object touched in the failed envelope to their pre-call values. The runtime guarantees atomic-or-nothing semantics. Load-bearing in [runtime-primitives.md](runtime-primitives.md) §1 (atomicity).
 
 ## save_object
 
@@ -118,7 +118,7 @@ A statedump file (the term and `statedump` are used interchangeably across the d
 
 ## statedump
 
-The on-disk image of the entire in-memory object graph written by `dump_state` to the `dump_file` path. Statedumps occur between timeslices, never inside an atomic operation; the runtime guarantees that the snapshot represents a consistent state-graph commit boundary. Load-bearing in [persistence.md](persistence.md) The statedump cycle.
+The on-disk image of the entire in-memory object graph written by `dump_state` to the `dump_file` path. Statedumps occur between timeslices, never inside an atomic operation. The runtime guarantees that the snapshot represents a consistent state-graph commit boundary. Load-bearing in [persistence.md](persistence.md) The statedump cycle.
 
 ## tier-A / tier-B / tier-C / tier-D / tier-E
 
@@ -126,19 +126,19 @@ The five capability layers. Tier A: host driver and dlopen-loaded extensions. Ti
 
 ## timeslice
 
-The execution-time unit DGD's scheduler uses between atomic operations. Statedumps fire between timeslices (never inside an atomic operation); long-running atomic envelopes are charged ticks against the timeslice budget and may be terminated if they exceed `tick_max`. Load-bearing in [operations.md](operations.md) Resource limits.
+The execution-time unit DGD's scheduler uses between atomic operations. Statedumps fire between timeslices (never inside an atomic operation). Long-running atomic envelopes are charged ticks against the timeslice budget and may be terminated if they exceed `tick_max`. Load-bearing in [operations.md](operations.md) Resource limits.
 
 ## ur-parent / ur-child / ur-hierarchy
 
-The data-inheritance cluster, distinct from LPC's code inheritance (`inherit`). An object's **ur-parent** is its data ancestor: a clone designates another object as its ur via `set_ur_object` (the Merry `Spawn` merryfun stamps the relationship at clone time), forming the **ur-hierarchy**. Lookups that honor the hierarchy — Merry script resolution (`find_merry`) and the dispatcher's observer-ancestry walk — search the object first and then walk `query_parent()` up the chain, so behavior bound at an ancestor serves every descendant (one observer on a base room reacts for the whole cohort; see the chat example's ancestry phase). Plain property reads do not walk the chain. The cluster lives in `/lib/util/ur`. Load-bearing in [merry-applications.md](merry-applications.md) the ancestry walk and [dispatcher.md](dispatcher.md).
+The data-inheritance cluster, distinct from LPC's code inheritance (`inherit`). An object's **ur-parent** is its data ancestor: a clone designates another object as its ur via `set_ur_object` (the Merry `Spawn` merryfun stamps the relationship at clone time), forming the **ur-hierarchy**. Lookups that honor the hierarchy, meaning Merry script resolution (`find_merry`) and the dispatcher's observer-ancestry walk, search the object first and then walk `query_parent()` up the chain, so behavior bound at an ancestor serves every descendant (one observer on a base room reacts for the whole cohort. See the chat example's ancestry phase). Plain property reads do not walk the chain. The cluster lives in `/lib/util/ur`. Load-bearing in [merry-applications.md](merry-applications.md) the ancestry walk and [dispatcher.md](dispatcher.md).
 
 ## userd
 
-The System daemon mediating incoming connections per binding. Each `.dgd`-declared port has a userd-attached connection manager; a new connection drives `select(str)` on the userd, which clones a per-connection user object. Load-bearing in [architecture.md](architecture.md) Tier-C daemons.
+The System daemon mediating incoming connections per binding. Each `.dgd`-declared port has a userd-attached connection manager. A new connection drives `select(str)` on the userd, which clones a per-connection user object. Load-bearing in [architecture.md](architecture.md) Tier-C daemons.
 
 ## wiztool
 
-The interactive wizard-tier shell that ships with cloud-server's upstream. eOS-kernellib's analogous interactive surface is the admin_console (the term "harness-shell" is the eOS-DeepContext graph's vocabulary refresh; either name refers to the same kind of tier-C operator surface). Load-bearing in [admin-console.md](admin-console.md).
+The interactive wizard-tier shell that ships with cloud-server's upstream. eOS-kernellib's analogous interactive surface is the admin_console (the term "harness-shell" is the eOS-DeepContext graph's vocabulary refresh, and either name refers to the same kind of tier-C operator surface). Load-bearing in [admin-console.md](admin-console.md).
 
 ## Vocabulary bridges
 
@@ -148,7 +148,7 @@ Readers arrive from two adjacent vocabularies: the SkotOS/kernellib lineage this
 
 | Lineage term | Platform term | Note |
 |---|---|---|
-| Signal phases `pre` / `prime` / `post` | Dispatcher timings `pre` / `main` / `post` | `prime` corresponds to `main`; the veto/mutate/audit roles carry over ([dispatcher.md](dispatcher.md)). SkotOS also ran a fourth `desc` phase (description rendering) between prime and post -- presentation-tier, no dispatcher counterpart |
+| Signal phases `pre` / `prime` / `post` | Dispatcher timings `pre` / `main` / `post` | `prime` corresponds to `main`. The veto/mutate/audit roles carry over ([dispatcher.md](dispatcher.md)). SkotOS also ran a fourth `desc` phase (description rendering) between prime and post: presentation-tier, no dispatcher counterpart |
 | `patch()` | `_F_touch()` | Same platform dispatch, different hook name ([code-lifecycle.md](code-lifecycle.md) Terminology note) |
 | Wiztool | admin_console | See the `wiztool` entry above |
 | Meriadoc / Merry (SkotOS subsystem) | The Merry subsystem (`src/usr/Merry/`) | The shipped implementation of the same decoration-and-compile pattern ([runtime-primitives.md](runtime-primitives.md) §5) |
@@ -160,12 +160,12 @@ Readers arrive from two adjacent vocabularies: the SkotOS/kernellib lineage this
 | substrate | runtime platform |
 | harness-shell | admin_console |
 | atomic envelope | atomic context (see `atomic` above) |
-| persistence image | the in-memory image; statedump / snapshot capture it |
-| code-as-state | hot reload semantics — code becomes live by state mutation, no deploy step ([code-lifecycle.md](code-lifecycle.md)) |
+| persistence image | the in-memory image: statedump / snapshot capture it |
+| code-as-state | hot reload semantics: code becomes live by state mutation, no deploy step ([code-lifecycle.md](code-lifecycle.md)) |
 | data inheritance | the ur-parent chain (see `ur-parent` above) |
 
 ## Where to next
 
-- [references.md](references.md) — citations for the orthogonal-persistence literature, DGD-list discussions, and upstream documentation referenced inline across the doc set.
-- [architecture.md](architecture.md) — the structural reference for capability tiers, daemons, boot sequence, and host-driver extensions.
-- [runtime-primitives.md](runtime-primitives.md) — the eight runtime primitives the platform provides, each with foundation, demonstration status, supporting extensions, and open work.
+- [references.md](references.md): citations for the orthogonal-persistence literature, DGD-list discussions, and upstream documentation referenced inline across the doc set.
+- [architecture.md](architecture.md): the structural reference for capability tiers, daemons, boot sequence, and host-driver extensions.
+- [runtime-primitives.md](runtime-primitives.md): the eight runtime primitives the platform provides, each with foundation, demonstration status, supporting extensions, and open work.

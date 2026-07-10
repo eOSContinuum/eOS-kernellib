@@ -4,14 +4,14 @@ The XML transport layer. XML parses ASCII XML to an internal XMD tree, generates
 
 XML is one of five subsystems in the cohesive Vault layout (Vault / Marshal / Schema / XML / Index). It is the format-implementation layer: where Schema defines what elements exist (format-neutral), XML defines how to wire-encode them. Future formats (CBOR, Gordian Envelope) would sit alongside as sibling format implementations, each registering its types with `dtd_daemon`.
 
-**Audience**: a kernel or application author reading or extending the XML transport beneath the Vault pipeline; most application authors touch it only through [vault-applications.md](vault-applications.md).
+**Audience**: a kernel or application author reading or extending the XML transport beneath the Vault pipeline. Most application authors touch it only through [vault-applications.md](vault-applications.md).
 
 ## What this subsystem provides
 
-- **XML parser** — converts ASCII XML to XMD, the internal binary form. All-LPC lexer; slow but flexible, and inheritable so callers can parse inline.
-- **XML generator** — emits ASCII XML from XMD, writing to a caller-supplied StringBuffer-shape sink.
-- **XMD helpers** — construct, query, and reshape XMD trees built from the LWO data wrappers in `data/`.
-- **Type registration** — at create time, `xml_daemon` registers `xml_element`, `xml_pcdata`, `xml_samref`, and `xml_bool` with `dtd_daemon`. Subsequent typed conversions for these types route through xml_daemon's handler methods.
+- **XML parser**: converts ASCII XML to XMD, the internal binary form. An all-LPC lexer, slow but flexible, and inheritable so callers can parse inline.
+- **XML generator**: emits ASCII XML from XMD, writing to a caller-supplied StringBuffer-shape sink.
+- **XMD helpers**: construct, query, and reshape XMD trees built from the LWO data wrappers in `data/`.
+- **Type registration**: at create time, `xml_daemon` registers `xml_element`, `xml_pcdata`, `xml_samref`, and `xml_bool` with `dtd_daemon`. Subsequent typed conversions for these types route through xml_daemon's handler methods.
 
 ## Layout
 
@@ -39,10 +39,10 @@ src/usr/XML/
 
 ## Boot sequence
 
-System's initd loads XML's initd in alphabetical iteration after Schema (S) — Schema must precede XML so `dtd_daemon` exists when `xml_daemon::create()` calls `DTD->register_type(...)`. XML's initd:
+System's initd loads XML's initd in alphabetical iteration after Schema (S). Schema must precede XML so `dtd_daemon` exists when `xml_daemon::create()` calls `DTD->register_type(...)`. XML's initd:
 
-1. `compile_object("data/element")`, `compile_object("data/pcdata")`, `compile_object("data/samref")` — compiles the LWO data wrappers first; `new_object()` does not auto-compile an uncompiled master, so skipping this step would fail `load_core_schemas` with "Cannot create new instance of /usr/XML/data/element".
-2. `compile_object("sys/xml_daemon")` — compiles the daemon. At `create()` time it inherits `~/lib/xmlparse`, `~/lib/xmlgen`, `~/lib/xmd` (which transitively pull `lib/entities`), then makes four separate `DTD->register_type(...)` calls (`XML_ELEMENT`, `XML_SAMREF`, `XML_PCDATA`, `XML_BOOL`) and three separate `DTD->register_colour(...)` calls (`COL_ELEMENT`, `COL_SAMREF`, `COL_PCDATA`) against the now-loaded Schema's `dtd_daemon`.
+1. `compile_object("data/element")`, `compile_object("data/pcdata")`, `compile_object("data/samref")`: compiles the LWO data wrappers first. `new_object()` does not auto-compile an uncompiled master, so skipping this step would fail `load_core_schemas` with "Cannot create new instance of /usr/XML/data/element".
+2. `compile_object("sys/xml_daemon")`: compiles the daemon. At `create()` time it inherits `~/lib/xmlparse`, `~/lib/xmlgen`, `~/lib/xmd` (which transitively pull `lib/entities`), then makes four separate `DTD->register_type(...)` calls (`XML_ELEMENT`, `XML_SAMREF`, `XML_PCDATA`, `XML_BOOL`) and three separate `DTD->register_colour(...)` calls (`COL_ELEMENT`, `COL_SAMREF`, `COL_PCDATA`) against the now-loaded Schema's `dtd_daemon`.
 
 After boot, Schema-mediated type dispatch resolves any XML-typed values through xml_daemon's handler methods (`queryTypeColour`, `typedToAscii`, `asciiToTyped`, `testRawData`, etc.).
 
@@ -50,26 +50,26 @@ After boot, Schema-mediated type dispatch resolves any XML-typed values through 
 
 XML uses two representations and a clear vocabulary for the boundary:
 
-- **XML** is the ASCII serialization. The lexer in `xmlparse.c` reads it; the generator in `xmlgen.c` writes it. Public.
+- **XML** is the ASCII serialization. The lexer in `xmlparse.c` reads it. The generator in `xmlgen.c` writes it. Public.
 - **XMD** is the internal binary form. LPC mappings and arrays carrying parsed element data, anchored by LWO wrappers in `data/`. Internal.
 
-`xmd.c` is named for the internal form; the helpers there (`xmdElts`, `xmdElement`, `xmdAttributes`, `xmdContent`, `xmdOptimize`, etc.) operate on XMD trees, not on serialized XML strings.
+`xmd.c` is named for the internal form. The helpers there (`xmdElts`, `xmdElement`, `xmdAttributes`, `xmdContent`, `xmdOptimize`, etc.) operate on XMD trees, not on serialized XML strings.
 
 ## Sugar tags: structural-only
 
 Sugar tags are a legacy inline content-substitution syntax (`$(ref ...)` references and `{ choice | choice }` alternation embedded in text). Their interpretation is not part of this transport layer. Three consequences:
 
-- **`xmlgen.c::generate_pcdata` does not consult a sugar-tag daemon**; it dispatches element / pcdata / samref directly.
-- **The brace form (`{ choice | choice }`) raises LexErr.** `xmlparse.c::p_oneof` does not interpret it; the parser flags it as invalid input.
-- **`samref.c` is a structural LWO.** The wrapper carries XML data with no semantic interpretation. xmlgen.c emits a literal `$(ref attrs)` form for any reader that wants it; no content rewrite happens in this layer.
+- **`xmlgen.c::generate_pcdata` does not consult a sugar-tag daemon**. It dispatches element / pcdata / samref directly.
+- **The brace form (`{ choice | choice }`) raises LexErr.** `xmlparse.c::p_oneof` does not interpret it. The parser flags it as invalid input.
+- **`samref.c` is a structural LWO.** The wrapper carries XML data with no semantic interpretation. xmlgen.c emits a literal `$(ref attrs)` form for any reader that wants it. No content rewrite happens in this layer.
 
 ## Boundaries
 
 What this layer deliberately does not provide:
 
-- **Sugar-tag interpretation** — see above.
-- **Typed-literal forms in `XML_BOOL`** — the serialization is a simple `true` / `false`.
-- **A logging surface of its own** — the `DEBUG` / `Debug` / `XDebug` diagnostic macros forward to the platform's `logd` facility (`docs/operations.md`) at DEBUG level, threshold-guarded so their argument expressions are not built under the default INFO threshold; `log-level debug` makes the parse trace visible.
+- **Sugar-tag interpretation**: see above.
+- **Typed-literal forms in `XML_BOOL`**: the serialization is a simple `true` / `false`.
+- **A logging surface of its own**: the `DEBUG` / `Debug` / `XDebug` diagnostic macros forward to the platform's `logd` facility (`docs/operations.md`) at DEBUG level, threshold-guarded so their argument expressions are not built under the default INFO threshold. `log-level debug` makes the parse trace visible.
 
 The `SID` and `DTD` daemon constants are inline-defined (`SID = /usr/Schema/sys/schema_daemon`, `DTD = /usr/Schema/sys/dtd_daemon`).
 
@@ -81,9 +81,9 @@ Function names within the XML transport are camelCase, matching the `/lib/util/*
 - `queryColour`, `queryColourValue`, `entityToAscii`, `asciiToEntity`
 - `sysLog`, `dumpValue`
 
-The **DTD-callback API** in `xml_daemon.c` is camelCase to match (`queryTypeColour`, `typedToAscii`, `asciiToTyped`, `testRawData`, `queryCheckboxed`, `defaultValue`), apart from two snake_case accessors, `ascii_size` and `ascii_height`, which sit outside the handler dispatch (the dispatch's size and height probes ask handlers for `queryAsciiSize` / `queryAsciiHeight`). The camelCase handler set is called by name through `dtd_daemon`'s dispatch, so all handlers registered with the daemon must agree on those names; any new handler implements the camelCase set.
+The **DTD-callback API** in `xml_daemon.c` is camelCase to match (`queryTypeColour`, `typedToAscii`, `asciiToTyped`, `testRawData`, `queryCheckboxed`, `defaultValue`), apart from two snake_case accessors, `ascii_size` and `ascii_height`, which sit outside the handler dispatch (the dispatch's size and height probes ask handlers for `queryAsciiSize` / `queryAsciiHeight`). The camelCase handler set is called by name through `dtd_daemon`'s dispatch, so all handlers registered with the daemon must agree on those names. Any new handler implements the camelCase set.
 
-Two boundaries retain `snake_case`: the schema_node query surface (`query_attributes`, `query_name`, and kin -- the marshaler walks these on schema definitions, a separate contract from handler dispatch), and `lower_case` / `strip` / `strip_left` / `strip_right` in `/lib/util/ascii`.
+Two boundaries retain `snake_case`: the schema_node query surface (`query_attributes`, `query_name`, and kin, which the marshaler walks on schema definitions as a separate contract from handler dispatch), and `lower_case` / `strip` / `strip_left` / `strip_right` in `/lib/util/ascii`.
 
 ## File-by-file reference
 
@@ -113,7 +113,7 @@ ASCII XML generation. Walks an XMD tree and appends serialized output via the ca
 
 ### `lib/xmlparse.c` (696 lines)
 
-ASCII XML parser. All-LPC lexer + recursive-descent parser. Returns an XMD tree or raises `LexErr` on invalid input. Surface: `parse_xml(mixed str, varargs string file, int peekflag, int looseflag)` is the entry point, wrapped publicly by `xml_daemon`'s `parse(string str)`; internally `Scan` / `ScanMerry` and the `p_virgin` / `p_oneof` / `p_ref` / `p_tag` / `p_attr` parse-state functions handle the lex/parse states. `convert(mixed content, varargs string ltype, int strip)` is a private helper that folds parsed content into its final XMD shape.
+ASCII XML parser. All-LPC lexer + recursive-descent parser. Returns an XMD tree or raises `LexErr` on invalid input. Surface: `parse_xml(mixed str, varargs string file, int peekflag, int looseflag)` is the entry point, wrapped publicly by `xml_daemon`'s `parse(string str)`. Internally `Scan` / `ScanMerry` and the `p_virgin` / `p_oneof` / `p_ref` / `p_tag` / `p_attr` parse-state functions handle the lex/parse states. `convert(mixed content, varargs string ltype, int strip)` is a private helper that folds parsed content into its final XMD shape.
 
 ### `sys/xml_daemon.c` (187 lines)
 
@@ -135,6 +135,6 @@ XML's libraries (`xmd`, `xmlgen`, `xmlparse`, `entities`) are inheritable, so Va
 
 ## Where to next
 
-- [schema.md](schema.md) — `dtd_daemon` is the registry XML registers with; `lib/dtd` is what XML inherits to query types
-- [`src/usr/Marshal/`](../src/usr/Marshal/) — XmlBinding/stateimpex builds on top of this XML transport for state import/export
-- [`src/lib/util/ascii.c`](../src/lib/util/ascii.c) and [`src/lib/util/lpc.c`](../src/lib/util/lpc.c) — the helper libs the XML transport uses
+- [schema.md](schema.md): `dtd_daemon` is the registry XML registers with. `lib/dtd` is what XML inherits to query types
+- [`src/usr/Marshal/`](../src/usr/Marshal/): XmlBinding/stateimpex builds on top of this XML transport for state import/export
+- [`src/lib/util/ascii.c`](../src/lib/util/ascii.c) and [`src/lib/util/lpc.c`](../src/lib/util/lpc.c): the helper libs the XML transport uses
