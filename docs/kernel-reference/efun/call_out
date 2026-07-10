@@ -1,0 +1,28 @@
+NAME
+	call_out - start a callout
+
+SYNOPSIS
+	int call_out(string function, mixed delay, mixed args...)
+
+
+DESCRIPTION
+	Start a callout: schedule the given function in the current
+	object to be called delay seconds from now, and return a handle
+	that identifies the pending callout.  delay is an int or a float;
+	a float schedules a sub-second callout.  Any further arguments
+	are stored and passed to the function when the callout fires.
+
+	The kernel layer routes the callout through its resource-limited
+	execution gate, so that when the function runs it is accounted
+	against the resource limits of the object's owner, the same gate
+	call_limited() uses.  Callouts started from a kernel object (one
+	whose name begins with /kernel/) are scheduled directly, without
+	the gate.
+
+ERRORS
+	Starting a callout for a function defined in the kernel's auto
+	object (other than create()), or in a light-weight object (one
+	with a name of the form "object_name#-1"), results in an error.
+
+SEE ALSO
+	efun/call_out_other, efun/call_limited, kfun/call_out

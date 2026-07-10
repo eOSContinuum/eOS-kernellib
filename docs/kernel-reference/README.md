@@ -8,6 +8,7 @@ Man-page-style reference for the kernel layer's modified API surface, organized 
 - `efun/` -- kernel-layer overrides of DGD's built-in functions (the auto object wraps these, so what an application program calls differs from the raw kfun: access checks, resource accounting, path normalization). One page per function:
   [`call_limited`](efun/call_limited),
   [`call_other`](efun/call_other),
+  [`call_out`](efun/call_out),
   [`call_out_other`](efun/call_out_other),
   [`call_trace`](efun/call_trace),
   [`clone_object`](efun/clone_object),
@@ -16,7 +17,9 @@ Man-page-style reference for the kernel layer's modified API surface, organized 
   [`file_info`](efun/file_info),
   [`find_object`](efun/find_object),
   [`get_dir`](efun/get_dir),
+  [`make_dir`](efun/make_dir),
   [`new_object`](efun/new_object),
+  [`remove_dir`](efun/remove_dir),
   [`retrieve_atomic_messages`](efun/retrieve_atomic_messages),
   [`send_atomic_message`](efun/send_atomic_message),
   [`status`](efun/status),
