@@ -1,8 +1,8 @@
 # Building
 
-Building eOS-kernellib means building DGD; the kernel layer is LPC source that DGD compiles at runtime. The build work in this guide is for the [DGD] driver, which is a build-time dependency.
+Building eOS-kernellib means building DGD. The kernel layer is LPC source that DGD compiles at runtime. The build work in this guide is for the [DGD] driver, which is a build-time dependency.
 
-**Audience**: a developer building DGD as a dependency of eOS-kernellib; comfortable with a C toolchain (`cc`, `make`, `bison` or `yacc`).
+**Audience**: a developer building DGD as a dependency of eOS-kernellib, comfortable with a C toolchain (`cc`, `make`, `bison` or `yacc`).
 
 ## DGD
 
@@ -20,7 +20,7 @@ make install
 
 The driver binary lands at `dgd/bin/dgd`. Run `make clean` from `dgd/src` to start over if a build dirties the tree.
 
-Verify the driver built by running it without arguments from the `dgd` repository root (the build installs to the repo root's `bin/`, not `src/bin/`); it prints a usage line.
+Verify the driver built by running it without arguments from the `dgd` repository root (the build installs to the repo root's `bin/`, not `src/bin/`). It prints a usage line.
 
 ```sh
 cd ..        # back to the dgd repository root
@@ -49,12 +49,12 @@ Verify the kernel layer compiles by running the driver against `example.dgd` per
 
 ## State and snapshot files
 
-`example.dgd` references swap and snapshot files under `../state/`. The `state/` directory ships with the checkout (it holds a tracked `.gitignore`); if you point those settings elsewhere, create the directory they name before starting the driver. The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph at the last `dump_interval` checkpoint.
+`example.dgd` references swap and snapshot files under `../state/`. The `state/` directory ships with the checkout (it holds a tracked `.gitignore`). If you point those settings elsewhere, create the directory they name before starting the driver. The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph at the last `dump_interval` checkpoint.
 
 ## Where to next
 
-- [`docs/getting-started.md`](getting-started.md) — run the example configuration once the driver is built.
-- [`docs/operations.md`](operations.md) — the `.dgd` configuration field reference, boot modes, and operator surface.
-- [`docs/architecture.md`](architecture.md) — the platform's tier model and where the build fits.
+- [`docs/getting-started.md`](getting-started.md): run the example configuration once the driver is built.
+- [`docs/operations.md`](operations.md): the `.dgd` configuration field reference, boot modes, and operator surface.
+- [`docs/architecture.md`](architecture.md): the platform's tier model and where the build fits.
 
 [DGD]: https://github.com/dworkin/dgd

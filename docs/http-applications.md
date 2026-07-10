@@ -1,8 +1,8 @@
 # Writing HTTP/1 applications
 
-An HTTP/1 application on eOS-kernellib supplies a clonable server object at `/usr/WWW/obj/server`; the kernel layer's HTTP/1 transport binds the binary port and clones that object for every incoming connection. The sections below show what the server object looks like, what it must inherit, how it routes requests, and how an application supports multiple logical apps behind one HTTP/1 port.
+An HTTP/1 application on eOS-kernellib supplies a clonable server object at `/usr/WWW/obj/server`. The kernel layer's HTTP/1 transport binds the binary port and clones that object for every incoming connection. The sections below show what the server object looks like, what it must inherit, how it routes requests, and how an application supports multiple logical apps behind one HTTP/1 port.
 
-**Audience**: an application author building an HTTP/1 service on eOS-kernellib; comfortable with LPC syntax (or read `docs/lpc-essentials.md` first); has the platform running locally per `docs/getting-started.md`.
+**Audience**: an application author who is building an HTTP/1 service on eOS-kernellib, is comfortable with LPC syntax (or reads `docs/lpc-essentials.md` first), and has the platform running locally per `docs/getting-started.md`.
 
 `docs/architecture.md` covers the capability tiers and the `src/usr/System/sys/http_server.c` bootstrap that makes HTTP routing possible. `docs/application-authoring.md` covers the general tier-E patterns for non-HTTP transports. `docs/runtime-primitives.md` covers the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
 
@@ -14,7 +14,7 @@ An HTTP/1 application is therefore an LPC domain at `/usr/WWW/` that supplies a 
 
 ## Reference application
 
-`examples/http-app/` carries a working reference implementation: a domain initd and a per-connection server with `GET /health`, `POST /echo`, and a 404 fallback. The code in that directory is the canonical example — accurate, compiling, and runnable. To deploy it:
+`examples/http-app/` carries a working reference implementation: a domain initd and a per-connection server with `GET /health`, `POST /echo`, and a 404 fallback. The code in that directory is the canonical example: accurate, compiling, and runnable. To deploy it:
 
 ```sh
 cp -R examples/http-app src/usr/WWW
@@ -54,7 +54,7 @@ static void create()
 
 The server object is the clonable that the kernel mount point hands every connection. Its job is to receive and parse the HTTP request (the inherited `Http1Server` does this), dispatch the request to application logic, and send the HTTP response.
 
-The skeleton inherits two libraries and replicates the binary-manager glue that the kernel's user contract requires. The code below shows only the load-bearing structure; the runnable form is in `examples/http-app/obj/server.c`.
+The skeleton inherits two libraries and replicates the binary-manager glue that the kernel's user contract requires. The code below shows only the load-bearing structure. The runnable form is in `examples/http-app/obj/server.c`.
 
 ### Inheritance and clone setup
 
@@ -130,7 +130,7 @@ static void receiveEntity(StringBuffer chunk)
 
 ### Building a response
 
-`HttpResponse` is constructed with the HTTP version, the status code, and the status phrase; headers are added to an `HttpFields` collection and attached via `setHeaders`:
+`HttpResponse` is constructed with the HTTP version, the status code, and the status phrase. Headers are added to an `HttpFields` collection and attached via `setHeaders`:
 
 ```c
 HttpResponse response = new HttpResponse(1.1, 200, "OK");
@@ -147,24 +147,24 @@ sendMessage(message);
 
 ### Binary-manager glue
 
-Six methods bridge the platform's user-tier flow contract to the HTTP/1 connection state machine. They are mechanical — replicate them verbatim from the reference application (`examples/http-app/obj/server.c`):
+Six methods bridge the platform's user-tier flow contract to the HTTP/1 connection state machine. They are mechanical: replicate them verbatim from the reference application (`examples/http-app/obj/server.c`):
 
-- `login(str)` — called when a connection arrives; calls `::connection(previous_object())`, `flow()`, and `receiveFirstLine(str)`.
-- `flow_receive_message(str, mode)` — defers `receiveBytes(str)` via `call_out`.
-- `_logout(quit)` — closes the connection and destructs.
-- `flow_logout(quit)` — defers `_logout` via `call_out`.
-- `flow_message_done()` — defers `messageDone` via `call_out`.
-- `timeout()` — closes the connection if no request has been received.
+- `login(str)`: called when a connection arrives, calls `::connection(previous_object())`, `flow()`, and `receiveFirstLine(str)`.
+- `flow_receive_message(str, mode)`: defers `receiveBytes(str)` via `call_out`.
+- `_logout(quit)`: closes the connection and destructs.
+- `flow_logout(quit)`: defers `_logout` via `call_out`.
+- `flow_message_done()`: defers `messageDone` via `call_out`.
+- `timeout()`: closes the connection if no request has been received.
 
-These methods exist because `Server1` (the library form, inheritable) does not carry them; they live in `/usr/HTTP/api/obj/server1.c` (the clonable form, not inheritable). Section "Inherit from `/lib/`, not from `/obj/`" below explains the constraint.
+These methods exist because `Server1` (the library form, inheritable) does not carry them. They live in `/usr/HTTP/api/obj/server1.c` (the clonable form, not inheritable). Section "Inherit from `/lib/`, not from `/obj/`" below explains the constraint.
 
 ## Platform contracts
 
-Four platform contracts apply to every HTTP/1 application server. The reference application honors all four; an application that omits any of them will fail to boot or fail at first request.
+Four platform contracts apply to every HTTP/1 application server. The reference application honors all four. An application that omits any of them will fail to boot or fail at first request.
 
 ### Inherit from `/lib/`, not from `/obj/`
 
-`Http1Server` is the library form of the HTTP/1 server; `Server1` (under `/obj/`) is the clonable form. Applications inherit the **library** form (`/usr/HTTP/api/lib/Server1`, aliased as `Http1Server`). The driver object's `inherit_program` hook (kernel-layer LPC, `src/kernel/sys/driver.c`) rejects inheritance from a path that does not contain `/lib/` — a discipline that separates inheritable libraries from clonable objects across the kernel layer. The library form of every HTTP/1 component lives under `/usr/HTTP/api/lib/`; the clonable forms under `/usr/HTTP/api/obj/` are not inheritable.
+`Http1Server` is the library form of the HTTP/1 server. `Server1` (under `/obj/`) is the clonable form. Applications inherit the **library** form (`/usr/HTTP/api/lib/Server1`, aliased as `Http1Server`). The driver object's `inherit_program` hook (kernel-layer LPC, `src/kernel/sys/driver.c`) rejects inheritance from a path that does not contain `/lib/`, a discipline that separates inheritable libraries from clonable objects across the kernel layer. The library form of every HTTP/1 component lives under `/usr/HTTP/api/lib/`. The clonable forms under `/usr/HTTP/api/obj/` are not inheritable.
 
 The consequence is that the binary-manager glue in `/usr/HTTP/api/obj/server1.c` cannot be inherited and must be replicated in the application server. The six methods listed above are that replication.
 
@@ -174,7 +174,7 @@ The kernel's binary-port manager invokes the connection's `login`, `flow_*`, and
 
 ### Never call `::receiveRequest`
 
-The HTTP/1 connection library implements `receiveRequest` as a `relay->receiveRequest` callback on a `relay` object. For an application server, the relay **is** the server itself (`this_object()`, passed to `::create` as the first argument). Calling `::receiveRequest` from inside the override would invoke the library's version on the relay, which is the same object, causing unbounded recursion and a stack overflow. Override `receiveRequest`; do not chain to the inherited implementation.
+The HTTP/1 connection library implements `receiveRequest` as a `relay->receiveRequest` callback on a `relay` object. For an application server, the relay **is** the server itself (`this_object()`, passed to `::create` as the first argument). Calling `::receiveRequest` from inside the override would invoke the library's version on the relay, which is the same object, causing unbounded recursion and a stack overflow. Override `receiveRequest`. Do not chain to the inherited implementation.
 
 ### Call `expectEntity` for body-bearing methods
 
@@ -182,19 +182,19 @@ The HTTP/1 connection library does not read request bodies automatically. After 
 
 The application is responsible for remembering the request that produced the body. The reference application saves it to a `private HttpRequest pendingRequest` member at the moment `expectEntity` is called, and consumes it in `receiveEntity`.
 
-An application that does not call `expectEntity` for `POST`, `PUT`, or `PATCH` requests will accept the request line and headers but never receive the body; the connection stalls until the client times out.
+An application that does not call `expectEntity` for `POST`, `PUT`, or `PATCH` requests will accept the request line and headers but never receive the body. The connection stalls until the client times out.
 
-For chunked transfer encoding (`Transfer-Encoding: chunked`), use `expectChunk` instead of `expectEntity`. WebSocket framing has its own opt-in (`expectWsFrame`); the same pattern applies.
+For chunked transfer encoding (`Transfer-Encoding: chunked`), use `expectChunk` instead of `expectEntity`. WebSocket framing has its own opt-in (`expectWsFrame`). The same pattern applies.
 
 ## Multiple applications on one port
 
 The platform mount point is a single path: `/usr/WWW/obj/server`. To run more than one logical application behind one HTTP/1 port, the `/usr/WWW/` server dispatches by route prefix to handlers registered by other domains:
 
-- `/usr/WWW/sys/router.c` — a registry mapping route prefixes to handler objects.
-- `/usr/WWW/obj/server.c` — queries the registry from `receiveRequest` and calls the matching handler.
-- `/usr/Counter/sys/handler.c`, `/usr/Inventory/sys/handler.c`, etc. — application handlers that register themselves with `/usr/WWW/sys/router` at boot.
+- `/usr/WWW/sys/router.c`: a registry mapping route prefixes to handler objects.
+- `/usr/WWW/obj/server.c`: queries the registry from `receiveRequest` and calls the matching handler.
+- `/usr/Counter/sys/handler.c`, `/usr/Inventory/sys/handler.c`, etc.: application handlers that register themselves with `/usr/WWW/sys/router` at boot.
 
-This is a higher-level pattern than the single-application reference. The kernel layer is indifferent to which pattern an application chooses; both rely on the same platform contracts.
+This is a higher-level pattern than the single-application reference. The kernel layer is indifferent to which pattern an application chooses. Both rely on the same platform contracts.
 
 ## Cross-domain initialization order
 
@@ -217,14 +217,14 @@ static void registerWithWWW()
 }
 ```
 
-The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where compilation order — the `TLS`, `HTTP`, `LPC` prefix followed by the alphabetical remainder — would otherwise leave a dependency unsatisfied.
+The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where compilation order (the `TLS`, `HTTP`, `LPC` prefix followed by the alphabetical remainder) would otherwise leave a dependency unsatisfied.
 
 ## Where to next
 
-- [`docs/getting-started.md`](getting-started.md) — install DGD, run the example configuration.
-- [`docs/architecture.md`](architecture.md) — capability tiers, daemons, kernel-layer libraries.
-- [`docs/application-authoring.md`](application-authoring.md) — general tier-E patterns for non-HTTP transports.
-- [`docs/runtime-primitives.md`](runtime-primitives.md) — the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
-- [`examples/http-app/`](../examples/http-app/) — runnable reference application.
-- [`src/usr/System/sys/http_server.c`](../src/usr/System/sys/http_server.c) — the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the platform-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
-- [`src/usr/HTTP/api/lib/Server1.c`](../src/usr/HTTP/api/lib/Server1.c) and [`src/usr/HTTP/lib/Connection1.c`](../src/usr/HTTP/lib/Connection1.c) — the HTTP/1 library implementation that an application server inherits and overrides.
+- [`docs/getting-started.md`](getting-started.md): install DGD, run the example configuration.
+- [`docs/architecture.md`](architecture.md): capability tiers, daemons, kernel-layer libraries.
+- [`docs/application-authoring.md`](application-authoring.md): general tier-E patterns for non-HTTP transports.
+- [`docs/runtime-primitives.md`](runtime-primitives.md): the platform properties an HTTP/1 application inherits (atomicity, persistence, hot reload, capability separation).
+- [`examples/http-app/`](../examples/http-app/): runnable reference application.
+- [`src/usr/System/sys/http_server.c`](../src/usr/System/sys/http_server.c): the kernel-side bootstrap that mounts `/usr/WWW/obj/server`. Its source comments document the platform-internal asymmetries (the `find_object` vs `status(O_INDEX)` choice, the `inherit_program` `/lib/` constraint).
+- [`src/usr/HTTP/api/lib/Server1.c`](../src/usr/HTTP/api/lib/Server1.c) and [`src/usr/HTTP/lib/Connection1.c`](../src/usr/HTTP/lib/Connection1.c): the HTTP/1 library implementation that an application server inherits and overrides.

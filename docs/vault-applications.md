@@ -14,13 +14,13 @@ The Vault daemon (`/usr/Vault/sys/vault`) stores any object that:
 - defines `queryStateRoot()` returning a Schema namespace:tag pair that names a registered `~Schema/obj/schema_node` (the marshaler walks that schema_node's attributes to extract the value tree);
 - implements the per-attribute `query_<name>` getters and `set_<name>` setters that the schema declares.
 
-A bare property-bearing object (an inheritor of `/lib/util/properties`) satisfies the last two by default: its inherited `queryStateRoot()` returns `"Core:Entries"`, the built-in property-table shape whose ascii-property accessors marshal each property value through the `/lib/util/coercion` codec -- no per-app schema, no hand-written accessors ([schema.md](schema.md) Property-table marshaling). The per-app schema pattern this document walks through is for applications whose durable state lives in typed member variables instead of the property table; the reference application exercises both (`obj/thing` per-app, `obj/item` property-table).
+A bare property-bearing object (an inheritor of `/lib/util/properties`) satisfies the last two by default: its inherited `queryStateRoot()` returns `"Core:Entries"`, the built-in property-table shape whose ascii-property accessors marshal each property value through the `/lib/util/coercion` codec, with no per-app schema and no hand-written accessors needed ([schema.md](schema.md) Property-table marshaling). The per-app schema pattern this document walks through is for applications whose durable state lives in typed member variables instead of the property table. The reference application exercises both (`obj/thing` per-app, `obj/item` property-table).
 
-Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`; clones come from `clone_object(program)`. The Vault stores both, distinguished on disk by `<object program="..."/>` vs `<clone program="..."/>` root elements.
+Singletons (one-of-a-kind daemons) come from a master via `findOrLoad(program)`. Clones come from `clone_object(program)`. The Vault stores both, distinguished on disk by `<object program="..."/>` vs `<clone program="..."/>` root elements.
 
 ## Reference application
 
-Paths written with a leading `~` (as in `~Schema/sys/schema_daemon`) are DGD's per-domain shorthand: `~Name/` resolves to `/usr/Name/`. `examples/vault-app/` carries a working reference implementation: a domain initd, a property-bearing clonable, a vault_node-inheriting lib, and a boot-time test driver that round-trips a thing through `Vault->store` + `Vault->spawn_one_by_name` and asserts the property tree matches. The code in that directory is the canonical example -- accurate, compiling, and runnable. To deploy it:
+Paths written with a leading `~` (as in `~Schema/sys/schema_daemon`) are DGD's per-domain shorthand: `~Name/` resolves to `/usr/Name/`. `examples/vault-app/` carries a working reference implementation: a domain initd, a property-bearing clonable, a vault_node-inheriting lib, and a boot-time test driver that round-trips a thing through `Vault->store` + `Vault->spawn_one_by_name` and asserts the property tree matches. The code in that directory is the canonical example: accurate, compiling, and runnable. To deploy it:
 
 ```sh
 cp -R examples/vault-app src/usr/MyApp
@@ -68,11 +68,11 @@ static void setup_and_run()
 }
 ```
 
-A real application with a stable boot-order position (alphabetically after Vault) can do the registration inline in `create()`; the call_out pattern is the boot-order-agnostic form.
+A real application with a stable boot-order position (alphabetically after Vault) can do the registration inline in `create()`. The call_out pattern is the boot-order-agnostic form.
 
 ## Property-bearing clonable
 
-`obj/thing.c` carries one string-typed `label`, one int-typed `count`, and one object-typed `peer` (a cross-object reference). The schema layer drives marshaling through the per-attribute `query_<name>` getters; import drives `set_<name>` setters:
+`obj/thing.c` carries one string-typed `label`, one int-typed `count`, and one object-typed `peer` (a cross-object reference). The schema layer drives marshaling through the per-attribute `query_<name>` getters. Import drives `set_<name>` setters:
 
 ```c
 inherit "/lib/util/named";
@@ -94,7 +94,7 @@ void set_count(int val)    { _count = val; }
 void set_peer(object val)  { _peer = val; }
 ```
 
-`queryStateRoot()` returns the schema name -- the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape. Overriding it binds the per-app schema; leaving it inherited keeps the `"Core:Entries"` property-table default.
+`queryStateRoot()` returns the schema name: the `(namespace, tag)` pair that the Vault daemon looks up via `~Schema/sys/schema_daemon::get_node()` to discover the marshaling shape. Overriding it binds the per-app schema. Leaving it inherited keeps the `"Core:Entries"` property-table default.
 
 ## Schema registration
 
@@ -116,9 +116,9 @@ private void register_thing_schema()
 }
 ```
 
-Each `add_attribute(attr, type, query_method)` declares one XML attribute on the `<MyApp:Thing/>` element; the marshaler invokes `query_method` on the object to extract the value. Each `add_callback(setter, ...attr-names...)` declares one setter the import path calls with the value(s) of the named attributes.
+Each `add_attribute(attr, type, query_method)` declares one XML attribute on the `<MyApp:Thing/>` element. The marshaler invokes `query_method` on the object to extract the value. Each `add_callback(setter, ...attr-names...)` declares one setter the import path calls with the value(s) of the named attributes.
 
-The five types the lifted dtd_daemon supports are `lpc_str`, `lpc_int`, `lpc_flt`, `lpc_obj`, and `lpc_mixed`. Of these, `lpc_mixed` is deliberately degraded (its string-passthrough decode is the undeclared-attribute contract; round-trip is not exact for arrays / mappings); the typed primitives round-trip cleanly, and property-table values round-trip through the `/lib/util/coercion` codec on the `Core:Entries` path instead ([schema.md](schema.md) Property-table marshaling).
+The five types the lifted dtd_daemon supports are `lpc_str`, `lpc_int`, `lpc_flt`, `lpc_obj`, and `lpc_mixed`. Of these, `lpc_mixed` is deliberately degraded (its string-passthrough decode is the undeclared-attribute contract, so round-trip is not exact for arrays / mappings). The typed primitives round-trip cleanly, and property-table values round-trip through the `/lib/util/coercion` codec on the `Core:Entries` path instead ([schema.md](schema.md) Property-table marshaling).
 
 ## On-disk shape
 
@@ -173,12 +173,12 @@ One-of-a-kind daemons store as `<object program="..."/>`. The test driver exerci
 
 ## Cross-object references
 
-The MyApp:Thing schema types its `peer` attribute as `lpc_obj`. On export, an object-valued attribute serializes as the literal `OBJ(<name>)`, where the name is the target's logical name when it has one (its `query_object_name`), or its LPC object path otherwise. On import, the literal resolves path-first, then through Index for logical names -- so a reference to another named object survives the disk round-trip as long as the target is loaded (or resolvable by name) at import time.
+The MyApp:Thing schema types its `peer` attribute as `lpc_obj`. On export, an object-valued attribute serializes as the literal `OBJ(<name>)`, where the name is the target's logical name when it has one (its `query_object_name`), or its LPC object path otherwise. On import, the literal resolves path-first, then through Index for logical names. A reference to another named object therefore survives the disk round-trip as long as the target is loaded (or resolvable by name) at import time.
 
 Two boundaries to design around:
 
 - **Dangling references do not throw to the spawn caller.** If the target resolves to nothing at import time, the type conversion errors inside the Vault's configure step, which is caught internally. The referencing object still spawns (the create step already succeeded) and carries whatever attributes imported cleanly, with the dangling reference left nil. Applications that need referential integrity must order their respawns so targets load before referrers, or re-check references after a bulk respawn.
-- **Vault-respawned clones are owned by the Vault daemon.** `clone_object` runs in the Vault's context during a respawn, so the kernel's owner-gated `destruct_object` refuses the application domain's attempt to destruct an object the Vault respawned -- even though the object logically belongs to the application. An application that needs to retire Vault-respawned objects must route the destruct through code the owner can call (for example, a self-destruct method on the object itself).
+- **Vault-respawned clones are owned by the Vault daemon.** `clone_object` runs in the Vault's context during a respawn, so the kernel's owner-gated `destruct_object` refuses the application domain's attempt to destruct an object the Vault respawned, even though the object logically belongs to the application. An application that needs to retire Vault-respawned objects must route the destruct through code the owner can call (for example, a self-destruct method on the object itself).
 
 ## Cross-domain access
 
@@ -187,15 +187,15 @@ Inheriting `~Vault/lib/vault_node` from a domain other than Vault requires Vault
 ## What this example does not exercise
 
 - **Statedump survival**. The DGD `dump_state` cycle (write snapshot, restart against the snapshot, verify property state survives) is part of the Vault's value proposition but is awkward to exercise in a single boot. A multi-boot test harness is a natural follow-on once the platform grows a CI shape.
-- **Hot reload**. Recompiling thing.c via `compile_object` updates the clonable in place; existing clones survive the recompile and dispatch to the new code on next method call. Demonstrating this requires admin_console interaction; out of scope for a boot-time assertion driver.
+- **Hot reload**. Recompiling thing.c via `compile_object` updates the clonable in place. Existing clones survive the recompile and dispatch to the new code on next method call. Demonstrating this requires admin_console interaction, which is out of scope for a boot-time assertion driver.
 
 ## Notes
 
-- The example uses `DRIVER->message()`-style logging via a sentinel file at `/usr/MyApp/data/test-result.log` because an application-tier driver has no privileged console surface (`DRIVER->message()` requires kernel/System privilege) and needs a file the smoke harness can read from outside the platform. `sysLog` now forwards to the `logd` facility (`docs/operations.md`), but its sink is the System-owned `system.log`, not a domain-readable sentinel; routing smoke results through `logd` instead of the sentinel file is test-infrastructure work.
-- The test driver's `setup_and_run` uses `make_dir("/usr/MyApp/data")` before the first `write_file` because the directory may not exist on first boot. Vault's own `paveWay` helper handles this for its own data path; application code does the same explicitly.
+- The example uses `DRIVER->message()`-style logging via a sentinel file at `/usr/MyApp/data/test-result.log` because an application-tier driver has no privileged console surface (`DRIVER->message()` requires kernel/System privilege) and needs a file the smoke harness can read from outside the platform. `sysLog` now forwards to the `logd` facility (`docs/operations.md`), but its sink is the System-owned `system.log`, not a domain-readable sentinel. Routing smoke results through `logd` instead of the sentinel file is test-infrastructure work.
+- The test driver's `setup_and_run` uses `make_dir("/usr/MyApp/data")` before the first `write_file` because the directory may not exist on first boot. Vault's own `paveWay` helper handles this for its own data path. Application code does the same explicitly.
 
 ## Where to next
 
-- [schema.md](schema.md) — the registry and marshaling pipeline under the participating-domain contract.
-- [xml.md](xml.md) — the on-disk transport Vault writes through.
-- [persistence.md](persistence.md) — the orthogonal-persistence layer beneath the structured layer.
+- [schema.md](schema.md): the registry and marshaling pipeline under the participating-domain contract.
+- [xml.md](xml.md): the on-disk transport Vault writes through.
+- [persistence.md](persistence.md): the orthogonal-persistence layer beneath the structured layer.
