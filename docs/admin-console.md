@@ -353,6 +353,19 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `ungrant <user> <dir>`, `ungrant <user> access`, `ungrant global <dir>` | Permissions | Remove a directory grant, a user's file access, or a global-read entry |
 | `unregister-observer <obj_path> <path> <timing> [index]` | Dispatcher | Clear all observers at (obj, path, timing), or remove one by index (extension) |
 
+## System login console verbs
+
+The appendix above is the kernel console's verb set, reached by the `admin` login. The System login console, reached by a registered user name (Connecting above), inherits those verbs and adds the lifecycle verbs below, which the kernel console does not carry (`src/usr/System/obj/user.c`). It also renames one: the kernel console's `shutdown` is reached as `halt` here.
+
+| Verb | Brief |
+|---|---|
+| `upgrade [-a\|-p] <file> [...]` | Recompile a source file and every dependent through the upgrade cascade. `-a` recompiles the whole dependency tree as one all-or-nothing atomic operation. `-p` additionally queues `call_touch` patching so live clones migrate state (see Hot-fixing code in production above and `docs/code-lifecycle.md` Library upgrade). |
+| `issues <file> [...]` | List the outstanding compiled program versions (objectd calls them issues) for each file. More than one issue means older versions are still bound to dependents that have not upgraded, so the verb reads back whether an upgrade cascade has fully propagated. |
+| `hotboot` | Write an incremental snapshot and re-exec the host binary in place (`dump_state(1)` then `shutdown(1)`), inheriting open connections. This is the connection-preserving host-binary swap (`docs/operations.md` Running under a supervisor). It requires full access and fails with `Permission denied` otherwise. |
+| `halt` | Cold shutdown without a snapshot, the System console's name for the kernel console's `shutdown`. It requires full access, and leaves a restore point only if a `snapshot` or `reboot` ran first. |
+
+`upgrade` recompiles only the sources the operator's owner may write, so an operator can upgrade only what it can edit.
+
 ## Where to next
 
 - [`docs/operations.md`](operations.md): the deployment surface, covering `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.

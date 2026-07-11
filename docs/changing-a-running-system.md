@@ -14,6 +14,8 @@ Edit the source, `compile <path>` from the operator console (or `compile_object`
 
 Compilation itself runs in atomic context: a syntax error or failed type-check leaves the prior master untouched. The failed compile is a no-op, not an outage.
 
+The change is durable only if it reaches the on-disk source. Editing the file (with `ed` or through the filesystem) and then `compile <path>` writes the fix to the source tree, so a cold boot rebuilds it from source. Compiling from an inline source string instead (`compile_object(path, source)` from `code`) replaces the master in memory without touching the file, so the source tree still holds the old code and a cold boot comes up with the old behavior. Write a lasting fix to the source tree, not just into the running image.
+
 Reference: `docs/code-lifecycle.md` Compile and Hot reload, `docs/admin-console.md` Hot-fixing code in production, and the working demonstration at `examples/hot-reload-demo/`.
 
 ### 2. Upgrade a library and its dependents
