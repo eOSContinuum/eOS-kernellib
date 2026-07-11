@@ -54,7 +54,7 @@ The admin_console is the platform's most dangerous interface and the platform's 
 1. **The `code` verb evaluates arbitrary LPC.** An operator who can invoke `code` can call any kfun the inheriting object has access to. For `admin`, that means every kfun in the runtime. Treat console access as equivalent to host shell access on the platform's process.
 2. **Permissions inside the console enforce the platform's tier model.** Non-admin operators see only what their owner permits. `code` invocations still hit per-call access checks at every kfun boundary; a non-admin operator's `code` invocation cannot bypass the tier model.
 
-In production deployments, expose the telnet port only on a loopback interface or a dedicated maintenance VLAN. The console wire protocol is unencrypted telnet; remote operators should reach the port through an SSH or TLS tunnel.
+In production deployments, expose the telnet port only on a loopback interface or a dedicated maintenance VLAN. The console wire protocol is unencrypted telnet; remote operators should reach the port through an SSH or TLS tunnel. See `docs/operations.md` (Network boundary and transport security) for the full deployment posture, covering the application HTTP transport alongside the console.
 
 ## Operational tasks
 

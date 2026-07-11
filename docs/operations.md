@@ -95,12 +95,12 @@ Which stop path leaves which case:
 
 | Stop path | Call | Restore needs |
 |---|---|---|
-| Kill signal (SIGINT) | `prepare_reboot()` then `dump_state(1)` (`src/kernel/sys/driver.c:757-766`) | `dump_file` + `dump_file.old` (in practice, see below) |
+| Kill signal (SIGTERM) | `prepare_reboot()` then `dump_state(1)` (`src/kernel/sys/driver.c:757-766`) | `dump_file` + `dump_file.old` (in practice, see below) |
 | `reboot` verb | `dump_state(TRUE)` then `shutdown()` (`cmd_reboot`, `src/kernel/lib/admin_console.c`) | `dump_file` + `dump_file.old` (in practice, see below) |
 | `snapshot` verb | `dump_state(FALSE)` (`cmd_snapshot`) | `dump_file` alone |
 | Console dump-and-exit path | `dump_state(FALSE)` then `shutdown()` (`src/usr/System/sys/persist_helper.c:54`) | `dump_file` alone |
 
-A supervisor sending SIGINT (the ordinary "stop the service" path outside admin_console) and the `reboot` verb both write an incremental. Strictly, a `dump_state(1)` dump is written as a partial only when swapped-out objects are pending at dump time. A small freshly-booted image can produce a self-contained file (which is why the tutorial's single-file restore succeeds after its first `reboot`), but on a long-running image the partial case is the norm. Routine operator practice should keep `<dump_file>.old` alongside `dump_file` rather than treat it as disposable. A restore attempted with only `dump_file` after either path is the likely cause of a "Missing secondary snapshot" failure at boot.
+A supervisor sending SIGTERM (the ordinary "stop the service" path outside admin_console) and the `reboot` verb both write an incremental. Strictly, a `dump_state(1)` dump is written as a partial only when swapped-out objects are pending at dump time. A small freshly-booted image can produce a self-contained file (which is why the tutorial's single-file restore succeeds after its first `reboot`), but on a long-running image the partial case is the norm. Routine operator practice should keep `<dump_file>.old` alongside `dump_file` rather than treat it as disposable. A restore attempted with only `dump_file` after either path is the likely cause of a "Missing secondary snapshot" failure at boot.
 
 ## Availability and data-loss model
 
@@ -199,6 +199,66 @@ Ceilings that are not `.dgd` fields:
 **Snapshot-pause scaling.** The dump-time pause scales with in-memory image size, not with the config caps above: "a multi-gigabyte image can take seconds to write; the runtime briefly blocks during the dump" (`docs/persistence.md` The statedump cycle). No number here substitutes for measuring a specific workload. `scripts/run-example.sh` (the harness that boots and drives each bundled example end-to-end) is the natural rig to extend for a workload-shaped pause measurement.
 
 **Unmeasured today.** Actual dump-pause duration at realistic image sizes, sustained throughput near the `objects` / `call_outs` / `array_size` ceilings, and the memory cost of a driver rebuilt with wider index types are not measured against this codebase. Treat the tables above as compiled-in ceilings and documented defaults, not throughput guarantees.
+
+## Running under a supervisor
+
+The platform is one process. A process supervisor (systemd, a container runtime, runit) owns its lifecycle: start it, restart it on exit, stop it on demand. Two facts shape that configuration.
+
+**A graceful stop takes a final snapshot.** The driver catches `SIGTERM`, the default stop signal for `systemctl stop`, `docker stop`, and a bare `kill`. On receipt it runs `prepare_reboot()`, writes an incremental snapshot with `dump_state(1)`, and shuts down cold (`src/kernel/sys/driver.c:757-766`, reached through the `SIGTERM` handler in `dworkin/dgd` `src/host/unix/local.cpp`). A supervisor's ordinary stop therefore leaves a current restore point with no operator action. This is the same incremental form the `reboot` verb writes (Backing up and restoring state above), so recovery needs both `dump_file` and `<dump_file>.old`.
+
+Give the stop timeout room for the dump. Dump time scales with the in-memory image size (Limits and capacity above), so a large image needs a stop timeout longer than a supervisor's default. A supervisor that escalates to `SIGKILL` before the dump finishes loses that snapshot.
+
+`SIGINT`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` are not caught: their default disposition applies, so a stop sent as `SIGINT` terminates the process without the snapshot. Only `SIGTERM` runs the snapshot-and-shutdown path. `SIGINT`, `SIGKILL`, and a host crash bypass it and lose the work committed since the last automatic dump (Availability and data-loss model above).
+
+**Restart is a cold restore, not a hot boot.** The signal path calls `shutdown()`, not `shutdown(1)`, so it does not `execv` and does not preserve connections. On restart the supervisor cold-boots against the snapshot pair (`dgd config_file dump_file dump_file.old`), the platform restores state, and clients reconnect. Connection-preserving hot boot is a separate operator action: the System console's `hotboot` verb calls `shutdown(1)` to `execv` the replacement process against a configured `hotboot` tuple (Booting above). No supervisor signal triggers it. Configure the supervisor to restart with the dump files in place: a restart that cannot read them cold-boots from source and carries no state across (the Cold boot row of the downtime taxonomy above).
+
+## Monitoring signals
+
+An unattended deployment needs its health read by a monitoring system, not by an operator at the telnet prompt. The signals below already exist. This section maps each to the condition it warns of and a way of reaching it without a human on the console. The interactive-triage view of the same signals is in `docs/admin-console.md` (Debugging a stuck platform).
+
+**Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (Limits and capacity above):
+
+| Signal | Alert condition | Reading |
+|---|---|---|
+| call_out count vs the `call_outs` cap | Approaching the cap | A backlog of deferred work: new `call_out`s begin to fail |
+| object count vs the `objects` cap | Approaching the cap | Allocation headroom is running out: clones and new objects begin to fail |
+| swap activity | Sustained churn | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot |
+| uptime, last reboot | Reset unexpectedly | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
+
+Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resource daemon, Resource limits above) reports each owner's tick usage against its budget. An owner far above its peers is running away. A tick-exhausted call rolls back rather than hanging the platform.
+
+**Alertable log lines.** `logd` writes `system.log` and tees `errord`'s reports there at ERROR level (Logging and diagnostics above):
+
+- ERROR lines in `system.log`: every uncaught runtime, atomic, and compile error routes through `errord` to this sink. A rising ERROR rate is the platform-level fault signal.
+- `cascade-aborted` and cycle-detection lines in `/usr/Merry/log/dispatch.log`: the property-change dispatcher records observer-cycle detection and cascade-depth overflow here (Logging and diagnostics above). These mark misbehaving application observer wiring.
+
+**A stalled snapshot.** The most reliable unattended signal that automatic persistence has stopped is the `dump_file` modification time. A successful dump rewrites it (automatic every `dump_interval`, plus any explicit one), and the rotation moves the prior file to `<dump_file>.old` first (State persistence above). A `dump_file` mtime older than `dump_interval` plus the dump duration means automatic snapshots are no longer completing, most often disk-full or a permissions problem on the dump directory (Common failure modes below). Because the rotation writes `<dump_file>.old` before the new file, a failed write leaves the prior snapshot intact as a restore point. An operator-invoked `snapshot` that fails also reports to the console and, through `errord`, to `system.log`.
+
+**Headless polling.** Reaching these signals without an operator borrows the mechanism the regression harness already relies on: a client drives the `admin_console` verbs over the telnet port and checks the replies. `scripts/drive-verbs.py` (documented in `scripts/README.md` and run by `drive-verbs-smoke.sh`) connects, authenticates, runs verbs such as `status`, and matches expected output. A monitoring probe follows the same shape: it reads the health vector on an interval and alerts on the thresholds above. An application can instead expose a runtime-derived health check on its own HTTP transport, returning the `status()` counts or a computed verdict rather than the static string the shipped `examples/http-app` returns. That check rides `binary_port` behind the reverse proxy (Network boundary and transport security below).
+
+## Network boundary and transport security
+
+The platform listens on two kinds of port (The .dgd configuration file above): `telnet_port` for the operator console, and `binary_port` for application transports (HTTP and others). Their exposure and transport security are separate decisions.
+
+**The operator console is unencrypted.** `admin_console` speaks plain telnet: the wire carries the operator's password and every command in clear text. Bind `telnet_port` to a loopback interface or a dedicated maintenance network, never a public one, and reach it through an SSH tunnel or a host-terminated TLS tunnel. Console access is equivalent to host shell access on the platform's process (`docs/admin-console.md` Security posture), so the tunnel endpoint and its credentials carry that weight.
+
+**Application HTTP terminates TLS at a reverse proxy.** The shipped deployment posture is a reverse proxy (nginx, Caddy, or equivalent) terminating TLS in front of the platform and forwarding cleartext HTTP to `binary_port` on the loopback. The proxy owns the certificate, the TLS version policy, and the public exposure. The platform serves plain HTTP/1 behind it. Certificate rotation and TLS configuration stay in the proxy, off the runtime's critical path.
+
+**Native TLS is compiled but not the deployment path.** A TLS 1.3 stack ships at `/usr/TLS/` and an HTTP/1 TLS server at `/usr/HTTP/api/lib/TlsServer1.c`, both compiled at boot (`docs/runtime-primitives.md`). The TLS stack's body is gated on the host driver being built with `KF_SECURE_RANDOM`, the HTTP TLS server depends on that stack, and no application subclass binds the server yet, so terminating TLS inside the platform is not a supported deployment today. Use the reverse proxy until an application subclass and the gated build make in-platform TLS a deliberate choice (`docs/runtime-platform-roadmap.md` tracks that activation).
+
+## State file locations and permissions
+
+The platform's persistent state lives in host files whose contents range from the object graph to admin credentials, so their filesystem permissions are part of the security posture.
+
+| Path | Contents | Sensitivity |
+|---|---|---|
+| `dump_file` and `<dump_file>.old` | The persistent object graph: every object's variables, every clone's dataspace, pending `call_out`s | The entire application state |
+| `swap_file` | Objects paged out of memory | Live object data, the same sensitivity as the snapshot |
+| `src/kernel/data/` (`admin.pwd`, `access.data`) | The admin password hash and per-user access grants | Platform credentials |
+| `/usr/System/log/system.log`, `/usr/Merry/log/dispatch.log` | Diagnostic and audit logs | Whatever application detail the logs record |
+| Vault data directories (`/usr/Vault/data/vault/...`) | Schema-exported per-domain state | Application state |
+
+Run the platform as a dedicated unprivileged user and keep each of these readable and writable only by that user: a restrictive `umask` on the process, files not group- or world-readable, containing directories not traversable by other users. The runtime user needs write access to the `dump_file` and `swap_file` directories. A permissions problem on the `dump_file` directory is a common cause of a failed dump (Common failure modes below). Back up the `dump_file` pair and `src/kernel/data/` to off-host storage for disaster recovery (Backing up and restoring state above). That backup carries the same credentials and state, so protect it the same way.
 
 ## Loading host-driver extensions
 
