@@ -35,11 +35,16 @@ The platform enforces the authority model; the deployment enforces the perimeter
 ## Non-goals and known limits
 
 - **This is not strict object-capability.** Authority is ambient (tier, owner, and call chain), not carried by an unforgeable held reference. LPC alone has no revocation or per-reference attenuation, and pure-LPC caretaker patterns are bypassable once the underlying object is reachable by name (`docs/capability.md` What "capability" means here).
+- **No operator-action audit trail exists.** Console commands are not recorded platform-side: the console library writes nothing to the log sink (its per-session history is in-memory session state), and `system.log` carries errors and diagnostics, not operator actions. Session recording, if required, lives in the tunnel layer around the telnet port, not in the platform.
 - **The console wire is unencrypted.** Confidentiality of a console session depends on the tunnel around it, not on the platform.
 - **Extension-loaded behavior is unverified against two primitives.** Whether atomicity and hot reload hold through an extension-compiled codepath is an open empirical question (`docs/operations.md` Open empirical questions). An operator who loads an extension in production owns that risk.
 - **The Merry sandbox is a language restriction, not a separate process.** It bounds what a script may call; it is not an operating-system isolation boundary.
 - **Only Merry source is sandboxed.** Plain LPC loaded through `compile_object` runs at the loading object's tier, unsandboxed. An application that exposes a compile path (a `POST /compile` route, say) runs that code at its own tier; bounded loading of arbitrary plain LPC is not yet available (`docs/runtime-primitives.md`).
 - **This is not a hardened multi-tenant boundary.** Peer domains are separated by discretionary access control inside one process, not an isolation barrier, and the single coherence domain means one runaway domain is a shared-fate risk to the others. The containment story for untrusted code is the Merry sandbox, not domain separation.
+
+## Credential lifecycle
+
+Operator credentials are kernel access-list entries plus a password hash held in image state, and the lifecycle is a handful of verbs. **Provision**: `grant <user> access` registers the name; the first login walks the set-a-password flow (`docs/admin-console.md` Connecting). **Rotate**: the System login console's `password` verb changes the logged-in operator's own password, gated on the old one. **Offboard**: `ungrant <user> access` removes the registration and file access; the name no longer authenticates. **Compromise** of a registered operator: `ungrant <user> access` then `grant <user> access` re-registers the name and the next login sets a fresh password (the old hash lived in the removed registration's user object). The `admin` hash persists in image state across statedumps; its guaranteed reset is the first-boot prompt on a cold boot without a snapshot, so treat an admin-password compromise as a full-perimeter event (the wire is plaintext -- a compromised tunnel equals a compromised console).
 
 ## Where to next
 

@@ -216,6 +216,27 @@ Give the stop timeout room for the dump. Dump time scales with the in-memory ima
 
 An unattended deployment needs its health read by a monitoring system, not by an operator at the telnet prompt. The signals below already exist. This section maps each to the condition it warns of and a way of reaching it without a human on the console. The interactive-triage view of the same signals is in `docs/admin-console.md` (Debugging a stuck platform).
 
+**The monitoring credential.** Provision a dedicated operator with nothing beyond registration -- `grant monitor access` and no directory grants -- and its surface, verified against a live console, is: `status` and `people` answer; the registry extension verbs (`log`, `observers`, `dispatch-trace`, and the rest) answer `No command`, because a registered user logs into the System console and only the kernel console (the `admin` login) routes them; `upgrade` refuses every source the operator cannot write. Log-based alerting therefore reads the host file directly (the `directory` value plus `/usr/System/log/system.log`, Running under a supervisor above) rather than the `log` verb. One warning keeps this credential honest: `halt` carries no access gate, so even this minimal operator can stop the platform -- a console credential is never read-only in blast radius, and the telnet-tunnel perimeter (`docs/admin-console.md` Console security posture) is what actually protects it.
+
+What `status` looks like when healthy (captured from a live console; the counts map to the table below):
+
+```text
+                                          Server:       DGD 1.7.9
+------------ Swap device -------------
+sectors:        513 /     65535 (  1%)    Start time:   Jul 12 15:40:27 2026
+sector size:   1K
+swap average:  0.75, 0.15                 Uptime:       00:00:01
+
+--------------- Memory ---------------    ------------ Callouts ------------
+static:     1502332 /   1621584 ( 93%)    short:         1            (100%)
+dynamic:     429476 /    780288 ( 55%) +  other:         0            (  0%) +
+            1931808 /   2401872 ( 80%)                   1 /    10000 (  0%)
+
+Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
+```
+
+**What an alertable line looks like.** A runtime error persists into `system.log` as a multi-line block: one timestamped `ERROR` header line carrying the message, then the indented trace frames beneath it (observed by tailing the log after a forced fault). Match alerting rules on the header (` ERROR `), not on frame lines; one fault produces one header and many frames.
+
 **Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (Limits and capacity above):
 
 | Signal | Alert condition | Reading |
