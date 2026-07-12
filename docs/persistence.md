@@ -93,7 +93,7 @@ The cost of a snapshot is proportional to the in-memory image size. A multi-giga
 
 ## Snapshot restore: cold boot from snapshot
 
-When the host driver starts and finds a valid `dump_file`, it restores from the snapshot instead of running the cold-boot initd cascade:
+When the host driver is started with a snapshot argument (`dgd config_file dump_file [dump_file.old]` -- the driver never restores a file it was not given, however current the file at `dump_file`), it restores from the snapshot instead of running the cold-boot initd cascade:
 
 1. The driver reads the snapshot file.
 2. The in-memory image is reconstituted from the snapshot data.

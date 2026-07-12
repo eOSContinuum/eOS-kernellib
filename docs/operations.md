@@ -33,8 +33,8 @@ A minimal example is included at `example.dgd` in the repository root.
 
 The platform has three boot modes. `docs/architecture.md` covers the dispatch in detail. Briefly:
 
-- **Cold boot**: started with no snapshot present. The driver compiles `/kernel/sys/driver`, which compiles the System initd. The System initd's `create()` iterates and loads every `/usr/[A-Z]*/initd.c`, and the platform reaches the running state. This is the path for first-time bring-up and after intentional state wipe.
-- **Snapshot restore**: started with a snapshot file present at `dump_file`. The driver reloads the snapshotted object graph and dataspaces, then calls the registered `restored(int hotboot)` driver hook. Initd cascades do not run. The platform resumes the state captured at the snapshot.
+- **Cold boot**: started with no snapshot argument. The driver compiles `/kernel/sys/driver`, which compiles the System initd. The System initd's `create()` iterates and loads every `/usr/[A-Z]*/initd.c`, and the platform reaches the running state. This is the path for first-time bring-up and after intentional state wipe.
+- **Snapshot restore**: started with the snapshot named on the command line (`dgd config_file dump_file [dump_file.old]`, Backing up and restoring state below). The driver reloads the snapshotted object graph and dataspaces, then calls the registered `restored(int hotboot)` driver hook. Initd cascades do not run. The platform resumes the state captured at the snapshot. The driver never restores a snapshot it was not given as an argument, however current the file sitting at `dump_file`.
 - **Hot boot**: `shutdown(1)` followed by `execv` (when the `.dgd` file's `hotboot` tuple is set). Open file descriptors and connections are inherited by the replacement process. The snapshot is written and reloaded, but external connections survive the transition. Used for upgrading the host binary or `.dgd` config without dropping live work.
 
 ## admin_console
@@ -211,6 +211,68 @@ Give the stop timeout room for the dump. Dump time scales with the in-memory ima
 `SIGINT`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` are not caught: their default disposition applies, so a stop sent as `SIGINT` terminates the process without the snapshot. Only `SIGTERM` runs the snapshot-and-shutdown path. `SIGINT`, `SIGKILL`, and a host crash bypass it and lose the work committed since the last automatic dump (Availability and data-loss model above).
 
 **Restart is a cold restore, not a hot boot.** The signal path calls `shutdown()`, not `shutdown(1)`, so it does not `execv` and does not preserve connections. On restart the supervisor cold-boots against the snapshot pair (`dgd config_file dump_file dump_file.old`), the platform restores state, and clients reconnect. Connection-preserving hot boot is a separate operator action: the System console's `hotboot` verb calls `shutdown(1)` to `execv` the replacement process against a configured `hotboot` tuple (Booting above). No supervisor signal triggers it. Configure the supervisor to restart with the dump files in place: a restart that cannot read them cold-boots from source and carries no state across (the Cold boot row of the downtime taxonomy above).
+
+**A boot-state-invariant start command.** The restore arguments are the fork in the road: passing them when the files are absent is a fatal `Config error: cannot open restore file`, and omitting them when a snapshot exists silently cold-boots a stale world -- the driver has no auto-detection (Booting above). A fixed `ExecStart` cannot cover both states, so start through a wrapper that passes the snapshot pair only when present:
+
+```sh
+#!/bin/sh
+# run-dgd.sh -- boot-state-invariant start
+cd /srv/eos || exit 1
+set --
+[ -f state/snapshot ] && set -- state/snapshot
+[ -f state/snapshot.old ] && set -- "$@" state/snapshot.old
+exec /srv/eos/dgd/bin/dgd server.dgd "$@"
+```
+
+A reference unit around it, each setting tied to a fact above:
+
+```ini
+[Unit]
+Description=eOS-kernellib platform
+After=network.target
+
+[Service]
+Type=simple
+User=eos
+WorkingDirectory=/srv/eos
+ExecStart=/srv/eos/run-dgd.sh
+Restart=on-failure
+KillSignal=SIGTERM
+# SIGTERM triggers the snapshot-then-exit path; give the dump room.
+# Scale with image size (Limits and capacity above).
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`KillSignal` stays `SIGTERM` because it is the only signal the driver catches for the graceful snapshot; `Restart=on-failure` rather than `always` so a deliberate operator `halt` stays down.
+
+**Reverse proxy.** Until native TLS activation (`docs/runtime-platform-roadmap.md` Transport posture), the doctrine is proxy-terminated TLS in front of the HTTP/1 port:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name example.org;
+    # ssl_certificate / ssl_certificate_key per your issuance
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+    }
+}
+```
+
+**Log rotation.** `logd` appends one line per flush and holds no descriptor between flushes, so plain logrotate with `create` suffices -- no signal, no copytruncate. The host path is the `.dgd` `directory` value plus `/usr/System/log/system.log`:
+
+```text
+/srv/eos/src/usr/System/log/system.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    create 0640 eos eos
+}
+```
 
 ## Monitoring signals
 
