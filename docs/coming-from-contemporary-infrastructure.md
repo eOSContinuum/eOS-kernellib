@@ -53,4 +53,5 @@ In the interest of honesty about the other direction, here are the needs the ser
 - **[persistence.md](persistence.md)**: the model underneath everything in this table: why orthogonal persistence, what persists, the statedump cycle, the boundaries, and Getting data out, for the exit-cost question.
 - **[getting-started.md](getting-started.md)**: boot the platform and see the properties firsthand.
 - **[lpc-essentials.md](lpc-essentials.md)**: the language bridge, including the "if you come from dynamic languages" notes.
+- **[debugging-applications.md](debugging-applications.md)** The working environment, plainly: what a team's day-to-day looks like -- the editor reality (C mode, no LSP), why git stays the source of truth structurally, and CI as the regression harness run headless.
 - **[runtime-primitives.md](runtime-primitives.md)**: the per-primitive foundation-and-evidence statement for the eight runtime guarantees.

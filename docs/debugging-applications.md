@@ -57,6 +57,12 @@ The iteration loop is short because the platform never leaves the running image:
 
 Automated tests are boot-time sentinel drivers, not a separate test runner: a `sys/test.c` in the application domain runs its checks at cold boot and writes a pass/fail line an external script asserts on. See `docs/application-authoring.md` for the pattern.
 
+**Editor.** LPC files are `.c` files; C or C++ mode in any editor gives working syntax highlighting, and that is the extent of what the platform provides: no language server, no formatter, no editor plugin ships with it or is maintained for this DGD dialect. Teams that live on LSP-heavy workflows should price that in honestly -- navigation is `rg` and the source map (`docs/source-map.md`), not go-to-definition.
+
+**Git stays the source of truth structurally, not by convention.** The console's `compile <file.c>` verb replaces a master from the file on disk -- there is no way to compile pasted or in-memory source into a lasting object (`code` evaluates a throwaway object and destructs it). A hot-fix therefore always exists in the working tree before it exists in the image, and the only discipline left to the team is the ordinary one: commit what was hot-fixed. The failure mode to guard is the reverse drift -- an editor buffer abandoned after `compile` leaves the image running code the tree has since lost; the fix is the same commit habit, not new tooling.
+
+**CI is the regression harness run headless.** A pipeline job needs no platform-specific infrastructure: build the driver (seconds, cacheable -- `docs/getting-started.md` states the measured cost), then run the same gate a human runs -- `scripts/run-example.sh` profiles plus the application's own boot-time sentinel driver, asserting on the pass lines. This is exactly the pre-PR bar `CONTRIBUTING.md` already asks of kernel changes (the Full regression sweep in `scripts/README.md`); an application team's CI is the same sweep with its own example profile added.
+
 ## Error messages
 
 The fastest path into this doc set is often the error string itself. This table indexes the messages an application author is likely to be holding when they arrive here, and where each one is actually documented.
