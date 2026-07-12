@@ -122,7 +122,7 @@ All four object-taking verbs (`clone`, `destruct`, `new`, `status`) also accept 
 - `swapout` calls `swapout()`. Swaps every in-memory object to disk (the swap file), reducing memory pressure. Next access faults the object back in. Useful before a snapshot: a swapped-out image fits more cleanly into the snapshot.
 - `snapshot` calls `dump_state(0)` (full image dump). Writes to `dump_file` per the `.dgd` configuration. The previous snapshot moves to `<dump_file>.old`. Cost: I/O for the full image size; runtime briefly blocks.
 - `shutdown` calls `shutdown()` (cold shutdown without snapshot). The platform exits; the next boot is a cold boot OR a snapshot-restore from the most recent snapshot (depending on whether the snapshot file is present and valid).
-- `reboot` calls `dump_state(1)` (incremental snapshot) followed by `shutdown()`. Effectively: snapshot-and-stop. Next boot restores from the new snapshot.
+- `reboot` calls `dump_state(1)` (incremental snapshot) followed by `shutdown()`. Effectively: snapshot-and-stop; requires full access. Next boot restores from the new snapshot.
 
 **What for**:
 
@@ -340,7 +340,7 @@ To reset the admin password from outside the console: the kernel's auth state li
 | `pwd` | Filesystem | Print session directory |
 | `query-approved-registrars` | Dispatcher | List MERRY's approved-registrars set (extension) |
 | `quota [<user> [<rsrc> [<limit>]]]` | Resources | Read or set per-owner resource limits |
-| `reboot` | Lifecycle | Incremental snapshot + cold shutdown (recovers from snapshot on next boot) |
+| `reboot` | Lifecycle | Incremental snapshot + cold shutdown (recovers from snapshot on next boot). Requires full access. |
 | `register-observer <obj_path> <path> <timing> <source...>` | Dispatcher | Install a runtime observer (extension) |
 | `rm <file> [...]` | Filesystem | Remove files (refuses directories) |
 | `rmdir <directory> [...]` | Filesystem | Remove empty directories |
@@ -362,7 +362,7 @@ The appendix above is the kernel console's verb set, reached by the `admin` logi
 | `upgrade [-a\|-p] <file> [...]` | Recompile a source file and every dependent through the upgrade cascade. `-a` recompiles the whole dependency tree as one all-or-nothing atomic operation. `-p` additionally queues `call_touch` patching so live clones migrate state (see Hot-fixing code in production above and `docs/code-lifecycle.md` Library upgrade). |
 | `issues <file> [...]` | List the outstanding compiled program versions (objectd calls them issues) for each file. More than one issue means older versions are still bound to dependents that have not upgraded, so the verb reads back whether an upgrade cascade has fully propagated. |
 | `hotboot` | Write an incremental snapshot and re-exec the host binary in place (`dump_state(1)` then `shutdown(1)`), inheriting open connections. This is the connection-preserving host-binary swap (`docs/operations.md` Running under a supervisor). It requires full access and fails with `Permission denied` otherwise. |
-| `halt` | Cold shutdown without a snapshot, the System console's name for the kernel console's `shutdown`. It requires full access, and leaves a restore point only if a `snapshot` or `reboot` ran first. |
+| `halt` | Cold shutdown without a snapshot, the System console's name for the kernel console's `shutdown`. It leaves a restore point only if a `snapshot` or `reboot` ran first. |
 
 `upgrade` recompiles only the sources the operator's owner may write, so an operator can upgrade only what it can edit.
 
