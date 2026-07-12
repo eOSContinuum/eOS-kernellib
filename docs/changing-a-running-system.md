@@ -48,6 +48,17 @@ The largest change (a new build of the host runtime itself) also takes effect wi
 
 Reference: `docs/operations.md` boot modes and `docs/admin-console.md` Snapshot, restore, and shutdown.
 
+## Shipping a release
+
+A multi-file application release composes the ladder's rungs into one operator sequence. Nothing here is new mechanism -- it is the order that keeps every step recoverable.
+
+1. **Snapshot first.** `snapshot` writes the restore point (`docs/operations.md` Backing up and restoring state). If anything below goes wrong, the recovery is that snapshot, not a reverse migration.
+2. **Sync the source tree.** Bring the domain's source to the release state (a git checkout or copy on the host). Nothing changes in the image yet: masters rebuild only when compiled.
+3. **Upgrade through the cascade.** For each changed library, `upgrade -a <file.c>` from the operator login (rung 2): the daemon recompiles every direct and transitive dependent, and `-a` makes the tree all-or-nothing, so a compile error anywhere leaves the whole release un-applied. Add `-p` when the release changes a clone's data shape (rung 3); the patch sweep runs eagerly after the recompile. Standalone masters with no shared library are a plain `compile <path>` each (rung 1).
+4. **Verify.** `issues <file.c>` per changed source reads back whether the cascade converged (more than one issue means older program versions are still bound); the application's own sentinel driver or a `code` probe exercises the changed behavior; `log 40` reads the error log for anything the release provoked.
+
+**Detecting image-versus-source drift.** No shipped tooling compares the compiled image against the on-disk tree, in either direction -- there is no manifest, no checksum walk, and no report of masters whose source changed since compile. The primitives to hand-roll a per-object check exist (an object's compile time via `status(obj)[O_COMPILETIME]`, the source's modification time via `file_info`), but nothing walks the tree for you. What holds drift down is discipline plus one structural fact: compile from files rather than the two-argument inline-source form (rung 1 names that escape hatch as exactly the drift hole), and drift does not survive a cold boot -- though not symmetrically. A cold boot starts from an empty object table and compiles what the initd cascade reaches from the tree: a stale on-disk master is rebuilt from the current file, while an inline-only master with no file behind it simply does not come back (it vanishes if nothing references its path again, and a later `compile_object` against the fileless path errors).
+
 ## The safety net
 
 Two properties hold under every rung above:
