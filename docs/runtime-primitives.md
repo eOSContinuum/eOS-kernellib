@@ -14,6 +14,19 @@ The architectural commitment behind this list (why these eight are surfaced as r
 - **Partial**: foundation present, demonstration partial. Some surface of the primitive is observed. Complete demonstration is not yet authored.
 - **Foundation-only**: platform mechanism is present, but no empirical demonstration of the primitive exists yet.
 
+**At a glance.** Status word matches each section's own **Status** line verbatim; see that section for the full statement.
+
+| Primitive | Status | Demonstrated by | One-command proof |
+|---|---|---|---|
+| [Atomicity](#1-atomicity) | Validated | `examples/atomic-demo/` | `examples/atomic-demo/smoke.sh` (live HTTP probe; no run-example.sh profile) |
+| [Capability separation](#2-capability-separation) | Partial | `examples/http-app/`, `examples/merry-app` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` |
+| [Persistent state](#3-persistent-state) | Validated | `examples/merry-app` (dump/restart cycle) | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` |
+| [Hot reload](#4-hot-reload) | Validated | `examples/hot-reload-demo/`, `examples/hot-reload-master/`, `examples/upgrade-cascade/` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh hot-reload-master` |
+| [Sandboxed code load](#5-sandboxed-code-load) | Partial | `examples/merry-app`, `examples/chat-app` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` |
+| [Asynchronous events](#6-asynchronous-events) | Partial | `examples/merry-app`, `examples/chat-app` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` |
+| [Multi-agent coherence](#7-multi-agent-coherence) | Partial | `examples/chat-app` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh chat-app` |
+| [State introspection](#8-state-introspection) | Partial | `admin_console` (interactive), driven headlessly by `scripts/drive-verbs-smoke.sh` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/drive-verbs-smoke.sh` |
+
 **Tier vocabulary** used throughout this document is defined in the Appendix. Briefly: kernel-tier code lives in `/kernel/` (tier B). System-tier code lives in `/usr/System/` (tier C). Shipped platform domains live in `/usr/HTTP/`, `/usr/TLS/`, `/usr/LPC/`, etc. (tier D). Application domains outside the kernel layer are tier E.
 
 ---
