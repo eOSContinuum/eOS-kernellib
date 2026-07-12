@@ -151,7 +151,7 @@ The kernel layer ships platform domains (tier D) under `src/usr/`:
 - **`src/usr/Marshal/`**: the state import/export binding between property tables and the XML transport, used by the Vault pipeline.
 - **`src/usr/XML/`**: XML parse and generate transport (element/pcdata/samref LWO wrappers) consumed by the Vault layout. See `docs/xml.md`.
 - **`src/usr/Index/`**: the logical-name registry daemon, name-to-object bindings consumed by Schema, Vault, and the console's clone addressing.
-- **`src/usr/MerryApp/`**: the reference Merry application (a schema-registered clonable with script slots plus its boot-time test driver). This is the same tree the `examples/merry-app` walkthrough documents.
+- **`examples/merry-app/`**, the reference Merry application (a schema-registered clonable with script slots plus its boot-time test driver): unlike the modules above, it ships as an example, not under `src/usr/`. The harness deploys it as the `/usr/MerryApp/` domain at boot, and the `examples/merry-app` walkthrough documents it.
 
 `src/usr/System/` (tier C) is the kernel-tier-adjacent privileged domain described under Daemons above.
 
