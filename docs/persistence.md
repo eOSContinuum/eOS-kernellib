@@ -66,9 +66,9 @@ The platform's statedump captures the entire in-memory image:
 | **Object identity** | Yes | Master paths, clone indices, owner attributions |
 | **Inheritance graph** | Yes | The objectd-maintained registry |
 | **Pending `call_out`s** | Yes | The deferred-call queue, with original argument values |
-| **Access bits** | Yes | Per-user, per-directory access state |
+| **Access bits** | Yes | Per-user, per-directory access state. Grants made through the kernel console's `grant` / `ungrant` verbs are also flushed to `src/kernel/data/access.data`, independent of the snapshot cycle; grants made by other paths reach that file only at the next such flush |
 | **Resource consumption** | Yes | Per-owner tick / object / call_out counters |
-| **Admin credentials** | Yes | Persisted under the access daemon |
+| **Admin credentials** | Yes | The hash rides the image as an ordinary user-object variable, and is also file-backed: the kernel user object writes it to `src/kernel/data/admin.pwd` via `save_object` the moment it changes and re-reads that file at the next login, independent of the snapshot cycle (`docs/runtime-primitives.md` section 3) |
 | **Open connections** | **No** | File descriptors are not in the snapshot |
 | **Swap-file contents** | **No** | The swap is per-boot scratch; objects swapped to disk are paged into the snapshot at dump time |
 | **Static variables, w.r.t. `save_object`** | **No** | `static` excludes from the per-object save format; full statedump is independent of the modifier |
