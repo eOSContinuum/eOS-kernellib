@@ -20,6 +20,8 @@ cp -R examples/http-app src/usr/WWW
 
 Then start the driver against `example.dgd`. The new `/usr/WWW/` user-layer domain is picked up automatically by the System initd's `/usr/[A-Z]*/initd.c` iteration.
 
+That iteration runs only at **cold boot**: a start that restores from a snapshot skips it, so a domain copied in while the platform was down is not compiled on restore. Boot cold (no snapshot argument) after deploying a new domain.
+
 ## Verify
 
 ```sh

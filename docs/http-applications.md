@@ -22,6 +22,8 @@ cp -R examples/http-app src/usr/WWW
 
 Then run the driver against `example.dgd` and verify with `curl http://localhost:8080/health`.
 
+Deploying by copy requires a **cold boot**: the System initd iterates `/usr/[A-Z]*/initd.c` only in its boot-time `create()` (`src/usr/System/initd.c`); a restart that restores from a snapshot skips that iteration, so a domain copied in while the platform was down is not compiled on a restore. Boot without a snapshot argument (or `snapshot` first and deploy before a cold boot) when adding a new domain.
+
 The sections below explain what the reference application is doing and why. Read the code in `examples/http-app/obj/server.c` alongside this document.
 
 ## Application layout
