@@ -2,7 +2,7 @@
 
 **Audience**: a contributor running or extending the headless boot regressions under `scripts/`; assumes DGD is built per `docs/getting-started.md`.
 
-Four scripts drive the platform through boot cycles and assert on the result. The three shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
+Five scripts drive the platform through boot cycles and assert or measure the result. The three shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
 
 ## run-example.sh
 
@@ -51,6 +51,14 @@ MAX_LINES=400 scripts/base-boot-guard.sh   # override the bound (default 400)
 ```
 
 Boots the platform with no example deployed for a fixed 6s window, then asserts both the boot log and `src/usr/System/log/system.log` stay at or under `MAX_LINES` -- a regression against the atomic-write-storm failure mode (a caught error inside an atomic function re-entering the error manager and looping a file write).
+
+## measure-baseline.py
+
+```sh
+DGD_BIN=/path/to/dgd scripts/measure-baseline.py [--sizes 4,12,28] [--requests 200]
+```
+
+The timing rig, not a pass/fail gate: boots cold (timed to console-ready), grows the image in steps by parking integer arrays in a scratch object, records the client-observed snapshot pause and the snapshot file size at each step, times a restore boot against the final snapshot, and drives sequential GETs against the deployed http-app for a throughput figure. It writes its own config copy with `sector_size` raised, because the stock build caps `swap_size` at 65535 sectors and the image must fit the swap device. Numbers land in `docs/operations.md` Limits and capacity; re-run there means re-measuring on your machine, not trusting ours.
 
 ## Full regression sweep
 
