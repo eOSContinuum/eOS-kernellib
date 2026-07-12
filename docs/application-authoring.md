@@ -88,7 +88,7 @@ What identity means on this platform today, surface by surface, and what an appl
 
 **Code identity is structural.** Every object runs under an owner within a capability tier, and the capability store's principals are ambient-derived strings (owner, program path, object name -- `docs/capability.md` The mechanism). This is the identity model the platform enforces, and it identifies code, not people.
 
-**Operator identity is the console's.** A registered operator is a kernel access-list entry plus a password hash held in the operator's user object; the System telnet manager admits only registered names, and the login flow checks a salted hash (`docs/admin-console.md` Connecting; `docs/security-posture.md` Credential lifecycle). Operators are administrators, not application users.
+**Operator identity is the console's.** A registered operator is a kernel access-list entry plus a password hash held in the operator's user object; the System telnet manager admits only registered names, and the login flow checks a salted hash (`docs/admin-console.md` Connecting). Operators are administrators, not application users.
 
 **HTTP connections are anonymous.** The HTTP/1 bootstrap clones the application server per connection and associates no identity with it: no principal is derived from the request, no session is bound to the connection, and consecutive requests share nothing but the clone. Any notion of an application user starts from nothing on this path.
 
