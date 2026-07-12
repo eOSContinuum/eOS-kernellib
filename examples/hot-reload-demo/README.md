@@ -44,10 +44,10 @@ Step 2: POST /compile (new LPC source for /usr/WWW/greeting)
 Step 3: GET /greet (post-recompile response)
   hello after recompile
 
-=== PASS: response changed across recompile to match new source ===
+=== PASS: post-recompile response contains expected marker ===
          initial: hello before recompile
          final:   hello after recompile
-         (hot reload verified, no DGD restart)
+         (hot reload verified, no DGD restart; response changed across recompile)
 ```
 
 The response changing across the three-step probe is the hot-reload evidence: the same DGD process serves the cold-boot string in step 1 and the recompiled string in step 3, with `compile_object` (invoked through `POST /compile`) as the only mechanism that changed in between.
