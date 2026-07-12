@@ -159,6 +159,22 @@ For the canonical HTTP/1 worked example of this pattern, see `examples/http-app/
 
 For datagram-shaped applications (UDP), the platform ships the datagram transport scaffolding (`docs/runtime-primitives.md` Supporting surfaces), but no canonical datagram application yet.
 
+## Outbound connections
+
+The platform can initiate connections outward, and the surface is smaller and less proven than the inbound one. Stated plainly:
+
+**What ships.** `Http1Client` (and its TLS variant `Http1TlsClient`) compiles at boot: an inheritable client library whose `create(object client, string host, int port, string responsePath, string headersPath)` initiates the connection, with the signatures in `docs/http-applications.md` API signatures. No shipped example or test exercises either client today -- an application that adopts this surface is its first consumer, and should say so in its own risk register.
+
+**The call chain and its gate.** An application cannot open a socket directly: the kernel auto's `connect()` is gated to the kernel's connection machinery, and the socket opens through a kernel connection object bound to a user object -- the same user-library pattern as inbound (Non-HTTP transports above). Inheriting `Http1Client` beside `/usr/System/lib/user` is the packaged form of that route.
+
+**The callback lifecycle.** `connect` is fire-and-forget; no call blocks. The outcome arrives as callbacks: `connected()` on success, `connectFailed(int errorcode)` on failure, with the error codes in `src/include/connect.h` (`CONNECT_REFUSED`, `CONNECT_HOST_UNREACH`, `CONNECT_NET_UNREACH`, `CONNECT_TIMEOUT`, and the unspecified `CONNECT_FAILURE`). Response data then arrives through the flow contract as new tasks -- every received chunk is its own task under run-to-completion (`docs/execution-model.md`), so a pending response never holds a task open.
+
+**Timeouts.** Two exist, one is yours: the established-connection inactivity timeout is the client class's `inactivityTimeout()` override (default 120 seconds), while the pending-connect timeout is the operating system's TCP timeout, which the host driver detects and surfaces as `connectFailed(CONNECT_TIMEOUT)` -- there is no LPC-side knob for it. The idiom for a request deadline is a `call_out` armed when the request is sent, cancelled in `receiveResponse`; if it fires first, `terminate()` the connection and treat the exchange as failed.
+
+**The atomic envelope.** How an in-flight outbound connect interacts with an enclosing atomic function is undocumented and untested today: no doc states whether the initiation is deferred, refused, or performed immediately, and no shipped code initiates one from atomic context. Treat it in the same register as the platform's other unproven interactions (`docs/operations.md` Open empirical questions): do not initiate outbound work inside an atomic function until someone has proven the behavior.
+
+The roadmap's transport posture carries the activation status for the outbound clients (`docs/runtime-platform-roadmap.md` Transport posture).
+
 ## Worked example sketch: an in-memory KV service
 
 The platform's persistence + atomicity guarantees make an in-memory key-value service near-trivial to implement at the application layer. The shape:
