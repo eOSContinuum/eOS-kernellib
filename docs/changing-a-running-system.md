@@ -59,6 +59,21 @@ A multi-file application release composes the ladder's rungs into one operator s
 
 **Detecting image-versus-source drift.** No shipped tooling compares the compiled image against the on-disk tree, in either direction -- there is no manifest, no checksum walk, and no report of masters whose source changed since compile. The primitives to hand-roll a per-object check exist (an object's compile time via `status(obj)[O_COMPILETIME]`, the source's modification time via `file_info`), but nothing walks the tree for you. What holds drift down is discipline plus one structural fact: compile from files rather than the two-argument inline-source form (rung 1 names that escape hatch as exactly the drift hole), and drift does not survive a cold boot -- though not symmetrically. A cold boot starts from an empty object table and compiles what the initd cascade reaches from the tree: a stale on-disk master is rebuilt from the current file, while an inline-only master with no file behind it simply does not come back (it vanishes if nothing references its path again, and a later `compile_object` against the fileless path errors).
 
+## Changing the kernel layer
+
+The ladder above is written for application-tier change. Kernel- and System-tier sources take the same mechanisms, with one matrix worth stating once (each row below was exercised against a live boot):
+
+| What changes | Live viability | The mechanism and the catch |
+|---|---|---|
+| A System daemon (`errord`, `logd`, `userd`) | Yes | `compile <path>` from the admin console. Master variables survive; `create()` does not re-run, so driver registrations held by reference persist. This holds for capabilityd too: its grant tables ride the recompile unchanged (`docs/capability.md`); only a cold boot re-seeds the bootstrap table. |
+| `objectd` / `upgraded` | Yes, between cascades | Same as any daemon, but not while an upgrade or patch sweep is in flight: the upgrade daemon tracks in-flight cascade state in its master variables (it refuses new upgrades with "Still patching" while a sweep runs), and the machinery does not patch itself. |
+| The System auto (`/usr/System/lib/auto.c`) | Yes, with breadth | A direct `compile` replaces the master but leaves every inheritor on the old issue (`issues` reads the divergence). The full cascade is `upgrade /usr/System/lib/auto.c` from an operator login -- and because everything user-tier inherits the System auto, the cascade wants write access to every dependent source: an operator with partial grants is refused per file (`<file>: Access denied`), while a full-access operator drives it end to end. This is also the path that picks up a changed `~System/data/EXT` (`docs/where-code-belongs.md`). |
+| The kernel auto (`/kernel/lib/auto.c`) | Recompiles live; cascade uncharted | The file-based `compile` succeeds from the admin console and the image stays sound, but kernel-tier objects are excluded from `call_touch` patching in the upgrade daemon, and no shipped procedure cascades kernel-tier dependents. Treat a kernel-auto change as a cold-boot change until someone proves the live path. |
+| The driver object (`/kernel/sys/driver.c`) | Yes | Recompiles live; it has no `create()` to re-run and its registrations survive by reference. |
+| An include file (`.h`) | Via the cascade | objectd records include relationships and the upgrade daemon walks them, so upgrading the include's dependents recompiles transitive includers. A bare edit with no `upgrade` changes nothing until the includers recompile. |
+
+The contributor's edit loop follows from the matrix: day-to-day kernel work is edit, `compile`, exercise from the console; a change to either auto or to widely-included headers is verified with a cold boot plus the regression sweep (`CONTRIBUTING.md`), because that is the only path that proves the whole tree rebuilds against the change.
+
 ## The safety net
 
 Two properties hold under every rung above:
