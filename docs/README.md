@@ -100,7 +100,7 @@ Common goals and the docs that serve them.
 - **Debug a misbehaving application**: [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
 - **Cross-reference an unfamiliar term mid-document**: [glossary.md](glossary.md).
 - **Follow a citation back to its source**: [references.md](references.md).
-- **Contribute to the kernel layer**: `../CONTRIBUTING.md`, then [architecture.md](architecture.md) for the model, [source-map.md](source-map.md) to find your way around the tree, [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference/](kernel-reference/README.md) for the modified API surface. `../scripts/README.md` documents the regression harness a change must keep green.
+- **Contribute to the kernel layer**: `../CONTRIBUTING.md`, then [architecture.md](architecture.md) for the model, [source-map.md](source-map.md) to find your way around the tree, [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference/](kernel-reference/README.md) for the modified API surface. `../scripts/README.md` documents the regression harness a change must keep green. [architecture.md](architecture.md) The boot, in source order is the guided first read of the kernel source; ../CONTRIBUTING.md Anatomy of a mergeable change shows two merged units as templates.
 
 [DGD]: https://github.com/dworkin/dgd
 [lpc-doc]: https://github.com/dworkin/lpc-doc

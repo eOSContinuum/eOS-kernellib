@@ -94,6 +94,22 @@ The host driver writes a snapshot, replaces the running executable via `execv` (
 
 Statedump cadence is governed by the config's `dump_interval`. Statedumps occur between timeslices, never inside an atomic operation. The runtime guarantees that the snapshot represents a consistent state-graph commit boundary.
 
+### The boot, in source order
+
+The same sequence as a contributor's first guided read: each file below, in the order the cold boot executes it, with what the reader learns there. (Follow along in the sources; the functions named carry the order.)
+
+1. `src/kernel/sys/driver.c` (`_initialize`) -- the object DGD calls first; everything below happens inside its bootstrap.
+2. `src/kernel/lib/auto.c` -- the kernel auto, compiled first among the objects the driver's bootstrap loads: kfun wrappers, owner identity, the access checks every later object inherits.
+3. `src/kernel/sys/resource_daemon.c` and `src/kernel/obj/rsrc.c` -- per-owner resource accounting, needed before any owner exists.
+4. `src/kernel/sys/access_daemon.c` -- the file- and command-access store.
+5. `src/kernel/sys/userd.c` and `src/kernel/obj/admin_console.c` -- connection acceptors and the operator console clonable.
+6. `src/kernel/sys/capabilityd.c` -- the capability store, deliberately compiled before any domain initd so the gating surfaces find it seeded (the source comment states the timing requirement).
+7. `src/usr/System/initd.c` (`create`) -- the System bootstrap: objectd first (so every later compile is recorded), then the global-read publishing of the shipped state domains, then the System daemons in order (`errord`, `logd`, `upgraded`, the System `userd`, `persist_helper`), the login console, and the shared base library (codecs, iterators, strings, collections, continuations).
+8. The domain passes -- one loop registers every `/usr/[A-Z]*` owner (so cross-domain inherits resolve regardless of order), a second compiles each domain's `initd.c`, with the fixed `TLS`, `HTTP`, `LPC` prefix ahead of the alphabetical remainder.
+9. `src/usr/System/sys/http_server.c` -- compiled last, once every domain exists, and registered as the binary-port manager.
+
+Everything after step 9 is demand-driven: clones per connection, compiles per operator action, call_outs per schedule.
+
 ## Auto-inheritance pattern
 
 Every compiled LPC source automatically inherits the auto object named by the `.dgd` config's `auto_object` line. The auto-inheritance is implicit. An LPC file does not declare it. The compile-time effect: every object's master inherits the auto's variables, functions, and access checks.

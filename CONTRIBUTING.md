@@ -79,6 +79,15 @@ An empirical Observation is a dated statement, in the doc it supports, naming th
 
 A behavior change updates the document that owns it: `docs/source-map.md`'s "Finding a subsystem" table names, for each subsystem, the entry-point code and the doc that explains it, and that doc is the one a behavior change must update. Adding or renaming a doc under `docs/` also updates `docs/README.md`'s Documentation map, the index a new doc does not otherwise appear in.
 
+## Anatomy of a mergeable change
+
+Two merged units show the full shape the sections above ask for; read their diffs as templates.
+
+- **A fix** (PR #52): a focused two-file type correction in the collection stack, shipped in the same PR as the regression verbset that drives exactly the fixed path (plus a companion console-baseline verbset), verified against a live boot and the default sweep. Internals-only, so no doc touch -- the test is the evidence.
+- **A feature** (PR #31): a diagnostics-routing change across two domains, shipped with the verbset assertion that proves the new visibility end to end and the five documentation updates that keep the owning docs true. Code, proof, and prose land as one reviewed unit.
+
+The common skeleton: one logical change, the regression that demonstrates it (sentinel driver phase, verbset entry, or example assertion), and whatever documentation the change makes stale -- in the same PR.
+
 ## Code style
 
 LPC code follows the conventions visible across `src/`:
