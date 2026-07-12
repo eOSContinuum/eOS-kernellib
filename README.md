@@ -49,7 +49,7 @@ A passing run ends with the expected `OK` sentinel count. `scripts/README.md` do
 - **Platform model** — `docs/architecture.md` (capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions), `docs/runtime-primitives.md` (the eight runtime primitives with per-primitive foundation and status), `docs/persistence.md` (orthogonal persistence, statedump cycle, hot boot), `docs/code-lifecycle.md` (compile / clone / destruct / call_touch / object-manager events)
 - **Writing applications** — `docs/lpc-essentials.md` (LPC language orientation, bridges to the formal spec), `docs/kernel-libraries.md` (the inheritable libraries under `src/lib/`), `docs/application-authoring.md` (general tier-E application patterns, non-HTTP transports), `docs/http-applications.md` (HTTP/1-specific patterns)
 - **Operations** — `docs/operations.md` (`.dgd` configuration, boot modes, state persistence, logging, resource limits, extension loading), `docs/admin-console.md` (operator console: connecting, security posture, per-task operational reference, verb appendix)
-- **Working examples** — eight runnable applications under `examples/`, from the minimal HTTP/1 service (`examples/http-app/`) through atomic rollback, hot reload, Vault persistence, signals, Merry scripting, and multi-user chat; the `docs/README.md` Working-examples section maps each to its companion doc
+- **Working examples** — nine runnable applications under `examples/`, from the minimal HTTP/1 service (`examples/http-app/`) through atomic rollback, hot reload, Vault persistence, signals, Merry scripting, and multi-user chat; the `docs/README.md` Working-examples section maps each to its companion doc
 
 ## How it composes
 
