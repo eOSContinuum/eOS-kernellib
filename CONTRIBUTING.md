@@ -83,7 +83,7 @@ A behavior change updates the document that owns it: `docs/source-map.md`'s "Fin
 
 Two merged units show the full shape the sections above ask for; read their diffs as templates.
 
-- **A fix** (PR #52): a focused two-file type correction in the collection stack, shipped with two new regression verbsets that were red before the fix and green after, verified against a live boot plus the default sweep. Internals-only, so no doc touch -- the test is the evidence.
+- **A fix** (PR #52): a focused two-file type correction in the collection stack, shipped in the same PR as the regression verbset that drives exactly the fixed path (plus a companion console-baseline verbset), verified against a live boot and the default sweep. Internals-only, so no doc touch -- the test is the evidence.
 - **A feature** (PR #31): a diagnostics-routing change across two domains, shipped with the verbset assertion that proves the new visibility end to end and the five documentation updates that keep the owning docs true. Code, proof, and prose land as one reviewed unit.
 
 The common skeleton: one logical change, the regression that demonstrates it (sentinel driver phase, verbset entry, or example assertion), and whatever documentation the change makes stale -- in the same PR.

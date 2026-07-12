@@ -99,7 +99,7 @@ Statedump cadence is governed by the config's `dump_interval`. Statedumps occur 
 The same sequence as a contributor's first guided read: each file below, in the order the cold boot executes it, with what the reader learns there. (Follow along in the sources; the functions named carry the order.)
 
 1. `src/kernel/sys/driver.c` (`_initialize`) -- the object DGD calls first; everything below happens inside its bootstrap.
-2. `src/kernel/lib/auto.c` -- the kernel auto, compiled before anything else: kfun wrappers, owner identity, the access checks every later object inherits.
+2. `src/kernel/lib/auto.c` -- the kernel auto, compiled first among the objects the driver's bootstrap loads: kfun wrappers, owner identity, the access checks every later object inherits.
 3. `src/kernel/sys/resource_daemon.c` and `src/kernel/obj/rsrc.c` -- per-owner resource accounting, needed before any owner exists.
 4. `src/kernel/sys/access_daemon.c` -- the file- and command-access store.
 5. `src/kernel/sys/userd.c` and `src/kernel/obj/admin_console.c` -- connection acceptors and the operator console clonable.
