@@ -110,10 +110,9 @@ A supervisor sending SIGTERM (the ordinary "stop the service" path outside admin
 
 Portability is stated exactly as tested: one macOS/arm64-to-Linux/aarch64 restore with driver binaries built from the same source succeeded. Other host and architecture pairs are unverified; the driver's own guard for an unusable file is the `Bad or incompatible restore file header` refusal, so an incompatible pair fails at boot rather than corrupting.
 
-**Backup-set coherence.** Take the dump pair and the tree at the same cut. The snapshot carries the compiled programs and all object state; the tree is what future compiles and cold boots build from, and it also carries the file-backed siblings (kernel data, Vault XML). A backup that pairs an older snapshot with a newer tree restores the older image state and will recompile against the newer sources on the next upgrade -- and Vault XML newer than the image diverges the other way, re-importing state the image predates. Neither is corruption; both are divergence you chose by mixing cuts.
+**Backup-set coherence.** Take the dump pair and the tree at the same cut. The snapshot carries the compiled programs and all object state; the tree is what future compiles and cold boots build from, and it also carries the file-backed siblings (kernel data, Vault XML). A backup that pairs an older snapshot with a newer tree restores the older image state and will recompile against the newer sources on the next upgrade -- and Vault XML newer than the image diverges the other way: the next explicit Vault import (a respawn by name from the owning domain) re-imports state the image predates -- nothing re-reads the XML at restore itself. Neither is corruption; both are divergence you chose by mixing cuts.
 
 **Post-restore checklist.** `State restored.` as the first boot line after the version banner; the application's own verification (its sentinel driver or probes); clients reconnect (connections never survive a statedump restore); `Missing secondary snapshot` means an incremental primary was named without its base, and `Bad or incompatible restore file header` means the file and binary do not match.
-
 
 ## Availability and data-loss model
 
