@@ -49,7 +49,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Operations
 
 - [operations.md](operations.md): the `.dgd` configuration, boot modes, state persistence, backup and restore, the availability and data-loss model, logging and diagnostics, resource limits and capacity, host-driver extension loading. The deployment surface.
-- [admin-console.md](admin-console.md), the operator's console (verb-based REPL on `telnet_port`): connecting, security posture, per-task operational reference, verb appendix.
+- [admin-console.md](admin-console.md), the operator's console (verb-based REPL on `telnet_port`): connecting, console security posture, per-task operational reference, verb appendix.
 - [security-posture.md](security-posture.md), the consolidated security overview: trust boundaries, what the platform enforces, the operator's deployment responsibilities, and the known limits. Routes to the authority model (`capability.md`), the deployment perimeter (`operations.md`), and the reporting policy (`../SECURITY.md`).
 
 ### Working examples

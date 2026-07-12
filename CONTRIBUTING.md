@@ -34,7 +34,7 @@ Commits in this repository are atomic, signed, and content-attributed to humans 
 
 - **Atomic**: one logical change per commit. Renames precede content edits; automated changes are separate from manual content.
 - **Signed**: `git commit -S -s` (GPG-signed and DCO-style sign-off). Configured via `~/.gitconfig` once; subsequent commits inherit.
-- **Message format**: imperative-mood title under 50 characters; body wraps at 72 columns; ASCII only (no em-dashes, curly quotes, or ellipsis characters).
+- **Message format**: imperative-mood title of 72 characters or fewer; body wraps at 72 columns; ASCII only (no em-dashes, curly quotes, or ellipsis characters).
 - **No AI attribution**: commit history names the human author. AI assistance is a tool, not a co-author.
 - **Body content**: lead with outcomes (what is different now), then supporting detail. For multi-file commits, the body is required and enumerates what changed per file or area.
 

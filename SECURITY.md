@@ -34,7 +34,7 @@ In scope for this repository:
 
 - Kernel-layer code under `src/kernel/`.
 - System-layer code under `src/usr/System/`.
-- The eight runtime primitives' behavior as documented in [`docs/runtime-primitives.md`](docs/runtime-primitives.md). A vulnerability is anything that breaks one of these guarantees: atomicity bypass, capability bypass, persistence corruption, hot-reload escape, code-load sandbox escape, event misdelivery, multi-agent coherence violation, or state-introspection unauthorized exposure.
+- The eight runtime primitives' behavior as documented in [`docs/runtime-primitives.md`](docs/runtime-primitives.md). A vulnerability is anything that breaks one of these guarantees: atomicity bypass, capability bypass, persistence corruption, hot-reload escape, code-load sandbox escape, event misdelivery, multi-agent coherence violation, or state-introspection unauthorized exposure. Capability bypass here means a breach of the tier model's enforced boundaries; the capability model's documented non-goals (ambient authority, bypassable pure-LPC caretaker patterns -- `docs/security-posture.md` Non-goals and known limits) are limitations, not vulnerabilities.
 - Daemon contracts (initd, userd, errord, objectd, accessd, resource_daemon, and related kernel/system daemons).
 - The HTTP/1 application surface bound by `mva.dgd`-style configurations of the example application.
 - The admin-console exposure shaped by the kernel layer's `admin_console.c`.

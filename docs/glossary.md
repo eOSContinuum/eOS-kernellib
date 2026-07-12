@@ -6,7 +6,7 @@ Definitions for terms used inline across the eOS-kernellib doc set. Each entry n
 
 ## atomic / atomic operation / atomic context
 
-A function or call envelope whose state mutations either all commit together (on normal return) or all roll back together (on error). DGD's host runtime enforces atomicity at the function-call boundary. An `atomic`-modifier function or a `call_limited` envelope establishes an atomic context. Load-bearing in [runtime-primitives.md](runtime-primitives.md) §1 (atomicity primitive) and [lpc-essentials.md](lpc-essentials.md) Type modifiers.
+A function or call envelope whose state mutations either all commit together (on normal return) or all roll back together (on error). DGD's host runtime enforces atomicity at the function-call boundary. A function declared with the `atomic` modifier establishes an atomic context covering everything called beneath it; `call_limited` is the resource-limits envelope and does not create one. Load-bearing in [runtime-primitives.md](runtime-primitives.md) §1 (atomicity primitive) and [lpc-essentials.md](lpc-essentials.md) Type modifiers.
 
 ## auto-inheritance
 
