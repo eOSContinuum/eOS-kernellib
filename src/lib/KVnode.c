@@ -8,7 +8,7 @@ static string nodePath();
 /*
  * create a new KVnode
  */
-static object newNode(string accessKey, int maxSize, string *keys,
+static object newNode(string accessKey, int maxSize, mixed *keys,
 		      mixed *values)
 {
     return clone_object(nodePath(), accessKey, maxSize, keys, values);

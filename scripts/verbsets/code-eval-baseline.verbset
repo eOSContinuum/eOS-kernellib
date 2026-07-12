@@ -1,0 +1,25 @@
+# Code-eval baseline -- asserts the console's code verb evaluates
+# against a sound runtime: the float-classification kfuns (isnan,
+# isinf, isfinite) exist and answer, a runtime fault is reported as an
+# error rather than swallowed, and the console keeps evaluating after
+# the fault.
+#
+# Runs against a base boot; no example deploy needed:
+#   DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/code-eval-baseline.verbset
+
+cmd: code isnan(1.0)
+expect: \$\d+ = 0
+
+cmd: code isinf(1.0)
+expect: \$\d+ = 0
+
+cmd: code isfinite(1.0)
+expect: \$\d+ = 1
+
+# a runtime fault surfaces as an error report
+cmd: code ({ })[0]
+expect: out of range
+
+# and evaluation still works afterwards
+cmd: code 2 + 3
+expect: \$\d+ = 5
