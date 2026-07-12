@@ -6,6 +6,8 @@ Thanks for your interest in eOS-kernellib. This document covers the conventions 
 
 - Read [README.md](README.md) for the project's framing and what the runtime platform provides.
 - Read [docs/architecture.md](docs/architecture.md) for the architectural model: capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions.
+- Skim [docs/source-map.md](docs/source-map.md) to find your way around the source tree: what lives in each directory, and which document owns each subsystem.
+- Read [docs/where-code-belongs.md](docs/where-code-belongs.md) for placement doctrine: which tier and which shape (library, daemon, cloneable, utility) new code takes, and the authority choke-point behind those choices.
 - Read [docs/runtime-primitives.md](docs/runtime-primitives.md) for the eight runtime primitives, each with foundation, demonstration status, supporting extensions, and open work.
 - For changes that touch the DGD driver itself, contributions belong upstream at [`dworkin/dgd`](https://github.com/dworkin/dgd). eOS-kernellib builds on DGD without modifying its source.
 - For changes that touch the upstream kernellib lineage, the relationships are: [`dworkin/cloud-server`](https://github.com/dworkin/cloud-server) is the immediate upstream; [`ChatTheatre/kernellib`](https://github.com/ChatTheatre/kernellib) is the public-domain ancestor; both remain valid contribution targets for changes appropriate to their scope.
