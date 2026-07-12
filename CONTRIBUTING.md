@@ -69,13 +69,15 @@ New docs added to `docs/` use lowercase-hyphenated filenames matching the existi
 
 ## Testing
 
-Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. Changes to capability tiers, daemons, or the primitive surfaces should include:
+Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. `scripts/README.md`'s Full regression sweep section enumerates every command in this harness, in order, with the pass signal for each; that sweep is the pre-PR bar. Changes to capability tiers, daemons, or the primitive surfaces should include:
 
 - Reproducible boot evidence (cold boot, statedump restore, hot boot as applicable to the change).
 - An empirical Observation in the relevant doc when the change demonstrates a previously-unverified primitive behavior.
 - LPC-level evidence (admin-console transcript or HTTP probe transcript) where the change affects an externally-visible surface.
 
 An empirical Observation is a dated statement, in the doc it supports, naming the command that ran and the output marker it produced -- a sentinel line, a response body, a status field -- specific enough that a later reader can rerun the command and check for the same marker. `docs/runtime-primitives.md`'s Demonstration entries set the citation shape: each names the exercising example or script and the sentinel or transcript line that constitutes the evidence, though they read as continuous platform-model prose rather than individually dated entries -- a new Observation adds the date.
+
+A behavior change updates the document that owns it: `docs/source-map.md`'s "Finding a subsystem" table names, for each subsystem, the entry-point code and the doc that explains it, and that doc is the one a behavior change must update. Adding or renaming a doc under `docs/` also updates `docs/README.md`'s Documentation map, the index a new doc does not otherwise appear in.
 
 ## Code style
 

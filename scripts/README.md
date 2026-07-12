@@ -23,7 +23,7 @@ Deploys the named example fresh under `src/usr/<Deploy>`, runs its boot sequence
 | upgrade-cascade | Cascade | 1 | timed | 7 |
 | vault-app | MyApp | 1 | timed | 10 |
 
-`atomic-demo` and `http-app` have no profile here -- they verify over live HTTP (see each README and bundled `smoke.sh`).
+`atomic-demo` and `http-app` have no profile here -- they verify over live HTTP (`atomic-demo` via its bundled `smoke.sh`, `http-app` via the probe commands in its README).
 
 ## drive-verbs.py + scripts/verbsets/
 
@@ -51,6 +51,33 @@ MAX_LINES=400 scripts/base-boot-guard.sh   # override the bound (default 400)
 ```
 
 Boots the platform with no example deployed for a fixed 6s window, then asserts both the boot log and `src/usr/System/log/system.log` stay at or under `MAX_LINES` -- a regression against the atomic-write-storm failure mode (a caught error inside an atomic function re-entering the error manager and looping a file write).
+
+## Full regression sweep
+
+Run in this order for the complete pre-PR bar. Each line names the command and the pass signal to look for; `<dgd>` is the path to a built DGD binary.
+
+1. `DGD_BIN=<dgd> scripts/run-example.sh chat-app` -- `PASS`, 20 " OK" sentinels across 3 boots (cold selfexit, snapshot restore, cold no-snapshot).
+2. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-demo` -- `PASS`, 2 " OK" sentinels (1 timed boot).
+3. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-master` -- `PASS`, 3 " OK" sentinels (1 timed boot).
+4. `DGD_BIN=<dgd> scripts/run-example.sh merry-app` -- `PASS`, 28 " OK" sentinels across 2 boots (cold selfexit, snapshot restore).
+5. `DGD_BIN=<dgd> scripts/run-example.sh signal-app` -- `PASS`, 1 " OK" sentinel (1 timed boot).
+6. `DGD_BIN=<dgd> scripts/run-example.sh upgrade-cascade` -- `PASS`, 7 " OK" sentinels (1 timed boot).
+7. `DGD_BIN=<dgd> scripts/run-example.sh vault-app` -- `PASS`, 10 " OK" sentinels (1 timed boot).
+8. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the six default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
+9. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
+10. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
+11. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
+12. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+
+This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
+
+## Adding a regression
+
+| Change class | Regression surface | Mechanic |
+|---|---|---|
+| Console / operator-visible behavior | A verbset block, added to an existing file or a new one under `scripts/verbsets/` | Add a `cmd:` line plus `expect:`/`absent:` regex lines per the block format in the `drive-verbs.py + scripts/verbsets/` section above; wire a new file into `drive-verbs-smoke.sh`'s default verbset list (or drive it explicitly) so the sweep runs it. |
+| Boot-time or primitive behavior | A sentinel phase in the example's `sys/test.c`, plus the profile's expected-OK bump in `run-example.sh` | Add a phase that appends an " OK" (or a `FAIL`) line to the deployed domain's `data/test-result.log`, then bump the matching `ok` field in `example_profile()`. The script's own header names this mechanic directly: "bump when a test-driver phase adds a sentinel". |
+| Boot hygiene / noise | `base-boot-guard.sh`'s line bound (`MAX_LINES`, default 400) | A change that adds legitimate boot-log or `system.log` output raises the guard's baseline; if the new output pushes past the bound, raise `MAX_LINES` deliberately with a stated reason rather than silencing the guard -- an unexplained jump toward the bound is the atomic-write-storm regression this guard exists to catch. |
 
 ## Where to next
 
