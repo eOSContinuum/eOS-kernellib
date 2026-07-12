@@ -219,6 +219,66 @@ static void registerWithWWW()
 
 The 0-second `call_out` runs after the System initd commits, which is after every user-layer domain's `create()` has run. Use this pattern for any cross-domain registration where compilation order (the `TLS`, `HTTP`, `LPC` prefix followed by the alphabetical remainder) would otherwise leave a dependency unsatisfied.
 
+## API signatures
+
+The signature reference for the HTTP API classes under `src/usr/HTTP/api/lib/`. The canonical-name `#define`s (`HttpRequest`, `Http1Server`, and the rest) come from the headers under `src/usr/HTTP/api/include/`. The source files are authoritative; internal protocol machinery (the parsing state machine in `Connection1.c`) is omitted here.
+
+### `HttpRequest` (`src/usr/HTTP/api/lib/Request.c`) and `HttpResponse` (`src/usr/HTTP/api/lib/Response.c`)
+
+The message value types. Both serialize themselves with `transport()`.
+
+- `create(float version, string method, string scheme, string host, string path)` -- construct a request from components
+- `create(float version, int code, string comment)` -- construct a response with a status line
+- `void setHeaders(HttpFields headers)` -- attach a headers collection (both classes)
+- `mixed headerValue(string str)` -- a header's value by name, or nil (both classes)
+- `string transport()` -- the message serialized to HTTP wire format (both classes)
+- request accessors: `float version()` / `string method()` / `string scheme()` / `string host()` / `string path()` / `HttpFields headers()`; the request also has `void setHost(string host)`
+- response accessors: `float version()` / `int code()` / `string comment()` / `HttpFields headers()`
+
+The `RemoteHttpRequest` / `RemoteHttpResponse` / `RemoteHttpFields` subclasses parse wire input; applications pass their object paths to the server and client constructors and do not use them directly.
+
+### `HttpField` and `HttpFields` (`src/usr/HTTP/api/lib/Field.c`, `Fields.c`)
+
+A single header and the ordered header collection.
+
+- `HttpField`: `create(string name, mixed value, varargs mixed *params)`; `void add(mixed *value, varargs mixed *params)` -- append to an array-valued field (errors otherwise); `int listContains(string str)` -- search a comma-separated value list (the stored value is lowercased for the comparison; pass `str` in lowercase); `string transport()`; accessors `string name()` / `string lcName()` / `mixed value()` / `mixed *params()`
+- `HttpFields`: `create()`; `void add(HttpField field)` -- errors on a duplicate singular field, merges array-valued ones; `void del(HttpField field)`; `HttpField get(string name)` -- case-insensitive; `string transport()`; inherits `Iterable`. The `addField` / `addFieldList` create-and-add conveniences are `static` (reachable from inheritors, not on an external `HttpFields` reference); external callers build with `add(new HttpField(...))`
+
+### `Http1Server` (`src/usr/HTTP/api/lib/Server1.c`)
+
+The inheritable per-connection server library; the mount-point object inherits it beside `/usr/System/lib/user` (see The server object above).
+
+- `create(object server, string requestPath, string headersPath)` -- bind the relay object (normally `this_object()`) and the wire-parsing classes (`OBJECT_PATH(RemoteHttpRequest)`, `OBJECT_PATH(RemoteHttpFields)`)
+- the application overrides: `void receiveRequest(int code, HttpRequest request)` -- REQUIRED; nonzero `code` is a protocol-level error status, and the override must not chain to the inherited implementation; `void receiveEntity(StringBuffer chunk)` -- the request body, called only after `expectEntity`; `int inactivityTimeout()` -- idle seconds before disconnect (default 60)
+- the application calls: `void expectEntity(int length)` -- ask for a body of `length` bytes; `void expectChunk(varargs string compression)` -- opt into chunked transfer (`"gzip"`, `"deflate"`, or nil; decompression requires the host driver's gunzip/inflate kfuns, and without them chunks arrive still compressed); `void sendResponse(HttpResponse response)` -- serialize and send a response, detecting `Transfer-Encoding` / `Content-Length` to hold the connection for a body; `void sendMessage(StringBuffer chunk, varargs int quiet, int hold)` -- send raw message data (`hold` buffers for batching); `void doneRequest()` -- finish the exchange (the connection persists or closes per HTTP/1.1 negotiation)
+
+### `Http1Client` (`src/usr/HTTP/api/lib/Client1.c`)
+
+The inheritable HTTP/1 client library. No shipped example exercises it yet; the shape below is the source contract.
+
+- `create(object client, string host, int port, string responsePath, string headersPath)` -- bind the relay, name the wire-parsing classes, and connect
+- the application overrides: `void receiveResponse(HttpResponse response)` -- REQUIRED, the parsed response; as with the server's `receiveRequest`, the override must not chain to the inherited implementation (the same relay dispatch would recurse); `void connected()` / `void connectFailed(int errorcode)` -- connection outcome callbacks; `int inactivityTimeout()` -- default 120
+- the application calls: `void sendRequest(HttpRequest request)`; `void expectEntity(int length)` and `void expectChunk(varargs string compression)` -- receive the response body; `void doneResponse()` -- finish the exchange
+
+### `Http1TlsServer` and `Http1TlsClient` (`src/usr/HTTP/api/lib/TlsServer1.c`, `TlsClient1.c`)
+
+TLS-wrapped variants; each dual-inherits its plain-HTTP class plus a buffering connection layer, so the `Http1Server` / `Http1Client` override and call surfaces above still apply. Existence-and-shape:
+
+- `Http1TlsServer`: `create(object server, string certificate, string key, string requestPath, string fieldsPath, string tlsServerSessionPath)` -- certificate and key are PEM strings, the last argument is the object path of the TLS server-session class to instantiate; `tlsAccept(string str, varargs int reqCert, string hosts...)` -- begin the handshake (`hosts` filters SNI; `reqCert` is accepted but currently a no-op, as client-certificate requests are unimplemented in the shipped TLS session); `tlsReceive(string str)`; `tlsClose(int quit)`; `sendMessage(StringBuffer str, varargs int quiet, int hold)` -- encrypt and send (`hold` buffers for batching); `string host()` -- the SNI hostname
+- `Http1TlsClient`: `create(object client, string address, int port, string responsePath, string fieldsPath, string tlsClientSessionPath)`; `tlsConnect(varargs string host)` -- handshake, optional SNI hostname; `tlsReceive(string str)`; `tlsClose(int quit)`; `sendMessage(StringBuffer str, varargs int quiet, int hold)`
+
+The TLS layer is inert unless the host driver provides secure randomness (see `docs/operations.md` on `KF_SECURE_RANDOM`).
+
+### `Connection1` flow surface (`src/usr/HTTP/lib/Connection1.c`)
+
+The HTTP/1.x protocol base both server and client inherit. Beyond the functions surfaced above, the flow controls an application may reach:
+
+- `void expectWsFrame()` -- switch to WebSocket frame receipt
+- `void sendChunk(StringBuffer chunk, varargs string *params)` / `void endChunk(varargs string *params, HttpFields trailers)` -- emit chunked transfer encoding
+- `void sendWsChunk(int opcode, int flags, varargs int mask, StringBuffer chunk)` -- emit a WebSocket frame
+- `void terminate()` -- break the connection
+- `int persistent()` / `int webSocket()` -- negotiated-state accessors
+
 ## Where to next
 
 - [`docs/getting-started.md`](getting-started.md): install DGD, run the example configuration.
