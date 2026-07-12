@@ -66,7 +66,7 @@ Capabilities whose owning surface cannot seed itself are seeded in `capabilityd:
 
 This bootstrap table is the documented ambient-authority seam: the initial grants are not themselves earned through a capability check. They are declared. A reader auditing the platform's root trust reads `capabilityd::create()` and the console registry's `create()`.
 
-The store persists like the per-surface sets it replaced. It survives statedumps. A cold boot re-seeds the bootstrap table via `create()`. Recompiling `capabilityd` re-runs `create()`, re-seeding the static grants while dropping any dynamic grants added at runtime. One consequence is worth calling out: because the store is a standalone daemon decoupled from the Merry daemon's lifecycle, hot-reloading Merry no longer disturbs the registrar capability state. The capability table outlives a Merry recompile, a small win for the hot-reload primitive.
+The store persists like the per-surface sets it replaced. It survives statedumps. A cold boot re-seeds the bootstrap table via `create()`. Recompiling `capabilityd` does not re-run `create()`: the grant tables are master state, and both static and runtime grants survive the recompile unchanged (observed against a live boot -- a runtime grant added before `compile /kernel/sys/capabilityd.c` still answers `is_allowed` after it). One consequence is worth calling out: because the store is a standalone daemon decoupled from the Merry daemon's lifecycle, hot-reloading Merry no longer disturbs the registrar capability state. The capability table outlives a Merry recompile, a small win for the hot-reload primitive.
 
 ## Design choices
 
