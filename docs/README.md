@@ -50,6 +50,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [operations.md](operations.md): the `.dgd` configuration, boot modes, state persistence, backup and restore, the availability and data-loss model, logging and diagnostics, resource limits and capacity, host-driver extension loading. The deployment surface.
 - [admin-console.md](admin-console.md), the operator's console (verb-based REPL on `telnet_port`): connecting, security posture, per-task operational reference, verb appendix.
+- [security-posture.md](security-posture.md), the consolidated security overview: trust boundaries, what the platform enforces, the operator's deployment responsibilities, and the known limits. Routes to the authority model (`capability.md`), the deployment perimeter (`operations.md`), and the reporting policy (`../SECURITY.md`).
 
 ### Working examples
 
@@ -75,10 +76,11 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 Common goals and the docs that serve them.
 
 - **Run the platform and see it work**: [getting-started.md](getting-started.md), then `DGD_BIN=... ../scripts/run-example.sh merry-app` to watch the assertion sentinels pass, then [first-hour.md](first-hour.md) and [first-application.md](first-application.md), then `../examples/http-app/README.md`.
-- **Evaluate whether the platform fits**: [runtime-primitives.md](runtime-primitives.md) for what is proven today (`../scripts/run-example.sh` runs the proofs), [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [operations.md](operations.md) Limits and capacity for the envelope, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces.
+- **Evaluate whether the platform fits**: [runtime-primitives.md](runtime-primitives.md) for what is proven today (`../scripts/run-example.sh` runs the proofs), [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [operations.md](operations.md) Limits and capacity for the envelope, [security-posture.md](security-posture.md) for the trust boundaries and operator responsibilities, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces.
 - **Arriving from a cloud-services stack**: [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
 - **Understand the platform's architectural commitments**: [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md), then [execution-model.md](execution-model.md) for the concurrency and latency model.
 - **Audit the platform's authority model**: [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
+- **Understand the platform's security posture**: [security-posture.md](security-posture.md), then [capability.md](capability.md) for the authority mechanism and [operations.md](operations.md) for the deployment perimeter.
 - **Write an HTTP application**: [lpc-essentials.md](lpc-essentials.md), [http-applications.md](http-applications.md), `../examples/http-app/`.
 - **Write a non-HTTP application**: [lpc-essentials.md](lpc-essentials.md), [first-application.md](first-application.md) for a worked build from an empty domain, then [application-authoring.md](application-authoring.md) for the patterns at reference depth.
 - **Decide where a new piece of behavior lives**: [where-code-belongs.md](where-code-belongs.md), then [application-authoring.md](application-authoring.md) for the mechanics of the chosen shape.
