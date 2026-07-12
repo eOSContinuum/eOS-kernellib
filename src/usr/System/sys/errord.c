@@ -86,7 +86,7 @@ private void persist(string str)
  * NAME:	runtime_error()
  * DESCRIPTION:	report a runtime error
  */
-void runtime_error(string error, int caught, mixed **trace)
+string runtime_error(string error, int caught, mixed **trace)
 {
     if (previous_object() == driver) {
 	int i, j, sz, maxlen, line;
@@ -96,9 +96,6 @@ void runtime_error(string error, int caught, mixed **trace)
 
 	auto::tls_set(TLS_ARGUMENTS, nil);
 
-	if (caught != 0) {
-	    error += " [caught]";
-	}
 	sz = sizeof(trace) - 1;
 	lines = allocate(sz * 2);
 	j = 0;
@@ -126,7 +123,11 @@ void runtime_error(string error, int caught, mixed **trace)
 	    }
 	}
 
-	str = error + "\n";
+	str = error;
+	if (caught != 0) {
+	    str += " [caught]";
+	}
+	str += "\n";
 	for (i = 0; i < j; i++) {
 	    if (typeof(lines[i]) == T_STRING) {
 		str += spaces(maxlen + 1) + lines[i];
@@ -145,6 +146,8 @@ void runtime_error(string error, int caught, mixed **trace)
 	    user->message(str);
 	}
     }
+
+    return error;
 }
 
 /*
