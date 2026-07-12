@@ -115,8 +115,8 @@ The platform is a single process on a single machine. There is no replica to fai
 | Mode | Trigger | Connections | State |
 |---|---|---|---|
 | Hot boot | `shutdown(1)` + `execv`, with a `hotboot` tuple configured (Booting above) | Survive: inherited file descriptors | Survives: dump plus immediate reload |
-| Statedump restore | Cold start with `dump_file` present (full or the two-file incremental form) | Drop: clients reconnect | Survives, from the dump file(s) |
-| Cold boot | Cold start with no usable `dump_file` | Drop | Rebuilt from source: only what the initd cascade recreates, nothing carried over |
+| Statedump restore | Cold start naming the snapshot on the command line (full, or the two-file incremental form) | Drop: clients reconnect | Survives, from the dump file(s) |
+| Cold boot | Cold start with no restore argument | Drop | Rebuilt from source: only what the initd cascade recreates, nothing carried over |
 
 **Portability.** A snapshot restores only against a driver started with the same `auto_object` and `driver_object`, and with the same `modules` extensions loaded (Common failure modes below, the same conditions `docs/persistence.md` states for hot boot). It is a resume point for a specific configuration, not a portable backup format across incompatible driver configurations.
 

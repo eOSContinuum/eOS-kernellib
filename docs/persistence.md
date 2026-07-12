@@ -103,9 +103,9 @@ When the host driver is started with a snapshot argument (`dgd config_file dump_
 
 No `initd::create()` runs. The application's bootstrap was captured in the snapshot. Restore returns the platform to that state. Initd cascades only run on cold-boot-from-scratch.
 
-If the snapshot is corrupt or `dump_file` is absent, the driver falls back to cold boot from scratch: the initd cascade runs, the platform boots without prior state, and connections start fresh.
+There is no fallback from a bad restore argument: naming a corrupt file fails the header check and naming an absent one is a fatal `Config error: cannot open restore file` -- the process exits either way. Cold boot from scratch happens by starting with no restore argument at all: the initd cascade runs, the platform boots without prior state, and connections start fresh.
 
-The `<dump_file>.old` file is the rollback target if the most recent snapshot is corrupt or undesirable: remove the current `dump_file`, the driver finds `<dump_file>.old` (or the operator renames it), and restore proceeds from the prior snapshot.
+The `<dump_file>.old` file is the rollback target if the most recent snapshot is corrupt or undesirable: pass `<dump_file>.old` as the restore argument instead of the current file (it is a self-contained full snapshot), and restore proceeds from the prior state.
 
 ## Hot boot: snapshot + execv + fd inheritance
 
