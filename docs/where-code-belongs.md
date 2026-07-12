@@ -43,6 +43,12 @@ An inheritable library remains right when its consumers are all System- or kerne
 
 Clonables under `obj/`, singleton daemons under `sys/`, LWO value types under `data/`, inheritables under `lib/`: the driver and kernel enforce these, and `docs/application-authoring.md` Domain layout covers them. Placement doctrine adds one steer: state that must exist once per domain is a `sys/` daemon. State that exists per-instance is a clonable plus the properties it carries. A value that crosses dataspaces is an LWO, copied rather than shared (`docs/code-lifecycle.md` LWO instantiation).
 
+### Extending the System auto: the `EXT` include
+
+The System auto object, the program every user-tier object inherits, ends its source with `# include <EXT>` under an "Optional extensions" banner (`src/usr/System/lib/auto.c`). When auto.c compiles, objectd's `include_file` hook serves that include path from `/usr/System/data/EXT` (`src/usr/System/sys/objectd.c`), an unversioned data file, and substitutes an empty include when the file is absent. A deployment can therefore add functions to the System auto by writing that file and recompiling auto, with no edit to auto.c itself.
+
+The routing guidance: when a change wants to extend the System auto, evaluate `EXT` first. It is the lower-merge-friction path, since the data file lives outside the versioned tree and survives platform upgrades without a merge. Editing auto.c remains correct for core platform features, which belong in the versioned source every checkout carries. Two properties to keep in view: `EXT` content compiles into the auto object with full System-tier trust (this is an operator extension point, not a sandbox), and the recompile that picks up a change cascades an upgrade across every inheritor (`docs/code-lifecycle.md` Library upgrade).
+
 ## Authority: one choke-point, never inline checks
 
 When new code needs a gate ("may this caller do this?"), the answer is never a fresh inline `previous_program()` comparison. The platform routes every authority decision through the capability store's single membership check (`capabilityd::is_allowed` / `require_member`), whether reached by inheriting the check face or by calling the daemon directly (`docs/capability.md` The mechanism). One store, one denial message, one place a future mediation mode attaches. Scattered inline checks are how the pre-consolidation platform accumulated six heterogeneous gates. The consolidation exists so that number stays one.
