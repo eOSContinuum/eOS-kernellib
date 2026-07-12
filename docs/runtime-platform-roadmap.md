@@ -62,6 +62,7 @@ The transport mechanisms are largely paid for (the TLS server and client variant
 - **HTTPS: committed, activation trigger-gated.** Native TLS termination is a platform transport. *Trigger: the first network-crossing consumer.* Until activation, the deployment doctrine is reverse-proxy TLS termination in front of the platform's HTTP/1 port. The certificate-management story is decided at activation time.
 - **HTTP streaming / server-sent events: committed, activation trigger-gated.** Composes with the shipped HTTP/1 surface. *Trigger: the first live-update consumer, a browser-facing demonstration or an integration bridge that pushes state changes outward.*
 - **WebSocket: deferred, with a trigger.** The shipped framing stays compiled. *Trigger: a bidirectional consumer that server-sent events plus POST cannot serve.* No removal. No activation work until the trigger fires.
+- **Outbound HTTP/HTTPS client: shipped, unproven, activation trigger-gated.** `Http1Client` and `Http1TlsClient` compile at boot; no application subclass, example, or test exercises either, and the atomic-envelope interaction is untested (`docs/application-authoring.md` Outbound connections). *Trigger: the first external-service consumer.* Activation work is a worked example plus the untested-interaction proofs, not construction.
 
 ## The application-tier boundary
 
