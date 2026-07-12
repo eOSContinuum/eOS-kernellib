@@ -53,7 +53,7 @@ Inherits `Iterable` (a `String` iterates over its characters); private-inherits 
 
 ### `BTree`
 
-Inherits `Iterable` (and private-inherits `/lib/util/random` for access-key generation). Every mutator is `atomic` (all-or-nothing under the driver's transaction model). Keys may be any type the host's comparison operators order; iteration yields `({ key, value })` pairs in key order.
+Inherits `Iterable` (and private-inherits `/lib/util/random` for access-key generation). Every mutator is `atomic` (all-or-nothing under the driver's transaction model). Keys may be any type the host's comparison operators order; iteration yields `({ key, value })` pairs in key order. One boundary, observed under test: a key the language treats as false (integer `0`, floating-point `0.0`) is unsupported -- the node implementation distinguishes present and absent keys by truthiness, and a falsy key derails lookup and iteration. Use string or nonzero keys.
 
 - `atomic create(int maxSize, varargs string accessKey, string nodePath)` -- constructor: node fan-out `maxSize`, optional access key (a random 32-char key if omitted), optional node-object path (light-weight `BTnode` objects by default)
 - `mixed get(mixed key)` -- the value stored under `key`, or nil
