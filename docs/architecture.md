@@ -202,7 +202,7 @@ The kernel daemons (driver, access_daemon, resource_daemon, userd, capabilityd) 
 
 For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server`. `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `docs/http-applications.md` walks through writing the application server. `examples/http-app/` is a runnable reference.
 
-For non-HTTP applications, the patterns are covered in `docs/application-authoring.md`. The LPC language itself is covered in `docs/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` (string buffers, persistent collections, iterators, async continuations, time) are catalogued in `docs/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `docs/operations.md`.
+For non-HTTP applications, the patterns are covered in `docs/application-authoring.md`. The LPC language itself is covered in `docs/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` (string buffers, persistent collections, large arrays, iterators, async continuations, time) are catalogued in `docs/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `docs/operations.md`.
 
 ## Where to next
 

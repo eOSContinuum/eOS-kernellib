@@ -76,9 +76,10 @@ void set_error_manager(object errord)	[System only]
     Install an error manager, in which the following functions can be called
     afterwards:
 
-    * void runtime_error(string error, int caught, mixed **trace)
+    * string runtime_error(string error, int caught, mixed **trace)
 
-	A runtime error has occurred.
+	A runtime error has occurred.  The returned string replaces the
+	error message.
 
     * void atomic_error(string error, int atom, mixed **trace)
 

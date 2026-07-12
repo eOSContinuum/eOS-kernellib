@@ -33,7 +33,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [lpc-essentials.md](lpc-essentials.md): LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
 - [kernel-reference/](kernel-reference/README.md): man-page-style reference for the kernel layer's modified API surface (efun overrides, lfun and hook contracts, the kernel overview).
-- [kernel-libraries.md](kernel-libraries.md): inheritable libraries under `src/lib/` (strings, persistent collections, iteration, asynchronous control, time, utilities).
+- [kernel-libraries.md](kernel-libraries.md): inheritable libraries under `src/lib/` (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities).
 - [where-code-belongs.md](where-code-belongs.md), placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility), with the authority choke-point and composition-seam disciplines behind the choices.
 - [application-authoring.md](application-authoring.md): general tier-E application patterns, owner/access conventions, `call_touch` upgrade model, and non-HTTP transports.
 - [debugging-applications.md](debugging-applications.md): reading error traces, where diagnostics land, the observer-didn't-fire checklist, and the day-to-day working environment.

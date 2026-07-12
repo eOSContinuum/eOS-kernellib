@@ -4,7 +4,7 @@ eOS-kernellib ships a small set of inheritable libraries under `src/lib/` for ap
 
 For the LPC mechanics that make these libraries work (inherit syntax, type modifiers, lifecycle), see `docs/lpc-essentials.md`. For where these libraries fit in the platform's tier model, see `docs/architecture.md`.
 
-**Audience**: an LPC application author looking up which inheritable library serves a common need (strings, persistent collections, iteration, asynchronous control, time, utilities); assumes `docs/lpc-essentials.md` for inherit syntax and `docs/architecture.md` for the tier model that bounds where each library is callable from.
+**Audience**: an LPC application author looking up which inheritable library serves a common need (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities); assumes `docs/lpc-essentials.md` for inherit syntax and `docs/architecture.md` for the tier model that bounds where each library is callable from.
 
 Each library below carries a per-class block listing its application-facing signatures. Each bullet gives a function's parameter and return types (the `varargs`, `mixed *`, and `args...` forms are LPC syntax; see `docs/lpc-essentials.md`); the `atomic` modifier is shown where a function runs as an atomic transaction, while the visibility modifiers (`static`, `nomask`) are omitted for brevity (the `src/lib/util/` helpers are `static` except where noted). `create` is the constructor the driver calls on instantiation, so its parameters are the arguments passed at `new_object` / `clone_object` time. Purely internal functions (declared `private`, or infrastructure callbacks) are omitted; where a class carries a large internal surface, the omission is noted.
 
@@ -44,27 +44,61 @@ Inherits `Iterable` (a `String` iterates over its characters); private-inherits 
 
 | Class | File | Header | Role |
 |---|---|---|---|
-| `KVstore` | `src/lib/KVstore.c` | `<KVstore.h>` | Persistent key-value store backed by a B+ tree |
-| `KVnode` | `src/lib/KVnode.c` | `<KVstore.h>` | Internal tree-node implementation backing `KVstore` |
+| `BTree` | `src/lib/BTree.c` | `<BTree.h>` | Ordered key-value B+ tree over light-weight nodes; the base `KVstore` extends |
+| `BTnode` | `src/lib/BTnode.c` | `<BTree.h>` | Internal tree-node implementation backing `BTree` |
+| `KVstore` | `src/lib/KVstore.c` | `<KVstore.h>` | Persistent key-value store: a `BTree` whose nodes are persistent clones |
+| `KVnode` | `src/lib/KVnode.c` | `<KVstore.h>` | Cloneable tree-node subclass backing `KVstore` |
 
-`KVstore` is the supported backing for application-level persistent collections beyond the host's built-in `mapping`. It is implemented as a B+ tree whose nodes mutate in place on insert and delete; it holds a single current root and does not retain prior versions or share subtrees across versions. The shipped `obj/kvnode.c` is the cloneable instantiation; the `KVNODE` macro in `<KVstore.h>` resolves to its path.
+`KVstore` is the supported backing for application-level persistent collections beyond the host's built-in `mapping`. The B+ tree mechanics live in `BTree`, which `KVstore` extends: `BTree` backs its nodes with light-weight `BTnode` objects and accepts any key type the host's comparison operators order, while `KVstore` narrows keys to strings and overrides node creation to clone the shipped `/obj/kvnode` (the `KVNODE` macro in `<KVstore.h>` resolves to its path), so each node is a persistent clone destructed when its tree deletes it. Both mutate nodes in place on insert and delete, hold a single current root, and do not retain prior versions or share subtrees across versions.
+
+### `BTree`
+
+Inherits `Iterable` (and private-inherits `/lib/util/random` for access-key generation). Every mutator is `atomic` (all-or-nothing under the driver's transaction model). Keys may be any type the host's comparison operators order; iteration yields `({ key, value })` pairs in key order. One boundary, observed under test: a key the language treats as false (integer `0`, floating-point `0.0`) is unsupported -- the node implementation distinguishes present and absent keys by truthiness, and a falsy key derails lookup and iteration. Use string or nonzero keys.
+
+- `atomic create(int maxSize, varargs string accessKey, string nodePath)` -- constructor: node fan-out `maxSize`, optional access key (a random 32-char key if omitted), optional node-object path (light-weight `BTnode` objects by default)
+- `mixed get(mixed key)` -- the value stored under `key`, or nil
+- `atomic int set(mixed key, mixed value)` -- insert or replace; a nil `value` deletes the key; returns the element-count delta (1 on insert, -1 on delete, 0 on replace or no-op)
+- `atomic int add(mixed key, mixed value)` -- insert; errors if `key` already exists
+- `atomic int change(mixed key, mixed value)` -- replace; errors if `key` does not exist
+- `atomic void remove()` -- remove the entire tree, deleting all nodes
+- `mixed iteratorStart(mixed from, mixed to)` / `mixed *iteratorNext(mixed state)` / `int iteratorEnd(mixed state)` -- the iterator protocol supplied to `Iterable`; a bounded iterator walks `from` .. `to` in key order, and walks backwards when `from > to`
+- operators: `tree[key]` is `get`, `tree[key] = value` is `set`
+
+### `BTnode`
+
+Internal B+ tree node backing `BTree`; applications use `BTree`, not `BTnode` directly. Nodes are light-weight objects; `KVnode` subclasses this into a persistent clone for `KVstore`.
 
 ### `KVstore`
 
-Inherits `Iterable` (and private-inherits `/lib/util/random` for access-key generation). Every mutator is `atomic` (all-or-nothing under the driver's transaction model).
+Inherits `BTree`: the mutators wrap `BTree`'s atomic implementations with key validation (a nil key errors), keys are strings, and the nodes are persistent clones.
 
 - `atomic create(int maxSize, varargs string accessKey, string nodePath)` -- constructor: node fan-out `maxSize`, optional access key (a random 32-char key if omitted), optional node-object path (`KVNODE` by default)
 - `mixed get(string key)` -- the value stored under `key`, or nil
-- `atomic void set(string key, mixed value)` -- insert or replace; a nil `value` deletes the key
-- `atomic void add(string key, mixed value)` -- insert; errors if `key` already exists
-- `atomic void change(string key, mixed value)` -- replace; errors if `key` does not exist
-- `atomic void remove()` -- remove the entire store, deleting all nodes
-- `mixed iteratorStart(mixed from, mixed to)` / `mixed *iteratorNext(mixed state)` / `int iteratorEnd(mixed state)` -- the iterator protocol supplied to `Iterable`
-- operators: `store[key]` is `get`, `store[key] = value` is `set`
+- `int set(string key, mixed value)` -- insert or replace; a nil `value` deletes the key
+- `int add(string key, mixed value)` -- insert; errors if `key` already exists
+- `int change(string key, mixed value)` -- replace; errors if `key` does not exist
+- inherited from `BTree`: `remove()`, the iterator protocol (bounded and reverse iteration), and the `store[key]` / `store[key] = value` operators
 
 ### `KVnode`
 
-Internal B+ tree node backing `KVstore`; applications use `KVstore`, not `KVnode` directly. The `KVNODE` macro (`<KVstore.h>`) resolves to the cloneable `/obj/kvnode`.
+Internal tree node backing `KVstore`: inherits `BTnode`, creating nodes as clones and destructing them on removal. Applications use `KVstore`, not `KVnode` directly. The `KVNODE` macro (`<KVstore.h>`) resolves to the cloneable `/obj/kvnode`.
+
+## Large arrays
+
+| Class | File | Header | Role |
+|---|---|---|---|
+| `Array` | `src/lib/Array.c` | `<Array.h>` | Chunked array presenting up to 32767^2 elements as one indexable value |
+
+The host caps a single LPC array at its configured array-size limit. `Array` stores elements in chunks of 32767 and presents them as one zero-indexed value of up to 32767 * 32767 (1,073,676,289) elements, with the familiar array operators reproduced over the chunked representation. Indexed assignment mutates in place; every other operator returns a new `Array`. An `Array` is instantiated as a light-weight object (`new Array(...)`), an embedded value in its creator's dataspace rather than an independently managed clone.
+
+### `Array`
+
+Inherits `Iterable`.
+
+- `create(mixed arg)` -- constructor: an int allocates that many nil elements (0 .. 32767^2, larger errors); an LPC array copies its contents; the `Array`-argument form is internal plumbing for the operator implementations
+- `int size()` -- the element count
+- `mixed iteratorStart(mixed from, mixed to)` / `mixed *iteratorNext(mixed state)` / `int iteratorEnd(mixed state)` -- the iterator protocol supplied to `Iterable`, over optional integer index bounds (invalid bounds error)
+- operators: `arr[i]` / `arr[i] = v` (range-checked), `arr[a..b]` (a new `Array` subrange; invalid bounds error), `arr + other` (concatenation), `arr - other` (remove `other`'s elements), `arr & other` (intersection), `arr | other` (set-union: `arr` plus `other`'s elements not already present), `arr ^ other` (symmetric difference) -- the chunked equivalents of the host's array operators
 
 ## Property storage, identity, and inheritance
 

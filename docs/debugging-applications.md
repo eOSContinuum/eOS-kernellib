@@ -6,7 +6,7 @@ There is no attached debugger on this platform, and none is needed for most prob
 
 ## Reading an error trace
 
-An uncaught runtime error lands as a formatted trace: the error message on its own line, then one line per stack frame -- source line number and function name -- grouped under an object-name header wherever the frame's object changes across the stack (`src/usr/System/sys/errord.c` `runtime_error`). It goes to whatever connection triggered the call, or the boot log if none is attached.
+An uncaught runtime error lands as a formatted trace: the error message on its own line, then one line per stack frame -- source line number and function name -- grouped under an object-name header wherever the frame's object changes across the stack (`src/usr/System/sys/errord.c` `runtime_error`). It goes to whatever connection triggered the call, or the boot log if none is attached. The hook also returns the error string to the driver, which adopts the returned value as the error's message from then on, so an error manager may rewrite it; the shipped errord returns it unchanged.
 
 A compile failure is one line instead:
 
