@@ -1,0 +1,43 @@
+# KVstore/BTree round-trip -- regression for the persistent-collection
+# stack (src/lib/KVstore.c over src/lib/BTree.c + BTnode/KVnode).
+# Asserts insert/lookup/delete through node splits and merges (fan-out
+# 4, nine keys), the mutators' element-count-delta returns (1/0/-1),
+# the add/change existence guards, key-ordered iteration after
+# deletion, and BTree directly with integer keys plus reverse
+# iteration (from > to).
+#
+# The console's code verb wraps its argument in a single return
+# statement, so each block is one comma expression; every block builds
+# and removes its own store, so the set is safe to re-run against a
+# warm console.
+#
+# Runs against a base boot; no example deploy needed:
+#   DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/kvstore-roundtrip.verbset
+
+# insert across node splits, then point lookups (hit, hit, hit, miss)
+cmd: code (o = new_object("/lib/KVstore", 4), o->set("k1", 101), o->set("k2", 102), o->set("k3", 103), o->set("k4", 104), o->set("k5", 105), o->set("k6", 106), o->set("k7", 107), o->set("k8", 108), o->set("k9", 109), r = ({ o->get("k1"), o->get("k5"), o->get("k9"), o->get("nope") }), o->remove(), r)
+expect: \(\{ 101, 105, 109, nil \}\)
+absent: Error:
+
+# delete every second key through merges; iteration stays key-ordered over survivors
+cmd: code (o = new_object("/lib/KVstore", 4), o->set("k1", 101), o->set("k2", 102), o->set("k3", 103), o->set("k4", 104), o->set("k5", 105), o->set("k6", 106), o->set("k7", 107), o->set("k8", 108), o->set("k9", 109), o->set("k2", nil), o->set("k4", nil), o->set("k6", nil), o->set("k8", nil), t = o->iterator(), x = t->next(), y = t->next(), z = t->next(), r = ({ x[0], y[0], z[0], o->get("k4"), o->get("k3") }), o->remove(), r)
+expect: \(\{ "k1", "k3", "k5", nil, 103 \}\)
+absent: Error:
+
+# set returns the element-count delta: insert 1, replace 0, delete -1
+cmd: code (o = new_object("/lib/KVstore", 4), r = ({ o->set("k", 1), o->set("k", 2), o->set("k", nil) }), o->remove(), r)
+expect: \(\{ 1, 0, -1 \}\)
+absent: Error:
+
+# add refuses a present key; change refuses an absent key
+cmd: code (o = new_object("/lib/KVstore", 4), o->set("k", 1), r = ({ catch(o->add("k", 2)), catch(o->change("zzz", 1)) }), o->remove(), r)
+expect: \(\{ "Key present", "Key not present" \}\)
+absent: Error:
+
+# BTree directly: integer keys, point lookups, reverse iteration from > to.
+# Keys deliberately start at 10: a falsy key (integer 0) is unsupported --
+# the node implementation distinguishes present and absent keys by
+# truthiness (see the BTree entry in docs/kernel-libraries.md).
+cmd: code (t = new_object("/lib/BTree", 4), t->set(10, 1), t->set(20, 2), t->set(30, 3), t->set(40, 4), t->set(50, 5), t->set(60, 6), t->set(70, 7), t->set(80, 8), t->set(90, 9), t->set(100, 10), u = t->iterator(100, 10), x = u->next(), y = u->next(), r = ({ t->get(50), t->get(55), x[0], y[0] }), t->remove(), r)
+expect: \(\{ 5, nil, 100, 90 \}\)
+absent: Error:
