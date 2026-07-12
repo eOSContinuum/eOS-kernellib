@@ -82,6 +82,22 @@ The default access posture for a tier-E domain at boot:
 
 Cross-domain reach for tier-E code is mediated at every relevant kfun call by the access daemon at `/kernel/sys/access_daemon.c`. The access primitives themselves (the `set_access`, `query_user_access`, `query_file_access`, `set_global_access` methods on `/kernel/lib/api/access.c`) are kernel-tier. An application that needs to expose a public read-only library typically requests the access grant through a System-tier helper rather than calling kernel access primitives directly. Applications that ship a binary or HTTP service do not need to manipulate access bits at all: the platform routes cross-tier calls through the System-tier libraries the application inherits, and access checks happen automatically inside those.
 
+## Identity and request authentication
+
+What identity means on this platform today, surface by surface, and what an application must build for itself. This section describes what ships; the architecture for binding external credentials to durable application identities is deliberately undecided (the roadmap's trigger discipline applies).
+
+**Code identity is structural.** Every object runs under an owner within a capability tier, and the capability store's principals are ambient-derived strings (owner, program path, object name -- `docs/capability.md` The mechanism). This is the identity model the platform enforces, and it identifies code, not people.
+
+**Operator identity is the console's.** A registered operator is a kernel access-list entry plus a password hash held in the operator's user object; the System telnet manager admits only registered names, and the login flow checks a salted hash (`docs/admin-console.md` Connecting). Operators are administrators, not application users.
+
+**HTTP connections are anonymous.** The HTTP/1 bootstrap clones the application server per connection and associates no identity with it: no principal is derived from the request, no session is bound to the connection, and consecutive requests share nothing but the clone. Any notion of an application user starts from nothing on this path.
+
+**What ships parsed but unenforced.** The HTTP surface carries RFC-shape parsers for the authentication headers -- `Authorization` credentials and `WWW-Authenticate` challenges parse into value objects (`src/usr/HTTP/api/lib/Authentication.c` and its wire-parsing subclass, fed by the header parsers under `src/usr/HTTP/sys/`) that arrive in the request's `HttpFields`. Nothing validates or enforces them: no shipped code checks a credential, issues a challenge, or gates a request, and no application exercises a challenge flow (`docs/runtime-primitives.md` states the same). They are raw material.
+
+**Session state is the application's.** The one shipped token pattern is the chat example's capability-token LWO -- minted by a grantor, carried by the subject, checked at each gated verb (`docs/chat-applications.md`) -- an in-application authorization pattern, not an HTTP session mechanism. Beyond it, honestly: no cookie handling exists in the HTTP layer, no bearer-token validation, no session middleware, no application-user registry (the Index daemon maps object names, not people; the access list holds operators), no application-tier password store, and no per-identity rate limiting (quotas are per-owner).
+
+An application that needs authenticated users today therefore builds the whole chain itself -- parse the shipped header objects or its own token format, keep its user records in its own persistent objects, and gate its verbs the way the chat example gates rooms. The platform contributes the parsing, the persistence, and the capability discipline; it deliberately does not yet contribute the doctrine.
+
 ## Writing tick-aware code
 
 The platform has no threads and no preemption. What bounds a runaway computation is the **tick budget**. Every entry into application code runs under per-owner resource limits, and exceeding them is a runtime error, not a hung platform. This section is the execution model an application author needs. All of it derives from the driver and kernel source (`src/kernel/lib/auto.c` `call_limited`, `src/kernel/sys/resource_daemon.c`, and the driver's interpreter).
