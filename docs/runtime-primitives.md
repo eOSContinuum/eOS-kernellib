@@ -35,7 +35,7 @@ The architectural commitment behind this list (why these eight are surfaced as r
 
 Operations commit wholly or roll back wholly. Partial effects do not escape on failure.
 
-**Foundation**: DGD atomic-function semantics. A function declared `atomic` (or invoked through `call_limited` with an atomic envelope) that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point. The application carries no roll-back code. The property is older than this repository. Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
+**Foundation**: DGD atomic-function semantics. A function declared `atomic` that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point. The application carries no roll-back code. The property is older than this repository. Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
 **Demonstration**: a deliberate-failure probe in `examples/atomic-demo/`. The counter master declares `atomic void increment_with_failure()` whose body mutates `counter` and then `error()`s. The HTTP route catches the error and reports it in the response body. The next `GET /counter` returns the pre-call value, evidence of rollback. The `[atomic]` annotation in the boot log on the error trace is the runtime's own marker of the atomic envelope. The smoke script (`examples/atomic-demo/smoke.sh`) exercises the three-step probe and asserts the rollback.
 
