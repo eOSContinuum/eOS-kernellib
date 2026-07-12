@@ -102,6 +102,19 @@ Which stop path leaves which case:
 
 A supervisor sending SIGTERM (the ordinary "stop the service" path outside admin_console) and the `reboot` verb both write an incremental. Strictly, a `dump_state(1)` dump is written as a partial only when swapped-out objects are pending at dump time. A small freshly-booted image can produce a self-contained file (which is why the tutorial's single-file restore succeeds after its first `reboot`), but on a long-running image the partial case is the norm. Routine operator practice should keep `<dump_file>.old` alongside `dump_file` rather than treat it as disposable. A restore attempted with only `dump_file` after either path is the likely cause of a "Missing secondary snapshot" failure at boot.
 
+**The off-host restore drill** (performed once, 2026-07-12): a snapshot written by the macOS/arm64 driver restored under the Linux/aarch64 driver built from the same source -- `State restored.` on the first boot line, and the deployed example's post-restore test phases ran to completion on the foreign host (its full sentinel count, including the persistence-verification phase). The procedure that worked, in full:
+
+1. Copy the backup set to the target host: the `src` tree (which carries `src/kernel/data/` and the Vault XML directories inside it), the dump pair, and the `.dgd` config.
+2. Edit one config field: `directory` to the tree's absolute path on the new host. The state-file fields resolve relative to `directory`, so a layout-preserving copy needs no other edit; the restore arguments resolve against the invocation directory.
+3. Start the driver naming the snapshot: `dgd config dump_file [dump_file.old]`.
+
+Portability is stated exactly as tested: one macOS/arm64-to-Linux/aarch64 restore with driver binaries built from the same source succeeded. Other host and architecture pairs are unverified; the driver's own guard for an unusable file is the `Bad or incompatible restore file header` refusal, so an incompatible pair fails at boot rather than corrupting.
+
+**Backup-set coherence.** Take the dump pair and the tree at the same cut. The snapshot carries the compiled programs and all object state; the tree is what future compiles and cold boots build from, and it also carries the file-backed siblings (kernel data, Vault XML). A backup that pairs an older snapshot with a newer tree restores the older image state and will recompile against the newer sources on the next upgrade -- and Vault XML newer than the image diverges the other way, re-importing state the image predates. Neither is corruption; both are divergence you chose by mixing cuts.
+
+**Post-restore checklist.** `State restored.` as the first boot line after the version banner; the application's own verification (its sentinel driver or probes); clients reconnect (connections never survive a statedump restore); `Missing secondary snapshot` means an incremental primary was named without its base, and `Bad or incompatible restore file header` means the file and binary do not match.
+
+
 ## Availability and data-loss model
 
 The platform is a single process on a single machine. There is no replica to fail over to and no distributed consensus to reason about (`docs/persistence.md`: "this platform is deliberately single-coherence-domain"). Availability and data loss are properties of one process's dump-and-restore cycle, not of a cluster.
