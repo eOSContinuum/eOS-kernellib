@@ -71,6 +71,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [source-map.md](source-map.md): a map of the source tree and a fast index from each subsystem to the code that implements it and the doc that explains it. The navigation companion to `architecture.md`.
 - [glossary.md](glossary.md): definitions for terms used inline across the doc set (atomic, auto-inheritance, dataspace, statedump, hotboot, capability tier, mount point, principal, master, clone, LWO, and similar).
 - [kernel-reference/README.md](kernel-reference/README.md) carries the "Where signatures live" router: which doc holds the signature for each kind of callable (efun override, library class, property surface, daemon LFUN, merryfun, console verb).
+- [system-daemons.md](system-daemons.md): the System-daemon application surface -- per-function signatures, gating, and semantics for objectd, upgraded, errord, logd, capabilityd, and the Index daemon.
 - [references.md](references.md): citations for the orthogonal-persistence literature (Atkinson and Morrison 1995; KeyKOS / EROS), DGD mailing-list discussions (Allen 2000, Croes 2003, Croes 2010), and upstream documentation (DGD itself, lpc-doc, kernellib lineage).
 
 ## Reading paths

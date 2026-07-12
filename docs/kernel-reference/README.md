@@ -42,7 +42,8 @@ The pages here are one of several signature homes. From "I need the signature of
 | Merry daemon LFUN | `register_observer`, `dispatch_set`, `batched_set` | [`dispatcher.md`](../dispatcher.md), Application surface |
 | Merryfun (called from Merry source) | `Set`, `BatchedSet`, `Call` | [`merry-language.md`](../merry-language.md), Merryfun call surface |
 | Console verb | `code`, `upgrade`, `log` | [`admin-console.md`](../admin-console.md), the alphabetical verb appendix |
-| System daemon API | `objectd`, `upgraded`, `errord`, `logd` | No signature reference yet; the source at `src/usr/System/sys/` is authoritative |
+| System daemon API | `objectd`, `upgraded`, `errord`, `logd` | [`system-daemons.md`](../system-daemons.md) |
+| HTTP API class | `HttpRequest`, `Http1Server`, `Http1Client` | [`http-applications.md`](../http-applications.md), API signatures |
 
 SEE ALSO references of the form `kfun/<name>` point at DGD's own kfun documentation, maintained in [`dworkin/lpc-doc`](https://github.com/dworkin/lpc-doc); those pages are not part of this repository.
 
