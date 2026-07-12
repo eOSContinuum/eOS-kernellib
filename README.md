@@ -28,9 +28,38 @@ eOS-kernellib is the kernel layer that exposes these as runtime primitives — c
 
 Treating these eight as runtime primitives is the architectural commitment of eOS-kernellib: each one is a runtime guarantee the application inherits rather than a pattern the application reimplements. An orthogonally-persistent server cannot fake them at the application layer — atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. Asking the application to provide them is asking it to reproduce the runtime in user space.
 
+## Two primitives, in code
+
+The counter master from `examples/atomic-demo/`, with only its header comment trimmed:
+
+```c
+inherit "/usr/System/lib/auto";
+
+private int counter;
+
+static void create()
+{
+    ::create();
+    counter = 0;
+}
+
+int query()
+{
+    return counter;
+}
+
+atomic void increment_with_failure()
+{
+    counter += 1;
+    error("deliberate failure for atomic-rollback demonstration");
+}
+```
+
+`private int counter` is persistent state: no serialize or restore method backs it, and the value survives a process restart because the runtime's statedump captures the whole object graph, this field included. `atomic void increment_with_failure()` demonstrates the atomicity primitive: the increment and the `error()` share one envelope, so the runtime restores `counter` to its pre-call value when the error fires. `examples/atomic-demo/smoke.sh` runs this exact rollback as a three-step HTTP probe and asserts the counter is unchanged; `docs/first-application.md` builds the same two primitives into a larger service and adds the restart-survival proof this excerpt only implies.
+
 ## Quickstart
 
-New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime.
+New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime. Evaluating whether the platform fits before building on it? `docs/README.md`'s "Evaluate whether the platform fits" reading path collects the proofs, the ships-today-versus-next boundary, the capacity envelope, and the security posture in one path.
 
 **See it proven in one command.** With DGD built, the regression harness deploys an example, boots the platform, exercises it — including a full snapshot-and-restart persistence cycle — and counts the assertion sentinels:
 
