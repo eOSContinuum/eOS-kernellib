@@ -4,7 +4,7 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 **Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the platform.
 
-**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), 2026-05-15. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
+**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.5 (arm64), 2026-07-12. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
 
 ## Prerequisites
 
@@ -23,6 +23,8 @@ make install
 ```
 
 The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the released driver as-is, and the Tested-against line above names the release it is validated on. Building upstream `master` usually works, but it is not what the doc set's transcripts were captured against.
+
+The build is small. From a clean checkout, `make install` (with the macOS bison workaround from `docs/building.md` where it applies) completes in about two seconds of wall time on an Apple M5 Max, and well under a minute on any recent hardware. There is no dependency fetch: the driver needs only a C++ toolchain and a yacc.
 
 ## Fetch eOS-kernellib
 
@@ -66,9 +68,36 @@ telnet localhost 8023    # or: nc localhost 8023
 
 The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no application mounted on top there is nothing to answer them: the kernel's HTTP server clones an application server at `/usr/WWW/obj/server` per connection, and when that path is absent the connection is dropped without a response (a client like `curl` waits until its own timeout). Mounting an application there (`examples/http-app/README.md` is the walkthrough) is what makes 8080 respond.
 
+## Prove the platform in one command
+
+`scripts/run-example.sh` deploys an example application, boots the platform cold, snapshots, restarts from the snapshot, and counts the example's assertion sentinels -- the fastest way to see the runtime primitives pass on your machine:
+
+```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
+```
+
+A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1.7.9 on macOS 26.5 arm64):
+
+```text
+== clean slate ==
+== deploy merry-app as the MerryApp domain ==
+== boot 1 (cold; driver dumps + self-exits) ==
+== boot 2 (restore from snapshot) ==
+== sentinels ==
+MerryApp:test: starting
+MerryApp:test: ANCESTRY OK
+MerryApp:test: SANDBOX OK
+[... 24 more sentinels ...]
+MerryApp:test: OBSERVER EVICT OK
+MerryApp:test: PERSIST VERIFY OK
+== 28 " OK" sentinels (expected 28) ==
+PASS
+```
+
+The two boots bracket a snapshot restore, so the PERSIST sentinels prove application state survived a real process exit. [`scripts/README.md`](../scripts/README.md) documents the harness; `examples/` holds the other runnable examples.
+
 ## Where to next
 
-- **Prove the platform in one command**: `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` deploys, boots, exercises, snapshots, restarts, and counts the assertion sentinels. This is the fastest way to see the runtime primitives pass on your machine. [`scripts/README.md`](../scripts/README.md) documents the harness.
 - [`docs/first-hour.md`](first-hour.md) is the natural next step: a hands-on hour from this booted platform to the persistence loop (your own objects, state, and reactions surviving a process restart).
 - [`docs/coming-from-contemporary-infrastructure.md`](coming-from-contemporary-infrastructure.md) maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
 - [`examples/http-app/README.md`](../examples/http-app/README.md) and [`docs/http-applications.md`](http-applications.md) cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
