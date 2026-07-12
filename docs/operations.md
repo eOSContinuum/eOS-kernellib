@@ -78,7 +78,7 @@ A complete backup covers more than the dump file:
 | Item | Why | Notes |
 |---|---|---|
 | `dump_file` and `<dump_file>.old` | The statedump pair | Rotation moves the previous file to `.old` before the new one is written (State persistence above). Copy both together, not `dump_file` alone |
-| `src/kernel/data/` | Admin credentials and access bits | File-backed independently of the snapshot cycle: the admin password and access grants are "written to host files the moment they changed ... deliberately file-backed, so they survive even without a snapshot" (`docs/first-hour.md`) |
+| `src/kernel/data/` | Admin credentials and access bits | File-backed independently of the snapshot cycle: the admin password is written on every change, and access grants on every kernel-console `grant` / `ungrant` ("written to host files the moment they changed ... deliberately file-backed, so they survive even without a snapshot", `docs/first-hour.md`); grants made outside those verbs ride the image until the next flush |
 | Vault data directories (the Vault daemon's on-disk store, `/usr/Vault/data/vault/<Domain>/...`) | Schema-exported per-domain state | The Vault daemon's own XML storage root, kept separately from the object graph's in-memory copy (`docs/vault-applications.md`) |
 | Loaded extension binaries and the `.dgd` `modules` mapping | Restore precondition, not a file to copy | "statedumps created with a specific kfun extension in effect will require the the same kfun extension on restore" (Loading host-driver extensions below, quoting the 2010 Hydra note). Without the same extensions available, a snapshot will not restore at all |
 
