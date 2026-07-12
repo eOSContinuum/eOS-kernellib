@@ -69,7 +69,7 @@ New docs added to `docs/` use lowercase-hyphenated filenames matching the existi
 
 ## Testing
 
-Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. `scripts/README.md`'s Full regression sweep section enumerates every command in this harness, in order, with the pass signal for each; that sweep is the pre-PR bar. Changes to capability tiers, daemons, or the primitive surfaces should include:
+Which kernel-tier changes recompile live and which need the cold-boot proof is stated once in `docs/changing-a-running-system.md` (Changing the kernel layer). Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. `scripts/README.md`'s Full regression sweep section enumerates every command in this harness, in order, with the pass signal for each; that sweep is the pre-PR bar. Changes to capability tiers, daemons, or the primitive surfaces should include:
 
 - Reproducible boot evidence (cold boot, statedump restore, hot boot as applicable to the change).
 - An empirical Observation in the relevant doc when the change demonstrates a previously-unverified primitive behavior.
