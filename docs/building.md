@@ -41,6 +41,12 @@ The Command Line Tools' `bison` binary at the path above (GNU Bison 2.3) runs co
 
 The DGD source compiles on Linux, FreeBSD, and other POSIX-compatible systems with a working C toolchain. Platform detection happens via `uname -s` at the top of `dgd/src/Makefile`.
 
+### Wider index types: unproven today
+
+The stock build's capacity ceilings trace to compile-time type widths: `uindex`, `Sector`, and `ssizet` default to `unsigned short` (`src/config.h` in the DGD source), which is why `swap_size` caps at 65535 sectors and swap capacity scales only through `sector_size` (`docs/operations.md` Limits and capacity). The driver's Makefile exposes a `DEFINES` hook and `config.h` takes `UINDEX_TYPE` / `SECTOR_TYPE` / `SSIZET_TYPE` overrides.
+
+Stated as observed, not promised: a naive widening (all three types to `unsigned int`, 2026-07-12, macOS arm64) compiles cleanly and segfaults at cold boot before the first banner line. A working wider-index build is therefore a driver-level task with upstream guidance, not a flip of these defines; until one exists, the stock-snapshot-compatibility question and the wider-index memory cost stay unmeasured (`docs/operations.md` Unmeasured today).
+
 ## eOS-kernellib
 
 There is no build step. DGD compiles the LPC source under `src/` at runtime, on first load and on hot-reload requests.
