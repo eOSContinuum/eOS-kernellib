@@ -28,6 +28,22 @@ Man-page-style reference for the kernel layer's modified API surface, organized 
 - `lfun/` -- the per-object function contract: [`create`](lfun/create) (the kernel calls it; objects define it) and [`query_owner`](lfun/query_owner) (the auto object predefines it; objects call it).
 - `hook/` -- the driver and user-daemon hook contracts: [`driver`](hook/driver), [`userd`](hook/userd).
 
+## Where signatures live
+
+The pages here are one of several signature homes. From "I need the signature of X", route by what kind of callable X is:
+
+| Callable kind | Examples | Home |
+|---|---|---|
+| Kernel override of a DGD built-in | `clone_object`, `call_out`, `status` | [`efun/`](efun/) pages here |
+| Unmodified DGD built-in (kfun) | `sizeof`, `explode` | [`dworkin/lpc-doc`](https://github.com/dworkin/lpc-doc) |
+| Per-object contract; driver and userd hooks | `create`, `query_owner`; `runtime_error` | [`lfun/`](lfun/) and [`hook/`](hook/) pages here |
+| Inheritable library class or utility | `KVstore`'s `set`, `Continuation`'s `chain`, `base64` `encode` | [`kernel-libraries.md`](../kernel-libraries.md), per-class blocks |
+| Property surface on a host object | `set_property`, `query_prefixed_properties` | [`kernel-libraries.md`](../kernel-libraries.md), the `/lib/util/properties.c` block |
+| Merry daemon LFUN | `register_observer`, `dispatch_set`, `batched_set` | [`dispatcher.md`](../dispatcher.md), Application surface |
+| Merryfun (called from Merry source) | `Set`, `BatchedSet`, `Call` | [`merry-language.md`](../merry-language.md), Merryfun call surface |
+| Console verb | `code`, `upgrade`, `log` | [`admin-console.md`](../admin-console.md), the alphabetical verb appendix |
+| System daemon API | `objectd`, `upgraded`, `errord`, `logd` | No signature reference yet; the source at `src/usr/System/sys/` is authoritative |
+
 SEE ALSO references of the form `kfun/<name>` point at DGD's own kfun documentation, maintained in [`dworkin/lpc-doc`](https://github.com/dworkin/lpc-doc); those pages are not part of this repository.
 
 These pages document the kernel contract at the function level. For task-oriented introductions, start with [getting-started.md](../getting-started.md) and [lpc-essentials.md](../lpc-essentials.md); for the platform's own library catalog, see [kernel-libraries.md](../kernel-libraries.md).
