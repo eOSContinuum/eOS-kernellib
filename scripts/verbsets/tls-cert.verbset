@@ -1,0 +1,40 @@
+# tls-cert operator verb -- regression for the certificate surface's
+# console face on a module-less base boot (the default suite's shape:
+# no crypto module, one binary port, no certificate). Asserts the status
+# verb reports the full stand-down honestly, reload answers with the
+# stand-down reason rather than pretending, argument validation answers
+# usage, and the mutating entry point refuses a non-console caller (the
+# console's code objects compile as /usr/<owner>/_code, outside the
+# kernel tier the dispatch gate requires). The active-path behaviors
+# (reload registering the manager, statedump hygiene) are exercised by
+# scripts/https-smoke.sh, which boots with the module and a second port.
+#
+# Run against a base-booted runtime (the orchestrator boots + drives):
+#   DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/tls-cert.verbset
+
+# status: every activation precondition reported absent
+cmd: tls-cert
+expect: certificate /usr/System/data/tls/cert\.pem \(missing\)
+expect: key /usr/System/data/tls/key\.pem \(missing\)
+expect: TLS stack not compiled
+expect: https label not declared
+expect: manager not registered
+
+# reload answers with the stand-down reason
+cmd: tls-cert reload
+expect: TLS stack not compiled
+
+# argument validation
+cmd: tls-cert paths /only-one-arg
+expect: usage: tls-cert paths
+
+cmd: tls-cert bogus
+expect: usage: tls-cert
+
+# the dispatch gate refuses a non-console caller
+cmd: code "/usr/System/sys/https_server"->cmd_tls_cert(nil, "tls-cert", "reload")
+expect: Error: Access denied
+
+# and the console still evaluates afterwards
+cmd: code 2 + 3
+expect: \$\d+ = 5
