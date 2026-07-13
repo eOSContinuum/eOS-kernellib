@@ -133,8 +133,10 @@ static void create()
 	}
     }
 
-    /* HTTP/1 server on the first binary port */
+    /* HTTP/1 server on the first binary port; HTTPS on the second when
+     * the TLS stack, port, and credentials are present */
     load("sys/http_server");
+    load("sys/https_server");
 }
 
 /*

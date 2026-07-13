@@ -2,7 +2,7 @@
 
 **Audience**: a contributor running or extending the headless boot regressions under `scripts/`; assumes DGD is built per `docs/getting-started.md`.
 
-Five scripts drive the platform through boot cycles and assert or measure the result. The three shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
+Six scripts drive the platform through boot cycles and assert or measure the result. The four shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
 
 ## run-example.sh
 
@@ -44,6 +44,15 @@ DEPLOY="<example>:<Mount> ..." scripts/drive-verbs-smoke.sh <verbset ...>
 
 Boots the platform headless and drives verbset file(s) with `drive-verbs.py` against the live telnet console, then shuts down. The default run covers admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, operator-provision, and operator-upgrade in one boot, deploying vault-app as the `MyApp` domain and upgrade-cascade as the `Cascade` domain first -- the dispatcher-verbs clone-addressing cycle drives the property-bearing named clone (`MyApp:core:item1`) the vault-app boot driver creates, the operator cycle drives `upgrade -p` against the settled cascade deploy, and neither example self-exits. The clean-slate step also removes the provisioned operator's artifacts (`src/usr/testop/`, the kernel's persisted access list) so every run reasserts the cold-boot registration flow. With explicit verbset arguments nothing is deployed unless `DEPLOY` asks for it; `DEPLOY` -- a space-separated list of `<example>:<Mount>` pairs -- also overrides the default run's deployment. A boot here is always cold, so a `selfexit` example (one whose driver calls `shutdown()` when it finishes) tears the console down before verbs can run -- drive those against a non-selfexit deployment, or rely on the example's own in-application test phases instead.
 
+## https-smoke.sh
+
+```sh
+LPC_EXT_CRYPTO=/path/to/lpc-ext/crypto.<ver> \
+DGD_BIN=/path/to/dgd/bin/dgd scripts/https-smoke.sh
+```
+
+Native-TLS end-to-end: deploys `examples/https-app` as the `WWW` domain, generates a throwaway self-signed P-256 certificate under `src/usr/System/data/tls/` (removed after the run), boots with a second binary port and the lpc-ext crypto module loaded (the `LPC_EXT_CRYPTO` path is appended as a `modules` line to the generated config -- the checked-in `example.dgd` stays module-less), and drives five probes: `GET /health`, the negotiated protocol version (TLS 1.3), a `POST /echo` round-trip, a 404 route, and a cleartext-refusal check. Probes use `openssl s_client`, not curl -- the stock macOS curl's SecureTransport backend cannot speak TLS 1.3. `HTTPS-SMOKE PASS` is the pass signal.
+
 ## base-boot-guard.sh
 
 ```sh
@@ -76,6 +85,7 @@ Run in this order for the complete pre-PR bar. Each line names the command and t
 10. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
 11. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
 12. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+13. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the five native-TLS probes. Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 

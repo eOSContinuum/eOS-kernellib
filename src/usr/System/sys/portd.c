@@ -92,6 +92,9 @@ static void create()
     ports = status(ST_BINARYPORTS);
     if (ports && sizeof(ports) != 0) {
 	declare("http", "binary", 0);
+	if (sizeof(ports) > 1) {
+	    declare("https", "binary", 1);
+	}
     }
 }
 

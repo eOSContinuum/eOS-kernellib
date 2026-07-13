@@ -44,6 +44,9 @@ static void create() {
        * http_server's accept path is /usr/System-tier and holds no grant
        * elevation, so it cannot seed its own identity principal. */
       "http.binary_manager": ([ USERD: 1 ]),
+
+      /* Same authorization for the HTTPS bootstrap's accept path. */
+      "https.binary_manager": ([ USERD: 1 ]),
    ]);
 }
 

@@ -30,7 +30,7 @@ The inheritable LPC types and utilities available to every tier, below the platf
 
 Privileged code owned by `System`, published for global read at boot so every domain inherits the System auto (`lib/auto.c`).
 
-- `sys/` holds the System daemons: `userd.c` (the telnet manager that routes logins), `objectd.c` (the compile-time program graph), `errord.c` (error logging), `upgraded.c` (upgrade-cascade coordination), `portd.c` (the port-label registry over the kernel's numeric port registration), `http_server.c` (the binary-port HTTP manager), `logd.c` (persistent logging), and `persist_helper.c` (statedump support).
+- `sys/` holds the System daemons: `userd.c` (the telnet manager that routes logins), `objectd.c` (the compile-time program graph), `errord.c` (error logging), `upgraded.c` (upgrade-cascade coordination), `portd.c` (the port-label registry over the kernel's numeric port registration), `http_server.c` (the binary-port HTTP manager), `https_server.c` (the HTTPS bootstrap on the labeled TLS port), `logd.c` (persistent logging), and `persist_helper.c` (statedump support).
 - `lib/` holds `auto.c` (the inheritance root for every user-tier object) and `user.c`; `obj/` holds the System login console (`user.c`) and the `objectd.c` clonable.
 
 ### `src/usr/<Domain>/` (tier D, the platform domains)
