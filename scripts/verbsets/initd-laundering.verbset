@@ -1,0 +1,37 @@
+# initd port-manager laundering -- regression for the removal of the
+# ungated set_connection_manager / set_connection_manager_by_port publics
+# on the System-tier initd (src/usr/System/initd.c).
+#
+# Those two functions forwarded a caller-supplied registration to the
+# kernel userd's set_<type>_manager, whose only gate (SYSTEM() =
+# previous_program() under /usr/System) was satisfied by initd itself --
+# so any tier that could reach initd's publics laundered a port-manager
+# registration through System identity, bypassing both the kernel gate
+# and the portd label gate. The label registry (portd.register_manager,
+# System-gated) is the surviving registration path.
+#
+# The console's code objects compile as /usr/<owner>/_code, outside the
+# System tier -- exactly the unauthorized caller the surface must not
+# offer. `code X->func()` on a missing function returns nil silently
+# (call_other to an undefined function is not an error), so the detector
+# is function_object(func, initd): the defining program if the surface is
+# present, nil once removed.
+#
+# Run against a base-booted runtime (the orchestrator boots + drives):
+#   DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/initd-laundering.verbset
+
+# RED before removal / GREEN after: the laundering entry point is gone.
+cmd: code function_object("set_connection_manager", find_object("/usr/System/initd"))
+expect: \$\d+ = nil
+
+cmd: code function_object("set_connection_manager_by_port", find_object("/usr/System/initd"))
+expect: \$\d+ = nil
+
+# Positive control -- the gated label path survives and still refuses a
+# non-System console caller (stable before and after the removal).
+cmd: code "/usr/System/sys/portd"->register_manager("http", nil)
+expect: Error: Access denied
+
+# and evaluation still works after the refusal
+cmd: code 2 + 3
+expect: \$\d+ = 5
