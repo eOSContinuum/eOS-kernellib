@@ -104,9 +104,9 @@ The same sequence as a contributor's first guided read: each file below, in the 
 4. `src/kernel/sys/access_daemon.c` -- the file- and command-access store.
 5. `src/kernel/sys/userd.c` and `src/kernel/obj/admin_console.c` -- connection acceptors and the operator console clonable.
 6. `src/kernel/sys/capabilityd.c` -- the capability store, deliberately compiled before any domain initd so the gating surfaces find it seeded (the source comment states the timing requirement).
-7. `src/usr/System/initd.c` (`create`) -- the System bootstrap: objectd first (so every later compile is recorded), then the global-read publishing of the shipped state domains, then the System daemons in order (`errord`, `logd`, `upgraded`, the System `userd`, `persist_helper`), the login console, and the shared base library (codecs, iterators, strings, collections, continuations).
+7. `src/usr/System/initd.c` (`create`) -- the System bootstrap: objectd first (so every later compile is recorded), then the global-read publishing of the shipped state domains, then the System daemons in order (`errord`, `logd`, `upgraded`, `portd`, the System `userd`, `persist_helper`), the login console, and the shared base library (codecs, iterators, strings, collections, continuations).
 8. The domain passes -- one loop registers every `/usr/[A-Z]*` owner (so cross-domain inherits resolve regardless of order), a second compiles each domain's `initd.c`, with the fixed `TLS`, `HTTP`, `LPC` prefix ahead of the alphabetical remainder.
-9. `src/usr/System/sys/http_server.c` -- compiled last, once every domain exists, and registered as the binary-port manager.
+9. `src/usr/System/sys/http_server.c` -- compiled last, once every domain exists, and registered as the binary-port manager under the `http` port label.
 
 Everything after step 9 is demand-driven: clones per connection, compiles per operator action, call_outs per schedule.
 

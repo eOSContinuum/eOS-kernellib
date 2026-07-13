@@ -1,0 +1,49 @@
+# Port-label registry -- regression for the System-tier label layer over
+# the kernel's numeric port-to-manager registration (portd at
+# src/usr/System/sys/portd.c). Asserts the canonical boot labels resolve
+# to their configured ports and the managers registered through the label
+# path, an unknown label answers nil rather than erroring, and the
+# mutating surface (declare_label / register_manager) refuses non-System
+# callers: the console's code objects compile as /usr/<owner>/_code,
+# outside the System tier, so a console eval is exactly the unauthorized
+# caller the gate must refuse.
+#
+# Run against a base-booted runtime (the orchestrator boots + drives):
+#   DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/port-labels.verbset
+
+# the canonical labels declared at boot
+cmd: code "/usr/System/sys/portd"->query_labels()
+expect: "admin"
+expect: "http"
+
+# "admin" resolves to the configured telnet port and the System telnet manager
+cmd: code "/usr/System/sys/portd"->query_label("admin")
+expect: "telnet"
+expect: 8023
+expect: /usr/System/sys/userd
+
+# "http" resolves to the configured binary port and the HTTP bootstrap
+cmd: code "/usr/System/sys/portd"->query_label("http")
+expect: "binary"
+expect: 8080
+expect: /usr/System/sys/http_server
+
+# an unknown label answers nil, not an error
+cmd: code "/usr/System/sys/portd"->query_label("bogus")
+expect: \$\d+ = nil
+
+# the declaration surface refuses a non-System caller
+cmd: code "/usr/System/sys/portd"->declare_label("evil", "binary", 0)
+expect: Error: Access denied
+
+# and the refused declaration left no trace
+cmd: code "/usr/System/sys/portd"->query_label("evil")
+expect: \$\d+ = nil
+
+# the registration surface refuses a non-System caller
+cmd: code "/usr/System/sys/portd"->register_manager("http", nil)
+expect: Error: Access denied
+
+# evaluation still works after the refusals
+cmd: code 2 + 3
+expect: \$\d+ = 5

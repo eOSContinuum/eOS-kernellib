@@ -2,6 +2,7 @@
 # include <kernel/user.h>
 # include <kernel/capability.h>
 # include <status.h>
+# include <portd.h>
 # include "/usr/HTTP/api/include/HttpConnection.h"
 
 inherit "/usr/System/lib/auto";
@@ -9,16 +10,13 @@ inherit "/kernel/lib/capability";
 
 # define APP_SERVER	"/usr/WWW/obj/server"
 
-object userd;	/* kernel user daemon */
-
 /*
- * register as binary-port manager on the first binary port
+ * register as binary-port manager on the labeled HTTP port
  */
 static void create()
 {
     ::create();
-    userd = find_object(USERD);
-    userd->set_binary_manager(0, this_object());
+    PORTD->register_manager("http", this_object());
 }
 
 /*
