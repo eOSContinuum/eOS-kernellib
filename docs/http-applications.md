@@ -269,7 +269,7 @@ TLS-wrapped variants; each dual-inherits its plain-HTTP class plus a buffering c
 - `Http1TlsServer`: `create(object server, string certificate, string key, string requestPath, string fieldsPath, string tlsServerSessionPath)` -- certificate and key are PEM strings, the last argument is the object path of the TLS server-session class to instantiate; `tlsAccept(string str, varargs int reqCert, string hosts...)` -- begin the handshake (`hosts` filters SNI; `reqCert` is accepted but currently a no-op, as client-certificate requests are unimplemented in the shipped TLS session); `tlsReceive(string str)`; `tlsClose(int quit)`; `sendMessage(StringBuffer str, varargs int quiet, int hold)` -- encrypt and send (`hold` buffers for batching); `string host()` -- the SNI hostname
 - `Http1TlsClient`: `create(object client, string address, int port, string responsePath, string fieldsPath, string tlsClientSessionPath)`; `tlsConnect(varargs string host)` -- handshake, optional SNI hostname; `tlsReceive(string str)`; `tlsClose(int quit)`; `sendMessage(StringBuffer str, varargs int quiet, int hold)`
 
-The TLS layer is inert unless the host driver provides secure randomness (see `docs/operations.md` on `KF_SECURE_RANDOM`).
+The TLS layer is inert unless the host driver provides secure randomness (see `docs/operations.md` on `KF_SECURE_RANDOM`). `examples/https-app/` is the reference `Http1TlsServer` subclass, cloned per connection by the HTTPS bootstrap on the labeled `https` port (`docs/operations.md` Network boundary and transport security); no client subclass exists yet.
 
 ### `Connection1` flow surface (`src/usr/HTTP/lib/Connection1.c`)
 
