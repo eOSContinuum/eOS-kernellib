@@ -1,6 +1,7 @@
 # include <kernel/kernel.h>
 # include <kernel/access.h>
 # include <kernel/user.h>
+# include <portd.h>
 
 inherit kernel AUTO;
 inherit "~/lib/user";
@@ -23,7 +24,7 @@ static void create()
 {
     access::create();
     userd = find_object(USERD);
-    userd->set_telnet_manager(0, this_object());
+    PORTD->register_manager("admin", this_object());
     users = ([ ]);
     banner = "\n" +
 	     "eOS-kernellib runtime platform.\n" +

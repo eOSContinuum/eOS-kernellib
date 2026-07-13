@@ -78,6 +78,7 @@ static void create()
     load("sys/errord");
     load("sys/logd");
     load("sys/upgraded");
+    load("sys/portd");
     load("sys/userd");
     load("sys/persist_helper");
 
