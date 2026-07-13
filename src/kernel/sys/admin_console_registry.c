@@ -32,6 +32,8 @@
 # include <Merry.h>
 # include <log.h>
 
+# define HTTPSD		"/usr/System/sys/https_server"
+
 inherit "/kernel/lib/capability";
 
 private mapping dispatch_table;
@@ -71,6 +73,9 @@ static void create() {
       "log-level":
          ([ "path": LOGD,
             "method": "cmd_log_level" ]),
+      "tls-cert":
+         ([ "path": HTTPSD,
+            "method": "cmd_tls_cert" ]),
    ]);
 
    /*

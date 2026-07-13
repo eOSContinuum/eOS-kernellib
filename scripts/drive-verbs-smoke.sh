@@ -12,9 +12,10 @@
 #   DEPLOY="<example>:<Mount> ..." scripts/drive-verbs-smoke.sh <verbset>
 #
 # The default run drives the admin-baseline, logging-verbs, schema-verbs,
-# dispatcher-verbs, port-labels, operator-provision, and operator-upgrade
-# verbsets in one boot, deploying vault-app as the MyApp domain and
-# upgrade-cascade as the Cascade domain first: the dispatcher-verbs
+# dispatcher-verbs, port-labels, tls-cert, operator-provision, and
+# operator-upgrade verbsets in one boot, deploying vault-app as the
+# MyApp domain and upgrade-cascade as the Cascade domain first: the
+# dispatcher-verbs
 # clone-addressing cycle needs the named property-bearing clone
 # (MyApp:core:item1) the vault-app boot driver creates, the operator
 # cycle needs the settled
@@ -48,7 +49,7 @@ PORT=8023
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
-    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/port-labels.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
+    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/port-labels.verbset scripts/verbsets/tls-cert.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
     # The dispatcher-verbs clone-addressing cycle drives the named clone
     # the vault-app boot driver creates; the operator cycle drives
     # `upgrade -p` against the cascade deploy. Honor an explicit DEPLOY
