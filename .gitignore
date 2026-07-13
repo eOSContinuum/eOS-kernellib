@@ -20,6 +20,10 @@ src/usr/Cascade/
 src/usr/Vault/data/
 src/usr/MyApp/data/
 
+# TLS certificate material (scripts/https-smoke.sh generates a throwaway
+# pair here per run; a real deployment's certificates never belong in git).
+src/usr/System/data/tls/
+
 # Runtime save file the Merry daemon writes during any from-checkout boot.
 src/usr/Merry/tmp/
 
