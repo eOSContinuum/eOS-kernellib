@@ -273,6 +273,7 @@ The `src/lib/util/` subdirectory holds small utility libraries that wrap kfun-le
 | `src/lib/util/random.c` | host kfun `random` | Pseudo-random string generation |
 | `src/lib/util/unicode.c` | UTF-8 encoding | Unicode code-point conversion |
 | `src/lib/util/url.c` | character encoding | URL encode and decode (the Vault's on-disk name segments) |
+| `src/lib/util/webauthn.c` | crypto kfuns | WebAuthn ceremony verification (registration, assertion) as pure functions over caller-supplied payloads |
 
 These are inherited via `inherit "/lib/util/<name>"`. Most of the wrapped functions are declared `static` (per LPC type-modifier semantics in `docs/lpc-essentials.md`), so they are callable from the inheriting object and its children but not from arbitrary callers; a few entry points are public (notably `delayed_call` and the `parse.c` / `fileparse.c` runner queries).
 
@@ -384,6 +385,13 @@ Operate on a single Unicode code point.
 
 - `string urlEncode(string str)` -- percent-encode reserved characters
 - `string urlDecode(string str)` -- decode a percent-encoded string
+
+### `src/lib/util/webauthn.c`
+
+WebAuthn (W3C Web Authentication Level 2) ceremony verification as pure functions: no challenge state, no credential store, no side effects. The caller supplies the relying-party id, origin, and the challenge it issued; each function returns the parsed result or raises a `webauthn: ...` error naming the first failed check. Scope matches the platform's TOFU posture: attestation format `"none"` only, ES256 and Ed25519 credentials. Needs the host crypto module (SHA-256, the verify kfuns). The System ceremony daemon (`docs/system-daemons.md` webauthnd) composes these with the identity registry; `examples/webauthn-app/` exercises them directly against foreign-generated vectors.
+
+- `mapping verifyRegistration(string rpId, string origin, string challenge, string clientDataJSON, string attestationObject)` -- verify a registration (client-data type/challenge/origin, `fmt "none"` with an empty attStmt, rpIdHash, user-present and attested-credential flags) and return the credential as identityd row keys plus `"credentialId"` (the raw id)
+- `int verifyAssertion(string rpId, string origin, string challenge, string scheme, string key, string clientDataJSON, string authenticatorData, string signature)` -- verify an assertion (client data, rpIdHash, user-present, then the signature over `authenticatorData || SHA-256(clientDataJSON)`) and return its signature counter; counter replay policy is the caller's
 
 ## Where to next
 

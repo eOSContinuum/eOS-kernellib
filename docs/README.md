@@ -66,7 +66,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - `../examples/hot-reload-demo/`, the hot-reload demonstration: new LPC source recompiled into the live runtime via `compile_object`, the next dispatch picking up the new program. The evidence behind [runtime-primitives.md](runtime-primitives.md) §4.
 - `../examples/hot-reload-master/`, clone-upgrade demonstration: recompiling a clonable master propagates the new program to existing clones while each keeps its state. Read alongside [code-lifecycle.md](code-lifecycle.md).
 - `../examples/upgrade-cascade/`, library-upgrade demonstration: upgrading a parent library through the upgrade daemon recompiles its inheritors and `call_touch`-patches their existing clones, each keeping its state. Read alongside [code-lifecycle.md](code-lifecycle.md) Library upgrade.
-- `../examples/webauthn-app/`, WebAuthn codec-substrate demonstration: the base64url, CBOR, and COSE_Key decoding a relying party performs on credential payloads, exercised against the RFC 4648 and RFC 8949 vectors with strict-reject batteries. Read alongside [kernel-libraries.md](kernel-libraries.md) Utilities.
+- `../examples/webauthn-app/`, WebAuthn substrate demonstration: the base64url, CBOR, and COSE_Key decoding a relying party performs on credential payloads (RFC 4648 and RFC 8949 vectors with strict-reject batteries), plus -- with the crypto module -- registration and assertion ceremony verification against foreign-generated vectors including the negative batteries. Read alongside [kernel-libraries.md](kernel-libraries.md) Utilities.
 
 ### Reference
 

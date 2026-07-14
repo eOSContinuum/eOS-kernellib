@@ -13,7 +13,7 @@ Runnable evidence: each directory below is a minimal, deployable application dem
 - `hot-reload-demo/` -- `compile_object` recompiles a live target; the next dispatch runs the new program, no restart. Doc: `../docs/runtime-primitives.md` §4. Verify: `./smoke.sh` (HTTP probe) or `scripts/run-example.sh hot-reload-demo` (headless sentinel profile).
 - `hot-reload-master/` -- recompiling a clonable master propagates the new program to existing clones while each keeps its own state. Doc: `../docs/code-lifecycle.md`. Verify: `scripts/run-example.sh hot-reload-master` (sentinel log).
 - `upgrade-cascade/` -- upgrading a parent library through the upgrade daemon recompiles its inheritors and `call_touch`-patches their existing clones, state intact. Doc: `../docs/code-lifecycle.md` Library upgrade. Verify: `scripts/run-example.sh upgrade-cascade` (sentinel log).
-- `webauthn-app/` -- the WebAuthn codec substrate: base64url round trips, strict CBOR decoding against the RFC 8949 vectors, COSE_Key extraction to the crypto kfuns' verify shapes. Doc: `../docs/kernel-libraries.md` Utilities. Verify: `scripts/run-example.sh webauthn-app` (sentinel log).
+- `webauthn-app/` -- the WebAuthn codec and ceremony substrate: base64url round trips, strict CBOR decoding against the RFC 8949 vectors, COSE_Key extraction to the crypto kfuns' verify shapes, and (with the crypto module) full registration/assertion verification against foreign-generated vectors with negative batteries. Doc: `../docs/kernel-libraries.md` Utilities. Verify: `scripts/run-example.sh webauthn-app` (sentinel log; 26 sentinels with `LPC_EXT_CRYPTO` + `EXPECTED_OK=26`).
 
 ## Where to next
 
