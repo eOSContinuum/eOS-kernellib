@@ -1,8 +1,9 @@
 /*
  * Session daemon: mints and validates bearer session tokens for
  * authenticated principals. The primitive only -- no cookie handling
- * and no HTTP bearer parsing ship here; a transport surface that wants
- * sessions calls mint/validate directly.
+ * and no HTTP bearer parsing ship here. The surface is System-tier; a
+ * tier-E transport reaches sessions through the authd facade
+ * (sys/authd.c), which mints only for a ceremony-proven principal.
  *
  * Secret discipline: a token's plaintext exists only in the mint
  * response. What persists is SHA-256(token) -> a session record

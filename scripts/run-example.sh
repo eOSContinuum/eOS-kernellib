@@ -12,7 +12,11 @@
 #
 # Each example's profile lives in example_profile() below:
 #
-#   deploy   the src/usr/<Name> domain the example deploys as
+#   deploy   the src/usr/<Name> domain the example deploys as. A
+#            multi-domain example joins its parts with '+' (e.g.
+#            "WWW+Inventory"): the example directory then carries one
+#            subdirectory per part, each deployed as its own domain,
+#            and sentinels are read from the LAST part's data/.
 #   boots    1 = cold only; 2 = cold + restore; 3 = cold + restore +
 #            cold-again (the no-snapshot negative case)
 #   boot1    selfexit = the driver dumps a snapshot and exits on its
@@ -44,6 +48,9 @@ cd "$REPO_ROOT"
 example_profile() {
     case "$1" in
         chat-app)          echo "Chat 3 selfexit 20" ;;
+        composite-app)     echo "WWW+Inventory 2 selfexit 5" ;;
+                           # 5 = transport-only subset; with the crypto
+                           # module: LPC_EXT_CRYPTO=... EXPECTED_OK=19
         hot-reload-demo)   echo "WWW 1 timed 2" ;;
         hot-reload-master) echo "Reload 1 timed 3" ;;
         merry-app)         echo "MerryApp 2 selfexit 28" ;;
@@ -58,13 +65,13 @@ example_profile() {
 EXAMPLE="${1:-}"
 if [ -z "$EXAMPLE" ]; then
     echo "usage: scripts/run-example.sh <example>" >&2
-    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
+    echo "known examples: chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
     exit 2
 fi
 PROFILE=$(example_profile "$EXAMPLE")
 if [ -z "$PROFILE" ]; then
     echo "run-example.sh: no profile for '$EXAMPLE'; add one to example_profile()" >&2
-    echo "known examples: chat-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
+    echo "known examples: chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
     echo "(atomic-demo and http-app verify via live HTTP probes; see their READMEs)" >&2
     exit 2
 fi
@@ -114,13 +121,24 @@ echo "== clean slate =="
 # shutdown() when its driver finishes) it tears the driver down before this
 # example's driver completes, truncating the result. Isolation requires a
 # single deployed example per boot.
-for mount in Cascade Chat MerryApp MyApp Reload SignalApp WebAuthn WWW; do
+for mount in Cascade Chat Inventory MerryApp MyApp Reload SignalApp WebAuthn WWW; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap "$LOG_PREFIX"1.log "$LOG_PREFIX"2.log "$LOG_PREFIX"3.log
 
-echo "== deploy $EXAMPLE as the $DEPLOY_NAME domain =="
-cp -R "examples/$EXAMPLE" "src/usr/$DEPLOY_NAME"
+echo "== deploy $EXAMPLE as the $DEPLOY_NAME domain(s) =="
+case "$DEPLOY_NAME" in
+    *+*)
+        # multi-domain example: one subdirectory per '+'-joined part
+        for part in $(echo "$DEPLOY_NAME" | tr '+' ' '); do
+            cp -R "examples/$EXAMPLE/$part" "src/usr/$part"
+        done
+        ;;
+    *)
+        cp -R "examples/$EXAMPLE" "src/usr/$DEPLOY_NAME"
+        ;;
+esac
+RESULT_DOMAIN=${DEPLOY_NAME##*+}
 
 if [ "$BOOT1_MODE" = "selfexit" ]; then
     echo "== boot 1 (cold; driver dumps + self-exits) =="
@@ -161,7 +179,7 @@ if [ "$BOOTS" -ge 3 ]; then
 fi
 
 echo "== sentinels =="
-RESULT="src/usr/$DEPLOY_NAME/data/test-result.log"
+RESULT="src/usr/$RESULT_DOMAIN/data/test-result.log"
 if [ ! -f "$RESULT" ]; then
     echo "FAIL: result log not written: $RESULT (boot logs: ${LOG_PREFIX}N.log)" >&2
     exit 1
