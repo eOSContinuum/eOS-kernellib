@@ -109,6 +109,274 @@ ChatApp:test: COLDBOOT-LOST OK
 
 Additional phases land as subsequent revisions add primitives.
 
+## Phase notes
+
+The phase-by-phase account of what the driver (`sys/test.c`) does and
+asserts. The build patterns these phases prove are documented in
+`../../docs/chat-applications.md`; this section is the evidence tour.
+
+### Phase 1 -- rejected kick (`CAP-REJECT OK`)
+
+The driver clones three users (alice, bob, carol) and one room. None of
+them carry an admin token at this point. bob calls
+`admin->kick(alice, room_a)`; the capability check finds no matching
+token and throws. The driver's `catch{}` converts the throw into the
+sentinel and asserts that the membership of `room_a` did not mutate.
+
+The boot log carries the `[caught]` annotation that DGD writes for any
+error-that-was-caught:
+
+```text
+** admin: actor bob not authorized for kick in room ChatApp:Room:LobbyA [caught]
+                       /usr/Chat/sys/test
+  202   setup_and_run         /usr/Chat/sys/test
+  240 * run_tests             /usr/Chat/sys/test
+                       /usr/Chat/sys/admin
+   53   kick                  /usr/Chat/sys/admin
+  149   _check_admin_token    /usr/Chat/sys/admin
+```
+
+The `[caught]` suffix confirms the error did not propagate to the
+runtime -- the driver's `catch{}` swallowed it. DGD's convention is to
+log every error regardless of `catch{}` so the platform retains a
+trace; the caught/uncaught distinction is in the suffix.
+
+### Phase 2 -- accepted kick (`CAP-ACCEPT OK`)
+
+carol receives a per-room `"kick"` token via
+`admin->grant_admin(nil, carol, room_a, ({ "kick" }))`. The same
+`admin->kick(carol, alice, room_a)` call now passes the capability
+check; the verb removes alice from `room_a`'s member list and removes
+`room_a` from alice's subscription list. The driver asserts both
+removals.
+
+### Phase 3 -- accepted reaction (`SANDBOX-ACCEPT OK`)
+
+The driver registers two in-sandbox observers on the room's
+`chat-room.message` arrival signal at main timing, each calling only
+unshadowed merryfuns (`Set` / `Get` / `sizeof`, all routing through
+`merrynode.c`) -- an append-to-history observer and a message-count
+marker observer:
+
+```c
+MERRY->register_observer(room_a, "chat-room.message", "main",
+    "Set($this, \"chat-room.message-log\", " +
+    "Get($this, \"chat-room.message-log\") + ({ $new })); return TRUE;");
+MERRY->register_observer(room_a, "chat-room.message", "main",
+    "Set($this, \"chat-room.message-count\", " +
+    "sizeof(Get($this, \"chat-room.message-log\"))); return TRUE;");
+```
+
+Registration order is firing order, so the marker observes the
+already-appended log. bob posts a message; `post_message` writes
+`chat-room.message`, and the dispatcher fires both observers with no
+manual `run_merry`. The driver reads the appended log and the marker
+back. This is sandboxed code load *as a registered reaction*: scripts
+authored as strings, compiled at runtime, bound on a room, and executed
+against that room's property storage automatically on a real state
+change.
+
+### Phase 4 -- rejected reaction (`SANDBOX-REJECT OK`)
+
+The driver compiles a sibling reaction whose source calls `write_file`,
+a kfun in the `SANDBOX()` deny list:
+
+```c
+write_file("/usr/Chat/data/hack.txt", "pwned");
+```
+
+Registration succeeds: the Merry compiler resolves `write_file` to the
+local `SANDBOX(write_file)` shadow method, which exists, so compilation
+finds the symbol and binds the script. The error fires only on the
+first invocation, when the shadow body runs and raises:
+
+```text
+** function 'write_file' not allowed in merry code [caught]
+```
+
+The boot log carries the full call stack down to `merrynode.c`'s
+`SANDBOX(write_file)` shadow. The driver's `catch{}` converts the throw
+into the sentinel and asserts that no `hack.txt` was created.
+
+### Phase 5 -- synchronous cross-user notification (`EVENT-ATOMIC OK`)
+
+A room carries an append-to-history main observer and a mention-notify
+post observer. alice posts a message mentioning dave; `scan_mentions`
+resolves `@dave` and carries him in the message's `mentions` list. The
+dispatcher fires the main append, then the post observer -- both
+synchronously:
+
+```c
+Set($new["mentions"][0], "chat-user.mention-tracker",
+    Get($new["mentions"][0], "chat-user.mention-tracker") + ({ $this }));
+return TRUE;
+```
+
+The instant `post_message` returns, dave's mention-tracker already
+names the room -- the notification landed inside the same
+`set_property` that wrote `chat-room.message`. `post_message` itself
+contains no notification logic.
+
+### Phase 6 -- no observer, no reaction (`NO-REACT OK`)
+
+The same mention post, on a room with the append observer but no
+mention-notify observer registered. The dispatcher has nothing to fire
+at post timing, so the target's mention-tracker stays empty. The
+negative isolates this to the missing post observer: the append
+observer is registered, so the message is still recorded.
+
+### Phase 7 -- event atomic with state change (`EVENT-ROLLBACK OK`)
+
+`atomic_post_then_fail` posts a message mentioning eve inside a DGD
+`atomic` function, then throws. The rollback unwinds every write the
+task made -- the message-log append and the observer's cross-user
+mention-tracker Set. After the caught throw, the room has no message
+and eve has no notification: the event "did not fire" in the same sense
+the state change "did not occur".
+
+### Phase 8 -- a deferred operation, kept distinct (`DEFERRED-OP OK`)
+
+A post observer schedules a `$delay()` continuation that writes a
+delivery-receipt marker on a subsequent tick:
+
+```c
+$delay(2, FALSE);
+Set($this, "chat-room.delivery-receipt", 1);
+return TRUE;
+```
+
+`$delay(2, FALSE)` returns `FALSE` to the dispatcher immediately, so
+the receipt is not set when `post_message` returns; a `call_out` at t+4
+confirms it appears once the continuation has run -- a cross-operation
+deferred operation that does not share the triggering write's atomic
+envelope, exercising the compiled-observer continuation with the room
+exposing the standard `delayed_call` / `perform_delayed_call` glue.
+
+### Phase 9 -- write coherence under contention (`COHERENCE-SERIALIZE OK`)
+
+The phase sets a room's capacity to 1, then has two users both call
+`claim_slot`. Each call is its own atomic DGD task, so the runtime runs
+them one after another: the first reads zero members, takes the slot,
+and commits; the second reads the post-commit membership (one member,
+at capacity) and is refused. The driver asserts exactly one claim
+returned 1, the room holds exactly the winner, and the loser is not a
+member.
+
+### Phase 9b -- the lost update (`LOST-UPDATE OK`)
+
+`claim_slot_stale` writes the member list from a snapshot captured
+before the other writer committed:
+
+```c
+void claim_slot_stale(object user, object *stale_snapshot)
+{
+    set_property("chat-room.member-list", stale_snapshot + ({ user }));
+}
+```
+
+The phase captures one empty snapshot and passes it to both writers.
+The second write (`stale_snapshot + ({ user })`) overwrites the first,
+so one writer's addition is lost and only the other remains -- exactly
+the bug an external coordination layer would otherwise have to prevent,
+and the bug `claim_slot` avoids by construction.
+
+### Phase 9c -- read coherence and cached drift (`COHERENCE OK`, `CACHED-DIVERGE OK`)
+
+Three users in one room each read the message log after three messages
+have posted. The log is one property on the room clone, not a per-user
+copy, so the three reads return identical content in identical order --
+the readers reconcile nothing. The negative: one user captures the log,
+a fourth message posts, and the cached copy now disagrees with the live
+log -- three entries against four. The divergence is the cost of
+holding a private snapshot instead of reading the shared property at
+use time.
+
+### Phase 9d -- atomic cross-room writes (`ATOMIC-COMMIT OK`, `ATOMIC-ROLLBACK OK`, `PARTIAL-STATE OK`)
+
+`cross_write` appends one message to two separate rooms:
+
+```c
+void cross_write(object room_a, object room_b, string content)
+{
+    mapping msg;
+
+    msg = ([ "content": content, "timestamp": time() ]);
+    room_a->set_property("chat-room.message-log",
+			 room_a->query_messages() + ({ msg }));
+    room_b->set_property("chat-room.message-log",
+			 room_b->query_messages() + ({ msg }));
+}
+```
+
+Run through `MERRY->batch(this_object(), "cross_write", args,
+([ "atomic": 1 ]))`, the two appends are one atomic unit: the commit
+path lands both rooms. A sibling `cross_write_then_fail` appends to the
+first room and then throws; under the atomic batch the throw rolls both
+writes back, so neither room retains the message. The negative is the
+same failing writer run through a non-atomic batch (`([ ])`): the first
+room's append commits before the throw and survives, while the second
+room is never written -- partial state on error.
+
+### Phase 9e -- ancestry-walk multi-agent observer (`ANCESTRY OK`, `NO-INHERIT OK`)
+
+A base room carries the append observer; three child rooms set the base
+as their ur-object (`set_ur_object`) but register nothing themselves. A
+message posting in each child writes `chat-room.message`, and the
+dispatcher's ancestry walk resolves the base's observer -- with `$this`
+bound to the child, so the append lands on the child's own log. All
+three children record their message from the single ancestor
+registration (cf. the merry-app DISPATCH ANCESTRY phase). The negative
+is a room with neither its own observer nor an ancestor carrying one:
+its message posts, the ancestry walk finds no append observer at any
+level, and the log stays empty.
+
+### Phase 10 -- persist setup (`PERSIST-SETUP OK`)
+
+The driver clones a fresh room (`ChatApp:Room:PersistD`), has alice and
+bob join it, and posts three messages through `chat::post_message`. It
+then sets alice's `chat-user.mention-tracker` to `({ bob })` -- a
+cross-clone object reference, alice's user object pointing directly at
+bob's. The room and the two accounts are saved as object globals on the
+test driver (non-`static` so the state dump captures them), the session
+shape is recorded to an on-disk marker file, a `persist_verify`
+`call_out` is scheduled at `t=3`, and the driver calls
+`/usr/System/sys/persist_helper::trigger_dump_and_exit`. That helper
+schedules `dump_state(FALSE)` + `shutdown()` on its own `call_out`, so
+the caller's stack unwinds before the snapshot is taken.
+
+The snapshot captures everything reachable in the image: the room
+clone, the two user clones, the three message mappings (each carrying a
+`sender` object reference), alice's cross-clone mention-tracker
+reference, and the not-yet-fired `persist_verify` `call_out`. The
+driver then exits; the boot log records `** System halted.`
+
+### Phase 11 -- persist verify (`PERSIST-VERIFY OK`)
+
+The second boot restarts DGD against the snapshot
+(`dgd example.dgd state/snapshot`). DGD does not re-run `create()` on
+restored objects; it resumes the dumped image and fires `call_out`s
+whose scheduled times have elapsed. The surviving `persist_verify`
+`call_out` fires immediately and asserts:
+
+- the room still holds three messages and two members;
+- `persist_alice` and `persist_bob` resolve to live clones with their
+  `chat-user.name` values intact (the user accounts survived);
+- alice's mention-tracker resurrected as the *same* bob object
+  (`mention[0] == persist_bob`), not a copy -- DGD's object-reference
+  resurrection rebound the cross-clone reference;
+- a third user (carol) joining the restored room is admitted and
+  observes the full prior session: three messages and a
+  now-three-member roster.
+
+### Negative case -- cold boot without a snapshot (`COLDBOOT-LOST OK`)
+
+A third boot starts DGD cold without the snapshot argument. The
+driver's `setup_and_run` finds the on-disk marker present (a file -- it
+survives any boot) but `persist_room` `nil` (a cold boot resets all
+object globals). That combination is the signature of "a session was
+persisted but the snapshot was not loaded," so the driver writes the
+negative sentinel rather than re-running setup.
+
 ## Layout
 
 ```text
