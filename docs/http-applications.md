@@ -192,11 +192,11 @@ For chunked transfer encoding (`Transfer-Encoding: chunked`), use `expectChunk` 
 
 The platform mount point is a single path: `/usr/WWW/obj/server`. To run more than one logical application behind one HTTP/1 port, the `/usr/WWW/` server dispatches by route prefix to handlers registered by other domains:
 
-- `/usr/WWW/sys/router.c`: a registry mapping route prefixes to handler objects.
-- `/usr/WWW/obj/server.c`: queries the registry from `receiveRequest` and calls the matching handler.
-- `/usr/Counter/sys/handler.c`, `/usr/Inventory/sys/handler.c`, etc.: application handlers that register themselves with `/usr/WWW/sys/router` at boot.
+- `/usr/WWW/sys/router.c`: a registry mapping route prefixes to handler object paths.
+- `/usr/WWW/obj/server.c`: queries the registry from its dispatch and relays to the matching handler.
+- `/usr/Inventory/sys/handler.c`: an application handler that registers its prefixes with `/usr/WWW/sys/router` at boot.
 
-This is a higher-level pattern than the single-application reference. The kernel layer is indifferent to which pattern an application chooses. Both rely on the same platform contracts.
+This pattern ships runnable: `examples/composite-app/` carries exactly these files (the WWW part deploys the registry and routing servers, the Inventory part a registering application domain), and [composite-applications.md](composite-applications.md) walks the seams. The kernel layer is indifferent to which pattern an application chooses; the single-application reference and the router pattern rely on the same platform contracts.
 
 ## Cross-domain initialization order
 
@@ -256,7 +256,7 @@ The inheritable per-connection server library; the mount-point object inherits i
 
 ### `Http1Client` (`src/usr/HTTP/api/lib/Client1.c`)
 
-The inheritable HTTP/1 client library. No shipped example exercises it yet; the shape below is the source contract.
+The inheritable HTTP/1 client library. The first in-tree consumer is `examples/composite-app/Inventory/obj/client.c`, which composes it with `/usr/HTTP/api/lib/BufferedConnection1` (driver-level connection kept raw, framing internal) -- start there rather than from `obj/client1.c`, whose plain driver-line-mode shape has documented latent defects (`docs/application-authoring.md` Outbound connections).
 
 - `create(object client, string host, int port, string responsePath, string headersPath)` -- bind the relay, name the wire-parsing classes, and connect
 - the application overrides: `void receiveResponse(HttpResponse response)` -- REQUIRED, the parsed response; as with the server's `receiveRequest`, the override must not chain to the inherited implementation (the same relay dispatch would recurse); `void connected()` / `void connectFailed(int errorcode)` -- connection outcome callbacks; `int inactivityTimeout()` -- default 120

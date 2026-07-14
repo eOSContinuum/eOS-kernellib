@@ -46,6 +46,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [signal-applications.md](signal-applications.md), the smallest signal-on-property demonstration: one observer, one write, the reaction done when the write returns. Why reacting to state change is a runtime primitive here rather than assembled queue/poller/worker glue.
 - [merry-applications.md](merry-applications.md), Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
 - [chat-applications.md](chat-applications.md), multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, and the shipped demonstrations spanning capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
+- [composite-applications.md](composite-applications.md), the composite application walkthrough: the multi-domain route registry, the connection-object-to-daemon seam, binding WebAuthn/session authentication to the wire through the authd facade, and the outbound HTTP client's working shape.
 - [merry-language.md](merry-language.md), Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fifteen merryfuns with full signatures. Read this when writing Merry source, not just binding it.
 
 ### Operations
@@ -59,6 +60,8 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 `../examples/README.md` is the in-directory index. `../scripts/README.md` documents the one-command harness that drives the sentinel-bearing examples.
 
 - `../examples/http-app/`: minimal HTTP/1 application with `GET /health`, `POST /echo`, and a 404 fallback. Read alongside [http-applications.md](http-applications.md).
+- `../examples/https-app/`, the TLS mount point: an `Http1TlsServer` subclass cloned per connection on the labeled `https` port. Read alongside [operations.md](operations.md) Network boundary and transport security.
+- `../examples/composite-app/`, the composite transport-connected application: a WWW routing domain plus an Inventory application domain, WebAuthn/session authentication bound to the wire, a persistent daemon with a synchronous audit observer, and the capability-gated admin route, all driven over real TCP. Read alongside [composite-applications.md](composite-applications.md).
 - `../examples/vault-app/`, minimal Vault application: a property-bearing clonable persisted via on-disk XML with a boot-time round-trip test. Read alongside [vault-applications.md](vault-applications.md).
 - `../examples/signal-app/`, minimal signal application: a one-inherit property host, one Merry observer, a synchronous-fire assertion. Read alongside [signal-applications.md](signal-applications.md).
 - `../examples/merry-app/`, minimal Merry application: a property + ur-bearing clonable, an ancestry-walk assertion through `run_merry`, and a sandbox-firing assertion. Read alongside [merry-applications.md](merry-applications.md).
@@ -74,7 +77,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [source-map.md](source-map.md): a map of the source tree and a fast index from each subsystem to the code that implements it and the doc that explains it. The navigation companion to `architecture.md`.
 - [glossary.md](glossary.md): definitions for terms used inline across the doc set (atomic, auto-inheritance, dataspace, statedump, hotboot, capability tier, mount point, principal, master, clone, LWO, and similar).
 - [kernel-reference/README.md](kernel-reference/README.md) carries the "Where signatures live" router: which doc holds the signature for each kind of callable (efun override, library class, property surface, daemon LFUN, merryfun, console verb).
-- [system-daemons.md](system-daemons.md): the System-daemon application surface -- per-function signatures, gating, and semantics for objectd, upgraded, errord, logd, capabilityd, and the Index daemon.
+- [system-daemons.md](system-daemons.md): the System-daemon application surface -- per-function signatures, gating, and semantics for objectd, upgraded, errord, logd, capabilityd, identityd, webauthnd, sessiond, authd, and the Index daemon.
 - [references.md](references.md): citations for the orthogonal-persistence literature (Atkinson and Morrison 1995; KeyKOS / EROS), DGD mailing-list discussions (Allen 2000, Croes 2003, Croes 2010), and upstream documentation (DGD itself, lpc-doc, kernellib lineage).
 
 ## Reading paths
@@ -94,6 +97,7 @@ Common goals and the docs that serve them.
 - **Decide where a new piece of behavior lives**: [where-code-belongs.md](where-code-belongs.md), then [application-authoring.md](application-authoring.md) for the mechanics of the chosen shape.
 - **React to property changes**: [lpc-essentials.md](lpc-essentials.md), [signal-applications.md](signal-applications.md), `../examples/signal-app/`, then [dispatcher.md](dispatcher.md) for dispatch semantics and [observers.md](observers.md) for the observer lifecycle contract.
 - **Write a multi-user chat application**: [lpc-essentials.md](lpc-essentials.md), [chat-applications.md](chat-applications.md), `../examples/chat-app/`.
+- **Compose several primitives behind one transport**: [http-applications.md](http-applications.md), [composite-applications.md](composite-applications.md), `../examples/composite-app/`.
 - **Write a Vault-persisted application**: [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
 - **Add scripted, sandboxed behavior to an object**: [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Write Merry source**: [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.

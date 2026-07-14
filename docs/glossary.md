@@ -74,7 +74,7 @@ A WebAuthn (W3C Web Authentication) public-key credential -- the first credentia
 
 ## session token
 
-A bearer token `sessiond` mints for an authenticated principal and validates on later requests. The plaintext exists only in the mint response; what persists is its hash, so a live token never reaches the statedump (a tested property). The primitive only -- no cookie or HTTP bearer parsing ships, so a transport binds it to its own request flow. Load-bearing in [identity.md](identity.md) Sessions and [system-daemons.md](system-daemons.md) sessiond.
+A bearer token `sessiond` mints for an authenticated principal and validates on later requests. The plaintext exists only in the mint response; what persists is its hash, so a live token never reaches the statedump (a tested property). The primitive only -- no cookie or HTTP bearer parsing ships, so a transport binds it to its own request flow through the `authd` facade (the daemon surface is System-tier). Load-bearing in [identity.md](identity.md) Sessions and [system-daemons.md](system-daemons.md) sessiond.
 
 ## hot boot / hotboot
 
