@@ -1,6 +1,6 @@
 # System-daemon application surface
 
-The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
+The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
 
 **Audience**: a System-tier or application author about to call one of these daemons directly and needing the exact contract, after the owning concept doc (`docs/code-lifecycle.md`, `docs/operations.md`, `docs/capability.md`, `docs/schema.md`) has explained when to.
 
@@ -124,6 +124,22 @@ The assertion ceremony against the stored credential (`credentialId` in base64ur
 ### `void configure(string rpId, string origin)` / `string query_rp_id()` / `string query_origin()`
 
 Relying-party configuration; nil leaves a value unchanged.
+
+## sessiond -- `src/usr/System/sys/sessiond.c`
+
+Mints and validates bearer session tokens for authenticated principals -- the primitive only; no cookie handling or HTTP bearer parsing ships here, a transport surface that wants sessions calls `mint`/`validate` directly. Secret discipline: a token's plaintext exists only in the mint response; what persists is `SHA-256(token) -> a session record` (principal, created, expires), and validation hashes the presented token to look it up. Because the plaintext is never stored it cannot reach the statedump -- `scripts/session-smoke.sh` proves this against a live image (a scan for the plaintext token bytes, with the stored hash and principal as the positive control). Hashing and randomness need the host crypto module; without it the daemon boots, reports the stand-down, and refuses minting. The surface is System/kernel-tier; the operator face is the `session` console verb (`docs/admin-console.md`).
+
+### `string mint(string principal, varargs int ttl)`
+
+Mint a session; returns the plaintext token (the only time it exists). `ttl` caps at one day; a non-positive `ttl` uses the one-hour default.
+
+### `string validate(string token)`
+
+The principal a live token authenticates, or nil for an unknown or expired token.
+
+### `int revoke(string token)` / `int revoke_principal(string principal)` / `int query_session_count()`
+
+Drop one session (TRUE iff a live one was removed); drop every session for a principal (a logout-everywhere primitive; returns the count); the live-session count (expired records reaped first).
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 
