@@ -23,7 +23,7 @@ Hard-trusted LPC that mediates the host driver. Hand-edited rarely.
 The inheritable LPC types and utilities available to every tier, below the platform domains.
 
 - `src/lib/` holds the collection and value types: `String.c`, `StringBuffer.c`, the B+ tree family (`BTree.c`, `BTnode.c`) and its persistent subclass pair (`KVstore.c`, `KVnode.c`), `Array.c` (chunked large arrays), the `Time.c` and `GMTime.c` pair, the `Iterator` family, and the `Continuation` family for asynchronous control flow. These are catalogued in `docs/kernel-libraries.md`.
-- `src/lib/util/` holds pure-function helpers: `coercion.c` (the canonical value-and-string codec), `properties.c` (the property-layer hook the dispatcher binds to), and `json.c`, `unicode.c`, `base64.c`, `hex.c`, `url.c`, `parse.c`, `ascii.c`, `named.c`, `ur.c`, `random.c`, `file.c`, and others.
+- `src/lib/util/` holds pure-function helpers: `coercion.c` (the canonical value-and-string codec), `properties.c` (the property-layer hook the dispatcher binds to), and `json.c`, `unicode.c`, `base64.c`, `cbor.c`, `cose.c`, `hex.c`, `url.c`, `parse.c`, `ascii.c`, `named.c`, `ur.c`, `random.c`, `file.c`, and others.
 - `src/obj/` holds base clonables (`kvnode.c`); `src/sys/` holds the base JSON and UTF-8 codec daemons; `src/include/` holds the shared headers, with the kernel API headers under `src/include/kernel/`.
 
 ### `src/usr/System/` (tier C, the platform overlay)

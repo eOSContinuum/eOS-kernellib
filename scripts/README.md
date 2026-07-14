@@ -80,12 +80,13 @@ Run in this order for the complete pre-PR bar. Each line names the command and t
 5. `DGD_BIN=<dgd> scripts/run-example.sh signal-app` -- `PASS`, 1 " OK" sentinel (1 timed boot).
 6. `DGD_BIN=<dgd> scripts/run-example.sh upgrade-cascade` -- `PASS`, 7 " OK" sentinels (1 timed boot).
 7. `DGD_BIN=<dgd> scripts/run-example.sh vault-app` -- `PASS`, 10 " OK" sentinels (1 timed boot).
-8. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the eight default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
-9. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
-10. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
-11. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
-12. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
-13. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
+8. `DGD_BIN=<dgd> scripts/run-example.sh webauthn-app` -- `PASS`, 13 " OK" sentinels (1 cold selfexit boot).
+9. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the eight default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
+10. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
+11. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
+12. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
+13. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+14. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 
