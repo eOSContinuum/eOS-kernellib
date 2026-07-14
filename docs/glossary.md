@@ -64,6 +64,18 @@ The system daemon at `/usr/System/sys/errord` registered via `set_error_manager(
 
 The hand-written `nomask` function in the kernel auto (`src/kernel/lib/auto.c`) that every compiled program inherits via auto-inheritance and that the host driver invokes on an object's first function call, before the object's own `create()` runs. It sets the object's creator and owner (registering the clone with the driver's clone manager if the object is a clone) and then calls `create()`, the same dispatch for a master or a clone. Load-bearing in [code-lifecycle.md](code-lifecycle.md) _F_create dispatch.
 
+## identity record / identity principal
+
+The shared substrate representing one human or agent: a persistent record (`src/usr/System/obj/identity.c`, minted by `identityd`) carrying a fixed UUID, typed credential rows (passkeys, hashed recovery codes), and a principal string `identity:<uuid>`. The principal is how an authenticated identity takes its place in the capability store, the third principal kind alongside domain and program-path strings (`principal`). Every application consumes the same record rather than keeping its own user table. Distinct from **code** identity (owner and tier) and **operator** identity (an access-list entry and password). Load-bearing in [identity.md](identity.md) and [system-daemons.md](system-daemons.md) identityd.
+
+## passkey / WebAuthn
+
+A WebAuthn (W3C Web Authentication) public-key credential -- the first credential type bound to an identity record. The platform is the relying party: it issues a challenge, the authenticator signs it, and the platform verifies the signature against a stored public key (no shared secret). Registration is trust-on-first-use (attestation `"none"`); authentication verifies an assertion signature and a strictly-increasing signature counter. The ceremonies are `webauthnd`'s, over the pure verification library `/lib/util/webauthn`. Load-bearing in [identity.md](identity.md) Credentials and [system-daemons.md](system-daemons.md) webauthnd.
+
+## session token
+
+A bearer token `sessiond` mints for an authenticated principal and validates on later requests. The plaintext exists only in the mint response; what persists is its hash, so a live token never reaches the statedump (a tested property). The primitive only -- no cookie or HTTP bearer parsing ships, so a transport binds it to its own request flow. Load-bearing in [identity.md](identity.md) Sessions and [system-daemons.md](system-daemons.md) sessiond.
+
 ## hot boot / hotboot
 
 Replacing the running DGD executable in place via `execv` (e.g., to pick up a new DGD binary or change a config value) while keeping the persistent connections open. The host runtime serializes per-connection state, the OS keeps the file descriptors across `execv` via POSIX fd inheritance, and the receiving binary reloads the snapshot. The kernel driver's `restored(int hotboot)` hook distinguishes hotboot-resume from statedump-resume. Load-bearing in [architecture.md](architecture.md) Boot sequence (Hot boot) and [persistence.md](persistence.md) Hot boot.
@@ -98,7 +110,7 @@ The architectural property that an object's lifetime is decoupled from the lifet
 
 ## principal
 
-The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it). The `previous_program()` chain is how a callee determines the caller's principal. In the capability library a principal is the opaque string key a grant is recorded under (a domain, a caller-program path, or an object name), supplied by the gating surface, never inferred by the store. Load-bearing in [architecture.md](architecture.md) Capability tiers and [capability.md](capability.md).
+The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it). The `previous_program()` chain is how a callee determines the caller's principal. In the capability library a principal is the opaque string key a grant is recorded under (a domain, a caller-program path, an object name, or an authenticated identity as `identity:<uuid>`), supplied by the gating surface, never inferred by the store. Load-bearing in [architecture.md](architecture.md) Capability tiers and [capability.md](capability.md).
 
 ## restore_object
 
