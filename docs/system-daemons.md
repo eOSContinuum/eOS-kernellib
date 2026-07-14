@@ -1,6 +1,6 @@
 # System-daemon application surface
 
-The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
+The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
 
 **Audience**: a System-tier or application author about to call one of these daemons directly and needing the exact contract, after the owning concept doc (`docs/code-lifecycle.md`, `docs/operations.md`, `docs/capability.md`, `docs/schema.md`) has explained when to.
 
@@ -104,6 +104,26 @@ WebAuthn bookkeeping on a bound passkey: sets the authenticator counter and last
 ### `object find_identity(string uuid)` / `string find_by_credential(string credentialId)` / `int query_identity_count()`
 
 Lookups (System/kernel-tier like the rest of the surface).
+
+## webauthnd -- `src/usr/System/sys/webauthnd.c`
+
+The WebAuthn ceremony daemon: composes the pure verification library (`/lib/util/webauthn`, `docs/kernel-libraries.md`) with identityd. TOFU registration verifies a foreign attestation payload and mints an identity bound to the new credential (identityd's global credential-id uniqueness makes a re-registration of a bound credential fail -- never bare TOFU re-bind); assertion verification checks the signature against the stored credential and enforces the signature-counter policy (when either counter is nonzero, the asserted counter must be strictly greater than the stored one) before advancing it. The daemon holds no challenge state: `issue_challenge()` returns fresh secure randomness and the verifying entry points take the expected challenge from the caller -- the session layer that issued it owns it. rpId and origin are operator-configured via the `webauthn` console verb (`docs/admin-console.md`); the surface is System/kernel-tier.
+
+### `string issue_challenge()`
+
+A fresh single-use challenge, base64url (32 bytes of `secure_random`); errors without the crypto module.
+
+### `string register_credential(string challenge, string clientDataJSON, string attestationObject)`
+
+The TOFU registration ceremony; returns the new principal string (`identity:<uuid>`).
+
+### `string verify_assertion(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature)`
+
+The assertion ceremony against the stored credential (`credentialId` in base64url, as bound at registration); enforces and advances the signature counter; returns the principal.
+
+### `void configure(string rpId, string origin)` / `string query_rp_id()` / `string query_origin()`
+
+Relying-party configuration; nil leaves a value unchanged.
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 

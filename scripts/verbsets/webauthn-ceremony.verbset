@@ -1,0 +1,52 @@
+# webauthn operator verb -- the ceremony daemon driven end-to-end on a
+# module-bearing boot with foreign-generated vectors (regenerate with
+# scripts/gen-webauthn-vectors.py; do not edit by hand):
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/webauthn-ceremony.verbset
+# Covers: rp configuration, TOFU registration minting an identity,
+# assertion verification updating signCount, the signCount replay
+# refusal, re-registration of a bound credential refused, an unknown
+# credential refused, and the System-tier gate refusing a console
+# caller.
+
+# point the ceremony daemon at the vectors' rp
+cmd: webauthn rpid localhost
+expect: webauthn: rpId localhost
+
+cmd: webauthn origin https://localhost:8443
+expect: webauthn: origin https://localhost:8443
+
+cmd: webauthn
+expect: webauthn: rpId localhost
+expect: webauthn: origin https://localhost:8443
+expect: crypto module: present
+
+# TOFU registration mints an identity bound to the credential
+cmd: webauthn register AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8 eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiQUFFQ0F3UUZCZ2NJQ1FvTERBME9EeEFSRWhNVUZSWVhHQmthR3h3ZEhoOCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViUSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAABQAAAAAAAAAAAAAAAAAAAAAAEBAREhMUFRYXGBkaGxwdHh-lAQIDJiABIVggI1eKa5TVSc5kjrT1g2JNUAOcQFRhLxKVdVRQKZy0jlQiWCDF5TIe6z83VSaqV9IgDjYPzudqrLRjj7L8YRvZKsaQNw
+expect: webauthn: registered identity:[0-9a-f-]+
+capture: uuid registered identity:([0-9a-f-]+)
+
+# the same credential cannot register twice (never bare TOFU re-bind)
+cmd: webauthn register AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8 eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiQUFFQ0F3UUZCZ2NJQ1FvTERBME9EeEFSRWhNVUZSWVhHQmthR3h3ZEhoOCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViUSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAABQAAAAAAAAAAAAAAAAAAAAAAEBAREhMUFRYXGBkaGxwdHh-lAQIDJiABIVggI1eKa5TVSc5kjrT1g2JNUAOcQFRhLxKVdVRQKZy0jlQiWCDF5TIe6z83VSaqV9IgDjYPzudqrLRjj7L8YRvZKsaQNw
+expect: identity: credential already bound
+
+# assertion verifies and advances signCount (5 at registration -> 6)
+cmd: webauthn authenticate ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8 EBESExQVFhcYGRobHB0eHw eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiSUNFaUl5UWxKaWNvS1NvckxDMHVMekF4TWpNME5UWTNPRGs2T3p3OVBqOCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MBAAAABg MEUCIQDPnMChSVTiKlyxNJzkSYBMBHwSqAddCgwMbRTUQ5COnAIgMiZhpDo0jhJ-AfediIhcPTdG9YvPFDX6PgsRVMKdtHg
+expect: webauthn: authenticated identity:%{uuid} signCount 6
+
+# replaying the same assertion is refused (6 is not greater than 6)
+cmd: webauthn authenticate ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8 EBESExQVFhcYGRobHB0eHw eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiSUNFaUl5UWxKaWNvS1NvckxDMHVMekF4TWpNME5UWTNPRGs2T3p3OVBqOCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MBAAAABg MEUCIQDPnMChSVTiKlyxNJzkSYBMBHwSqAddCgwMbRTUQ5COnAIgMiZhpDo0jhJ-AfediIhcPTdG9YvPFDX6PgsRVMKdtHg
+expect: webauthn: signCount replay
+
+# an unknown credential is refused
+cmd: webauthn authenticate ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8 AAAAAAAAAAAAAAAAAAAAAA eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiSUNFaUl5UWxKaWNvS1NvckxDMHVMekF4TWpNME5UWTNPRGs2T3p3OVBqOCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MBAAAABg MEUCIQDPnMChSVTiKlyxNJzkSYBMBHwSqAddCgwMbRTUQ5COnAIgMiZhpDo0jhJ-AfediIhcPTdG9YvPFDX6PgsRVMKdtHg
+expect: webauthn: unknown credential
+
+# the System-tier API refuses a console caller
+cmd: code "/usr/System/sys/webauthnd"->issue_challenge()
+expect: Error: Access denied
+
+# the record carries the passkey row with the advanced counter
+cmd: identity show %{uuid}
+expect: credentials: 1
+expect: passkey signCount 6

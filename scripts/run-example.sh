@@ -87,6 +87,17 @@ LOG_PREFIX="state/run-$EXAMPLE-boot"
 CONFIG="state/run-example.dgd"
 sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
 
+# Optional: load the lpc-ext crypto module (same knob as the smoke
+# scripts). webauthn-app's ceremony phases need it and skip without it;
+# pair with EXPECTED_OK for the with-module sentinel count.
+if [ -n "${LPC_EXT_CRYPTO:-}" ]; then
+    if [ ! -f "$LPC_EXT_CRYPTO" ]; then
+        echo "run-example.sh: LPC_EXT_CRYPTO not found: $LPC_EXT_CRYPTO" >&2
+        exit 2
+    fi
+    printf 'modules\t\t= ([ "%s" : "" ]);\n' "$LPC_EXT_CRYPTO" >> "$CONFIG"
+fi
+
 # A leftover DGD instance holds the telnet/binary ports; the new boot
 # then dies on "bind: Address already in use" and the failure surfaces
 # confusingly as "result log not written". Fail fast with the cause.

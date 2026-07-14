@@ -39,6 +39,9 @@ private inherit base64 "/lib/util/base64";
 private inherit hex "/lib/util/hex";
 private inherit cbor "/lib/util/cbor";
 private inherit cose "/lib/util/cose";
+private inherit webauthn "/lib/util/webauthn";
+
+# include "vectors.h"
 
 # define PERSIST_HELPER	"/usr/System/sys/persist_helper"
 # define RESULT_FILE	"/usr/WebAuthn/data/test-result.log"
@@ -347,6 +350,155 @@ private void test_cose_pipeline()
 }
 
 
+/*
+ * ceremony phases -- foreign-generated vectors from sys/vectors.h
+ * (scripts/gen-webauthn-vectors.py); they need the host crypto module
+ * for SHA-256 and the verify kfuns
+ */
+private int crypto_present()
+{
+    return !catch(hash_string("SHA256", "probe"));
+}
+
+private void test_reg_verify()
+{
+    mapping cred;
+
+    cred = webauthn::verifyRegistration(WA_RP_ID, WA_ORIGIN, WA_CH_REG,
+					hex::decodeString(WA_REG_CDJ_HEX),
+					hex::decodeString(WA_REG_AO_HEX));
+    if (cred["credentialId"] != hex::decodeString(WA_ES_CRED_ID_HEX) ||
+	cred["scheme"] != "ECDSA-SECP256R1-SHA256" ||
+	strlen(cred["key"]) != 65 || cred["key"][0] != 0x04 ||
+	cred["signCount"] != 5 || cred["type"] != "passkey") {
+	log_line("WebAuthn:test: FAIL: registration parsed wrong");
+	return;
+    }
+    log_line("WebAuthn:test: REG-VERIFY OK");
+}
+
+/*
+ * one registration negative: expect the exact error
+ */
+private void reg_negative(string sentinel, string want, string challenge,
+			  string cdjHex, string aoHex)
+{
+    string err;
+
+    err = catch(webauthn::verifyRegistration(WA_RP_ID, WA_ORIGIN, challenge,
+					     hex::decodeString(cdjHex),
+					     hex::decodeString(aoHex)));
+    if (err != want) {
+	log_line("WebAuthn:test: FAIL: " + sentinel + " expected \"" + want +
+		 "\", got \"" + (err ? err : "no error") + "\"");
+	return;
+    }
+    log_line("WebAuthn:test: " + sentinel + " OK");
+}
+
+/*
+ * one assertion negative against the ES256 credential
+ */
+private void assert_negative(string sentinel, string want, string challenge,
+			     string key, string cdjHex, string adHex,
+			     string sigHex)
+{
+    string err;
+
+    err = catch(webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, challenge,
+					  "ECDSA-SECP256R1-SHA256", key,
+					  hex::decodeString(cdjHex),
+					  hex::decodeString(adHex),
+					  hex::decodeString(sigHex)));
+    if (err != want) {
+	log_line("WebAuthn:test: FAIL: " + sentinel + " expected \"" + want +
+		 "\", got \"" + (err ? err : "no error") + "\"");
+	return;
+    }
+    log_line("WebAuthn:test: " + sentinel + " OK");
+}
+
+private void test_ceremonies()
+{
+    mapping cred, edCred;
+    int count;
+
+    /* ES256 registration, then its negatives */
+    catch { test_reg_verify(); } : { log_line("WebAuthn:test: FAIL: reg verify threw"); }
+    reg_negative("REG-BAD-TYPE", "webauthn: clientData type mismatch",
+		 WA_CH_REG, WA_REG_CDJ_BAD_TYPE_HEX, WA_REG_AO_HEX);
+    reg_negative("REG-BAD-CHALLENGE", "webauthn: challenge mismatch",
+		 WA_CH_A1, WA_REG_CDJ_HEX, WA_REG_AO_HEX);
+    reg_negative("REG-BAD-ORIGIN", "webauthn: origin mismatch",
+		 WA_CH_REG, WA_REG_CDJ_BAD_ORIGIN_HEX, WA_REG_AO_HEX);
+    reg_negative("REG-BAD-RPIDHASH", "webauthn: rpIdHash mismatch",
+		 WA_CH_REG, WA_REG_CDJ_HEX, WA_REG_AO_BAD_RP_HEX);
+    reg_negative("REG-BAD-FMT", "webauthn: unsupported attestation format",
+		 WA_CH_REG, WA_REG_CDJ_HEX, WA_REG_AO_BAD_FMT_HEX);
+
+    catch {
+	cred = webauthn::verifyRegistration(WA_RP_ID, WA_ORIGIN, WA_CH_REG,
+					    hex::decodeString(WA_REG_CDJ_HEX),
+					    hex::decodeString(WA_REG_AO_HEX));
+
+	/* the positive assertion: counter 5 at registration, 6 asserted */
+	count = webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, WA_CH_A1,
+					  cred["scheme"], cred["key"],
+					  hex::decodeString(WA_A1_CDJ_HEX),
+					  hex::decodeString(WA_A1_AD_HEX),
+					  hex::decodeString(WA_A1_SIG_HEX));
+	if (count == 6) {
+	    log_line("WebAuthn:test: ASSERT-VERIFY OK");
+	} else {
+	    log_line("WebAuthn:test: FAIL: assertion signCount " +
+		     (string) count);
+	}
+
+	/* assertion negatives against the same stored credential */
+	assert_negative("ASSERT-BAD-ORIGIN", "webauthn: origin mismatch",
+			WA_CH_A2, cred["key"], WA_A_BAD_ORIGIN_CDJ_HEX,
+			WA_A1_AD_HEX, WA_A_BAD_ORIGIN_SIG_HEX);
+	assert_negative("ASSERT-BAD-RPIDHASH", "webauthn: rpIdHash mismatch",
+			WA_CH_A2, cred["key"], WA_A_BAD_RP_CDJ_HEX,
+			WA_A_BAD_RP_AD_HEX, WA_A_BAD_RP_SIG_HEX);
+	assert_negative("ASSERT-BAD-SIG", "webauthn: signature invalid",
+			WA_CH_A1, cred["key"], WA_A1_CDJ_HEX,
+			WA_A1_AD_HEX, WA_A_BAD_SIG_HEX);
+	assert_negative("ASSERT-WRONG-KEY", "webauthn: signature invalid",
+			WA_CH_A1, cred["key"], WA_A1_CDJ_HEX,
+			WA_A1_AD_HEX, WA_A_WRONG_KEY_SIG_HEX);
+    } : {
+	log_line("WebAuthn:test: FAIL: assertion phases threw");
+    }
+
+    /* the second algorithm: Ed25519 registration and assertion */
+    catch {
+	edCred = webauthn::verifyRegistration(WA_RP_ID, WA_ORIGIN, WA_CH_REG2,
+					hex::decodeString(WA_ED_REG_CDJ_HEX),
+					hex::decodeString(WA_ED_REG_AO_HEX));
+	if (edCred["scheme"] == "Ed25519" && strlen(edCred["key"]) == 32 &&
+	    edCred["signCount"] == 2) {
+	    log_line("WebAuthn:test: ED25519-REG OK");
+	} else {
+	    log_line("WebAuthn:test: FAIL: Ed25519 registration parsed wrong");
+	}
+	count = webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, WA_CH_A3,
+					  edCred["scheme"], edCred["key"],
+					  hex::decodeString(WA_ED_A_CDJ_HEX),
+					  hex::decodeString(WA_ED_A_AD_HEX),
+					  hex::decodeString(WA_ED_A_SIG_HEX));
+	if (count == 3) {
+	    log_line("WebAuthn:test: ED25519-ASSERT OK");
+	} else {
+	    log_line("WebAuthn:test: FAIL: Ed25519 assertion signCount " +
+		     (string) count);
+	}
+    } : {
+	log_line("WebAuthn:test: FAIL: Ed25519 phases threw");
+    }
+}
+
+
 static void run_tests()
 {
     log_line("WebAuthn:test: starting");
@@ -364,6 +516,14 @@ static void run_tests()
     catch { test_cose_ed25519(); } : { log_line("WebAuthn:test: FAIL: cose ed25519 threw"); }
     catch { test_cose_rejects(); } : { log_line("WebAuthn:test: FAIL: cose rejects threw"); }
     catch { test_cose_pipeline(); } : { log_line("WebAuthn:test: FAIL: cose pipeline threw"); }
+
+    /* ceremony phases need the host crypto module; the module-less
+     * profile counts only the codec sentinels above */
+    if (crypto_present()) {
+	catch { test_ceremonies(); } : { log_line("WebAuthn:test: FAIL: ceremonies threw"); }
+    } else {
+	log_line("WebAuthn:test: ceremony phases skipped: crypto module absent");
+    }
 }
 
 

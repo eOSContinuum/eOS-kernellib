@@ -13,6 +13,7 @@
 
 # define IDENTITYD	"/usr/System/sys/identityd"
 # define OBJ_IDENTITY	"/usr/System/obj/identity"
+# define WEBAUTHND	"/usr/System/sys/webauthnd"
 
 /* credential row keys */
 # define CRED_TYPE		"type"		/* row type, below */
