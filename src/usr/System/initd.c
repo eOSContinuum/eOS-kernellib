@@ -81,6 +81,7 @@ static void create()
     load("sys/portd");
     load("sys/userd");
     load("sys/persist_helper");
+    load("sys/identityd");
 
     /* clonables */
     compile_object("obj/user");

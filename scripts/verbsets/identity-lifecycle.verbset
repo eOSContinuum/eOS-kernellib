@@ -1,0 +1,84 @@
+# identity lifecycle -- the active paths of the identity registry, driven
+# under a module-bearing boot (secure_random + SHA256 present):
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/identity-lifecycle.verbset
+#
+# Covers: operator mint with recovery codes, record display, wrong-code
+# refusal, single-use redemption, the never-zero-credentials invariant,
+# atomic rollback of a rotation that would empty the record, rotation
+# replacing the code set, and revocation. Uses drive-verbs.py capture to
+# thread the minted uuid and plaintext codes through later verbs -- the
+# codes exist only in the mint response, so the verbset must carry them.
+
+# status: module present, empty registry
+cmd: identity
+expect: identity: identities: 0
+expect: crypto module: present
+
+# mint an identity with two recovery codes
+cmd: identity mint 2
+expect: minted identity:[0-9a-f-]+ with 2 recovery codes
+expect: only their hashes are kept
+capture: uuid minted identity:([0-9a-f-]+) with
+capture: code1 code 1: (\S+)
+capture: code2 code 2: (\S+)
+
+# the record: principal, two recovery rows
+cmd: identity show %{uuid}
+expect: principal identity:%{uuid}
+expect: credentials: 2
+expect: rc:[0-9a-f]+ recovery-code
+
+# a wrong code is refused and consumes nothing
+cmd: identity redeem %{uuid} not-a-real-code
+expect: identity: unknown recovery code
+
+cmd: identity show %{uuid}
+expect: credentials: 2
+
+# redemption is single-use: the first succeeds, the replay is refused
+cmd: identity redeem %{uuid} %{code1}
+expect: identity: redeemed
+
+cmd: identity redeem %{uuid} %{code1}
+expect: identity: unknown recovery code
+
+# the last credential cannot be redeemed away
+cmd: identity redeem %{uuid} %{code2}
+expect: cannot redeem the last credential
+
+# atomic rollback: rotating a codes-only record to zero codes aborts...
+cmd: identity rotate-codes %{uuid} 0
+expect: record cannot reach zero credentials
+
+# ...and the removals rolled back with it
+cmd: identity show %{uuid}
+expect: credentials: 1
+
+# rotation replaces the set
+cmd: identity rotate-codes %{uuid} 3
+expect: rotated recovery codes: 3
+
+cmd: identity show %{uuid}
+expect: credentials: 3
+
+# the pre-rotation code is gone
+cmd: identity redeem %{uuid} %{code2}
+expect: identity: unknown recovery code
+
+# revoke one row by its displayed id
+cmd: identity show %{uuid}
+capture: rowid (rc:[0-9a-f]+)
+
+cmd: identity revoke %{uuid} %{rowid}
+expect: identity: revoked
+
+cmd: identity show %{uuid}
+expect: credentials: 2
+
+# a second identity; the registry counts both
+cmd: identity mint 1
+expect: minted identity:
+
+cmd: identity
+expect: identity: identities: 2

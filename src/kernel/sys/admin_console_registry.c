@@ -33,6 +33,7 @@
 # include <log.h>
 
 # define HTTPSD		"/usr/System/sys/https_server"
+# define IDENTITYD	"/usr/System/sys/identityd"
 
 inherit "/kernel/lib/capability";
 
@@ -76,6 +77,9 @@ static void create() {
       "tls-cert":
          ([ "path": HTTPSD,
             "method": "cmd_tls_cert" ]),
+      "identity":
+         ([ "path": IDENTITYD,
+            "method": "cmd_identity" ]),
    ]);
 
    /*

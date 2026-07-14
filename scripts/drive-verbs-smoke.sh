@@ -12,7 +12,8 @@
 #   DEPLOY="<example>:<Mount> ..." scripts/drive-verbs-smoke.sh <verbset>
 #
 # The default run drives the admin-baseline, logging-verbs, schema-verbs,
-# dispatcher-verbs, port-labels, tls-cert, operator-provision, and
+# dispatcher-verbs, port-labels, tls-cert, identity-verbs,
+# operator-provision, and
 # operator-upgrade verbsets in one boot, deploying vault-app as the
 # MyApp domain and upgrade-cascade as the Cascade domain first: the
 # dispatcher-verbs
@@ -49,7 +50,7 @@ PORT=8023
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
-    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/port-labels.verbset scripts/verbsets/tls-cert.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
+    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/port-labels.verbset scripts/verbsets/tls-cert.verbset scripts/verbsets/identity-verbs.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
     # The dispatcher-verbs clone-addressing cycle drives the named clone
     # the vault-app boot driver creates; the operator cycle drives
     # `upgrade -p` against the cascade deploy. Honor an explicit DEPLOY
@@ -90,6 +91,18 @@ done
 # example.dgd ships a placeholder base directory; localize it under state/.
 CONFIG=state/run-example.dgd
 sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
+
+# Optional: load the lpc-ext crypto module (same knob as https-smoke.sh),
+# for verbsets whose active paths need secure_random/SHA256 -- e.g.
+# identity-lifecycle.verbset. Unset, the boot is the module-less base
+# shape the default suite asserts.
+if [ -n "${LPC_EXT_CRYPTO:-}" ]; then
+    if [ ! -f "$LPC_EXT_CRYPTO" ]; then
+        echo "drive-verbs-smoke.sh: LPC_EXT_CRYPTO not found: $LPC_EXT_CRYPTO" >&2
+        exit 2
+    fi
+    printf 'modules\t\t= ([ "%s" : "" ]);\n' "$LPC_EXT_CRYPTO" >> "$CONFIG"
+fi
 
 echo "== boot =="
 "$DGD_BIN" "$CONFIG" > state/drive-verbs-boot.log 2>&1 &
