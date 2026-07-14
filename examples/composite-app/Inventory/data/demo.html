@@ -1,0 +1,143 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>composite-app WebAuthn demo</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+  button { font: inherit; padding: .4rem .9rem; margin: 0 .4rem .4rem 0; }
+  input { font: inherit; padding: .3rem; }
+  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; }
+  .ok { color: #06600e; } .err { color: #a11; }
+</style>
+<h1>composite-app: browser-real WebAuthn</h1>
+<p>Served by the platform's native TLS stack on the labeled https port;
+every button below drives the same routes the headless driver proves
+with foreign vectors, but with a <em>real authenticator</em>.</p>
+<p>
+  <button id="reg">1. Register (create passkey)</button>
+  <button id="login">2. Login (assert passkey)</button>
+  <button id="logout">Logout</button>
+</p>
+<p>
+  <input id="itemname" value="browser-widget" size="16">
+  <button id="create">3. Create item (authenticated)</button>
+  <button id="list">4. List items</button>
+  <button id="audit">5. Audit trail (observer)</button>
+  <button id="wipe">6. Admin wipe (expect 403)</button>
+</p>
+<div id="log">ready.
+</div>
+<script>
+const log = (m, cls) => {
+  const d = document.getElementById('log');
+  const s = document.createElement('div');
+  if (cls) s.className = cls;
+  s.textContent = m;
+  d.appendChild(s);
+};
+const b64u = {
+  enc: buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: str => Uint8Array.from(
+    atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+};
+let token = null, credId = null, principal = null;
+
+async function challenge() {
+  const r = await fetch('/auth/challenge');
+  if (!r.ok) throw new Error('challenge: HTTP ' + r.status);
+  return (await r.json()).challenge;
+}
+async function post(path, body, bearer) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (bearer && token) headers['Authorization'] = 'Bearer ' + token;
+  const r = await fetch(path, { method: 'POST', headers,
+                                body: JSON.stringify(body) });
+  return { status: r.status, body: await r.json().catch(() => ({})) };
+}
+
+document.getElementById('reg').onclick = async () => {
+  try {
+    const ch = await challenge();
+    const cred = await navigator.credentials.create({ publicKey: {
+      challenge: b64u.dec(ch),
+      rp: { name: 'composite-app', id: 'localhost' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)),
+              name: 'demo@localhost', displayName: 'demo' },
+      pubKeyCredParams: [ { type: 'public-key', alg: -7 },
+                          { type: 'public-key', alg: -8 } ],
+      attestation: 'none',
+    }});
+    credId = b64u.enc(cred.rawId);
+    const res = await post('/auth/register', {
+      challenge: ch,
+      clientDataJSON: b64u.enc(cred.response.clientDataJSON),
+      attestationObject: b64u.enc(cred.response.attestationObject),
+    });
+    if (res.status === 201) {
+      token = res.body.token; principal = res.body.principal;
+      log('REGISTER OK: ' + principal, 'ok');
+    } else {
+      log('REGISTER refused: ' + res.status + ' ' +
+          JSON.stringify(res.body), 'err');
+    }
+  } catch (e) { log('register: ' + e, 'err'); }
+};
+
+document.getElementById('login').onclick = async () => {
+  try {
+    const ch = await challenge();
+    const cred = await navigator.credentials.get({ publicKey: {
+      challenge: b64u.dec(ch),
+      rpId: 'localhost',
+      allowCredentials: credId ?
+        [ { type: 'public-key', id: b64u.dec(credId) } ] : [],
+    }});
+    const res = await post('/auth/login', {
+      challenge: ch,
+      credentialId: b64u.enc(cred.rawId),
+      clientDataJSON: b64u.enc(cred.response.clientDataJSON),
+      authenticatorData: b64u.enc(cred.response.authenticatorData),
+      signature: b64u.enc(cred.response.signature),
+    });
+    if (res.status === 200) {
+      token = res.body.token; principal = res.body.principal;
+      credId = b64u.enc(cred.rawId);
+      log('LOGIN OK: ' + principal, 'ok');
+    } else {
+      log('LOGIN refused: ' + res.status + ' ' +
+          JSON.stringify(res.body), 'err');
+    }
+  } catch (e) { log('login: ' + e, 'err'); }
+};
+
+document.getElementById('logout').onclick = async () => {
+  const res = await post('/auth/logout', {}, true);
+  token = null;
+  log('logout: ' + res.status + ' ' + JSON.stringify(res.body));
+};
+
+document.getElementById('create').onclick = async () => {
+  const res = await post('/inventory/items',
+    { name: document.getElementById('itemname').value, qty: 1 }, true);
+  log('create item: ' + res.status + ' ' + JSON.stringify(res.body),
+      res.status === 201 ? 'ok' : 'err');
+};
+
+document.getElementById('list').onclick = async () => {
+  const r = await fetch('/inventory/items');
+  log('items: ' + JSON.stringify(await r.json()));
+};
+
+document.getElementById('audit').onclick = async () => {
+  const r = await fetch('/inventory/audit');
+  log('audit: ' + JSON.stringify(await r.json()));
+};
+
+document.getElementById('wipe').onclick = async () => {
+  const r = await fetch('/inventory/items', { method: 'DELETE',
+    headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+  const body = await r.json().catch(() => ({}));
+  log('wipe: ' + r.status + ' ' + JSON.stringify(body),
+      r.status === 403 ? 'ok' : 'err');
+};
+</script>

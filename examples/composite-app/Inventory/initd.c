@@ -22,6 +22,7 @@ static void create()
     compile_object("sys/inventoryd");
     compile_object("sys/handler");
     compile_object("obj/client");
+    compile_object("sys/demo");
     compile_object("sys/test");
     call_out("register_routes", 0);
 }
@@ -30,4 +31,5 @@ static void register_routes()
 {
     ROUTER->register("/inventory", "/usr/Inventory/sys/handler");
     ROUTER->register("/auth", "/usr/Inventory/sys/handler");
+    ROUTER->register("/demo", "/usr/Inventory/sys/demo");
 }

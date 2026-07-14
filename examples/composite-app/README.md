@@ -54,6 +54,7 @@ request becomes an authenticated principal -- is the companion doc
 | `PUT /inventory/items/<id>` | bearer | application-tier authorization (creator only) |
 | `DELETE /inventory/items` | bearer + capability | platform capability `example:inventory-admin` via `is_allowed` |
 | `GET /inventory/audit` | none | the observer-written audit trail |
+| `GET /demo` | none | the browser demo page (data/demo.html) |
 
 WebAuthn binary fields travel base64url in JSON bodies; sessions are
 `Authorization: Bearer <token>`. The wipe route refuses until an
@@ -83,8 +84,30 @@ observer binding all survived (the sentinel comment block in
 ## The browser path
 
 `WWW/obj/tls_server.c` mounts the same registry behind the labeled
-`https` port, so a real browser + authenticator session against this
-example is a certificate deploy away (docs/operations.md Network
-boundary and transport security). The headless profile verifies the
+`https` port, and `GET /demo` serves a page that drives the full flow
+-- register, login, authenticated create, audit read, capability-gate
+refusal -- with a real authenticator. The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
-the other.
+the other. To run the browser session:
+
+```sh
+# deploy both parts
+cp -R examples/composite-app/WWW src/usr/WWW
+cp -R examples/composite-app/Inventory src/usr/Inventory
+
+# a certificate the browser genuinely trusts (a clicked-through warning
+# is not a secure context, and WebAuthn refuses); mkcert is the easy way
+mkdir -p src/usr/System/data/tls
+mkcert -cert-file src/usr/System/data/tls/cert.pem        -key-file  src/usr/System/data/tls/key.pem  localhost 127.0.0.1
+
+# config: second binary port 8443 (the "https" label) + crypto module,
+# as scripts/https-smoke.sh generates it; then boot and open
+#   https://localhost:8443/demo
+```
+
+The origin must match webauthnd's relying-party configuration (default
+`https://localhost:8443`, rpId `localhost`); a different host or port
+needs the `webauthn` console verb first. The self-exiting test driver
+(sys/test.c) dumps and stops the boot after its phases run -- for an
+interactive session, remove `sys/test.c` from the deployed copy and its
+`compile_object` line from the deployed initd.
