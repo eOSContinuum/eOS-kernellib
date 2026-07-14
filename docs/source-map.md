@@ -30,8 +30,8 @@ The inheritable LPC types and utilities available to every tier, below the platf
 
 Privileged code owned by `System`, published for global read at boot so every domain inherits the System auto (`lib/auto.c`).
 
-- `sys/` holds the System daemons: `userd.c` (the telnet manager that routes logins), `objectd.c` (the compile-time program graph), `errord.c` (error logging), `upgraded.c` (upgrade-cascade coordination), `portd.c` (the port-label registry over the kernel's numeric port registration), `http_server.c` (the binary-port HTTP manager), `https_server.c` (the HTTPS bootstrap on the labeled TLS port), `logd.c` (persistent logging), and `persist_helper.c` (statedump support).
-- `lib/` holds `auto.c` (the inheritance root for every user-tier object) and `user.c`; `obj/` holds the System login console (`user.c`) and the `objectd.c` clonable.
+- `sys/` holds the System daemons: `userd.c` (the telnet manager that routes logins), `objectd.c` (the compile-time program graph), `errord.c` (error logging), `upgraded.c` (upgrade-cascade coordination), `portd.c` (the port-label registry over the kernel's numeric port registration), `http_server.c` (the binary-port HTTP manager), `https_server.c` (the HTTPS bootstrap on the labeled TLS port), `identityd.c` (the platform identity registry), `logd.c` (persistent logging), and `persist_helper.c` (statedump support).
+- `lib/` holds `auto.c` (the inheritance root for every user-tier object) and `user.c`; `obj/` holds the System login console (`user.c`), the `objectd.c` clonable, and the identity record (`identity.c`).
 
 ### `src/usr/<Domain>/` (tier D, the platform domains)
 
@@ -75,6 +75,7 @@ Each runtime surface, the code that implements it, and the document that explain
 | Resources and limits | `src/kernel/sys/resource_daemon.c` | `docs/operations.md` |
 | Code lifecycle and upgrade | `src/kernel/sys/driver.c`, `src/usr/System/sys/upgraded.c`, `src/usr/System/sys/objectd.c` | `docs/code-lifecycle.md`, `docs/changing-a-running-system.md` |
 | Logging and diagnostics | `src/usr/System/sys/logd.c`, `src/usr/System/sys/errord.c` | `docs/operations.md`, `docs/debugging-applications.md` |
+| Platform identity substrate | `src/usr/System/sys/identityd.c`, `src/usr/System/obj/identity.c`, `src/include/identityd.h` | `docs/system-daemons.md` |
 | Consoles | `src/kernel/lib/admin_console.c`, `src/usr/System/obj/user.c` | `docs/admin-console.md` |
 | Coercion and serialization | `src/lib/util/coercion.c`, `src/usr/Marshal/` | `docs/schema.md` |
 | XML | `src/usr/XML/` | `docs/xml.md` |

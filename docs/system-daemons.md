@@ -1,6 +1,6 @@
 # System-daemon application surface
 
-The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
+The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
 
 **Audience**: a System-tier or application author about to call one of these daemons directly and needing the exact contract, after the owning concept doc (`docs/code-lifecycle.md`, `docs/operations.md`, `docs/capability.md`, `docs/schema.md`) has explained when to.
 
@@ -72,6 +72,38 @@ The capability store behind the platform's gating surfaces. `docs/capability.md`
 - `void require_member(string capability, string principal)` -- throwing check, uniform denial message
 - `void grant(string capability, string principal)` / `void revoke(string capability, string principal)` -- KERNEL()-gated mutation (an ungated caller gets an error)
 - `string *query_principals(string capability)` / `string *query_capabilities()` -- public reads
+
+## identityd -- `src/usr/System/sys/identityd.c`
+
+The platform identity substrate: mints identity records (clones of `src/usr/System/obj/identity.c`, one per identity), owns the global credential-id index, and enforces the record invariants -- a credential id binds to at most one identity ever, and a record never reaches zero credentials (single-step removals are guarded up front; compound operations run as `atomic` functions validated at the end, so a violating compound rolls back whole). A record's principal string (`identity:<uuid>`) is the form capabilityd principals take for authenticated identities. Recovery codes are generated here (never imported), stored hashed, and single-use; plaintext codes exist only in the minting response. Randomness and hashing need the host crypto module -- without it the daemon boots, reports the stand-down, and refuses minting cleanly. The whole surface is System/kernel-tier; the operator face is the `identity` console verb (`docs/admin-console.md`). Credential-row keys and types are defined in `src/include/identityd.h`.
+
+### `atomic string create_identity(string credentialId, mapping row)` / `atomic mixed *mint_with_codes(int n)`
+
+Mint a record with its first credential (a record never exists empty): from a validated credential row, or from `n` freshly generated recovery codes (returns `({ uuid, code... })`).
+
+### `atomic void bind_credential(string uuid, string credentialId, mapping row)` / `atomic void unbind_credential(string uuid, string credentialId)`
+
+Add a credential (globally unique id) / remove one (refuses to empty the record).
+
+### `atomic void rotate_credential(string uuid, string newId, mapping row, string oldId)`
+
+Add-then-revoke as one atomic step -- the record never passes through a zero-credential or old-only state observable from outside.
+
+### `atomic string *rotate_recovery_codes(string uuid, int n)`
+
+Replace the record's recovery-code set with `n` fresh codes; returns the plaintext codes. A rotation that would empty a codes-only record aborts and rolls back whole.
+
+### `atomic int redeem_recovery_code(string uuid, string code)` / `atomic void redeem_and_replace(string uuid, string code, string newId, mapping row)`
+
+Single-use redemption (refuses to consume the last credential) / the recovery ceremony's substrate step: redeem plus bind the replacement in one atomic operation, valid even on the last credential.
+
+### `void update_sign_count(string uuid, string credentialId, int count)`
+
+WebAuthn bookkeeping on a bound passkey: sets the authenticator counter and last-used time.
+
+### `object find_identity(string uuid)` / `string find_by_credential(string credentialId)` / `int query_identity_count()`
+
+Lookups (System/kernel-tier like the rest of the surface).
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 

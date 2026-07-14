@@ -1,0 +1,41 @@
+# identity operator verb -- regression for the identity registry's console
+# face on a module-less base boot (the default suite's shape: no crypto
+# module). Asserts the status verb reports the stand-down honestly, the
+# minting path refuses cleanly, argument validation answers usage, and the
+# System-tier API refuses a non-System caller: the console's code objects
+# compile as /usr/<owner>/_code, outside the System tier the gates
+# require. The active lifecycle (mint, redeem, rotation, revocation,
+# atomic rollback) is exercised by identity-lifecycle.verbset under a
+# module-bearing boot:
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/identity-lifecycle.verbset
+
+# status reports the module-less stand-down
+cmd: identity
+expect: identity: identities: 0
+expect: crypto module: absent
+
+# minting refuses cleanly without the module
+cmd: identity mint 2
+expect: identity: crypto module not loaded
+
+# argument validation
+cmd: identity mint lots
+expect: usage: identity mint
+
+cmd: identity bogus
+expect: usage: identity
+
+# the System-tier API refuses a console caller
+cmd: code "/usr/System/sys/identityd"->create_identity("cred", ([ ]))
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->find_identity("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->query_identity_count()
+expect: Error: Access denied
+
+# the refusals left nothing behind
+cmd: identity
+expect: identity: identities: 0

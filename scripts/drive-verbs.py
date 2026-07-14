@@ -38,6 +38,13 @@ separated by blank lines, one verb per block; '#' lines are comments:
   cmd:      (required) the verb line to send
   expect:   (repeatable) regex that must match the response (re.search)
   absent:   (repeatable) regex that must NOT match the response
+  capture:  (repeatable) '<name> <regex-with-one-group>'; on match, the
+            group's text is stored under <name> and later cmd/expect/
+            absent/capture lines may reference it as %{name} (values are
+            regex-escaped when substituted into patterns, inserted raw
+            into cmd lines). A capture that does not match FAILs the
+            block. Lets a verbset thread runtime values (a minted id, a
+            generated secret) through later verbs.
 
 A block with only expect/absent failures reports FAIL; the run exits
 non-zero if any entry fails. Entries run in file order, so a verbset can
@@ -168,13 +175,13 @@ def parse_verbset(path: str):
     directives (empty when absent), entries the cmd blocks."""
     entries = []
     meta = {}
-    block = {"cmd": None, "expect": [], "absent": []}
+    block = {"cmd": None, "expect": [], "absent": [], "capture": []}
 
     def flush():
         nonlocal block
         if block["cmd"]:
             entries.append(block)
-        block = {"cmd": None, "expect": [], "absent": []}
+        block = {"cmd": None, "expect": [], "absent": [], "capture": []}
 
     with open(path, encoding="utf-8") as f:
         for lineno, raw in enumerate(f, 1):
@@ -194,13 +201,20 @@ def parse_verbset(path: str):
                                      f"the first cmd block")
                 meta[key] = value
                 continue
-            if not sep or key not in ("cmd", "expect", "absent"):
+            if not sep or key not in ("cmd", "expect", "absent", "capture"):
                 raise ValueError(f"{path}:{lineno}: expected "
-                                 f"'cmd:'/'expect:'/'absent:', got: {line}")
+                                 f"'cmd:'/'expect:'/'absent:'/'capture:', "
+                                 f"got: {line}")
             if key == "cmd":
                 if block["cmd"]:
                     flush()
                 block["cmd"] = value
+            elif key == "capture":
+                name, _, pattern = value.partition(" ")
+                if not name.isidentifier() or not pattern.strip():
+                    raise ValueError(f"{path}:{lineno}: capture wants "
+                                     f"'capture: <name> <regex-with-group>'")
+                block["capture"].append((name, pattern.strip()))
             else:
                 block[key].append(value)
     flush()
@@ -209,10 +223,31 @@ def parse_verbset(path: str):
     return meta, entries
 
 
+def substitute(text: str, variables: dict, escape: bool) -> str:
+    """Replace %{name} references with captured values; escape=True
+    regex-escapes the value (for expect/absent patterns), False inserts
+    it raw (for cmd lines). An unknown name is an error."""
+    def repl(m):
+        name = m.group(1)
+        if name not in variables:
+            raise ValueError(f"%{{{name}}} referenced before capture")
+        value = variables[name]
+        return re.escape(value) if escape else value
+    return re.sub(r"%\{(\w+)\}", repl, text)
+
+
 def drive(sess: Session, entries) -> int:
     failures = 0
+    variables = {}
     for n, entry in enumerate(entries, 1):
-        cmd = entry["cmd"]
+        try:
+            cmd = substitute(entry["cmd"], variables, escape=False)
+        except ValueError as e:
+            # an earlier capture failed; skip the send, fail the block
+            failures += 1
+            print(f"FAIL [{n:2}] {entry['cmd']}")
+            print(f"        {e}")
+            continue
         sess.send_line(cmd)
         response = sess.read_until([PROMPT])
         # trim the trailing prompt; the rest is the verbatim response
@@ -223,11 +258,30 @@ def drive(sess: Session, entries) -> int:
 
         problems = []
         for pat in entry["expect"]:
-            if not re.search(pat, body, re.MULTILINE):
-                problems.append(f"expect failed: /{pat}/")
+            try:
+                if not re.search(substitute(pat, variables, escape=True),
+                                 body, re.MULTILINE):
+                    problems.append(f"expect failed: /{pat}/")
+            except ValueError as e:
+                problems.append(f"expect unusable: {e}")
         for pat in entry["absent"]:
-            if re.search(pat, body, re.MULTILINE):
-                problems.append(f"absent matched: /{pat}/")
+            try:
+                if re.search(substitute(pat, variables, escape=True),
+                             body, re.MULTILINE):
+                    problems.append(f"absent matched: /{pat}/")
+            except ValueError as e:
+                problems.append(f"absent unusable: {e}")
+        for name, pat in entry["capture"]:
+            try:
+                m = re.search(substitute(pat, variables, escape=True),
+                              body, re.MULTILINE)
+            except ValueError as e:
+                problems.append(f"capture unusable: {e}")
+                continue
+            if not m or m.lastindex is None:
+                problems.append(f"capture failed: {name} /{pat}/")
+            else:
+                variables[name] = m.group(1)
 
         if problems:
             failures += 1
