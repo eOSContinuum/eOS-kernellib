@@ -25,6 +25,8 @@
  */
 
 # include <kernel/kernel.h>
+# include <kernel/user.h>
+# include <kernel/capability.h>
 # include <kfun.h>
 # include <type.h>
 # include <identityd.h>
@@ -404,6 +406,63 @@ int query_identity_count()
 
 
 /*
+ * capability binding: the operator grant path for platform capabilities
+ * to an authenticated identity. capabilityd's grant/revoke stay
+ * KERNEL()-gated; this routes through the console registry's
+ * KERNEL-elevated, admin_console.caller-gated verb_grant_capability
+ * helper, which also constrains the principal to the identity namespace.
+ * The identity's principal string is derived here from its uuid, never
+ * caller-supplied, so an operator grants to "the identity", not to an
+ * arbitrary principal.
+ */
+void grant_capability(string uuid, string capability)
+{
+    object identity;
+
+    check_system(previous_program());
+    if (!capability || strlen(capability) == 0) {
+	error("identity: a grant needs a capability");
+    }
+    identity = need_identity(uuid);
+    ADMIN_CONSOLE_REGISTRY->verb_grant_capability(capability,
+						  identity->query_principal());
+}
+
+void revoke_capability(string uuid, string capability)
+{
+    object identity;
+
+    check_system(previous_program());
+    identity = need_identity(uuid);
+    ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
+						   identity->query_principal());
+}
+
+/*
+ * the platform capabilities an identity's principal holds, read back
+ * through capabilityd's public introspection
+ */
+string *query_grants(string uuid)
+{
+    object identity;
+    string principal, *caps, *held;
+    int i;
+
+    check_system(previous_program());
+    identity = need_identity(uuid);
+    principal = identity->query_principal();
+    caps = CAPABILITYD->query_capabilities();
+    held = ({ });
+    for (i = 0; i < sizeof(caps); i++) {
+	if (CAPABILITYD->is_allowed(caps[i], principal)) {
+	    held += ({ caps[i] });
+	}
+    }
+    return held;
+}
+
+
+/*
  * NAME:	_emit()
  * DESCRIPTION:	route operator-verb output through the console user
  */
@@ -420,7 +479,7 @@ private void _emit(object user, string msg)
 private string show_identity(string uuid)
 {
     object identity;
-    string *ids, text;
+    string *ids, *grants, text;
     mapping row;
     int i;
 
@@ -437,6 +496,11 @@ private string show_identity(string uuid)
 		((row[CRED_TYPE] == CRED_TYPE_PASSKEY) ?
 		  " signCount " + (string) row[CRED_SIGNCOUNT] : "") + "\n";
     }
+    grants = query_grants(uuid);
+    text += "identity: capabilities: " + (string) sizeof(grants) + "\n";
+    for (i = 0; i < sizeof(grants); i++) {
+	text += "identity:   grant " + grants[i] + "\n";
+    }
     return text;
 }
 
@@ -451,6 +515,8 @@ private string show_identity(string uuid)
  *		  identity rotate-codes <uuid> <n> -- replace the code set
  *		  identity redeem <uuid> <code>   -- consume one code
  *		  identity revoke <uuid> <id>     -- remove a credential
+ *		  identity grant <uuid> <cap>     -- grant a platform capability
+ *		  identity ungrant <uuid> <cap>   -- revoke a platform capability
  */
 void cmd_identity(object user, string cmd, string str)
 {
@@ -542,10 +608,31 @@ void cmd_identity(object user, string cmd, string str)
 	_emit(user, err ? err + "\n" : "identity: revoked\n");
 	return;
 
+    case "grant":
+	if (sizeof(parts) != 3) {
+	    _emit(user, "usage: " + cmd + " grant <uuid> <capability>\n");
+	    return;
+	}
+	err = catch(grant_capability(parts[1], parts[2]));
+	_emit(user, err ? err + "\n"
+			: "identity: granted " + parts[2] + "\n");
+	return;
+
+    case "ungrant":
+	if (sizeof(parts) != 3) {
+	    _emit(user, "usage: " + cmd + " ungrant <uuid> <capability>\n");
+	    return;
+	}
+	err = catch(revoke_capability(parts[1], parts[2]));
+	_emit(user, err ? err + "\n"
+			: "identity: ungranted " + parts[2] + "\n");
+	return;
+
     default:
 	_emit(user, "usage: " + cmd + " [mint <n> | show <uuid> | " +
 		    "rotate-codes <uuid> <n> | redeem <uuid> <code> | " +
-		    "revoke <uuid> <id>]\n");
+		    "revoke <uuid> <id> | grant <uuid> <capability> | " +
+		    "ungrant <uuid> <capability>]\n");
 	return;
     }
 }
