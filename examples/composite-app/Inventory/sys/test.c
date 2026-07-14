@@ -51,8 +51,8 @@
  *
  * Without the crypto module the ceremony surface stands down
  * (challenge returns 503); the driver then runs the transport-only
- * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, and PERSIST-HTTP after
- * restore -- 4 sentinels, the profile default. Run with
+ * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
+ * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
  * LPC_EXT_CRYPTO=<module> EXPECTED_OK=19 for the full set.
  */
 

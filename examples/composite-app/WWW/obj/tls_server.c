@@ -117,7 +117,13 @@ private void dispatch(HttpRequest request, StringBuffer body)
 	return;
     }
 
+    /* the HTTP layer parses Authorization into a value object
+     * (/usr/HTTP/api/lib/Authentication.c); hand the handler the
+     * wire form it re-serializes to */
     auth = request->headerValue("Authorization");
+    if (typeof(auth) == T_OBJECT) {
+	auth = auth->transport();
+    }
     if (catch(result = handler->handle(request->method(), path,
 				       drainBody(body),
 				       (typeof(auth) == T_STRING) ?

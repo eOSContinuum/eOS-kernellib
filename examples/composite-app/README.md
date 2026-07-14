@@ -68,7 +68,7 @@ DGD_BIN=/path/to/dgd scripts/run-example.sh composite-app
 ```
 
 Without the crypto module the ceremony surface stands down and the
-transport-only subset runs (4 sentinels). With it, the full set:
+transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \

@@ -48,8 +48,8 @@ cd "$REPO_ROOT"
 example_profile() {
     case "$1" in
         chat-app)          echo "Chat 3 selfexit 20" ;;
-        composite-app)     echo "WWW+Inventory 2 selfexit 4" ;;
-                           # 4 = transport-only subset; with the crypto
+        composite-app)     echo "WWW+Inventory 2 selfexit 5" ;;
+                           # 5 = transport-only subset; with the crypto
                            # module: LPC_EXT_CRYPTO=... EXPECTED_OK=19
         hot-reload-demo)   echo "WWW 1 timed 2" ;;
         hot-reload-master) echo "Reload 1 timed 3" ;;

@@ -7,15 +7,27 @@
  *
  * This is the first in-tree consumer of the HTTP/1 client library
  * (docs/application-authoring.md Outbound connections notes that no
- * shipped example exercised it before). The binary-manager glue below
- * is replicated from /usr/HTTP/api/obj/client1.c -- the clonable form
- * under /obj/ is not inheritable -- with one deliberate difference:
- * client1.c's create calls connect() again after Http1Client's create
- * has already connected; this clone lets the library's create do the
- * connecting, once.
+ * shipped example exercised it before), and its shape follows the TLS
+ * pair (Http1TlsClient / obj/tls_client1.c), not obj/client1.c. The
+ * plain clonable's driver-line-mode design has two failure modes this
+ * example hit live:
+ *
+ *   - MODE_BLOCK at login is never lifted (only MODE_UNBLOCK lifts
+ *     driver-level blocking), so the response sits unread in the
+ *     socket; and
+ *   - with the driver line-framing the input, a response head and
+ *     body arriving in one TCP segment queue the body as a LINE event
+ *     before expectEntity's RAW switch lands -- the body line then
+ *     parses as a new status line ("Bad response"), and the stripped
+ *     line terminator makes the Content-Length count unsatisfiable.
+ *
+ * The cure is the same one the TLS variants use: keep the DRIVER in
+ * raw mode for the whole exchange and let BufferedConnection1 do the
+ * line/entity framing internally, synchronously with Connection1's
+ * state machine (its setMode override keeps mode changes local).
  *
  * Lifecycle: fetch() wires the exchange and connects; connected()
- * sends the request (plus body, held and flushed as one message);
+ * sends the request (body queued behind the head's call_out);
  * receiveResponse/receiveEntity collect status and body; the driver
  * hears exactly one of http_done(code, body) or http_fail(errorcode).
  * The servers answer with Connection: close, so the peer closes and
@@ -30,8 +42,9 @@
 # include "/usr/HTTP/api/include/HttpResponse.h"
 # include "/usr/HTTP/api/include/HttpField.h"
 
-inherit Http1Client;
-inherit "/usr/System/lib/user";
+inherit client Http1Client;
+inherit buffered "/usr/HTTP/api/lib/BufferedConnection1";
+inherit user "/usr/System/lib/user";
 
 # define HOST	"127.0.0.1"
 # define PORT	8080		/* example.dgd binary_port */
@@ -62,8 +75,10 @@ void fetch(object drv, string m, string p, string a, string b)
     path = p;
     auth = a;
     bodyOut = b;
-    ::create(this_object(), HOST, PORT,
-	     OBJECT_PATH(RemoteHttpResponse), OBJECT_PATH(RemoteHttpFields));
+    client::create(this_object(), HOST, PORT,
+		   OBJECT_PATH(RemoteHttpResponse),
+		   OBJECT_PATH(RemoteHttpFields));
+    buffered::create(MODE_LINE);
 }
 
 private void report(string body)
@@ -90,16 +105,21 @@ private string drainBody(StringBuffer buf)
 }
 
 /*
- * connection established: send the request, holding the serialized
- * head when a body follows so both flush as one message
+ * connection established: send the request; a body follows the head
+ * in queue order (0-delay call_outs run in the order queued, and the
+ * flow wrapper defers the head send by one)
  */
 static void connected()
 {
     HttpRequest request;
     HttpFields headers;
 
-    request = new HttpRequest(1.1, method, nil, HOST, path);
+    /* origin-form request line: scheme and host nil (transport()
+     * would otherwise serialize them into the request-target); the
+     * host travels in the Host header */
+    request = new HttpRequest(1.1, method, nil, nil, path);
     headers = new HttpFields();
+    headers->add(new HttpField("Host", HOST));
     if (auth) {
 	headers->add(new HttpField("Authorization", auth));
     }
@@ -107,13 +127,22 @@ static void connected()
 	headers->add(new HttpField("Content-Type", "application/json"));
 	headers->add(new HttpField("Content-Length", strlen(bodyOut)));
     }
-    headers->add(new HttpField("Connection", "close"));
+    /* comma-list fields are array-valued (Field's listContains
+     * assumes it; Connection1 consults this header on send) */
+    headers->add(new HttpField("Connection", ({ "close" })));
     request->setHeaders(headers);
 
-    sendRequest(request);
+    /* through call_other so the flow wrapper sees previous_object()
+     * == the relay (this object) */
+    this_object()->sendRequest(request);
     if (bodyOut && strlen(bodyOut) != 0) {
-	sendMessage(new StringBuffer(bodyOut));
+	call_out("send_body", 0);
     }
+}
+
+static void send_body()
+{
+    sendMessage(new StringBuffer(bodyOut));
 }
 
 /*
@@ -159,14 +188,16 @@ static void receiveEntity(StringBuffer chunk)
 }
 
 /*
- * Binary-manager glue replicated from /usr/HTTP/api/obj/client1.c
- * (under /obj/, not inheritable).
+ * Binary-manager glue modeled on /usr/HTTP/api/obj/tls_client1.c: the
+ * driver-level connection stays in raw mode for the whole exchange
+ * (BufferedConnection1 does the framing), input feeds the buffered
+ * layer, and no driver-level MODE_BLOCK is ever set.
  */
 int login(string str)
 {
     if (previous_program() == LIB_CONN) {
-	setMode(MODE_BLOCK);
 	flow();
+	flow_mode(MODE_RAW);
 	call_limited("connected");
     }
     return MODE_NOCHANGE;
@@ -183,9 +214,14 @@ void connect_failed(int errorcode)
 int flow_receive_message(string str, int mode)
 {
     if (previous_program() == LIB_CONN) {
-	call_out("receiveBytes", 0, str);
+	call_out("receive_raw", 0, str);
     }
     return TRUE;
+}
+
+static void receive_raw(string str)
+{
+    buffered::receiveBytes(new StringBuffer(str));
 }
 
 static void _logout(int quit)

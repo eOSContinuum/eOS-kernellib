@@ -43,6 +43,7 @@ private int nextId;
 
 static void create()
 {
+    ::create();
     items = ([ ]);
     nextId = 1;
     set_property(AUDIT_PROP, ({ }));
