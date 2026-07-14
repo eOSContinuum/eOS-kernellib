@@ -1,6 +1,6 @@
 # System-daemon application surface
 
-The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
+The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), the transport authentication facade (authd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
 
 **Audience**: a System-tier or application author about to call one of these daemons directly and needing the exact contract, after the owning concept doc (`docs/code-lifecycle.md`, `docs/operations.md`, `docs/capability.md`, `docs/schema.md`) has explained when to.
 
@@ -144,6 +144,26 @@ The principal a live token authenticates, or nil for an unknown or expired token
 ### `int revoke(string token)` / `int revoke_principal(string principal)` / `int query_session_count()`
 
 Drop one session (TRUE iff a live one was removed); drop every session for a principal (a logout-everywhere primitive; returns the count); the live-session count (expired records reaped first).
+
+## authd -- `src/usr/System/sys/authd.c`
+
+The transport authentication facade. The identity substrate's daemons gate every entry to System/kernel callers, so a tier-E transport surface -- an HTTP application binding a login flow, a non-HTTP protocol doing the same -- consumes ceremonies and sessions through this facade instead. It composes webauthnd and sessiond and exposes exactly the ceremony-plus-session flow; it deliberately does NOT expose `sessiond->mint` (minting a session for an arbitrary principal string would forge authority -- here a session is minted only for the principal a ceremony just proved), identityd mutation, or the capability grant path. The facade holds no state: challenge ownership stays with the caller per the webauthnd contract, and the reference single-use challenge store is `examples/composite-app`'s handler (`docs/composite-applications.md`). Unlike the rest of this page, the surface is deliberately callable from every tier.
+
+### `string issue_challenge()`
+
+A fresh single-use challenge via webauthnd; the caller stores it and accepts it back exactly once.
+
+### `mixed *register_identity(string challenge, string clientDataJSON, string attestationObject, varargs int ttl)`
+
+The TOFU registration ceremony plus session mint in one step; returns `({ principal, token })`. Ceremony errors propagate.
+
+### `mixed *authenticate(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature, varargs int ttl)`
+
+The assertion ceremony plus session mint in one step; returns `({ principal, token })`.
+
+### `string validate(string token)` / `int logout(string token)`
+
+sessiond's validate and revoke, passed through: the principal a live token authenticates (or nil), and single-session revocation (TRUE iff a live one was removed).
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 

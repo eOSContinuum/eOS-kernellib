@@ -46,7 +46,7 @@ Authorization on the platform is three distinct layers, and keeping them distinc
 
 ## Sessions
 
-An authentication ceremony is a point event; a session lets it persist across requests. `sessiond` mints a bearer token for an authenticated principal and validates it later (`docs/system-daemons.md`). The token's plaintext exists only in the mint response; what persists is its hash, so a statedump cannot leak a live token (a tested property, `scripts/session-smoke.sh`). This is the primitive only: no cookie handling and no HTTP bearer parsing ship, so a transport that wants sessions binds `mint`/`validate` to its own request flow.
+An authentication ceremony is a point event; a session lets it persist across requests. `sessiond` mints a bearer token for an authenticated principal and validates it later (`docs/system-daemons.md`). The token's plaintext exists only in the mint response; what persists is its hash, so a statedump cannot leak a live token (a tested property, `scripts/session-smoke.sh`). This is the primitive only: no cookie handling and no HTTP bearer parsing ship. The daemon surface is System-tier, so a transport reaches it through the `authd` facade (`docs/system-daemons.md`), binding the token to its own request flow; `examples/composite-app` is the worked binding (`docs/composite-applications.md`).
 
 ## The boundary: operator authentication is a separate circuit
 
