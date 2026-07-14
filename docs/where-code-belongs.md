@@ -21,7 +21,7 @@ Everything on the platform is ultimately LPC: a Merry script compiles to a wrapp
 - **It is the application's skeleton.** Domain layout, the initd, the clonables that carry state, the libraries other code inherits: the structural inventory `docs/application-authoring.md` describes is all compiled LPC. Scripts decorate this skeleton. They do not replace it.
 - **It is a shared algorithm.** Code called from many places, performance-sensitive code, and code with real inheritance structure belongs in the compiled tree where the driver's tier enforcement, the upgrade cascade, and the object manager see it.
 
-The boundary case is behavior that starts script-shaped and grows structural: a reaction that accretes logic until it wants library calls the sandbox denies. The migration is mechanical (a script's body is already near-LPC), and the direction is one-way by design: move the logic into a compiled library or daemon in the owning domain, and leave behind a thin script that delegates through a script space (`docs/merry-applications.md` Phase 5, LabelCall), which is the sanctioned bridge from script code to a compiled handler.
+The boundary case is behavior that starts script-shaped and grows structural: a reaction that accretes logic until it wants library calls the sandbox denies. The migration is mechanical (a script's body is already near-LPC), and the direction is one-way by design: move the logic into a compiled library or daemon in the owning domain, and leave behind a thin script that delegates through a script space (`docs/merry-applications.md` Invocation surface, LabelCall), which is the sanctioned bridge from script code to a compiled handler.
 
 ## Placing plain LPC: shape follows consumer
 

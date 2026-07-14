@@ -91,6 +91,99 @@ kill %1
 
 The sentinel file lives at the DGD-internal path `/usr/MerryApp/data/test-result.log`, which lands at `<directory>/usr/MerryApp/data/test-result.log` on the host filesystem (`<directory>` is the DGD config's `directory` setting; this repository's `src/` in the example configuration).
 
+## Phase notes
+
+The per-phase walkthrough for the five assertions summarized in `../../docs/merry-applications.md` "Verification -- the merry-app sentinels". Read the code in `sys/test.c` alongside this section.
+
+### Phase 1 -- ancestry walk
+
+```c
+parent = clone_object(THING_PROG);
+parent->set_object_name("MerryApp:demo:parent");
+
+child = clone_object(THING_PROG);
+child->set_object_name("MerryApp:demo:child");
+child->set_ur_object(parent);
+
+script = new_object(MERRY_DATA,
+                    "return \"MerryApp:test: ANCESTRY OK\";");
+parent->set_property("merry:lib:greet", script);
+
+result = run_merry(child, "greet", "lib", ([ ]));
+```
+
+`run_merry(child, ...)` calls `find_merry(child, "greet", "lib")` which:
+
+1. queries `child` for `merry:lib:greet` -- nil (script was bound on parent);
+2. queries `child` for `merry:inherit:lib:greet` -- nil;
+3. walks to `child->query_parent()` -> parent;
+4. queries `parent` for `merry:lib:greet` -- finds the script object;
+5. returns the script.
+
+`run_merry` then calls `script->evaluate(child, "greet", "lib", ([ ]), nil, "MerryApp:demo:child/lib:greet")`. The clonable's evaluate forwards to the compiled `/merry/<md5>` program's evaluate, which sets up `this = child`, `args = ([])`, then calls `merry("greet", "lib", "virgin")`. The wrapped switch on `label == "virgin"` fires the body's `return "MerryApp:test: ANCESTRY OK"`. The string propagates back up the call stack.
+
+### Phase 2 -- sandbox firing
+
+```c
+bad_script = new_object(MERRY_DATA,
+                        "clone_object(\"/foo/bar\");");
+parent->set_property("merry:lib:badcall", bad_script);
+
+catch {
+    run_merry(child, "badcall", "lib", ([ ]));
+    /* unreachable on success */
+} : {
+    log_line("MerryApp:test: SANDBOX OK");
+}
+```
+
+The Merry source `clone_object("/foo/bar");` parses cleanly -- the parser accepts the identifier-call syntax. At evaluation, the wrapped LPC calls `clone_object("/foo/bar")` against the compiled program's namespace; `merrynode.c`'s `SANDBOX(clone_object)` macro defines a local error-thrower that takes precedence over the kfun. The call raises `function 'clone_object' not allowed in merry code`, which the test driver's `catch` block captures and logs as the success sentinel.
+
+### Phase 3 -- Spawn merryfun
+
+```c
+spawn_script = new_object(MERRY_DATA,
+                          "return object_name(Spawn($this));");
+parent->set_property("merry:lib:make_one", spawn_script);
+result = run_merry(child, "make_one", "lib", ([ ]));
+/* result is "/usr/MerryApp/obj/thing#NN" */
+```
+
+`Spawn($this)` resolves to the static `Spawn(object ur)` merryfun on `merrynode`, which extracts the binding host's clonable from its object_name and calls `::clone_object(clonable)` -- the `::` escape past the local `SANDBOX(clone_object)` shadow (`../../docs/merry-applications.md` "What the sandbox forbids" walks the escape idiom). Phase 3b registers the `MerryApp:Thing` schema (one property-backed `label` attribute) at setup, then asserts a Merry-invoked `Duplicate($this)` returns a distinct clone of the same clonable carrying the schema-declared state (`export_state` resolves the model via `SID->get_root_node(ob)`; `import_state` replays it on the fresh clone).
+
+### Phase 4 -- $delay() and the 5-arg mcontext dispatch
+
+```c
+delay_script = new_object(MERRY_DATA,
+                          "$delay(1, FALSE); " +
+                          "Set($this, \"delay_fired\", 1); " +
+                          "return TRUE;");
+parent->set_property("merry:lib:delay_test", delay_script);
+run_merry(child, "delay_test", "lib", ([ ]));
+/* schedules verify_delay call_out at t=+2 sec */
+```
+
+The grammar expands `$delay(1, FALSE)` to `{ do_delay(mode, signal, 1, "<label>"); return FALSE; case "<label>": ; }`. `do_delay` calls `::call_other(this, "delayed_call", new_object("/usr/Merry/data/mcontext", signal, mode, label, args, this_object()), "merry_continuation", 1, this)`. The binding host's `delayed_call` LFUN (inherited from `/lib/util/delayed`) wraps that in `call_out("perform_delayed_call", 1, mcontext, "merry_continuation", ({ this }))`. After one second, `perform_delayed_call` fires `merry_continuation` on the mcontext LWO, which calls `run_merries(this, signal, mode, args, label)` -- the second pass resumes execution at the case label and the `Set($this, "delay_fired", 1)` line runs. A `verify_delay` call_out polls `query_raw_property("delay_fired")` at t=+2 and logs the sentinel.
+
+The path validates cloud-server's `new_object(path, args...)` -> `_F_init` -> `create(args...)` 5-arg dispatch (mcontext's `create(string m, string s, string l, mapping a, varargs object c)`, where the fifth, varargs `c` carries the running compiled merry object so a resumed continuation -- including a dispatcher-fired observer's -- can call back into it directly).
+
+### Phase 5 -- LabelCall and the script-space handler protocol
+
+```c
+MERRY->register_script_space("testspace", this_object());
+/* this_object() exposes:
+ *   int   query_method(string name);
+ *   mixed call_method(string name, mapping args); */
+
+label_script = new_object(MERRY_DATA,
+                          "return testspace::greet($who: \"world\");");
+parent->set_property("merry:lib:label_test", label_script);
+result = run_merry(child, "label_test", "lib", ([ ]));
+/* result is "Hello world" */
+```
+
+The grammar maps `testspace::greet($who: "world")` to `LabelCall("testspace", "greet", ({ "who", "world" }))`. `merrynode.c::LabelCall` queries `MERRY->query_script_space("testspace")`, then calls `Call(handler, "greet", local)`. `Call` walks the handler's `query_method` -- a non-zero return routes through `obj->call_method(name, args)`, where `args` is the merry-source `args` mapping with the inline locals overlaid. The handler reads `args["who"]` and returns `"Hello world"`.
+
 ## Files
 
 - `initd.c` -- domain initd; compiles `obj/thing` + `sys/test` at boot.
