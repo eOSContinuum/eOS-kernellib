@@ -265,7 +265,9 @@ The `src/lib/util/` subdirectory holds small utility libraries that wrap kfun-le
 | `src/lib/util/parse.c` | `parse_string` | Parser-runner over a yacc-shape grammar compiled to a scratch object |
 | `src/lib/util/asn.c` | host kfuns `asn_*` | Big-integer (arbitrary-precision) arithmetic |
 | `src/lib/util/base64.c` | character encoding | Base64 encode and decode |
+| `src/lib/util/cbor.c` | binary parsing | CBOR (RFC 8949) decoder for the deterministic subset WebAuthn/CTAP2 payloads use |
 | `src/lib/util/coercion.c` | LPC-literal grammar | Round-trip codec for simple LPC values (ints, floats, strings, object references, nil, arrays, mappings); the marshaling path behind `properties.c`'s `query_ascii_property` / `set_ascii_property` |
+| `src/lib/util/cose.c` | key extraction | COSE_Key (RFC 9052/9053) public-key extraction to the crypto kfuns' verify shapes (ES256, Ed25519) |
 | `src/lib/util/hex.c` | character encoding | Hexadecimal encode and decode |
 | `src/lib/util/json.c` | `/sys/jsonencode`, `/sys/jsondecode` | JSON encode and decode |
 | `src/lib/util/random.c` | host kfun `random` | Pseudo-random string generation |
@@ -298,10 +300,23 @@ Arbitrary-precision integers are carried as byte strings; these convert and meas
 - `string encode(string str)` / `string decode(string str)` -- standard Base64
 - `string urlEncode(string str)` / `string urlDecode(string str)` -- URL-safe Base64 alphabet
 
+### `src/lib/util/cbor.c`
+
+Strict decoder for the deterministic CBOR subset WebAuthn and CTAP2 payloads use: integers, byte and text strings, arrays, maps (integer or string keys), and false/true/null (mapped to `0`/`1`/`nil`). Indefinite lengths, tags, floats, undefined, duplicate map keys, truncation, and integers that do not fit an LPC int all raise errors rather than returning partial values; a null map value is rejected because assigning `nil` deletes a mapping entry.
+
+- `mixed decode(string data)` -- decode a string holding exactly one CBOR data item (trailing bytes are an error)
+- `mixed *decodePrefix(string data, int offset)` -- decode the item starting at `offset`; returns `({ value, next })` with `next` the offset past the item, for values embedded mid-stream (a COSE key inside authenticator data)
+
 ### `src/lib/util/coercion.c`
 
 - `string encodeValue(mixed value)` -- encode a simple LPC value (int, float, string, object reference, nil, array, mapping) to its literal form
 - `mixed decodeValue(string str)` -- decode such a literal back to the LPC value
+
+### `src/lib/util/cose.c`
+
+COSE_Key (RFC 9052/9053) public-key extraction for the credential algorithms the platform verifies natively. Unsupported key types, curve or algorithm mismatches, and malformed coordinates raise errors.
+
+- `string *verifyKey(mapping coseKey)` -- map a decoded COSE_Key to `({ scheme, key })`: the crypto-kfun scheme prefix (`"ECDSA-SECP256R1-SHA256"` or `"Ed25519"`) and the raw public key in the shape `decrypt("<scheme> verify", key, signature, message)` expects (the uncompressed EC point `04 || X || Y` for P-256; the raw 32-byte key for Ed25519)
 
 ### `src/lib/util/delayed.c`
 
