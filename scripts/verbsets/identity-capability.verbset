@@ -1,0 +1,53 @@
+# identity capability binding -- the operator grant path for platform
+# capabilities to an authenticated identity, and the check through
+# capabilityd's existing choke-point. Driven under a module-bearing boot
+# (minting an identity needs the crypto module):
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/identity-capability.verbset
+#
+# Demonstrates: grant a capability to an identity's principal via the
+# operator verb, confirm capabilityd->is_allowed answers true for that
+# principal (the choke-point every authority decision routes through),
+# ungrant and confirm it answers false, and that the grant/revoke on
+# capabilityd itself stay KERNEL()-gated (a console caller is refused).
+
+# mint an identity to grant to
+cmd: identity mint 1
+expect: minted identity:[0-9a-f-]+
+capture: uuid minted identity:([0-9a-f-]+) with
+
+# capabilityd does not yet allow the principal
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.example", "identity:%{uuid}")
+expect: \$\d+ = 0
+
+# grant the capability through the operator path
+cmd: identity grant %{uuid} platform.example
+expect: identity: granted platform.example
+
+# now the choke-point answers true for the identity principal
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.example", "identity:%{uuid}")
+expect: \$\d+ = 1
+
+# the grant shows on the record
+cmd: identity show %{uuid}
+expect: capabilities: 1
+expect: grant platform.example
+
+# capabilityd's own grant stays KERNEL()-gated: a console caller refused
+cmd: code "/kernel/sys/capabilityd"->grant("platform.example", "identity:evil")
+expect: Error: capabilityd: grant not callable from outside /kernel
+
+# the operator path refuses a non-identity principal (constrained seam):
+# there is no such identity, so it never reaches capabilityd
+cmd: identity grant not-a-real-uuid platform.example
+expect: identity: no such identity
+
+# ungrant, and the choke-point answers false again
+cmd: identity ungrant %{uuid} platform.example
+expect: identity: ungranted platform.example
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.example", "identity:%{uuid}")
+expect: \$\d+ = 0
+
+cmd: identity show %{uuid}
+expect: capabilities: 0

@@ -105,6 +105,14 @@ static void create() {
     * hold admin_console.caller too.
     */
    CAPABILITYD->grant("admin_console.caller", LOGD);
+
+   /*
+    * identityd hosts the operator grant path for identity principals
+    * (cmd_identity's grant / ungrant), so it reaches the
+    * verb_grant_capability elevation helper below and must hold
+    * admin_console.caller too.
+    */
+   CAPABILITYD->grant("admin_console.caller", IDENTITYD);
 }
 
 /*
@@ -185,4 +193,35 @@ nomask void verb_set_dispatch_trace(int flag) {
 nomask void verb_set_log_threshold(int level) {
    _check_caller(previous_program());
    LOGD->set_threshold(level);
+}
+
+/*
+ * verb_grant_capability / verb_revoke_capability: the operator path for
+ * granting a platform capability to an authenticated identity. This is
+ * the identity-principal analog of verb_approve_registrar -- the same
+ * elevation shape (only the registered caller reaches it, and the
+ * KERNEL()-gated CAPABILITYD->grant runs from this /kernel program), but
+ * the principal is constrained to the identity namespace ("identity:"),
+ * so the elevation surface is not a general-purpose grant of arbitrary
+ * capabilities to arbitrary principals. Granting to a domain or program
+ * principal stays a declared bootstrap-table entry or a /kernel caller,
+ * never this operator path.
+ */
+private void _check_identity_principal(string principal) {
+   if (!principal || sscanf(principal, "identity:%*s") == 0) {
+      error("admin_console_registry: not an identity principal: " +
+            (principal ? principal : "(nil)"));
+   }
+}
+
+nomask void verb_grant_capability(string capability, string principal) {
+   _check_caller(previous_program());
+   _check_identity_principal(principal);
+   CAPABILITYD->grant(capability, principal);
+}
+
+nomask void verb_revoke_capability(string capability, string principal) {
+   _check_caller(previous_program());
+   _check_identity_principal(principal);
+   CAPABILITYD->revoke(capability, principal);
 }

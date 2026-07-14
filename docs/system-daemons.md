@@ -105,6 +105,10 @@ WebAuthn bookkeeping on a bound passkey: sets the authenticator counter and last
 
 Lookups (System/kernel-tier like the rest of the surface).
 
+### `void grant_capability(string uuid, string capability)` / `void revoke_capability(string uuid, string capability)` / `string *query_grants(string uuid)`
+
+The operator path binding a platform capability to an identity's principal (`identity:<uuid>`). `capabilityd`'s own grant/revoke stay `KERNEL()`-gated; these derive the principal from the uuid and route through the console registry's identity-constrained elevation helper, then the grant is checked back through the ordinary `is_allowed` choke-point (`docs/capability.md` Identity principals). `query_grants` reads back the platform capabilities the identity holds.
+
 ## webauthnd -- `src/usr/System/sys/webauthnd.c`
 
 The WebAuthn ceremony daemon: composes the pure verification library (`/lib/util/webauthn`, `docs/kernel-libraries.md`) with identityd. TOFU registration verifies a foreign attestation payload and mints an identity bound to the new credential (identityd's global credential-id uniqueness makes a re-registration of a bound credential fail -- never bare TOFU re-bind); assertion verification checks the signature against the stored credential and enforces the signature-counter policy (when either counter is nonzero, the asserted counter must be strictly greater than the stored one) before advancing it. The daemon holds no challenge state: `issue_challenge()` returns fresh secure randomness and the verifying entry points take the expected challenge from the caller -- the session layer that issued it owns it. rpId and origin are operator-configured via the `webauthn` console verb (`docs/admin-console.md`); the surface is System/kernel-tier.
