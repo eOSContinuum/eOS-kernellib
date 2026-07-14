@@ -1,0 +1,39 @@
+# session operator verb -- regression for the session daemon's console
+# face on a module-less base boot (the default suite's shape: no crypto
+# module). Asserts the status verb reports the stand-down honestly, the
+# minting path refuses cleanly, argument validation answers usage, and
+# the System-tier API refuses a non-System caller: the console's code
+# objects compile as /usr/<owner>/_code, outside the System tier the
+# gates require. The active lifecycle (mint, validate, revoke, and the
+# statedump discipline) is exercised by scripts/session-smoke.sh under a
+# module-bearing boot.
+
+# status reports the module-less stand-down
+cmd: session
+expect: session: sessions: 0
+expect: crypto module: absent
+
+# minting refuses cleanly without the module
+cmd: session mint identity:someone
+expect: session: crypto module not loaded
+
+# argument validation
+cmd: session mint
+expect: usage: session mint
+
+cmd: session bogus
+expect: usage: session
+
+# the System-tier API refuses a console caller
+cmd: code "/usr/System/sys/sessiond"->mint("identity:x")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/sessiond"->validate("anything")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/sessiond"->query_session_count()
+expect: Error: Access denied
+
+# the refusals left nothing behind
+cmd: session
+expect: session: sessions: 0

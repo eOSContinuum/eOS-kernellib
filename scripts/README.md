@@ -2,7 +2,7 @@
 
 **Audience**: a contributor running or extending the headless boot regressions under `scripts/`; assumes DGD is built per `docs/getting-started.md`.
 
-Six scripts drive the platform through boot cycles and assert or measure the result. The four shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
+Seven scripts drive the platform through boot cycles and assert or measure the result. The five shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
 
 ## run-example.sh
 
@@ -38,11 +38,11 @@ The session logs in as `admin` unless the verbset declares otherwise: file-level
 ## drive-verbs-smoke.sh
 
 ```sh
-scripts/drive-verbs-smoke.sh                  # default: all nine verbsets over vault-app + upgrade-cascade deploys
+scripts/drive-verbs-smoke.sh                  # default: all ten verbsets over vault-app + upgrade-cascade deploys
 DEPLOY="<example>:<Mount> ..." scripts/drive-verbs-smoke.sh <verbset ...>
 ```
 
-Boots the platform headless and drives verbset file(s) with `drive-verbs.py` against the live telnet console, then shuts down. The default run covers admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, identity-verbs, operator-provision, and operator-upgrade in one boot, deploying vault-app as the `MyApp` domain and upgrade-cascade as the `Cascade` domain first -- the dispatcher-verbs clone-addressing cycle drives the property-bearing named clone (`MyApp:core:item1`) the vault-app boot driver creates, the operator cycle drives `upgrade -p` against the settled cascade deploy, and neither example self-exits. The clean-slate step also removes the provisioned operator's artifacts (`src/usr/testop/`, the kernel's persisted access list) so every run reasserts the cold-boot registration flow. With explicit verbset arguments nothing is deployed unless `DEPLOY` asks for it; `DEPLOY` -- a space-separated list of `<example>:<Mount>` pairs -- also overrides the default run's deployment. A boot here is always cold, so a `selfexit` example (one whose driver calls `shutdown()` when it finishes) tears the console down before verbs can run -- drive those against a non-selfexit deployment, or rely on the example's own in-application test phases instead.
+Boots the platform headless and drives verbset file(s) with `drive-verbs.py` against the live telnet console, then shuts down. The default run covers admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, identity-verbs, session-verbs, operator-provision, and operator-upgrade in one boot, deploying vault-app as the `MyApp` domain and upgrade-cascade as the `Cascade` domain first -- the dispatcher-verbs clone-addressing cycle drives the property-bearing named clone (`MyApp:core:item1`) the vault-app boot driver creates, the operator cycle drives `upgrade -p` against the settled cascade deploy, and neither example self-exits. The clean-slate step also removes the provisioned operator's artifacts (`src/usr/testop/`, the kernel's persisted access list) so every run reasserts the cold-boot registration flow. With explicit verbset arguments nothing is deployed unless `DEPLOY` asks for it; `DEPLOY` -- a space-separated list of `<example>:<Mount>` pairs -- also overrides the default run's deployment. A boot here is always cold, so a `selfexit` example (one whose driver calls `shutdown()` when it finishes) tears the console down before verbs can run -- drive those against a non-selfexit deployment, or rely on the example's own in-application test phases instead.
 
 ## https-smoke.sh
 
@@ -52,6 +52,15 @@ DGD_BIN=/path/to/dgd/bin/dgd scripts/https-smoke.sh
 ```
 
 Native-TLS end-to-end, covering the binding and its certificate surface in nine phases. Deploys `examples/https-app` as the `WWW` domain and boots with a second binary port and the lpc-ext crypto module loaded but no certificate (the `LPC_EXT_CRYPTO` path is appended as a `modules` line to the generated config -- the checked-in `example.dgd` stays module-less). Phase 1 proves the bootstrap stood down honestly (`tls-cert` status, no HTTPS service); phase 2 generates a throwaway self-signed P-256 certificate under `src/usr/System/data/tls/` (removed after the run) and activates it with `tls-cert reload` -- registration without a restart; phases 3-7 drive the service probes (`GET /health`, negotiated TLS 1.3, `POST /echo` round-trip, 404 route, cleartext refusal); phases 8-9 take a console `snapshot` twice -- idle and with a live established TLS connection held open -- and scan the statedump for the private key in every in-memory representation (DER, PEM base64, raw scalar), with the port registry's `https` label as the scan's positive control. HTTP probes use `openssl s_client`, not curl -- the stock macOS curl's SecureTransport backend cannot speak TLS 1.3; console phases ride `drive-verbs.py` with an ephemeral verbset under `state/`. `HTTPS-SMOKE PASS` is the pass signal.
+
+## session-smoke.sh
+
+```sh
+LPC_EXT_CRYPTO=/path/to/lpc-ext/crypto.<ver> \
+DGD_BIN=/path/to/dgd/bin/dgd scripts/session-smoke.sh
+```
+
+The session daemon end-to-end with its statedump-discipline proof. Boots with the crypto module and drives the session lifecycle over the console -- mint (capturing the plaintext token from the transcript), validate, revoke, TTL expiry, revoke-principal. The load-bearing phase takes a console `snapshot` while a session is live and scans the image for the plaintext token: it must be absent, while the token's SHA-256 hash and the principal string are present (their absence would mean the session never persisted and the scan is vacuous -- the positive control). `SESSION-SMOKE PASS` is the pass signal. Needs the lpc-ext crypto module (`make crypto` in `dworkin/lpc-ext`); the daemon's module-less stand-down is asserted by session-verbs in the drive-verbs default suite.
 
 ## base-boot-guard.sh
 
@@ -82,14 +91,15 @@ Run in this order for the complete pre-PR bar. Each line names the command and t
 7. `DGD_BIN=<dgd> scripts/run-example.sh vault-app` -- `PASS`, 10 " OK" sentinels (1 timed boot).
 8. `DGD_BIN=<dgd> scripts/run-example.sh webauthn-app` -- `PASS`, 13 " OK" sentinels (1 cold selfexit boot; the codec phases -- ceremony phases skip without the crypto module).
 9. `LPC_EXT_CRYPTO=<crypto-module> EXPECTED_OK=26 DGD_BIN=<dgd> scripts/run-example.sh webauthn-app` -- `PASS`, 26 " OK" sentinels: the codec phases plus the 13 ceremony phases (registration and assertion against foreign-generated vectors, with the negative batteries: bad type, bad challenge, bad origin, bad rpIdHash, bad format, bad signature, wrong key, and the Ed25519 pair). Without the module this step is the documented skip.
-10. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the nine default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, identity-verbs, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
+10. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the ten default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, identity-verbs, session-verbs, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
 11. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-lifecycle.verbset` -- `DRIVE-VERBS PASS` after the active identity lifecycle (operator mint with recovery codes, single-use redemption, the never-zero-credentials invariant, atomic rotation rollback, revocation). Needs the lpc-ext crypto module like the https-smoke step; without it this step is the documented skip -- identityd's module-less stand-down is asserted by identity-verbs in step 10.
 12. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/webauthn-ceremony.verbset` -- `DRIVE-VERBS PASS` after the ceremony daemon's console drive: TOFU registration minting an identity, re-registration refused, assertion advancing signCount, the replay refusal, an unknown credential refused, and the System-tier gate. Regenerate the vectors (and this verbset) with `scripts/gen-webauthn-vectors.py`; without the module this step is the documented skip.
-13. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
-14. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
-15. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
-16. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
-17. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
+13. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/session-smoke.sh` -- `SESSION-SMOKE PASS` after the session lifecycle (mint, validate, revoke, TTL expiry, revoke-principal) and the statedump-discipline scan: the plaintext token is absent from a live-session snapshot while its hash and principal are present. Needs the lpc-ext crypto module; the module-less stand-down is asserted by session-verbs in step 10.
+14. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
+15. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
+16. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
+17. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+18. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 

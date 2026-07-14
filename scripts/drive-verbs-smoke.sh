@@ -50,7 +50,7 @@ PORT=8023
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
-    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/port-labels.verbset scripts/verbsets/tls-cert.verbset scripts/verbsets/identity-verbs.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
+    VERBSETS="scripts/verbsets/admin-baseline.verbset scripts/verbsets/logging-verbs.verbset scripts/verbsets/schema-verbs.verbset scripts/verbsets/dispatcher-verbs.verbset scripts/verbsets/port-labels.verbset scripts/verbsets/tls-cert.verbset scripts/verbsets/identity-verbs.verbset scripts/verbsets/session-verbs.verbset scripts/verbsets/operator-provision.verbset scripts/verbsets/operator-upgrade.verbset"
     # The dispatcher-verbs clone-addressing cycle drives the named clone
     # the vault-app boot driver creates; the operator cycle drives
     # `upgrade -p` against the cascade deploy. Honor an explicit DEPLOY

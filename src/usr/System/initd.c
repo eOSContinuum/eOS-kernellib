@@ -83,6 +83,7 @@ static void create()
     load("sys/persist_helper");
     load("sys/identityd");
     load("sys/webauthnd");
+    load("sys/sessiond");
 
     /* clonables */
     compile_object("obj/user");

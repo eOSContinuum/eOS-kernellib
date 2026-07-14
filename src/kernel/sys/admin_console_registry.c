@@ -35,6 +35,7 @@
 # define HTTPSD		"/usr/System/sys/https_server"
 # define IDENTITYD	"/usr/System/sys/identityd"
 # define WEBAUTHND	"/usr/System/sys/webauthnd"
+# define SESSIOND	"/usr/System/sys/sessiond"
 
 inherit "/kernel/lib/capability";
 
@@ -84,6 +85,9 @@ static void create() {
       "webauthn":
          ([ "path": WEBAUTHND,
             "method": "cmd_webauthn" ]),
+      "session":
+         ([ "path": SESSIOND,
+            "method": "cmd_session" ]),
    ]);
 
    /*
