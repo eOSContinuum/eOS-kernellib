@@ -166,7 +166,7 @@ private string generate_token()
 
 private string token_id(string hash)
 {
-    return "at:" + hash[.. 11];
+    return AGENT_TOKEN_ID(hash);
 }
 
 private int token_expiry(int ttl)
@@ -576,6 +576,22 @@ void update_sign_count(string uuid, string credentialId, int count)
 	error("identity: no such credential");
     }
     identity->update_credential(credentialId, CRED_SIGNCOUNT, count);
+    identity->update_credential(credentialId, CRED_LASTUSED, time());
+}
+
+/*
+ * ceremony bookkeeping on any bound credential: stamp the last
+ * successful use, so stale credentials are reviewable
+ */
+void touch_credential(string uuid, string credentialId)
+{
+    object identity;
+
+    check_system(previous_program());
+    identity = need_identity(uuid);
+    if (!identity->query_credential(credentialId)) {
+	error("identity: no such credential");
+    }
     identity->update_credential(credentialId, CRED_LASTUSED, time());
 }
 

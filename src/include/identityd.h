@@ -20,6 +20,7 @@
 # define OBJ_IDENTITY	"/usr/System/obj/identity"
 # define WEBAUTHND	"/usr/System/sys/webauthnd"
 # define SESSIOND	"/usr/System/sys/sessiond"
+# define AGENTAUTHD	"/usr/System/sys/agentauthd"
 
 /* credential row keys */
 # define CRED_TYPE		"type"		/* row type, below */
@@ -50,6 +51,16 @@
    ttl up to the cap, and a non-positive ttl takes the default */
 # define AGENT_TOKEN_TTL	2592000		/* 30 days */
 # define AGENT_TOKEN_MAX_TTL	7776000		/* 90 days */
+
+/* an agent-token row's credential id, derived from the token's SHA-256
+   hex hash -- shared by the minting side (identityd) and the ceremony
+   side (agentauthd) */
+# define AGENT_TOKEN_ID(hash)	("at:" + (hash)[.. 11])
+
+/* the agent key ceremony signs a domain-separated message (this tag +
+   the challenge), so an agent-auth signature can never be replayed
+   into another protocol that has the agent sign something */
+# define AGENT_AUTH_DOMAIN	"eos-agent-auth-v1:"
 
 /* capability-grant bookkeeping sources (identityd tracks why a grant
    exists so revocation removes the store entry only with its last
