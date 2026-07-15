@@ -70,7 +70,7 @@ echo "== clean slate (base boot) =="
 # (operator-provision.verbset asserts the cold-boot registration flow,
 # so the granted user's directory and the kernel's persisted access list
 # must both go).
-for mount in Cascade Chat MerryApp MyApp Reload SignalApp WebAuthn WWW testop; do
+for mount in AgentApp Cascade Chat Inventory MerryApp MyApp Reload SignalApp WebAuthn WWW testop; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap state/drive-verbs-boot.log

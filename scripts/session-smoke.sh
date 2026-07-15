@@ -57,7 +57,7 @@ cleanup() {
 }
 
 echo "== clean slate (base boot) =="
-for mount in Cascade Chat MerryApp MyApp Reload SignalApp WebAuthn WWW testop; do
+for mount in AgentApp Cascade Chat Inventory MerryApp MyApp Reload SignalApp WebAuthn WWW testop; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap state/session-smoke-boot.log

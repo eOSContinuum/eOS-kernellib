@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""Generate agent-identity ceremony test vectors for examples/agent-app.
+
+Writes one generated fixture (do not edit it by hand; rerun this):
+
+  examples/agent-app/sys/vectors.h    LPC defines (hex strings)
+
+The controller's WebAuthn registration vector needs no signature
+(attestation format "none"), so it is built with the python standard
+library alone. The agent-key ceremony signatures come from an
+independent implementation -- Ed25519 via the openssl CLI -- so the
+platform's verify kfun checks foreign-generated payloads, not bytes the
+LPC stack produced itself. Ed25519 signatures are deterministic, but
+the keypair is fresh per run, so regenerated files differ while staying
+valid; the structures (challenges, credential ids, the domain tag) are
+fixed below and the LPC driver asserts against those.
+
+Run from the repository root:
+
+  python3 scripts/gen-agent-vectors.py
+
+Needs python3 and an openssl CLI with Ed25519 support (OpenSSL 1.1.1+;
+LibreSSL will not do).
+"""
+
+import base64
+import hashlib
+import json
+import pathlib
+import struct
+import subprocess
+import tempfile
+
+RP_ID = "localhost"
+ORIGIN = "https://localhost:8443"
+DOMAIN_TAG = "eos-agent-auth-v1:"
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+VECTORS_H = ROOT / "examples/agent-app/sys/vectors.h"
+
+# fixed structures: distinct from webauthn-app's so the two examples
+# can share a boot without colliding in the global credential index
+REG_CHALLENGE_BYTES = bytes(range(0xA0, 0xC0))
+CRED_ID = bytes(range(0x20, 0x30))
+AGENT_CRED_ID = "ak-agent-app-1"
+AGENT_CHALLENGE_1 = "agent-app-challenge-one"
+AGENT_CHALLENGE_2 = "agent-app-challenge-two"
+
+
+def b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+
+def cbor_bytes(data: bytes) -> bytes:
+    assert len(data) < 0x10000
+    if len(data) < 24:
+        return bytes([0x40 + len(data)]) + data
+    if len(data) < 0x100:
+        return bytes([0x58, len(data)]) + data
+    return b"\x59" + struct.pack(">H", len(data)) + data
+
+
+def cbor_text(text: str) -> bytes:
+    data = text.encode()
+    assert len(data) < 24
+    return bytes([0x60 + len(data)]) + data
+
+
+def cbor_int(n: int) -> bytes:
+    if n >= 0:
+        assert n < 24
+        return bytes([n])
+    assert n >= -24
+    return bytes([0x20 + (-1 - n)])
+
+
+def cose_es256_key(x: bytes, y: bytes) -> bytes:
+    # {1: 2, 3: -7, -1: 1, -2: x, -3: y} -- EC2, ES256, P-256
+    return (b"\xa5" + cbor_int(1) + cbor_int(2) + cbor_int(3) + cbor_int(-7) +
+            cbor_int(-1) + cbor_int(1) + cbor_int(-2) + cbor_bytes(x) +
+            cbor_int(-3) + cbor_bytes(y))
+
+
+def attestation_object(rp_id: str, cred_id: bytes, cose_key: bytes) -> bytes:
+    auth_data = (hashlib.sha256(rp_id.encode()).digest() +
+                 bytes([0x41]) +                # UP | AT
+                 struct.pack(">I", 5) +          # signCount
+                 bytes(16) +                     # aaguid
+                 struct.pack(">H", len(cred_id)) + cred_id +
+                 cose_key)
+    # {"fmt": "none", "attStmt": {}, "authData": auth_data}
+    return (b"\xa3" + cbor_text("fmt") + cbor_text("none") +
+            cbor_text("attStmt") + b"\xa0" +
+            cbor_text("authData") + cbor_bytes(auth_data))
+
+
+def client_data(challenge_b64: str) -> bytes:
+    return json.dumps({"type": "webauthn.create", "challenge": challenge_b64,
+                       "origin": ORIGIN, "crossOrigin": False},
+                      separators=(",", ":")).encode()
+
+
+def openssl(*args, **kw):
+    return subprocess.run(["openssl", *args], check=True,
+                          capture_output=True, **kw).stdout
+
+
+def main():
+    reg_ch = b64url(REG_CHALLENGE_BYTES)
+    cose = cose_es256_key(bytes([0x33]) * 32, bytes([0x44]) * 32)
+    att_obj = attestation_object(RP_ID, CRED_ID, cose)
+    cdj = client_data(reg_ch)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        key = pathlib.Path(tmp) / "agent.pem"
+        badkey = pathlib.Path(tmp) / "bad.pem"
+        openssl("genpkey", "-algorithm", "ed25519", "-out", str(key))
+        openssl("genpkey", "-algorithm", "ed25519", "-out", str(badkey))
+        pub = openssl("pkey", "-in", str(key), "-pubout",
+                      "-outform", "DER")[-32:]
+
+        def sign(pem, message: bytes) -> bytes:
+            msg = pathlib.Path(tmp) / "msg"
+            msg.write_bytes(message)
+            return openssl("pkeyutl", "-sign", "-inkey", str(pem),
+                           "-rawin", "-in", str(msg))
+
+        sig1 = sign(key, (DOMAIN_TAG + AGENT_CHALLENGE_1).encode())
+        sig2 = sign(key, (DOMAIN_TAG + AGENT_CHALLENGE_2).encode())
+        # two negatives: the right key over the BARE challenge (domain
+        # tag missing), and a different key over the right message
+        sig_bare = sign(key, AGENT_CHALLENGE_1.encode())
+        sig_badkey = sign(badkey, (DOMAIN_TAG + AGENT_CHALLENGE_1).encode())
+
+    lines = [
+        "/*",
+        " * Generated by scripts/gen-agent-vectors.py -- do not edit.",
+        " * Controller registration vector (attestation \"none\", no",
+        " * signature); agent-key ceremony signatures produced by the",
+        " * openssl CLI (an independent Ed25519 implementation).",
+        " * _HEX-suffixed values decode with /lib/util/hex decodeString.",
+        " */",
+        "",
+        '# define AA_REG_CHALLENGE\t"%s"' % reg_ch,
+        '# define AA_REG_CDJ_HEX\t"%s"' % cdj.hex(),
+        '# define AA_REG_AO_HEX\t"%s"' % att_obj.hex(),
+        '# define AA_CRED_ID\t"%s"' % AGENT_CRED_ID,
+        '# define AA_PUB_HEX\t"%s"' % pub.hex(),
+        '# define AA_CH_1\t"%s"' % AGENT_CHALLENGE_1,
+        '# define AA_SIG_1_HEX\t"%s"' % sig1.hex(),
+        '# define AA_CH_2\t"%s"' % AGENT_CHALLENGE_2,
+        '# define AA_SIG_2_HEX\t"%s"' % sig2.hex(),
+        '# define AA_SIG_BARE_HEX\t"%s"' % sig_bare.hex(),
+        '# define AA_SIG_BADKEY_HEX\t"%s"' % sig_badkey.hex(),
+        "",
+    ]
+    VECTORS_H.parent.mkdir(parents=True, exist_ok=True)
+    VECTORS_H.write_text("\n".join(lines))
+    print("wrote", VECTORS_H)
+
+
+if __name__ == "__main__":
+    main()

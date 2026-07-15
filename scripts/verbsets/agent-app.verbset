@@ -1,0 +1,34 @@
+# agent-app operator continuation -- the operator half of the agent
+# identity worked example, driven against a boot with the example
+# deployed:
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> DEPLOY="agent-app:AgentApp" \
+#       scripts/drive-verbs-smoke.sh scripts/verbsets/agent-app.verbset
+#
+# The example's boot driver registers a controller, mints its agent,
+# and proves the pre-operator refusals (examples/agent-app/README.md).
+# This verbset performs the two deliberately operator-only actions --
+# grant the controller the application capability, flag it delegable
+# -- then triggers the driver's continuation and asserts the
+# end-to-end sentinels: the delegation lands, the agent's principal
+# passes the application action gate, suspension kills the delegated
+# grant, resume restores nothing.
+
+cmd: code "/usr/AgentApp/sys/test"->query_controller_uuid()
+expect: \$\d+ = "[0-9a-f-]+"
+capture: controller = "([0-9a-f-]+)"
+
+cmd: identity grant %{controller} agentapp.write
+expect: identity: granted agentapp.write
+
+cmd: capability delegable agentapp.write on
+expect: capability: agentapp.write delegable on
+
+cmd: code "/usr/AgentApp/sys/test"->continue_with_operator_grant()
+expect: agent-app: operator phase complete
+
+cmd: code "/usr/AgentApp/sys/test"->query_result_log()
+expect: DELEGATED OK
+expect: AGENT-EXERCISES-CAP OK
+expect: SUSPEND-KILLS-DELEGATION OK
+expect: RESUME-NO-GRANTS OK
+absent: FAIL
