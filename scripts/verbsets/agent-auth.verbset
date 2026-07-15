@@ -1,0 +1,83 @@
+# agent authentication -- the agent ceremony daemon and the authd agent
+# entry points, driven end-to-end over the token ceremony on a
+# module-bearing boot (minting and hashing need the crypto module):
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/agent-auth.verbset
+#
+# Demonstrates: controller self-service minting through authd (the
+# controller edge derived from the proven session principal, never
+# caller-supplied), token ceremony + session mint, structural
+# non-transitivity (an agent session cannot mint agents), own-agents
+# scoping on suspend/resume, suspension killing ceremonies and live
+# sessions, resume restoring authentication only, and the System-tier
+# gate on agentauthd's verifying entries. The key-assertion ceremony
+# with a real signer is exercised by agent-smoke.sh.
+
+# a human controller with a live session
+cmd: identity mint 1
+expect: minted identity:[0-9a-f-]+
+capture: controller minted identity:([0-9a-f-]+) with
+
+cmd: session mint identity:%{controller}
+expect: session: token [A-Za-z0-9_-]+
+capture: csession session: token ([A-Za-z0-9_-]+)
+
+# self-service: mint an agent whose first credential is a fresh token
+cmd: code "/usr/System/sys/authd"->mint_agent_with_token("%{csession}")
+expect: "[0-9a-f-]+", "[A-Za-z0-9_-]+"
+capture: agent "([0-9a-f-]+)"
+capture: atoken "[0-9a-f-]+", "([A-Za-z0-9_-]+)"
+
+# the token authenticates: ceremony + session mint in one step
+cmd: code "/usr/System/sys/authd"->authenticate_agent_token("%{atoken}")
+expect: "identity:%{agent}", "[A-Za-z0-9_-]+"
+capture: asession "identity:[0-9a-f-]+", "([A-Za-z0-9_-]+)"
+
+cmd: session validate %{asession}
+expect: session: valid, principal identity:%{agent}
+
+# a garbage token is refused
+cmd: code "/usr/System/sys/authd"->authenticate_agent_token("bogus")
+expect: Error: agentauth: unknown token
+
+# structural non-transitivity: an agent session cannot mint agents
+cmd: code "/usr/System/sys/authd"->mint_agent_with_token("%{asession}")
+expect: Error: identity: an agent's controller must be a human identity
+
+# own-agents scoping: the agent's own session cannot suspend it
+cmd: code "/usr/System/sys/authd"->suspend_agent("%{asession}", "%{agent}")
+expect: Error: auth: no such agent of this controller
+
+# the controller suspends the agent; its live session dies now
+cmd: code "/usr/System/sys/authd"->suspend_agent("%{csession}", "%{agent}")
+expect: \$\d+ = 1
+
+cmd: code "/usr/System/sys/authd"->authenticate_agent_token("%{atoken}")
+expect: Error: agentauth: agent suspended
+
+cmd: session validate %{asession}
+expect: session: no live session for that token
+
+# resume restores the ability to authenticate only
+cmd: code "/usr/System/sys/authd"->resume_agent("%{csession}", "%{agent}")
+expect: \$\d+ = nil
+
+cmd: code "/usr/System/sys/authd"->authenticate_agent_token("%{atoken}")
+expect: "identity:%{agent}", "[A-Za-z0-9_-]+"
+
+# a key credential minted self-service; a bad signature is refused
+cmd: code "/usr/System/sys/authd"->mint_agent("%{csession}", "agent-key-probe", ([ "type" : "agent-key", "key" : "notakey", "scheme" : "Ed25519" ]))
+expect: \$\d+ = "[0-9a-f-]+"
+
+cmd: code "/usr/System/sys/authd"->authenticate_agent_key("somechallenge", "agent-key-probe", "badsig")
+expect: Error: agentauth: signature invalid
+
+# agentauthd's verifying entries are System-tier; challenges are public
+cmd: code "/usr/System/sys/agentauthd"->verify_token("x")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/agentauthd"->verify_key_assertion("c", "id", "sig")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/agentauthd"->issue_challenge()
+expect: \$\d+ = "[A-Za-z0-9_-]+"

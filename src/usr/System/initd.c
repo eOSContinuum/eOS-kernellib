@@ -84,6 +84,7 @@ static void create()
     load("sys/identityd");
     load("sys/webauthnd");
     load("sys/sessiond");
+    load("sys/agentauthd");
     load("sys/authd");
 
     /* clonables */
