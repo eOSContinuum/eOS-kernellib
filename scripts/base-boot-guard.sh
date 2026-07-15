@@ -44,7 +44,7 @@ if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
 fi
 
 echo "== clean slate (no example deployed) =="
-for mount in Cascade Chat MerryApp MyApp Reload SignalApp WebAuthn WWW; do
+for mount in AgentApp Cascade Chat Inventory MerryApp MyApp Reload SignalApp WebAuthn WWW; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap "$BOOT_LOG"
