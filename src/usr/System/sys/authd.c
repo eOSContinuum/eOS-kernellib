@@ -200,6 +200,27 @@ void resume_agent(string sessionToken, string agentUuid)
 }
 
 /*
+ * delegate one of the session identity's own capabilities to one of
+ * its own agents, or withdraw the delegation. The substrate checks --
+ * against live state, atomically -- that the delegator holds the
+ * capability, the capability is operator-flagged delegable, the
+ * target is the delegator's own unsuspended agent.
+ */
+void delegate_capability(string sessionToken, string agentUuid,
+			 string capability)
+{
+    IDENTITYD->delegate_capability(session_identity(sessionToken),
+				   agentUuid, capability);
+}
+
+void undelegate_capability(string sessionToken, string agentUuid,
+			   string capability)
+{
+    IDENTITYD->undelegate_capability(session_identity(sessionToken),
+				     agentUuid, capability);
+}
+
+/*
  * the principal a live session token authenticates, or nil
  */
 string validate(string token)

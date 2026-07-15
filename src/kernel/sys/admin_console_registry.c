@@ -88,6 +88,9 @@ static void create() {
       "session":
          ([ "path": SESSIOND,
             "method": "cmd_session" ]),
+      "capability":
+         ([ "path": CAPABILITYD,
+            "method": "cmd_capability" ]),
    ]);
 
    /*

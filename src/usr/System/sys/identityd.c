@@ -47,12 +47,16 @@ private inherit "/lib/util/lpc";	/* sysLog */
 private inherit base64 "/lib/util/base64";
 private inherit hex "/lib/util/hex";
 
+private void add_grant_source(string uuid, string capability, string source);
+private int drop_grant_source(string uuid, string capability, string source);
+
 # define MAX_CODES	16	/* recovery codes per mint/rotation */
 
 private mapping identities;		/* uuid : identity object */
 private mapping credentialIndex;	/* credential id : uuid */
 private mapping controllerIndex;	/* controller uuid : agent uuid set */
 private mapping grantSources;		/* uuid : capability : source set */
+private mapping delegations;		/* agent uuid : capability : grantor */
 
 static void create()
 {
@@ -61,6 +65,7 @@ static void create()
     credentialIndex = ([ ]);
     controllerIndex = ([ ]);
     grantSources = ([ ]);
+    delegations = ([ ]);
     compile_object(OBJ_IDENTITY);
     sysLog("identity: registry up; crypto module " +
 # ifdef KF_SECURE_RANDOM
@@ -539,17 +544,32 @@ atomic string *bind_agent_token(string uuid, varargs int ttl)
 }
 
 /*
- * suspend an agent: authentication refuses at ceremony time and every
- * live session dies now. The record and its audit trail persist.
- * Returns the count of sessions revoked.
+ * suspend an agent: authentication refuses at ceremony time, every
+ * live session dies now, and every delegated grant is revoked (an
+ * operator grant of the same capability survives as its own source).
+ * The record and its audit trail persist. Returns the count of
+ * sessions revoked.
  */
 atomic int suspend_agent(string uuid)
 {
     object identity;
+    mapping byAgent;
+    string *held;
+    int i;
 
     check_system(previous_program());
     identity = need_identity(uuid);
     identity->set_suspended(TRUE);
+    if (delegations && (byAgent = delegations[uuid])) {
+	held = map_indices(byAgent);
+	for (i = 0; i < sizeof(held); i++) {
+	    if (drop_grant_source(uuid, held[i], GRANT_SOURCE_DELEGATED)) {
+		ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(held[i],
+							       identity->query_principal());
+	    }
+	}
+	delegations[uuid] = nil;
+    }
     return SESSIOND->revoke_principal(identity->query_principal());
 }
 
@@ -694,6 +714,38 @@ string *query_grant_sources(string uuid, string capability)
     return set ? map_indices(set) : ({ });
 }
 
+/*
+ * revoke every delegation of one capability made by one grantor: the
+ * eager half of the revocation cascade, run inside the same atomic
+ * operation as the mutation that invalidates the delegations' premise
+ */
+private void revoke_delegations_from(string grantorUuid, string capability)
+{
+    mapping set, byAgent;
+    string *agents;
+    int i;
+
+    set = controllerIndex ? controllerIndex[grantorUuid] : nil;
+    if (!set || !delegations) {
+	return;
+    }
+    agents = map_indices(set);
+    for (i = 0; i < sizeof(agents); i++) {
+	byAgent = delegations[agents[i]];
+	if (byAgent && byAgent[capability] == grantorUuid) {
+	    byAgent[capability] = nil;
+	    if (map_sizeof(byAgent) == 0) {
+		delegations[agents[i]] = nil;
+	    }
+	    if (drop_grant_source(agents[i], capability,
+				  GRANT_SOURCE_DELEGATED)) {
+		ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
+		    identities[agents[i]]->query_principal());
+	    }
+	}
+    }
+}
+
 atomic void grant_capability(string uuid, string capability)
 {
     object identity;
@@ -708,16 +760,152 @@ atomic void grant_capability(string uuid, string capability)
     add_grant_source(uuid, capability, GRANT_SOURCE_OPERATOR);
 }
 
+/*
+ * the operator revocation cascades eagerly: revoking a controller's
+ * own grant revokes the delegated copies to its agents in the same
+ * atomic operation, so a delegation never outlives its premise
+ */
 atomic void revoke_capability(string uuid, string capability)
 {
     object identity;
 
     check_system(previous_program());
     identity = need_identity(uuid);
+    revoke_delegations_from(uuid, capability);
     if (drop_grant_source(uuid, capability, GRANT_SOURCE_OPERATOR)) {
 	ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
 						       identity->query_principal());
     }
+}
+
+/*
+ * controller-to-agent delegation: the narrowest decidable form of
+ * delegated authority. Checked here, against live substrate state, in
+ * one atomic operation: the delegator holds the capability, the
+ * capability is operator-flagged delegable, the target is the
+ * delegator's own agent, and the agent is not suspended. The grant
+ * routes through the same KERNEL-elevated, identity-namespace-
+ * constrained helper the operator path uses. Non-transitivity is
+ * structural: only human records control agents, and a delegated
+ * grant is never itself a basis for delegation (the delegator must
+ * hold the capability as a human record).
+ */
+atomic void delegate_capability(string controllerUuid, string agentUuid,
+				string capability)
+{
+    object controller, agent;
+    mapping byAgent;
+
+    check_system(previous_program());
+    if (!capability || strlen(capability) == 0) {
+	error("identity: a delegation needs a capability");
+    }
+    controller = need_identity(controllerUuid);
+    agent = need_identity(agentUuid);
+    if (agent->query_kind() != ID_KIND_AGENT ||
+	agent->query_controller() != controllerUuid) {
+	error("identity: no such agent of this controller");
+    }
+    if (agent->query_suspended()) {
+	error("identity: agent suspended");
+    }
+    if (!CAPABILITYD->is_allowed(capability,
+				 controller->query_principal())) {
+	error("identity: delegator does not hold " + capability);
+    }
+    if (!CAPABILITYD->query_delegable(capability)) {
+	error("identity: " + capability + " is not delegable");
+    }
+    if (!delegations) {
+	delegations = ([ ]);
+    }
+    byAgent = delegations[agentUuid];
+    if (byAgent && byAgent[capability]) {
+	error("identity: already delegated");
+    }
+    if (!byAgent) {
+	byAgent = delegations[agentUuid] = ([ ]);
+    }
+    byAgent[capability] = controllerUuid;
+    ADMIN_CONSOLE_REGISTRY->verb_grant_capability(capability,
+						  agent->query_principal());
+    add_grant_source(agentUuid, capability, GRANT_SOURCE_DELEGATED);
+}
+
+/*
+ * a controller withdraws one delegation; the capabilityd entry dies
+ * only if the delegation was its last source
+ */
+atomic void undelegate_capability(string controllerUuid, string agentUuid,
+				  string capability)
+{
+    object agent;
+    mapping byAgent;
+
+    check_system(previous_program());
+    agent = need_identity(agentUuid);
+    if (!delegations || !(byAgent = delegations[agentUuid]) ||
+	byAgent[capability] != controllerUuid) {
+	error("identity: no such delegation");
+    }
+    byAgent[capability] = nil;
+    if (map_sizeof(byAgent) == 0) {
+	delegations[agentUuid] = nil;
+    }
+    if (drop_grant_source(agentUuid, capability, GRANT_SOURCE_DELEGATED)) {
+	ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
+						       agent->query_principal());
+    }
+}
+
+/*
+ * an agent's delegations, as a copy: capability : grantor uuid
+ */
+mapping query_delegations(string uuid)
+{
+    mapping byAgent;
+
+    check_system(previous_program());
+    byAgent = delegations ? delegations[uuid] : nil;
+    return byAgent ? byAgent + ([ ]) : ([ ]);
+}
+
+/*
+ * the documented-bypass heal: a raw KERNEL-tier capabilityd->revoke
+ * against a grantor's principal bypasses this bookkeeping, so a
+ * reconcile pass revokes any delegation whose grantor no longer holds
+ * the capability. Returns the capabilities revoked.
+ */
+atomic string *reconcile_delegations(string uuid)
+{
+    object identity, grantor;
+    mapping byAgent;
+    string *held, *revoked;
+    int i;
+
+    check_system(previous_program());
+    identity = need_identity(uuid);
+    revoked = ({ });
+    if (!delegations || !(byAgent = delegations[uuid])) {
+	return revoked;
+    }
+    held = map_indices(byAgent);
+    for (i = 0; i < sizeof(held); i++) {
+	grantor = identities[byAgent[held[i]]];
+	if (!grantor ||
+	    !CAPABILITYD->is_allowed(held[i], grantor->query_principal())) {
+	    byAgent[held[i]] = nil;
+	    if (drop_grant_source(uuid, held[i], GRANT_SOURCE_DELEGATED)) {
+		ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(held[i],
+							       identity->query_principal());
+	    }
+	    revoked += ({ held[i] });
+	}
+    }
+    if (map_sizeof(byAgent) == 0) {
+	delegations[uuid] = nil;
+    }
+    return revoked;
 }
 
 /*

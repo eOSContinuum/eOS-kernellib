@@ -117,3 +117,79 @@ string *query_principals(string capability) {
 string *query_capabilities() {
    return map_indices(caps);
 }
+
+/*
+ * delegable registry: a per-capability flag an operator flips before any
+ * controller may delegate that capability to an agent. Default off -- no
+ * capability ships delegable. The flag gates the delegation path in the
+ * identity registry; the store above is untouched by it. Mutation is
+ * KERNEL()-gated like grant/revoke; the read is public.
+ */
+private mapping delegable;	/* capability : 1 */
+
+void set_delegable(string capability, int flag) {
+   if (!KERNEL()) {
+      error("capabilityd: set_delegable not callable from outside /kernel");
+   }
+   if (!capability || strlen(capability) == 0) {
+      error("capabilityd: set_delegable wants a capability");
+   }
+   if (!delegable) {
+      delegable = ([ ]);
+   }
+   delegable[capability] = flag ? 1 : nil;
+}
+
+int query_delegable(string capability) {
+   return (delegable && capability && delegable[capability]) ? 1 : 0;
+}
+
+/*
+ * NAME:	_emit()
+ * DESCRIPTION:	route operator-verb output through the console user
+ */
+private void _emit(object user, string msg) {
+   if (user) {
+      user->message(msg);
+   }
+}
+
+/*
+ * NAME:	cmd_capability()
+ * DESCRIPTION:	the capability operator verb, dispatched by the kernel
+ *		admin-console registry:
+ *		  capability                        -- list the store
+ *		  capability delegable <cap> on|off -- flip the delegable flag
+ */
+void cmd_capability(object user, string cmd, string str) {
+   string *parts, *names;
+   int i;
+
+   if (!KERNEL()) {
+      error("Access denied");
+   }
+
+   parts = str ? explode(str, " ") - ({ "" }) : ({ });
+   if (sizeof(parts) == 0) {
+      names = map_indices(caps);
+      _emit(user, "capability: capabilities: " + (string) sizeof(names) +
+                  "\n");
+      for (i = 0; i < sizeof(names); i++) {
+         _emit(user, "capability:   " + names[i] + " principals " +
+                     (string) sizeof(query_principals(names[i])) +
+                     (query_delegable(names[i]) ? " delegable" : "") + "\n");
+      }
+      return;
+   }
+   if (parts[0] == "delegable") {
+      if (sizeof(parts) != 3 || (parts[2] != "on" && parts[2] != "off")) {
+         _emit(user, "usage: " + cmd + " delegable <capability> on|off\n");
+         return;
+      }
+      set_delegable(parts[1], parts[2] == "on");
+      _emit(user, "capability: " + parts[1] + " delegable " + parts[2] +
+                  "\n");
+      return;
+   }
+   _emit(user, "usage: " + cmd + " [delegable <capability> on|off]\n");
+}
