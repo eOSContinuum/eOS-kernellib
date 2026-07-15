@@ -1,6 +1,6 @@
 # System-daemon application surface
 
-The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), the transport authentication facade (authd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
+The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), the agent ceremony daemon (agentauthd), the transport authentication facade (authd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
 
 **Audience**: a System-tier or application author about to call one of these daemons directly and needing the exact contract, after the owning concept doc (`docs/code-lifecycle.md`, `docs/operations.md`, `docs/capability.md`, `docs/schema.md`) has explained when to.
 
@@ -72,10 +72,11 @@ The capability store behind the platform's gating surfaces. `docs/capability.md`
 - `void require_member(string capability, string principal)` -- throwing check, uniform denial message
 - `void grant(string capability, string principal)` / `void revoke(string capability, string principal)` -- KERNEL()-gated mutation (an ungated caller gets an error)
 - `string *query_principals(string capability)` / `string *query_capabilities()` -- public reads
+- `void set_delegable(string capability, int flag)` / `int query_delegable(string capability)` -- the per-capability delegable flag gating controller-to-agent delegation (`docs/capability.md` Identity principals); mutation KERNEL()-gated, read public. The operator face is the `capability` console verb (list the store; `capability delegable <cap> on|off`).
 
 ## identityd -- `src/usr/System/sys/identityd.c`
 
-The platform identity substrate: mints identity records (clones of `src/usr/System/obj/identity.c`, one per identity), owns the global credential-id index, and enforces the record invariants -- a credential id binds to at most one identity ever, and a record never reaches zero credentials (single-step removals are guarded up front; compound operations run as `atomic` functions validated at the end, so a violating compound rolls back whole). A record's principal string (`identity:<uuid>`) is the form capabilityd principals take for authenticated identities. Recovery codes are generated here (never imported), stored hashed, and single-use; plaintext codes exist only in the minting response. Randomness and hashing need the host crypto module -- without it the daemon boots, reports the stand-down, and refuses minting cleanly. The whole surface is System/kernel-tier; the operator face is the `identity` console verb (`docs/admin-console.md`). Credential-row keys and types are defined in `src/include/identityd.h`.
+The platform identity substrate: mints identity records (clones of `src/usr/System/obj/identity.c`, one per identity), owns the global credential-id index, and enforces the record invariants -- a credential id binds to at most one identity ever, and a record never reaches zero credentials (single-step removals are guarded up front; compound operations run as `atomic` functions validated at the end, so a violating compound rolls back whole). A record's principal string (`identity:<uuid>`) is the form capabilityd principals take for authenticated identities. Records carry a kind (human or agent; agent records add an immutable controller edge and a suspended flag, `docs/identity.md` Agent identities), and credential rows bind by kind: passkeys and recovery codes to human records, agent keys and agent tokens to agent records, checked at the single bind choke point. Recovery codes and agent tokens are generated here (never imported), stored hashed; plaintext exists only in the minting response, and agent tokens carry a required expiry (30-day default, 90-day cap). Randomness and hashing need the host crypto module -- without it the daemon boots, reports the stand-down, and refuses minting cleanly. The whole surface is System/kernel-tier; the operator face is the `identity` console verb (`docs/admin-console.md`). Credential-row keys and types are defined in `src/include/identityd.h`.
 
 ### `atomic string create_identity(string credentialId, mapping row)` / `atomic mixed *mint_with_codes(int n)`
 
@@ -97,9 +98,29 @@ Replace the record's recovery-code set with `n` fresh codes; returns the plainte
 
 Single-use redemption (refuses to consume the last credential) / the recovery ceremony's substrate step: redeem plus bind the replacement in one atomic operation, valid even on the last credential.
 
-### `void update_sign_count(string uuid, string credentialId, int count)`
+### `void update_sign_count(string uuid, string credentialId, int count)` / `void touch_credential(string uuid, string credentialId)`
 
-WebAuthn bookkeeping on a bound passkey: sets the authenticator counter and last-used time.
+WebAuthn bookkeeping on a bound passkey (sets the authenticator counter and last-used time) / ceremony bookkeeping on any bound credential (stamps last use; agentauthd's path).
+
+### `atomic string mint_agent(string controllerUuid, string credentialId, mapping row)` / `atomic string *mint_agent_with_token(string controllerUuid, varargs int ttl)` / `atomic string *bind_agent_token(string uuid, varargs int ttl)`
+
+Agent minting: with a caller-supplied agent-key row (public key material only), or with a fresh platform-generated token (returns `({ uuid, token })`, the only time the plaintext exists). The controller must be an existing human record. `bind_agent_token` adds a fresh token to an existing agent (returns `({ credentialId, token })`); a non-positive `ttl` takes the 30-day default, capped at 90 days.
+
+### `atomic int suspend_agent(string uuid)` / `void resume_agent(string uuid)`
+
+The kill switch: suspend blocks authentication at ceremony time, revokes the agent's live sessions (returns the count), and revokes its delegated grants in the same atomic operation. Resume restores the ability to authenticate only.
+
+### `atomic void delegate_capability(string controllerUuid, string agentUuid, string capability)` / `atomic void undelegate_capability(string controllerUuid, string agentUuid, string capability)`
+
+Controller-to-agent delegation, checked against live state in one atomic operation (delegator holds it, flagged delegable, target is the delegator's own unsuspended agent) and routed through the identity-constrained elevation helper. Undelegate removes the delegation; the store entry dies only with its last source (`docs/capability.md` Identity principals).
+
+### `mapping query_delegations(string uuid)` / `atomic string *reconcile_delegations(string uuid)`
+
+An agent's delegations (capability : grantor uuid, a copy) / the bypass heal: revoke any delegation whose grantor no longer holds the capability; returns the capabilities revoked. `identity show` reconciles at read.
+
+### `string *query_agents(string controllerUuid)` / `string *query_grant_sources(string uuid, string capability)`
+
+The agents a controller controls (the controller index) / the tracked reasons a grant exists (`operator`, `delegated`).
 
 ### `object find_identity(string uuid)` / `string find_by_credential(string credentialId)` / `int query_identity_count()`
 
@@ -145,6 +166,22 @@ The principal a live token authenticates, or nil for an unknown or expired token
 
 Drop one session (TRUE iff a live one was removed); drop every session for a principal (a logout-everywhere primitive; returns the count); the live-session count (expired records reaped first).
 
+## agentauthd -- `src/usr/System/sys/agentauthd.c`
+
+The agent ceremony daemon: verifies the two agent authentication ceremonies against live substrate state (the record's kind and suspended flag are checked at ceremony time) and returns the proven principal. It never mints sessions -- authd composes ceremony plus mint -- and never mutates records beyond last-use bookkeeping. The key assertion verifies a signature over a domain-separated message (a fixed tag plus the challenge, so an agent-auth signature cannot be replayed into another protocol) with the bound row's verify scheme and raw public key; replay protection is the caller-owned single-use challenge, with no signature counter. The token ceremony hashes the presented token, requires a matching stored hash and an unexpired row, and stamps last use. Challenge ownership follows the webauthnd contract: the daemon holds no challenge state. Ceremonies need the crypto module; the verifying surface is System/kernel-tier (`docs/identity.md` Agent identities; `scripts/agent-smoke.sh` is the live proof).
+
+### `string issue_challenge()`
+
+A fresh single-use challenge, base64url (32 bytes of `secure_random`); errors without the crypto module. Public, like webauthnd's.
+
+### `string verify_key_assertion(string challenge, string credentialId, string signature)`
+
+The key ceremony: signature over the domain-separated message against the bound agent-key row; returns the proven principal. Refuses a non-agent or suspended record, an unknown credential, and an invalid signature.
+
+### `string verify_token(string token)`
+
+The token ceremony: hash lookup, full-hash match, expiry and record checks; returns the proven principal.
+
 ## authd -- `src/usr/System/sys/authd.c`
 
 The transport authentication facade. The identity substrate's daemons gate every entry to System/kernel callers, so a tier-E transport surface -- an HTTP application binding a login flow, a non-HTTP protocol doing the same -- consumes ceremonies and sessions through this facade instead. It composes webauthnd and sessiond and exposes exactly the ceremony-plus-session flow; it deliberately does NOT expose `sessiond->mint` (minting a session for an arbitrary principal string would forge authority -- here a session is minted only for the principal a ceremony just proved), identityd mutation, or the capability grant path. The facade holds no state: challenge ownership stays with the caller per the webauthnd contract, and the reference single-use challenge store is `examples/composite-app`'s handler (`docs/composite-applications.md`). Unlike the rest of this page, the surface is deliberately callable from every tier.
@@ -164,6 +201,14 @@ The assertion ceremony plus session mint in one step; returns `({ principal, tok
 ### `string validate(string token)` / `int logout(string token)`
 
 sessiond's validate and revoke, passed through: the principal a live token authenticates (or nil), and single-session revocation (TRUE iff a live one was removed).
+
+### `mixed *authenticate_agent_key(string challenge, string credentialId, string signature, varargs int ttl)` / `mixed *authenticate_agent_token(string agentToken, varargs int ttl)`
+
+The agent ceremonies (verified by agentauthd) plus session mint in one step; returns `({ principal, token })` exactly like the human flow -- a session is minted only for a ceremony-proven principal.
+
+### `string mint_agent(string sessionToken, string credentialId, mapping row)` / `string *mint_agent_with_token(string sessionToken, varargs int ttl)` / `int suspend_agent(string sessionToken, string agentUuid)` / `void resume_agent(string sessionToken, string agentUuid)` / `void delegate_capability(string sessionToken, string agentUuid, string capability)` / `void undelegate_capability(string sessionToken, string agentUuid, string capability)`
+
+Controller self-service: a live session proves the controlling identity, and every operation derives the controller from that proven principal, never from a caller-supplied argument -- the new agent's controller edge on the mint paths, and the own-agents constraint on suspend/resume/delegate/undelegate. The substrate enforces that only a human record controls agents, so an agent session cannot mint or manage agents (`docs/identity.md` Agent identities).
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 
