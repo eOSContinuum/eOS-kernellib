@@ -944,32 +944,64 @@ private void _emit(object user, string msg)
 }
 
 /*
- * one record, formatted for the operator
+ * one record, formatted for the operator. Reading an agent record
+ * reconciles its delegations first (the delegation-read half of the
+ * bypass heal), so what is shown is what live state supports.
  */
 private string show_identity(string uuid)
 {
     object identity;
-    string *ids, *grants, text;
-    mapping row;
+    string *ids, *grants, *sources, *agents, text, grantor;
+    mapping row, byCap;
     int i;
 
     identity = identities[uuid];
     if (!identity) {
 	return "identity: no such identity\n";
     }
-    ids = identity->query_credential_ids();
     text = "identity: principal " + identity->query_principal() + "\n" +
-	   "identity: credentials: " + (string) sizeof(ids) + "\n";
+	   "identity: kind " + identity->query_kind() + "\n";
+    if (identity->query_kind() == ID_KIND_AGENT) {
+	reconcile_delegations(uuid);
+	text += "identity: controller " + identity->query_controller() +
+		"\n" +
+		"identity: suspended " +
+		(identity->query_suspended() ? "yes" : "no") + "\n";
+    } else {
+	agents = query_agents(uuid);
+	if (sizeof(agents) != 0) {
+	    text += "identity: agents: " + (string) sizeof(agents) + "\n";
+	    for (i = 0; i < sizeof(agents); i++) {
+		text += "identity:   agent " + agents[i] + "\n";
+	    }
+	}
+    }
+    ids = identity->query_credential_ids();
+    text += "identity: credentials: " + (string) sizeof(ids) + "\n";
     for (i = 0; i < sizeof(ids); i++) {
 	row = identity->query_credential(ids[i]);
-	text += "identity:   " + ids[i] + " " + row[CRED_TYPE] +
-		((row[CRED_TYPE] == CRED_TYPE_PASSKEY) ?
-		  " signCount " + (string) row[CRED_SIGNCOUNT] : "") + "\n";
+	text += "identity:   " + ids[i] + " " + row[CRED_TYPE];
+	switch (row[CRED_TYPE]) {
+	case CRED_TYPE_PASSKEY:
+	    text += " signCount " + (string) row[CRED_SIGNCOUNT];
+	    break;
+
+	case CRED_TYPE_AGENT_TOKEN:
+	    text += " expires " + (string) row[CRED_EXPIRES];
+	    break;
+	}
+	text += "\n";
     }
     grants = query_grants(uuid);
+    byCap = query_delegations(uuid);
     text += "identity: capabilities: " + (string) sizeof(grants) + "\n";
     for (i = 0; i < sizeof(grants); i++) {
-	text += "identity:   grant " + grants[i] + "\n";
+	sources = query_grant_sources(uuid, grants[i]);
+	grantor = byCap[grants[i]];
+	text += "identity:   grant " + grants[i] +
+		((sizeof(sources) != 0) ?
+		  " (" + implode(sources, ", ") + ")" : "") +
+		(grantor ? " by " + grantor : "") + "\n";
     }
     return text;
 }
@@ -987,6 +1019,16 @@ private string show_identity(string uuid)
  *		  identity revoke <uuid> <id>     -- remove a credential
  *		  identity grant <uuid> <cap>     -- grant a platform capability
  *		  identity ungrant <uuid> <cap>   -- revoke a platform capability
+ *		  identity mint-agent <controller> token [ttl]
+ *		                                  -- new agent, fresh token
+ *		  identity mint-agent <controller> key <id> <scheme> <b64url>
+ *		                                  -- new agent, supplied key
+ *		  identity suspend <uuid>         -- suspend an agent
+ *		  identity resume <uuid>          -- resume an agent
+ *		  identity delegate <controller> <agent> <cap>
+ *		                                  -- delegate a held capability
+ *		  identity undelegate <controller> <agent> <cap>
+ *		                                  -- withdraw a delegation
  */
 void cmd_identity(object user, string cmd, string str)
 {
@@ -1098,11 +1140,98 @@ void cmd_identity(object user, string cmd, string str)
 			: "identity: ungranted " + parts[2] + "\n");
 	return;
 
+    case "mint-agent":
+	if (sizeof(parts) >= 3 && parts[2] == "token" &&
+	    (sizeof(parts) == 3 ||
+	     (sizeof(parts) == 4 && sscanf(parts[3], "%d", i) == 1))) {
+	    err = catch(minted = mint_agent_with_token(parts[1],
+						       (sizeof(parts) == 4) ?
+							i : 0));
+	    if (err) {
+		_emit(user, err + "\n");
+		return;
+	    }
+	    _emit(user, "identity: minted agent identity:" + minted[0] +
+			"\n" +
+			"identity: token " + minted[1] + "\n" +
+			"identity: present the token now; only its hash is " +
+			"kept\n");
+	    return;
+	}
+	if (sizeof(parts) == 6 && parts[2] == "key") {
+	    string uuid, key;
+
+	    err = catch(key = base64::urlDecode(parts[5]));
+	    if (!err) {
+		err = catch(uuid = mint_agent(parts[1], parts[3],
+					      ([ CRED_TYPE :
+						   CRED_TYPE_AGENT_KEY,
+						 CRED_SCHEME : parts[4],
+						 CRED_KEY : key,
+						 CRED_CREATED : time() ])));
+	    }
+	    _emit(user, err ? err + "\n"
+			    : "identity: minted agent identity:" + uuid +
+			      "\n");
+	    return;
+	}
+	_emit(user, "usage: " + cmd + " mint-agent <controller> token " +
+		    "[ttl] | mint-agent <controller> key <id> <scheme> " +
+		    "<b64url-key>\n");
+	return;
+
+    case "suspend":
+	if (sizeof(parts) != 2) {
+	    _emit(user, "usage: " + cmd + " suspend <uuid>\n");
+	    return;
+	}
+	err = catch(i = suspend_agent(parts[1]));
+	_emit(user, err ? err + "\n"
+			: "identity: suspended; sessions revoked: " +
+			  (string) i + "\n");
+	return;
+
+    case "resume":
+	if (sizeof(parts) != 2) {
+	    _emit(user, "usage: " + cmd + " resume <uuid>\n");
+	    return;
+	}
+	err = catch(resume_agent(parts[1]));
+	_emit(user, err ? err + "\n" : "identity: resumed\n");
+	return;
+
+    case "delegate":
+	if (sizeof(parts) != 4) {
+	    _emit(user, "usage: " + cmd +
+			" delegate <controller> <agent> <capability>\n");
+	    return;
+	}
+	err = catch(delegate_capability(parts[1], parts[2], parts[3]));
+	_emit(user, err ? err + "\n"
+			: "identity: delegated " + parts[3] + "\n");
+	return;
+
+    case "undelegate":
+	if (sizeof(parts) != 4) {
+	    _emit(user, "usage: " + cmd +
+			" undelegate <controller> <agent> <capability>\n");
+	    return;
+	}
+	err = catch(undelegate_capability(parts[1], parts[2], parts[3]));
+	_emit(user, err ? err + "\n"
+			: "identity: undelegated " + parts[3] + "\n");
+	return;
+
     default:
 	_emit(user, "usage: " + cmd + " [mint <n> | show <uuid> | " +
 		    "rotate-codes <uuid> <n> | redeem <uuid> <code> | " +
 		    "revoke <uuid> <id> | grant <uuid> <capability> | " +
-		    "ungrant <uuid> <capability>]\n");
+		    "ungrant <uuid> <capability> | " +
+		    "mint-agent <controller> token [ttl] | " +
+		    "mint-agent <controller> key <id> <scheme> <b64url> | " +
+		    "suspend <uuid> | resume <uuid> | " +
+		    "delegate <controller> <agent> <capability> | " +
+		    "undelegate <controller> <agent> <capability>]\n");
 	return;
     }
 }
