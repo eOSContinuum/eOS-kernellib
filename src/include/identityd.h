@@ -8,7 +8,12 @@
  * is the form capabilityd principals take when a platform capability is
  * granted to an authenticated identity. Credential rows are mappings
  * over the CRED_* keys below; the row types are passkeys (public key
- * material, WebAuthn bookkeeping) and hashed single-use recovery codes.
+ * material, WebAuthn bookkeeping) and hashed single-use recovery codes
+ * on human records, and agent keys (public key material) and hashed
+ * expiring agent tokens on agent records. A record's kind (ID_KIND_*)
+ * separates the two: an agent record carries an immutable controller
+ * edge naming the human identity accountable for it, and only agent
+ * records can be suspended.
  */
 
 # define IDENTITYD	"/usr/System/sys/identityd"
@@ -24,10 +29,29 @@
 # define CRED_SIGNCOUNT		"signCount"	/* authenticator counter */
 # define CRED_TRANSPORTS	"transports"	/* string array, optional */
 # define CRED_FLAGS		"flags"		/* authData flags (int) */
-# define CRED_HASH		"hash"		/* recovery-code hash (hex) */
+# define CRED_HASH		"hash"		/* recovery-code / agent-token
+						   hash (hex) */
 # define CRED_CREATED		"created"	/* row creation time() */
 # define CRED_LASTUSED		"lastUsed"	/* last successful use */
+# define CRED_EXPIRES		"expires"	/* expiry time(); required on
+						   agent-token rows */
 
 /* credential row types */
 # define CRED_TYPE_PASSKEY	"passkey"
 # define CRED_TYPE_RECOVERY	"recovery-code"
+# define CRED_TYPE_AGENT_KEY	"agent-key"
+# define CRED_TYPE_AGENT_TOKEN	"agent-token"
+
+/* record kinds; a nil kind on a stored record reads as human */
+# define ID_KIND_HUMAN		"human"
+# define ID_KIND_AGENT		"agent"
+
+/* agent-token expiry policy: expiry is required; a bind may set any
+   ttl up to the cap, and a non-positive ttl takes the default */
+# define AGENT_TOKEN_TTL	2592000		/* 30 days */
+# define AGENT_TOKEN_MAX_TTL	7776000		/* 90 days */
+
+/* capability-grant bookkeeping sources (identityd tracks why a grant
+   exists so revocation removes the store entry only with its last
+   source) */
+# define GRANT_SOURCE_OPERATOR	"operator"
