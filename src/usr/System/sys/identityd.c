@@ -13,7 +13,18 @@
  *     violating compound rolls back whole;
  *   - recovery codes are stored hashed, single-use, and are generated
  *     here (never imported), so plaintext codes exist only in the
- *     minting response.
+ *     minting response;
+ *   - agent records carry an immutable controller edge that must name
+ *     a human record, so control never chains (an agent cannot control
+ *     an agent) and every agent action is attributable to a human;
+ *   - agent credential rows bind only to agent records and human rows
+ *     only to human records, checked at the single bind choke point;
+ *   - agent tokens follow the recovery-code secret discipline (stored
+ *     hashed, generated here, plaintext only in the minting response)
+ *     plus a required expiry;
+ *   - a capability grant on an identity is source-tracked here, so a
+ *     revocation drops the capabilityd entry only when the last reason
+ *     for the grant is gone.
  *
  * Randomness and hashing come from the host crypto module
  * (secure_random, SHA256); without the module the daemon boots, reports
@@ -40,12 +51,16 @@ private inherit hex "/lib/util/hex";
 
 private mapping identities;		/* uuid : identity object */
 private mapping credentialIndex;	/* credential id : uuid */
+private mapping controllerIndex;	/* controller uuid : agent uuid set */
+private mapping grantSources;		/* uuid : capability : source set */
 
 static void create()
 {
     ::create();
     identities = ([ ]);
     credentialIndex = ([ ]);
+    controllerIndex = ([ ]);
+    grantSources = ([ ]);
     compile_object(OBJ_IDENTITY);
     sysLog("identity: registry up; crypto module " +
 # ifdef KF_SECURE_RANDOM
@@ -136,6 +151,43 @@ private mapping code_row(string hash)
 }
 
 /*
+ * agent tokens follow the recovery-code secret discipline (generated
+ * here, stored hashed, plaintext only in the minting response) plus a
+ * required expiry; the credential id is derived from the hash
+ */
+private string generate_token()
+{
+# ifdef KF_SECURE_RANDOM
+    return base64::urlEncode(secure_random(32));
+# else
+    error("identity: crypto module not loaded");
+# endif
+}
+
+private string token_id(string hash)
+{
+    return "at:" + hash[.. 11];
+}
+
+private int token_expiry(int ttl)
+{
+    if (ttl <= 0) {
+	ttl = AGENT_TOKEN_TTL;
+    } else if (ttl > AGENT_TOKEN_MAX_TTL) {
+	ttl = AGENT_TOKEN_MAX_TTL;
+    }
+    return time() + ttl;
+}
+
+private mapping token_row(string hash, int expires)
+{
+    return ([ CRED_TYPE : CRED_TYPE_AGENT_TOKEN,
+	      CRED_HASH : hash,
+	      CRED_EXPIRES : expires,
+	      CRED_CREATED : time() ]);
+}
+
+/*
  * validate a caller-supplied credential row
  */
 private void validate_row(string id, mapping row)
@@ -157,19 +209,51 @@ private void validate_row(string id, mapping row)
 	}
 	break;
 
+    case CRED_TYPE_AGENT_KEY:
+	if (typeof(row[CRED_KEY]) != T_STRING ||
+	    typeof(row[CRED_SCHEME]) != T_STRING) {
+	    error("identity: agent key row lacks key material");
+	}
+	break;
+
+    case CRED_TYPE_AGENT_TOKEN:
+	if (typeof(row[CRED_HASH]) != T_STRING ||
+	    typeof(row[CRED_EXPIRES]) != T_INT ||
+	    row[CRED_EXPIRES] <= 0) {
+	    error("identity: agent token row lacks hash or expiry");
+	}
+	break;
+
     default:
 	error("identity: unknown credential type");
     }
 }
 
 /*
+ * the row-kind discipline: agent rows bind only to agent records,
+ * human rows (passkeys, recovery codes) only to human records
+ */
+private int agent_row(mapping row)
+{
+    return row[CRED_TYPE] == CRED_TYPE_AGENT_KEY ||
+	   row[CRED_TYPE] == CRED_TYPE_AGENT_TOKEN;
+}
+
+/*
  * bind a row on a record and in the global index; the credential id
- * must be globally unused
+ * must be globally unused and the row type must match the record kind
  */
 private void bind_row(object identity, string uuid, string id, mapping row)
 {
     if (credentialIndex[id]) {
 	error("identity: credential already bound");
+    }
+    if (agent_row(row)) {
+	if (identity->query_kind() != ID_KIND_AGENT) {
+	    error("identity: agent credential on a non-agent record");
+	}
+    } else if (identity->query_kind() != ID_KIND_HUMAN) {
+	error("identity: human credential on an agent record");
     }
     identity->add_credential(id, row);
     credentialIndex[id] = uuid;
@@ -367,6 +451,119 @@ atomic void redeem_and_replace(string uuid, string code, string newId,
 }
 
 /*
+ * agent minting: an agent record is an ordinary identity plus kind
+ * agent and an immutable controller edge that must name an existing
+ * human record -- control never chains, so delegation depth is bounded
+ * by the record shape
+ */
+private object new_agent(string controllerUuid, string uuid)
+{
+    object controller, identity;
+
+    controller = need_identity(controllerUuid);
+    if (controller->query_kind() != ID_KIND_HUMAN) {
+	error("identity: an agent's controller must be a human identity");
+    }
+    identity = clone_object(OBJ_IDENTITY);
+    identity->configure(uuid, controllerUuid);
+    identities[uuid] = identity;
+    if (!controllerIndex) {
+	controllerIndex = ([ ]);
+    }
+    if (!controllerIndex[controllerUuid]) {
+	controllerIndex[controllerUuid] = ([ ]);
+    }
+    controllerIndex[controllerUuid][uuid] = 1;
+    return identity;
+}
+
+/*
+ * mint an agent with a caller-supplied agent-key credential (public
+ * key material only; the private key never reaches the platform)
+ */
+atomic string mint_agent(string controllerUuid, string credentialId,
+			 mapping row)
+{
+    object identity;
+    string uuid;
+
+    check_system(previous_program());
+    validate_row(credentialId, row);
+    if (!agent_row(row)) {
+	error("identity: an agent needs an agent credential");
+    }
+    uuid = generate_uuid();
+    identity = new_agent(controllerUuid, uuid);
+    bind_row(identity, uuid, credentialId, row);
+    return uuid;
+}
+
+/*
+ * mint an agent whose first credential is a fresh agent token; returns
+ * ({ uuid, token }) -- the only time the plaintext exists
+ */
+atomic string *mint_agent_with_token(string controllerUuid, varargs int ttl)
+{
+    object identity;
+    string uuid, token, hash;
+
+    check_system(previous_program());
+    uuid = generate_uuid();
+    identity = new_agent(controllerUuid, uuid);
+    token = generate_token();
+    hash = code_hash(token);
+    bind_row(identity, uuid, token_id(hash),
+	     token_row(hash, token_expiry(ttl)));
+    return ({ uuid, token });
+}
+
+/*
+ * bind a fresh agent token to an existing agent record; returns
+ * ({ credential id, token })
+ */
+atomic string *bind_agent_token(string uuid, varargs int ttl)
+{
+    object identity;
+    string token, hash;
+
+    check_system(previous_program());
+    identity = need_identity(uuid);
+    if (identity->query_kind() != ID_KIND_AGENT) {
+	error("identity: agent tokens bind to agent records");
+    }
+    token = generate_token();
+    hash = code_hash(token);
+    bind_row(identity, uuid, token_id(hash),
+	     token_row(hash, token_expiry(ttl)));
+    return ({ token_id(hash), token });
+}
+
+/*
+ * suspend an agent: authentication refuses at ceremony time and every
+ * live session dies now. The record and its audit trail persist.
+ * Returns the count of sessions revoked.
+ */
+atomic int suspend_agent(string uuid)
+{
+    object identity;
+
+    check_system(previous_program());
+    identity = need_identity(uuid);
+    identity->set_suspended(TRUE);
+    return SESSIOND->revoke_principal(identity->query_principal());
+}
+
+/*
+ * resume restores the ability to authenticate only; anything revoked
+ * at suspension is re-established deliberately, never automatically
+ */
+void resume_agent(string uuid)
+{
+    check_system(previous_program());
+    need_identity(uuid)->set_suspended(FALSE);
+}
+
+/*
  * WebAuthn bookkeeping on a bound passkey
  */
 void update_sign_count(string uuid, string credentialId, int count)
@@ -404,6 +601,18 @@ int query_identity_count()
     return map_sizeof(identities);
 }
 
+/*
+ * the agents a controller's uuid controls
+ */
+string *query_agents(string controllerUuid)
+{
+    mapping set;
+
+    check_system(previous_program());
+    set = controllerIndex ? controllerIndex[controllerUuid] : nil;
+    return set ? map_indices(set) : ({ });
+}
+
 
 /*
  * capability binding: the operator grant path for platform capabilities
@@ -414,8 +623,62 @@ int query_identity_count()
  * The identity's principal string is derived here from its uuid, never
  * caller-supplied, so an operator grants to "the identity", not to an
  * arbitrary principal.
+ *
+ * Grants are source-tracked: capabilityd's store entry is one bit, but
+ * two reasons for it can coexist (an operator grant and, on an agent, a
+ * controller's delegation of the same capability). Each grant path
+ * records its source and a revocation drops the store entry only when
+ * the last source dies -- otherwise revoking one path would silently
+ * destroy the other's grant, or destroy nothing.
  */
-void grant_capability(string uuid, string capability)
+private void add_grant_source(string uuid, string capability, string source)
+{
+    if (!grantSources) {
+	grantSources = ([ ]);
+    }
+    if (!grantSources[uuid]) {
+	grantSources[uuid] = ([ ]);
+    }
+    if (!grantSources[uuid][capability]) {
+	grantSources[uuid][capability] = ([ ]);
+    }
+    grantSources[uuid][capability][source] = 1;
+}
+
+/*
+ * drop one source; TRUE iff no source remains for (uuid, capability),
+ * including the pre-tracking case where no source was ever recorded
+ */
+private int drop_grant_source(string uuid, string capability, string source)
+{
+    mapping byCap, set;
+
+    if (!grantSources || !(byCap = grantSources[uuid]) ||
+	!(set = byCap[capability])) {
+	return TRUE;
+    }
+    set[source] = nil;
+    if (map_sizeof(set) == 0) {
+	byCap[capability] = nil;
+	if (map_sizeof(byCap) == 0) {
+	    grantSources[uuid] = nil;
+	}
+	return TRUE;
+    }
+    return FALSE;
+}
+
+string *query_grant_sources(string uuid, string capability)
+{
+    mapping byCap, set;
+
+    check_system(previous_program());
+    set = (grantSources && (byCap = grantSources[uuid])) ?
+	   byCap[capability] : nil;
+    return set ? map_indices(set) : ({ });
+}
+
+atomic void grant_capability(string uuid, string capability)
 {
     object identity;
 
@@ -426,16 +689,19 @@ void grant_capability(string uuid, string capability)
     identity = need_identity(uuid);
     ADMIN_CONSOLE_REGISTRY->verb_grant_capability(capability,
 						  identity->query_principal());
+    add_grant_source(uuid, capability, GRANT_SOURCE_OPERATOR);
 }
 
-void revoke_capability(string uuid, string capability)
+atomic void revoke_capability(string uuid, string capability)
 {
     object identity;
 
     check_system(previous_program());
     identity = need_identity(uuid);
-    ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
-						   identity->query_principal());
+    if (drop_grant_source(uuid, capability, GRANT_SOURCE_OPERATOR)) {
+	ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
+						       identity->query_principal());
+    }
 }
 
 /*

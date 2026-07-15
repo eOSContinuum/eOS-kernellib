@@ -1,8 +1,10 @@
 /*
  * One platform identity: the shared substrate record every application
  * consumes. Carries the fixed uuid, the principal string derived from
- * it, and the typed credential rows (passkeys, hashed recovery codes)
- * bound to it.
+ * it, the record kind (human, or agent with an immutable controller
+ * edge naming the human identity accountable for it), and the typed
+ * credential rows (passkeys, hashed recovery codes, agent keys, hashed
+ * agent tokens) bound to it.
  *
  * All mutation goes through identityd: the daemon owns the cross-record
  * credential index and the never-zero-credentials invariant (validated
@@ -18,6 +20,10 @@
 private string uuid;		/* fixed at configure() */
 private mapping credentials;	/* credential id : row mapping */
 private int created;		/* record creation time */
+private string kind;		/* ID_KIND_*; nil reads human */
+private string controller;	/* controlling identity's uuid; agents only,
+				   fixed at configure() */
+private int suspended;		/* agents only; blocks authentication */
 
 static void create()
 {
@@ -38,9 +44,12 @@ private void check_daemon(string caller)
 }
 
 /*
- * fix the uuid; called once by identityd at creation
+ * fix the uuid; called once by identityd at creation. An agent record
+ * is configured with its controller's uuid, which never changes -- a
+ * record with no controller is a human record (kind nil reads human,
+ * so pre-existing records in live statedumps need no migration).
  */
-void configure(string id)
+void configure(string id, varargs string agentController)
 {
     check_daemon(previous_program());
     if (uuid) {
@@ -48,6 +57,24 @@ void configure(string id)
     }
     uuid = id;
     created = time();
+    if (agentController) {
+	kind = ID_KIND_AGENT;
+	controller = agentController;
+    }
+}
+
+/*
+ * set or clear the suspended flag; agent records only (humans keep the
+ * no-suspend, no-delete posture). identityd polices the side effects
+ * (session revocation).
+ */
+void set_suspended(int flag)
+{
+    check_daemon(previous_program());
+    if (kind != ID_KIND_AGENT) {
+	error("identity: only agent records suspend");
+    }
+    suspended = flag;
 }
 
 /*
@@ -113,6 +140,24 @@ int query_created()
 {
     check_system(previous_program());
     return created;
+}
+
+string query_kind()
+{
+    check_system(previous_program());
+    return kind ? kind : ID_KIND_HUMAN;
+}
+
+string query_controller()
+{
+    check_system(previous_program());
+    return controller;
+}
+
+int query_suspended()
+{
+    check_system(previous_program());
+    return suspended;
 }
 
 string *query_credential_ids()

@@ -1,0 +1,39 @@
+# agent identity records -- substrate-tier gating regression for the
+# agent extension of the identity registry. The new identityd agent
+# operations are System-tier API like the rest of the registry surface,
+# so a console caller (compiled as /usr/<owner>/_code, outside the
+# System tier) is refused at every entry, and the record object refuses
+# non-daemon mutation of the agent fields. Driveable on the module-less
+# base boot: each gate refuses before any crypto-backed path runs.
+# The active agent lifecycle (minting, ceremonies, suspension) is
+# exercised through the agent operator verbs and agent-smoke.sh.
+
+cmd: code "/usr/System/sys/identityd"->mint_agent("nobody", "cred", ([ ]))
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->mint_agent_with_token("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->bind_agent_token("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->suspend_agent("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->resume_agent("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->query_agents("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->query_grant_sources("nobody", "cap")
+expect: Error: Access denied
+
+# the record master is not even call_other-reachable from the console
+# (the daemon-only gate on set_suspended sits behind this outer block)
+cmd: code "/usr/System/obj/identity"->set_suspended(1)
+expect: Error: Illegal use of call_other
+
+# the refusals left nothing behind
+cmd: identity
+expect: identity: identities: 0
