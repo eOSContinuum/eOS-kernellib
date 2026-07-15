@@ -1,0 +1,143 @@
+# agent delegation -- the delegable registry, controller-to-agent
+# delegation, source-tracked eager revocation cascade, and suspension
+# semantics, driven end-to-end on a module-bearing boot:
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/agent-delegation.verbset
+#
+# Demonstrates: no capability is delegable until an operator flips it;
+# delegation requires the delegator's live hold, the delegable flag,
+# and an unsuspended own agent; an operator grant and a delegation of
+# the same capability coexist as separate sources (revoking one never
+# destroys the other; the store entry dies only with its last source);
+# revoking the controller's own grant cascades to the delegated copies
+# in the same atomic operation; suspension revokes delegated grants and
+# live sessions; resume restores authentication only.
+
+# a controller with a session, an agent, and an agent session
+cmd: identity mint 1
+expect: minted identity:[0-9a-f-]+
+capture: controller minted identity:([0-9a-f-]+) with
+
+cmd: session mint identity:%{controller}
+expect: session: token [A-Za-z0-9_-]+
+capture: csession session: token ([A-Za-z0-9_-]+)
+
+cmd: code "/usr/System/sys/authd"->mint_agent_with_token("%{csession}")
+expect: "[0-9a-f-]+", "[A-Za-z0-9_-]+"
+capture: agent "([0-9a-f-]+)"
+capture: atoken "[0-9a-f-]+", "([A-Za-z0-9_-]+)"
+
+cmd: code "/usr/System/sys/authd"->authenticate_agent_token("%{atoken}")
+expect: "identity:%{agent}", "[A-Za-z0-9_-]+"
+capture: asession "identity:[0-9a-f-]+", "([A-Za-z0-9_-]+)"
+
+# the controller holds the capability; the agent does not
+cmd: identity grant %{controller} platform.demo
+expect: identity: granted platform.demo
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 0
+
+# not delegable until an operator flips it
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: Error: identity: platform.demo is not delegable
+
+cmd: capability delegable platform.demo on
+expect: capability: platform.demo delegable on
+
+cmd: capability
+expect: platform.demo principals 1 delegable
+
+# delegation requires the delegator's own live hold
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.other")
+expect: Error: identity: delegator does not hold platform.other
+
+# an agent session cannot delegate (no agent of an agent)
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{asession}", "%{agent}", "platform.demo")
+expect: Error: identity: no such agent of this controller
+
+# the delegation lands and the choke-point answers true for the agent
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: \$\d+ = nil
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 1
+
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: Error: identity: already delegated
+
+# coexisting sources: an operator grant of the same capability, then
+# undelegate -- the store entry survives on the operator source
+cmd: identity grant %{agent} platform.demo
+expect: identity: granted platform.demo
+
+cmd: code "/usr/System/sys/authd"->undelegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: \$\d+ = nil
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 1
+
+# re-delegate, drop the operator source -- the entry survives on the
+# delegation
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: \$\d+ = nil
+
+cmd: identity ungrant %{agent} platform.demo
+expect: identity: ungranted platform.demo
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 1
+
+# the eager cascade: revoking the controller's own grant kills the
+# delegated copy in the same operation
+cmd: identity ungrant %{controller} platform.demo
+expect: identity: ungranted platform.demo
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 0
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{controller}")
+expect: \$\d+ = 0
+
+# suspension revokes delegated grants and live sessions; resume
+# restores authentication only, never the delegations
+cmd: identity grant %{controller} platform.demo
+expect: identity: granted platform.demo
+
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: \$\d+ = nil
+
+cmd: code "/usr/System/sys/authd"->suspend_agent("%{csession}", "%{agent}")
+expect: \$\d+ = \d+
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 0
+
+cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")
+expect: Error: identity: agent suspended
+
+cmd: code "/usr/System/sys/authd"->resume_agent("%{csession}", "%{agent}")
+expect: \$\d+ = nil
+
+cmd: code "/usr/System/sys/authd"->authenticate_agent_token("%{atoken}")
+expect: "identity:%{agent}", "[A-Za-z0-9_-]+"
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("platform.demo", "identity:%{agent}")
+expect: \$\d+ = 0
+
+# the delegation bookkeeping is System-tier API; the delegable flag's
+# kernel mutation stays KERNEL()-gated
+cmd: code "/usr/System/sys/identityd"->delegate_capability("a", "b", "c")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->undelegate_capability("a", "b", "c")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->query_delegations("nobody")
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/identityd"->reconcile_delegations("nobody")
+expect: Error: Access denied
+
+cmd: code "/kernel/sys/capabilityd"->set_delegable("platform.demo", 0)
+expect: Error: capabilityd: set_delegable not callable from outside /kernel

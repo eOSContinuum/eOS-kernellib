@@ -66,3 +66,4 @@
    exists so revocation removes the store entry only with its last
    source) */
 # define GRANT_SOURCE_OPERATOR	"operator"
+# define GRANT_SOURCE_DELEGATED	"delegated"
