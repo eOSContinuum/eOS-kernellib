@@ -1,0 +1,98 @@
+# agent operator verbs -- the console face of the agent identity
+# substrate, driven on a module-bearing boot:
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/agent-console.verbset
+#
+# Demonstrates: operator agent minting (token and supplied-key), the
+# identity show extensions (kind, controller, suspended, an agent
+# roster on the controller, token expiry, delegation sources and
+# grantor), suspend/resume, operator-driven delegation with the same
+# live-state checks as the self-service path, and structural
+# non-transitivity at the verb face (an agent cannot control agents).
+
+cmd: identity mint 1
+expect: minted identity:[0-9a-f-]+
+capture: controller minted identity:([0-9a-f-]+) with
+
+# operator token mint; an over-cap ttl is clamped, expiry always shows
+cmd: identity mint-agent %{controller} token 99999999
+expect: minted agent identity:[0-9a-f-]+
+expect: identity: token [A-Za-z0-9_-]+
+capture: agent minted agent identity:([0-9a-f-]+)
+
+cmd: identity show %{agent}
+expect: identity: kind agent
+expect: identity: controller %{controller}
+expect: identity: suspended no
+expect: agent-token expires \d+
+
+# the controller record shows its roster
+cmd: identity show %{controller}
+expect: identity: kind human
+expect: identity: agents: 1
+expect: identity:   agent %{agent}
+
+# operator key mint (raw public key supplied base64url)
+cmd: identity mint-agent %{controller} key ak-console-1 Ed25519 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+expect: minted agent identity:[0-9a-f-]+
+
+cmd: identity show %{controller}
+expect: identity: agents: 2
+
+# an agent cannot control agents, even from the operator face
+cmd: identity mint-agent %{agent} token
+expect: identity: an agent's controller must be a human identity
+
+cmd: identity mint-agent not-a-uuid token
+expect: identity: no such identity
+
+# suspend / resume from the operator face
+cmd: identity suspend %{agent}
+expect: identity: suspended; sessions revoked: 0
+
+cmd: identity show %{agent}
+expect: identity: suspended yes
+
+cmd: identity resume %{agent}
+expect: identity: resumed
+
+cmd: identity show %{agent}
+expect: identity: suspended no
+
+# humans do not suspend
+cmd: identity suspend %{controller}
+expect: identity: only agent records suspend
+
+# operator-driven delegation: same live-state checks as self-service
+cmd: identity grant %{controller} platform.console
+expect: identity: granted platform.console
+
+cmd: identity delegate %{controller} %{agent} platform.console
+expect: identity: platform.console is not delegable
+
+cmd: capability delegable platform.console on
+expect: capability: platform.console delegable on
+
+cmd: identity delegate %{controller} %{agent} platform.console
+expect: identity: delegated platform.console
+
+# show surfaces the source and the grantor
+cmd: identity show %{agent}
+expect: grant platform.console \(delegated\) by %{controller}
+
+cmd: identity undelegate %{controller} %{agent} platform.console
+expect: identity: undelegated platform.console
+
+cmd: identity show %{agent}
+expect: identity: capabilities: 0
+
+# a wrong controller cannot delegate to another's agent
+cmd: identity mint 1
+expect: minted identity:[0-9a-f-]+
+capture: stranger minted identity:([0-9a-f-]+) with
+
+cmd: identity grant %{stranger} platform.console
+expect: identity: granted platform.console
+
+cmd: identity delegate %{stranger} %{agent} platform.console
+expect: identity: no such agent of this controller
