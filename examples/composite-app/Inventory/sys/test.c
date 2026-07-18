@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (19 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (27 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -38,6 +38,24 @@
  *   ADMIN-REFUSED OK             platform-capability gate: wipe
  *                                refused without the operator grant
  *   LOGOUT OK                    revoked session no longer validates
+ *   AGENT-MINT OK                a live identity session mints an
+ *                                agent; the response carries the
+ *                                token's only plaintext
+ *   AGENT-LIST OK                the controller's own-agents view
+ *                                shows the new agent, active
+ *   AGENT-LOGIN OK               the agent-token ceremony mints an
+ *                                agent session
+ *   AGENT-NOT-OWN-REFUSED OK     another identity cannot suspend it
+ *   AGENT-DELEGATE-REFUSED OK    delegation refused when the atomic
+ *                                substrate checks fail (capability
+ *                                not held, not flagged delegable)
+ *   AGENT-SUSPEND OK             suspension revokes the agent's live
+ *                                session, now
+ *   AGENT-SUSPENDED-REFUSED OK   a suspended agent's token ceremony
+ *                                refuses
+ *   AGENT-RESUME OK              resume restores the ability to
+ *                                authenticate: the ceremony works
+ *                                again
  *   PERSIST SETUP OK             restore probe armed, snapshot dumped
  *
  * Boot 2 (restore): the call_out armed before the dump fires and
@@ -53,7 +71,7 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=19 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=27 for the full set.
  */
 
 # include <type.h>
@@ -88,11 +106,20 @@ private inherit hex "/lib/util/hex";
 # define P_ADMIN_REFUSED	14
 # define P_LOGOUT		15
 # define P_LOGOUT_PROBE		16
+# define P_AGENT_MINT		17
+# define P_AGENT_LIST		18
+# define P_AGENT_LOGIN		19
+# define P_AGENT_NOT_OWN	20
+# define P_AGENT_DELEGATE_REF	21
+# define P_AGENT_SUSPEND	22
+# define P_AGENT_SUSPENDED	23
+# define P_AGENT_RESUME		24
+# define P_AGENT_RELOGIN	25
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	17
-# define P_PERSIST_SESSION	18
-# define P_PERSIST_OBSERVER	19
-# define P_PERSIST_HTTP		20	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	26
+# define P_PERSIST_SESSION	27
+# define P_PERSIST_OBSERVER	28
+# define P_PERSIST_HTTP		29	/* no-crypto restore probe */
 
 private int phase;		/* current phase */
 private int cryptoMode;		/* ceremony surface available */
@@ -105,6 +132,8 @@ private string principal1;	/* first identity */
 private string principalEd;	/* second identity */
 private int itemId;		/* the created item */
 private int auditCount;		/* audit entries at dump time */
+private string agentUuid;	/* the minted agent */
+private string agentToken;	/* its mint-time token (plaintext) */
 
 private void log_line(string msg);
 static void start_phase();
@@ -297,6 +326,45 @@ static void start_phase()
     case P_LOGOUT_PROBE:
 	http("PUT", "/inventory/items/" + itemId, bearer(token2),
 	     item_body("widget", 4));
+	break;
+
+    case P_AGENT_MINT:
+	http("POST", "/auth/agents", bearer(token1), nil);
+	break;
+
+    case P_AGENT_LIST:
+	http("GET", "/auth/agents", bearer(token1), nil);
+	break;
+
+    case P_AGENT_LOGIN:
+    case P_AGENT_SUSPENDED:
+    case P_AGENT_RELOGIN:
+	http("POST", "/auth/agent-login", nil,
+	     json::encode(([ "token" : agentToken ])));
+	break;
+
+    case P_AGENT_NOT_OWN:
+	/* the second identity is not the agent's controller */
+	http("POST", "/auth/agents/" + agentUuid + "/suspend",
+	     bearer(tokenEd), nil);
+	break;
+
+    case P_AGENT_DELEGATE_REF:
+	/* the controller does not hold the capability (ADMIN-REFUSED
+	 * proved that), so the atomic delegation checks refuse */
+	http("POST", "/auth/agents/" + agentUuid + "/delegate",
+	     bearer(token1),
+	     json::encode(([ "capability" : "example:inventory-admin" ])));
+	break;
+
+    case P_AGENT_SUSPEND:
+	http("POST", "/auth/agents/" + agentUuid + "/suspend",
+	     bearer(token1), nil);
+	break;
+
+    case P_AGENT_RESUME:
+	http("POST", "/auth/agents/" + agentUuid + "/resume",
+	     bearer(token1), nil);
 	break;
 
     case P_PERSIST_ITEMS:
@@ -533,6 +601,100 @@ void http_done(int code, string body)
 	    return;
 	}
 	pass("LOGOUT");
+	advance();
+	break;
+
+    case P_AGENT_MINT:
+	parsed = jbody(body);
+	if (code != 201 || typeof(parsed["uuid"]) != T_STRING ||
+	    typeof(parsed["token"]) != T_STRING) {
+	    stop("AGENT-MINT: " + code + " " + body);
+	    return;
+	}
+	agentUuid = parsed["uuid"];
+	agentToken = parsed["token"];
+	pass("AGENT-MINT");
+	advance();
+	break;
+
+    case P_AGENT_LIST:
+	parsed = jbody(body);
+	value = parsed["agents"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 1 || value[0]["uuid"] != agentUuid ||
+	    value[0]["suspended"] != 0) {
+	    stop("AGENT-LIST: " + code + " " + body);
+	    return;
+	}
+	pass("AGENT-LIST");
+	advance();
+	break;
+
+    case P_AGENT_LOGIN:
+	parsed = jbody(body);
+	if (code != 200 ||
+	    parsed["principal"] != "identity:" + agentUuid ||
+	    typeof(parsed["token"]) != T_STRING) {
+	    stop("AGENT-LOGIN: " + code + " " + body);
+	    return;
+	}
+	pass("AGENT-LOGIN");
+	advance();
+	break;
+
+    case P_AGENT_NOT_OWN:
+	if (code != 403) {
+	    stop("AGENT-NOT-OWN: expected 403, got " + code);
+	    return;
+	}
+	pass("AGENT-NOT-OWN-REFUSED");
+	advance();
+	break;
+
+    case P_AGENT_DELEGATE_REF:
+	if (code != 403) {
+	    stop("AGENT-DELEGATE: expected 403, got " + code);
+	    return;
+	}
+	pass("AGENT-DELEGATE-REFUSED");
+	advance();
+	break;
+
+    case P_AGENT_SUSPEND:
+	parsed = jbody(body);
+	if (code != 200 || parsed["revoked"] != 1) {
+	    stop("AGENT-SUSPEND: " + code + " " + body);
+	    return;
+	}
+	pass("AGENT-SUSPEND");
+	advance();
+	break;
+
+    case P_AGENT_SUSPENDED:
+	if (code != 401) {
+	    stop("AGENT-SUSPENDED: expected 401, got " + code);
+	    return;
+	}
+	pass("AGENT-SUSPENDED-REFUSED");
+	advance();
+	break;
+
+    case P_AGENT_RESUME:
+	if (code != 200) {
+	    stop("AGENT-RESUME: " + code + " " + body);
+	    return;
+	}
+	advance();	/* the sentinel lands after the ceremony probe */
+	break;
+
+    case P_AGENT_RELOGIN:
+	parsed = jbody(body);
+	if (code != 200 ||
+	    parsed["principal"] != "identity:" + agentUuid) {
+	    stop("AGENT-RESUME: relogin " + code + " " + body);
+	    return;
+	}
+	pass("AGENT-RESUME");
 	persist_setup();
 	break;
 

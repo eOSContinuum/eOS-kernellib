@@ -49,6 +49,13 @@ request becomes an authenticated principal -- is the companion doc
 | `POST /auth/register` | none | TOFU registration; mints identity + session |
 | `POST /auth/login` | none | assertion ceremony; mints a session |
 | `POST /auth/logout` | bearer | session revocation |
+| `POST /auth/agent-login` | none | agent-token ceremony; mints an agent session |
+| `GET /auth/agents` | bearer | the controller's own-agents view |
+| `POST /auth/agents` | bearer | mint an agent; the response carries the token's only plaintext |
+| `POST /auth/agents/<uuid>/suspend` | bearer | suspend an own agent; revokes its live sessions |
+| `POST /auth/agents/<uuid>/resume` | bearer | resume an own agent (restores authentication only) |
+| `POST /auth/agents/<uuid>/delegate` | bearer | delegate an own capability to an own agent |
+| `POST /auth/agents/<uuid>/undelegate` | bearer | withdraw the delegation |
 | `GET /inventory/items` | none | the persistent core, read side |
 | `POST /inventory/items` | bearer | authenticated mutation + audit observer |
 | `PUT /inventory/items/<id>` | bearer | application-tier authorization (creator only) |
@@ -73,10 +80,13 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=19 scripts/run-example.sh composite-app
+    EXPECTED_OK=27 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the sixteen wire-level phases and dumps a snapshot; boot 2
+Boot 1 runs the twenty-five wire-level phases -- including the agent
+lifecycle: mint, own-agents list, token ceremony, the not-own and
+not-delegable refusals, suspend-revokes-sessions, and
+resume-restores-authentication -- and dumps a snapshot; boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in
 `Inventory/sys/test.c` is the phase-by-phase map).
@@ -86,7 +96,8 @@ observer binding all survived (the sentinel comment block in
 `WWW/obj/tls_server.c` mounts the same registry behind the labeled
 `https` port, and `GET /demo` serves a page that drives the full flow
 -- register, login, authenticated create, audit read, capability-gate
-refusal -- with a real authenticator. The headless profile verifies the
+refusal, and the agent-management panel -- with a real authenticator.
+The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
 the other. To run the browser session:
 
@@ -111,3 +122,26 @@ needs the `webauthn` console verb first. The self-exiting test driver
 (sys/test.c) dumps and stops the boot after its phases run -- for an
 interactive session, remove `sys/test.c` from the deployed copy and its
 `compile_object` line from the deployed initd.
+
+### Agents from the browser
+
+Buttons 7-9 are authd's controller self-service, driven by the logged-in
+passkey session. Mint an agent (7): the response is the only time the
+token plaintext exists, and the page fills it into the agent-token field
+-- copy it now or lose it. List (8) shows each of your agents with its
+suspension state and delegated capabilities. Suspend/Resume and
+Delegate/Undelegate act on the uuid field (mint and list fill it);
+delegation refuses until an operator grants the controller the
+capability and flags it delegable on the console:
+
+```text
+identity grant <controller-uuid> example:inventory-admin
+capability delegable example:inventory-admin on
+```
+
+Agent login (9) trades the minted token for an agent session: the page's
+bearer session becomes the agent's, so an item create runs as the agent
+principal and lands in the audit trail under it, and the admin wipe (6)
+succeeds exactly when the delegation is in place. Passkey login (2)
+switches the page back to the controller; suspending the agent then
+revokes its sessions and refuses its ceremony until resume.
