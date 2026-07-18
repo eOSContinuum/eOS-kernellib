@@ -31,6 +31,15 @@
  *     about its own records; ceremony refusals below stay uniform.
  *   - /auth/agent-login runs the agent-token ceremony: the token is
  *     the proof, so there is no challenge round-trip.
+ *   - The event streams: GET /inventory/events (public, like the audit
+ *     read) and GET /auth/agents/stream?token=<session> subscribe the
+ *     connection with the SSE broker (sys/streamd) and return the
+ *     streaming sentinel the WWW servers act on. The agent stream
+ *     authenticates by token in the query string because EventSource
+ *     cannot set an Authorization header; the token is validated here
+ *     at subscribe time and re-validated by the broker's poll, and a
+ *     production surface would prefer a cookie-bound session to keep
+ *     tokens out of request logs.
  *
  * Wire format: JSON bodies; WebAuthn binary fields (clientDataJSON,
  * attestationObject, authenticatorData, signature) travel
@@ -53,6 +62,9 @@ private inherit base64 "/lib/util/base64";
 
 # define AUTHD		"/usr/System/sys/authd"
 # define INVENTORYD	"/usr/Inventory/sys/inventoryd"
+# define STREAMD	"/usr/Inventory/sys/streamd"
+
+# define STREAM_SENTINEL	({ 200, "OK", "text/event-stream", nil })
 
 private mapping pendingChallenges;	/* challenge : issue time */
 
@@ -239,6 +251,26 @@ private mixed *do_login(string body)
     }
     return respond(200, "OK",
 		   ([ "principal" : result[0], "token" : result[1] ]));
+}
+
+/*
+ * the event streams: subscribe the per-connection server clone (the
+ * caller of handle()) with the broker, then hand the server the
+ * streaming sentinel
+ */
+private mixed *do_audit_stream()
+{
+    STREAMD->subscribe_audit(previous_object());
+    return STREAM_SENTINEL;
+}
+
+private mixed *do_agent_stream(string token)
+{
+    if (!token || token == "" || !AUTHD->validate(token)) {
+	return fail(401, "Unauthorized", "live session token required");
+    }
+    STREAMD->subscribe_agents(previous_object(), token);
+    return STREAM_SENTINEL;
 }
 
 private mixed *do_agent_login(string body)
@@ -436,7 +468,7 @@ private mixed *do_audit()
  */
 mixed *handle(string method, string path, string body, string authorization)
 {
-    string principal, uuid;
+    string principal, uuid, streamToken;
     int id;
 
     /* the anonymous surfaces */
@@ -457,6 +489,14 @@ mixed *handle(string method, string path, string body, string authorization)
     }
     if (method == "POST" && path == "/auth/agent-login") {
 	return do_agent_login(body);
+    }
+    if (method == "GET" && path == "/inventory/events") {
+	return do_audit_stream();
+    }
+    if (method == "GET" &&
+	(path == "/auth/agents/stream" ||
+	 sscanf(path, "/auth/agents/stream?token=%s", streamToken) != 0)) {
+	return do_agent_stream(streamToken);
     }
     if (method == "GET" && path == "/inventory/items") {
 	return do_list_items();

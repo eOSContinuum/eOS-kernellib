@@ -25,8 +25,12 @@ Inventory/                the application domain
                           capability-gated wipe()
   sys/handler.c           routes, WebAuthn/session wire binding,
                           single-use challenge store
+  sys/streamd.c           SSE broker: observer-driven audit topic,
+                          poll-bridged agent-state topic
   obj/client.c            loopback HTTP/1 client (the client library's
                           first in-tree consumer)
+  obj/stream_client.c     loopback SSE client (first through the
+                          receive-side chunk surface)
   sys/test.c              boot-time driver: every phase over real TCP
   sys/vectors.h           foreign-generated WebAuthn vectors
                           (scripts/gen-webauthn-vectors.py output,
@@ -56,6 +60,8 @@ request becomes an authenticated principal -- is the companion doc
 | `POST /auth/agents/<uuid>/resume` | bearer | resume an own agent (restores authentication only) |
 | `POST /auth/agents/<uuid>/delegate` | bearer | delegate an own capability to an own agent |
 | `POST /auth/agents/<uuid>/undelegate` | bearer | withdraw the delegation |
+| `GET /inventory/events` | none | SSE stream: observer-driven audit events |
+| `GET /auth/agents/stream?token=<session>` | query token | SSE stream: own-agents snapshots on change |
 | `GET /inventory/items` | none | the persistent core, read side |
 | `POST /inventory/items` | bearer | authenticated mutation + audit observer |
 | `PUT /inventory/items/<id>` | bearer | application-tier authorization (creator only) |
@@ -80,13 +86,15 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=27 scripts/run-example.sh composite-app
+    EXPECTED_OK=32 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the twenty-five wire-level phases -- including the agent
-lifecycle: mint, own-agents list, token ceremony, the not-own and
-not-delegable refusals, suspend-revokes-sessions, and
-resume-restores-authentication -- and dumps a snapshot; boot 2
+Boot 1 runs the thirty wire-level phases -- the agent lifecycle
+(mint, own-agents list, token ceremony, the not-own and not-delegable
+refusals, suspend-revokes-sessions, resume-restores-authentication)
+and the event streams (open, observer-driven audit push, agent-state
+snapshot and change push, bad-token refusal) -- and dumps a snapshot;
+boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in
 `Inventory/sys/test.c` is the phase-by-phase map).
@@ -145,3 +153,12 @@ principal and lands in the audit trail under it, and the admin wipe (6)
 succeeds exactly when the delegation is in place. Passkey login (2)
 switches the page back to the controller; suspending the agent then
 revokes its sessions and refuses its ceremony until resume.
+
+Live updates (10) opens the server-sent-event streams: audit events
+arrive the moment a mutation commits (the observer routes them to the
+stream broker inside the atomic write), and the agent-state stream
+pushes an own-agents snapshot whenever it changes -- suspend or
+delegate in another tab and watch it arrive. The agent stream carries
+the session token in its URL because EventSource cannot set headers;
+that keeps the demo dependency-free, and a production deployment would
+prefer a cookie-bound session so tokens stay out of request logs.

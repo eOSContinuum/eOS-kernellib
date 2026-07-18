@@ -42,6 +42,9 @@ with foreign vectors, but with a <em>real authenticator</em>.</p>
   <input id="agenttoken" placeholder="agent token (from mint)" size="38">
   <button id="agentlogin">9. Agent login (the token is the proof)</button>
 </p>
+<p>
+  <button id="live">10. Live updates (SSE)</button>
+</p>
 <div id="log">ready.
 </div>
 <script>
@@ -200,6 +203,35 @@ document.getElementById('delegate').onclick = () =>
   agentOp('delegate', { capability: document.getElementById('cap').value.trim() });
 document.getElementById('undelegate').onclick = () =>
   agentOp('undelegate', { capability: document.getElementById('cap').value.trim() });
+
+let liveAudit = null, liveAgents = null;
+document.getElementById('live').onclick = () => {
+  if (liveAudit || liveAgents) {
+    if (liveAudit) liveAudit.close();
+    if (liveAgents) liveAgents.close();
+    liveAudit = liveAgents = null;
+    log('live updates OFF');
+    return;
+  }
+  liveAudit = new EventSource('/inventory/events');
+  liveAudit.addEventListener('audit', e => log('live audit: ' + e.data, 'ok'));
+  liveAudit.onerror = () => log('audit stream error/closed', 'err');
+  if (token) {
+    liveAgents = new EventSource('/auth/agents/stream?token=' +
+                                 encodeURIComponent(token));
+    liveAgents.addEventListener('agents',
+      e => log('live agents: ' + e.data, 'ok'));
+    liveAgents.addEventListener('closed', e => {
+      log('agent stream closed by server: ' + e.data, 'err');
+      liveAgents.close(); liveAgents = null;
+    });
+    liveAgents.onerror = () => log('agent stream error/closed', 'err');
+    log('live updates ON (audit + agents; suspend or delegate in ' +
+        'another tab to watch them arrive)');
+  } else {
+    log('live updates ON (audit only -- login first for the agent stream)');
+  }
+};
 
 document.getElementById('agentlogin').onclick = async () => {
   const t = document.getElementById('agenttoken').value.trim();
