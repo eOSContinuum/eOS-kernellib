@@ -88,6 +88,13 @@ a freshly minted session token), `validate`, `logout` -- and never
 mints a session for a principal a ceremony did not just prove.
 `sessiond->mint(principal)` stays out of tier-E reach by design:
 minting for an arbitrary principal string would be authority forgery.
+The agent surface extends the same rule: `authenticate_agent_token`
+mints only for the ceremony-proven agent principal, and the controller
+self-service entries (mint, the own-agents read, suspend/resume,
+delegate/undelegate) derive the controlling identity from a live
+session, never from the caller. The example binds them under
+`/auth/agents` and `/auth/agent-login`, and the demo page's agent
+panel drives them from the browser.
 
 **Challenge ownership is the application's.** webauthnd holds no
 challenge state (the caller that issued a challenge owns it --
@@ -151,9 +158,11 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 19 sentinels with the
+multi-deploy profile form) and runs the driver: 27 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
-with examples/webauthn-app), 5 in the transport-only subset without
+with examples/webauthn-app, plus the agent lifecycle -- mint,
+own-agents list, token ceremony, the ownership and delegability
+refusals, suspend and resume), 5 in the transport-only subset without
 it. Boot 2 restores the snapshot and re-drives the wire: items, a
 pre-restore session token, and the observer binding all survive. The
 sentinel comment block in `Inventory/sys/test.c` is the
