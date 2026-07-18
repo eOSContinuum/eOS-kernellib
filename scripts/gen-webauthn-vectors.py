@@ -39,6 +39,7 @@ BAD_RP_ID = "attacker.example"
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VECTORS_H = ROOT / "examples/webauthn-app/sys/vectors.h"
 VERBSET = ROOT / "scripts/verbsets/webauthn-ceremony.verbset"
+RECOVERY_VERBSET = ROOT / "scripts/verbsets/identity-recovery.verbset"
 
 
 def b64u(data: bytes) -> str:
@@ -174,6 +175,44 @@ ed_a_ad = auth_data(RP_ID, UP, 3)
 ed_a_cdj = client_data("webauthn.get", CH_A3, ORIGIN)
 ed_a_sig = ed_key.sign(ed_a_ad + hashlib.sha256(ed_a_cdj).digest())
 
+# --- ES256 credential #2: the recovery ceremony's replacement passkey ---
+
+es2_key = ec.generate_private_key(ec.SECP256R1())
+es2_nums = es2_key.public_key().public_numbers()
+es2_cose = {1: 2, 3: -7, -1: 1,
+            -2: es2_nums.x.to_bytes(32, "big"),
+            -3: es2_nums.y.to_bytes(32, "big")}
+es2_cred_id = bytes(range(0x50, 0x60))
+
+CH_REG3 = b64u(bytes(range(160, 192)))
+CH_A4 = b64u(bytes(range(192, 224)))
+
+reg3_ad = auth_data(RP_ID, UP | AT, 9,
+                    attested_credential(es2_cred_id, es2_cose))
+reg3_ao = attestation_object(reg3_ad)
+reg3_cdj = client_data("webauthn.create", CH_REG3, ORIGIN)
+
+a4_ad = auth_data(RP_ID, UP, 10)
+a4_cdj = client_data("webauthn.get", CH_A4, ORIGIN)
+a4_sig = es2_key.sign(a4_ad + hashlib.sha256(a4_cdj).digest(),
+                      ec.ECDSA(hashes.SHA256()))
+
+# --- ES256 credential #3: the operator console-bind vector ---
+
+es3_key = ec.generate_private_key(ec.SECP256R1())
+es3_nums = es3_key.public_key().public_numbers()
+es3_cose = {1: 2, 3: -7, -1: 1,
+            -2: es3_nums.x.to_bytes(32, "big"),
+            -3: es3_nums.y.to_bytes(32, "big")}
+es3_cred_id = bytes(range(0x60, 0x70))
+
+CH_REG4 = b64u(bytes(range(224, 256)))
+
+reg4_ad = auth_data(RP_ID, UP | AT, 11,
+                    attested_credential(es3_cred_id, es3_cose))
+reg4_ao = attestation_object(reg4_ad)
+reg4_cdj = client_data("webauthn.create", CH_REG4, ORIGIN)
+
 
 # --- emit the LPC fixture ---
 
@@ -202,6 +241,14 @@ defines = [
     ("WA_ED_CRED_ID", ed_cred_id, "x"),
     ("WA_ED_A_AD", ed_a_ad, "x"), ("WA_ED_A_CDJ", ed_a_cdj, "x"),
     ("WA_ED_A_SIG", ed_a_sig, "x"),
+    ("WA_CH_REG3", CH_REG3, "s"), ("WA_CH_A4", CH_A4, "s"),
+    ("WA_CH_REG4", CH_REG4, "s"),
+    ("WA_REG3_CDJ", reg3_cdj, "x"), ("WA_REG3_AO", reg3_ao, "x"),
+    ("WA_ES2_CRED_ID", es2_cred_id, "x"),
+    ("WA_A4_AD", a4_ad, "x"), ("WA_A4_CDJ", a4_cdj, "x"),
+    ("WA_A4_SIG", a4_sig, "x"),
+    ("WA_REG4_CDJ", reg4_cdj, "x"), ("WA_REG4_AO", reg4_ao, "x"),
+    ("WA_ES3_CRED_ID", es3_cred_id, "x"),
 ]
 
 lines = ["/*",
@@ -275,5 +322,61 @@ expect: passkey signCount 6
 """
 VERBSET.write_text(vs)
 
+# --- emit the identity-recovery console verbset ---
+
+rvs = f"""# identity recovery -- the operator half of the recovery doctrine on a
+# module-bearing boot (regenerate with scripts/gen-webauthn-vectors.py;
+# do not edit by hand):
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \\
+#       scripts/verbsets/identity-recovery.verbset
+# Covers: mint-with-codes, the console bind verb (operator-mediated
+# re-bind through the same ceremony verifier the wire uses), the
+# never-bare-re-bind refusal, single-use redemption, and the
+# last-credential redemption refusal.
+
+# point the ceremony daemon at the vectors' rp
+cmd: webauthn rpid {RP_ID}
+expect: webauthn: rpId {RP_ID}
+
+cmd: webauthn origin {ORIGIN}
+expect: webauthn: origin {ORIGIN}
+
+# a record minted with recovery codes only
+cmd: identity mint 2
+expect: identity: minted identity:[0-9a-f-]+ with 2 recovery codes
+capture: uuid minted identity:([0-9a-f-]+)
+capture: code1 identity: code 1: ([A-Za-z0-9_-]+)
+
+# operator-mediated re-bind: the console verifies the attestation
+# through the same ceremony entry the wire uses, then binds
+cmd: identity bind %{{uuid}} {CH_REG4} {b64u(reg4_cdj)} {b64u(reg4_ao)}
+expect: identity: bound passkey {b64u(es3_cred_id)} to identity:%{{uuid}}
+
+cmd: identity show %{{uuid}}
+expect: identity: credentials: 3
+
+# never bare re-bind: an already-bound credential refuses
+cmd: identity bind %{{uuid}} {CH_REG4} {b64u(reg4_cdj)} {b64u(reg4_ao)}
+expect: identity: credential already bound
+
+# redemption is single-use
+cmd: identity redeem %{{uuid}} %{{code1}}
+expect: identity: redeemed
+
+cmd: identity redeem %{{uuid}} %{{code1}}
+expect: identity: unknown recovery code
+
+# the last credential cannot be redeemed away
+cmd: identity mint 1
+expect: identity: minted identity:[0-9a-f-]+ with 1 recovery codes
+capture: uuid2 minted identity:([0-9a-f-]+)
+capture: lastcode identity: code 1: ([A-Za-z0-9_-]+)
+
+cmd: identity redeem %{{uuid2}} %{{lastcode}}
+expect: cannot redeem the last credential
+"""
+RECOVERY_VERBSET.write_text(rvs)
+
 print(f"wrote {VECTORS_H}")
 print(f"wrote {VERBSET}")
+print(f"wrote {RECOVERY_VERBSET}")
