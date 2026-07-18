@@ -32,6 +32,7 @@
 
 inherit "/usr/System/lib/auto";
 private inherit json "/lib/util/json";
+private inherit "/lib/util/lpc";	/* sysLog */
 
 private mixed *agent_rows(string sessionToken);
 
@@ -54,9 +55,24 @@ static void create()
     call_out("register_space", 0);
 }
 
+/*
+ * The audit observer's script calls stream::audit unconditionally, so
+ * an unregistered "stream" space would make every inventory mutation
+ * throw inside its atomic write. A registration failure is therefore
+ * loud (logged with the reason) and self-healing (retried), never
+ * silently swallowed.
+ */
 static void register_space()
 {
-    catch(MERRY_DAEMON->register_script_space("stream", this_object()));
+    string err;
+
+    err = catch(MERRY_DAEMON->register_script_space("stream",
+						    this_object()));
+    if (err != nil) {
+	sysLog("streamd: stream script-space registration failed (" +
+	       err + "); retrying");
+	call_out("register_space", 5);
+    }
 }
 
 /*
