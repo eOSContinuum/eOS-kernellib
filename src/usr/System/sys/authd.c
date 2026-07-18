@@ -221,6 +221,31 @@ void undelegate_capability(string sessionToken, string agentUuid,
 }
 
 /*
+ * the session identity's own agents, read-only: one row per agent,
+ * ({ uuid, suspended, delegated capabilities }). The controller is
+ * derived from the live session, so a caller can only ever see its
+ * own; the row carries record state, never credential material.
+ */
+mixed *query_agents(string sessionToken)
+{
+    string controllerUuid, *uuids;
+    mixed *rows;
+    object agent;
+    int i, sz;
+
+    controllerUuid = session_identity(sessionToken);
+    uuids = IDENTITYD->query_agents(controllerUuid);
+    sz = sizeof(uuids);
+    rows = allocate(sz);
+    for (i = 0; i < sz; i++) {
+	agent = IDENTITYD->find_identity(uuids[i]);
+	rows[i] = ({ uuids[i], agent->query_suspended(),
+		     map_indices(IDENTITYD->query_delegations(uuids[i])) });
+    }
+    return rows;
+}
+
+/*
  * the principal a live session token authenticates, or nil
  */
 string validate(string token)
