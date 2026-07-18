@@ -121,6 +121,35 @@ mixed *authenticate_agent_token(string agentToken, varargs int ttl)
 }
 
 /*
+ * the recovery ceremony: both proofs in one shot. The registration
+ * payload for the NEW passkey is verified without a mint, then the
+ * substrate redeems the recovery code and binds the verified
+ * credential as one atomic operation (valid even on the record's last
+ * credential), then a session is minted for the recovered principal.
+ * A wrong code binds nothing, a bad attestation redeems nothing, and
+ * there is no intermediate recovery state to hijack. Never-bare-
+ * re-bind holds: the only path onto an existing record still requires
+ * the account proof.
+ */
+mixed *recover_identity(string uuid, string code, string challenge,
+			string clientDataJSON, string attestationObject,
+			varargs int ttl)
+{
+    mapping row;
+    string credentialId, principal, token;
+
+    row = WEBAUTHND->verify_registration_payload(challenge, clientDataJSON,
+						 attestationObject);
+    credentialId = row["credentialId"];
+    row["credentialId"] = nil;
+    IDENTITYD->redeem_and_replace(uuid, code, credentialId, row);
+    principal = "identity:" + uuid;
+    token = SESSIOND->mint(principal, ttl);
+    return ({ principal, token });
+}
+
+
+/*
  * controller self-service: a live session proves the controlling
  * identity. The new agent's controller edge -- and the own-agents
  * constraint on suspend/resume -- is derived from that proven
@@ -243,6 +272,19 @@ mixed *query_agents(string sessionToken)
 		     map_indices(IDENTITYD->query_delegations(uuids[i])) });
     }
     return rows;
+}
+
+/*
+ * self-service recovery-code provisioning: a live identity session
+ * replaces the record's recovery-code set with n fresh codes and
+ * returns the plaintext -- the only time it exists. Without this
+ * entry a transport-registered identity would have no codes and so
+ * no self-service recovery path.
+ */
+string *rotate_recovery_codes(string sessionToken, int n)
+{
+    return IDENTITYD->rotate_recovery_codes(session_identity(sessionToken),
+					    n);
 }
 
 /*

@@ -93,25 +93,48 @@ void configure(string id, string org)
 }
 
 /*
- * TOFU registration: verify the payloads against the challenge the
- * caller issued, then mint an identity whose first credential is the
- * attested passkey (identityd refuses a credential id bound anywhere
- * else -- never bare TOFU re-bind). Returns the new principal string.
+ * registration-ceremony verification without a mint: verify the
+ * payloads against the challenge the caller issued and return the
+ * credential row, keyed under "credentialId" (base64url, the form the
+ * store binds). What happens to the verified row is the System-tier
+ * caller's composition: register_credential below mints a fresh
+ * identity (TOFU), the recovery ceremony pairs it with a code
+ * redemption onto an existing record, and the operator bind verb
+ * attaches it directly -- never-bare-re-bind holds because no caller
+ * composes a bare re-bind out of the registration route.
  */
-string register_credential(string challenge, string clientDataJSON,
-			   string attestationObject)
+mapping verify_registration_payload(string challenge, string clientDataJSON,
+				    string attestationObject)
 {
     mapping parsed, row;
-    string credentialId, uuid;
 
     check_system(previous_program());
     parsed = webauthn::verifyRegistration(rpId, origin, challenge,
 					  clientDataJSON, attestationObject);
-    credentialId = parsed["credentialId"];
     row = parsed + ([ ]);
-    row["credentialId"] = nil;
+    row["credentialId"] = base64::urlEncode(parsed["credentialId"]);
     row[CRED_CREATED] = time();
-    uuid = IDENTITYD->create_identity(base64::urlEncode(credentialId), row);
+    return row;
+}
+
+/*
+ * TOFU registration: verify the payloads, then mint an identity whose
+ * first credential is the attested passkey (identityd refuses a
+ * credential id bound anywhere else -- never bare TOFU re-bind).
+ * Returns the new principal string.
+ */
+string register_credential(string challenge, string clientDataJSON,
+			   string attestationObject)
+{
+    mapping row;
+    string credentialId, uuid;
+
+    check_system(previous_program());
+    row = verify_registration_payload(challenge, clientDataJSON,
+				      attestationObject);
+    credentialId = row["credentialId"];
+    row["credentialId"] = nil;
+    uuid = IDENTITYD->create_identity(credentialId, row);
     return "identity:" + uuid;
 }
 
