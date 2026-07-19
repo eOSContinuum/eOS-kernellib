@@ -15,11 +15,15 @@
  *
  * Routes:
  *   GET  /health   -- returns 200 OK, body "ok\n".
+ *   GET  /status   -- returns 200 OK, the status() health vector's
+ *                     capacity-headroom counts, one key=used/cap line
+ *                     each.
  *   POST /echo     -- returns 200 OK echoing the request body.
  *   any other      -- returns 404 Not Found.
  */
 
 # include <kernel/user.h>
+# include <status.h>
 # include <type.h>
 # include <String.h>
 # include "/usr/HTTP/api/include/HttpConnection.h"
@@ -95,6 +99,24 @@ private void dispatch(HttpRequest request, StringBuffer body)
 
     if (method == "GET" && path == "/health") {
 	emit(makeResponse(200, "OK", "ok\n"), "ok\n");
+	return;
+    }
+
+    if (method == "GET" && path == "/status") {
+	mixed *st;
+	string report;
+
+	/* The capacity-headroom counts operations.md's Monitoring
+	 * signals reads, in a stable line-oriented form a monitoring
+	 * probe parses without a console login. Each line is used/cap. */
+	st = status();
+	report = "objects=" + st[ST_NOBJECTS] + "/" + st[ST_OTABSIZE] + "\n" +
+	    "callouts=" + (st[ST_NCOSHORT] + st[ST_NCOLONG]) + "/" +
+			  st[ST_COTABSIZE] + "\n" +
+	    "swap-sectors=" + st[ST_SWAPUSED] + "/" + st[ST_SWAPSIZE] + "\n" +
+	    "users=" + st[ST_NUSERS] + "/" + st[ST_UTABSIZE] + "\n" +
+	    "uptime=" + st[ST_UPTIME] + "\n";
+	emit(makeResponse(200, "OK", report), report);
 	return;
     }
 

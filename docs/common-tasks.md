@@ -77,6 +77,18 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/kernel-reference/hook/userd`; `docs/operations.md` for the `.dgd` port configuration fields.
 
+## Expose a health check for monitoring
+
+**Goal**: a monitoring system reads the platform's capacity counts over HTTP, with no console login.
+
+1. Add a status route to your application's HTTP server object: call the no-argument `status()` and emit the capacity-headroom counts (`objects`, callouts, swap sectors, `users`) as stable `key=used/cap` lines. `examples/http-app/obj/server.c`'s `GET /status` route is the worked form -- copy its report block.
+2. The route rides your existing `binary_port` mount, cleartext or TLS (`docs/operations.md` Network boundary and transport security); no new port and no operator credential is involved.
+3. Point the monitor at the route on an interval and alert on the thresholds in `docs/operations.md` Monitoring signals -- the swap-sector line earliest, because its ceiling is fatal rather than degrading.
+
+**Verify**: `curl http://localhost:8080/status` against the deployed example returns the five `key=value` lines; cross-check a value against the console `status` block.
+
+**Owning doc**: `docs/operations.md` Monitoring signals; `examples/http-app/` for the worked route.
+
 ## Where to next
 
 - [`docs/application-authoring.md`](application-authoring.md): the pattern reference behind most of these recipes.

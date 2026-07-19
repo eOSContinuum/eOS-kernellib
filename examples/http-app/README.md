@@ -7,6 +7,7 @@ The code in this directory is a stripped-down derivative of a verified working H
 ## Routes
 
 - `GET /health` -- returns `200 OK` with body `ok\n`.
+- `GET /status` -- returns `200 OK` with the `status()` health vector's capacity-headroom counts, one `key=used/cap` line each (`objects`, `callouts`, `swap-sectors`, `users`, plus `uptime` in seconds) -- the machine-readable form of `docs/operations.md` Monitoring signals.
 - `POST /echo` -- returns `200 OK` echoing the request body.
 - any other path -- returns `404 Not Found`.
 
@@ -27,6 +28,13 @@ That iteration runs only at **cold boot**: a start that restores from a snapshot
 ```sh
 curl http://localhost:8080/health
 # ok
+
+curl http://localhost:8080/status
+# objects=234/10000
+# callouts=8/10000
+# swap-sectors=567/65535
+# users=1/255
+# uptime=4
 
 curl -d 'hello' http://localhost:8080/echo
 # hello
