@@ -79,7 +79,15 @@ static void close(int dest)
  */
 static void _flow_mode(int mode, int length)
 {
-    ::length = length;
+    if (length != 0 || mode == MODE_RAW) {
+	/*
+	 * only a raw switch (or an explicit length) establishes a new
+	 * read length; other flow directives (LINE, UNBLOCK, BLOCK)
+	 * arrive with the varargs default and must not clobber the
+	 * remaining-entity count mid-raw
+	 */
+	::length = length;
+    }
     if (mode == MODE_NOCHANGE) {
 	/*
 	 * a flow decision that keeps the current mode: resume input,

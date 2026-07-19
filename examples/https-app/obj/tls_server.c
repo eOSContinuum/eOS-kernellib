@@ -25,6 +25,7 @@
  */
 
 # include <kernel/user.h>
+# include <status.h>
 # include <type.h>
 # include <String.h>
 # include "/usr/TLS/api/include/tls.h"
@@ -151,6 +152,15 @@ static void receiveRequest(int code, HttpRequest request)
 
     cl = request->headerValue("Content-Length");
     length = (typeof(cl) == T_INT) ? cl : 0;
+    if (length > status()[ST_STRSIZE]) {
+	/* larger than one LPC string can hold: refuse before reading
+	 * rather than erroring mid-drain; the response closes the
+	 * connection, discarding the unread body */
+	emit(makeResponse(413, "Payload Too Large",
+			  "413 Payload Too Large\n"),
+	     "413 Payload Too Large\n");
+	return;
+    }
     if (length > 0) {
 	pendingRequest = request;
 	expectEntity(length);
