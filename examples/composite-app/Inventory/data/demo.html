@@ -24,6 +24,24 @@ with foreign vectors, but with a <em>real authenticator</em>.</p>
   <button id="audit">5. Audit trail (observer)</button>
   <button id="wipe">6. Admin wipe (expect 403)</button>
 </p>
+<p>
+  <button id="mint">7. Mint agent (token shown once)</button>
+  <button id="agents">8. List my agents</button>
+</p>
+<p>
+  <input id="agentuuid" placeholder="agent uuid" size="38">
+  <button id="suspend">Suspend</button>
+  <button id="resume">Resume</button>
+</p>
+<p>
+  <input id="cap" value="example:inventory-admin" size="22">
+  <button id="delegate">Delegate</button>
+  <button id="undelegate">Undelegate</button>
+</p>
+<p>
+  <input id="agenttoken" placeholder="agent token (from mint)" size="38">
+  <button id="agentlogin">9. Agent login (the token is the proof)</button>
+</p>
 <div id="log">ready.
 </div>
 <script>
@@ -139,5 +157,63 @@ document.getElementById('wipe').onclick = async () => {
   const body = await r.json().catch(() => ({}));
   log('wipe: ' + r.status + ' ' + JSON.stringify(body),
       r.status === 403 ? 'ok' : 'err');
+};
+
+document.getElementById('mint').onclick = async () => {
+  const res = await post('/auth/agents', {}, true);
+  if (res.status === 201) {
+    document.getElementById('agentuuid').value = res.body.uuid;
+    document.getElementById('agenttoken').value = res.body.token;
+    log('AGENT MINTED: ' + res.body.uuid, 'ok');
+    log('agent token (this response is the only time the plaintext ' +
+        'exists): ' + res.body.token);
+  } else {
+    log('mint: ' + res.status + ' ' + JSON.stringify(res.body), 'err');
+  }
+};
+
+document.getElementById('agents').onclick = async () => {
+  const r = await fetch('/auth/agents', { headers: token ?
+    { 'Authorization': 'Bearer ' + token } : {} });
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 200) {
+    log('agents (' + body.agents.length + '):');
+    body.agents.forEach(a => log('  ' + a.uuid +
+      (a.suspended ? ' [suspended]' : ' [active]') +
+      (a.capabilities.length ?
+        '  caps: ' + a.capabilities.join(', ') : '')));
+  } else {
+    log('agents: ' + r.status + ' ' + JSON.stringify(body), 'err');
+  }
+};
+
+const agentOp = async (op, extra) => {
+  const uuid = document.getElementById('agentuuid').value.trim();
+  if (!uuid) { log(op + ': agent uuid required (mint or list first)', 'err'); return; }
+  const res = await post('/auth/agents/' + uuid + '/' + op, extra || {}, true);
+  log(op + ': ' + res.status + ' ' + JSON.stringify(res.body),
+      res.status === 200 ? 'ok' : 'err');
+};
+document.getElementById('suspend').onclick = () => agentOp('suspend');
+document.getElementById('resume').onclick = () => agentOp('resume');
+document.getElementById('delegate').onclick = () =>
+  agentOp('delegate', { capability: document.getElementById('cap').value.trim() });
+document.getElementById('undelegate').onclick = () =>
+  agentOp('undelegate', { capability: document.getElementById('cap').value.trim() });
+
+document.getElementById('agentlogin').onclick = async () => {
+  const t = document.getElementById('agenttoken').value.trim();
+  if (!t) { log('agent login: agent token required (mint first)', 'err'); return; }
+  const res = await post('/auth/agent-login', { token: t });
+  if (res.status === 200) {
+    token = res.body.token; principal = res.body.principal;
+    log('AGENT LOGIN OK: ' + principal, 'ok');
+    log('the page session is now the agent\'s; item create runs as ' +
+        'the agent, controller-only buttons will refuse, and passkey ' +
+        'login (2) switches back');
+  } else {
+    log('agent login refused: ' + res.status + ' ' +
+        JSON.stringify(res.body), 'err');
+  }
 };
 </script>

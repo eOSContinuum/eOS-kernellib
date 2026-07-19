@@ -22,6 +22,15 @@
  *   - Authenticated routes parse "Authorization: Bearer <token>" and
  *     validate through authd; the validated principal is what the
  *     domain's authorization (inventoryd) decides against.
+ *   - /auth/agents binds authd's controller self-service: a live
+ *     identity session mints agent principals (the agent token is in
+ *     the response once, at mint, the only time the plaintext exists),
+ *     lists its own agents, suspends and resumes them, and delegates
+ *     or withdraws its own capabilities. Management refusals surface
+ *     the substrate's reason -- the caller is authenticated and asking
+ *     about its own records; ceremony refusals below stay uniform.
+ *   - /auth/agent-login runs the agent-token ceremony: the token is
+ *     the proof, so there is no challenge round-trip.
  *
  * Wire format: JSON bodies; WebAuthn binary fields (clientDataJSON,
  * attestationObject, authenticatorData, signature) travel
@@ -232,6 +241,113 @@ private mixed *do_login(string body)
 		   ([ "principal" : result[0], "token" : result[1] ]));
 }
 
+private mixed *do_agent_login(string body)
+{
+    mapping parsed;
+    mixed agentToken;
+    mixed *result;
+
+    parsed = parse_body(body);
+    if (!parsed) {
+	return fail(400, "Bad Request", "malformed body");
+    }
+    agentToken = parsed["token"];
+    if (typeof(agentToken) != T_STRING || agentToken == "") {
+	return fail(400, "Bad Request", "agent token required");
+    }
+    if (catch(result = AUTHD->authenticate_agent_token(agentToken)) != nil) {
+	return fail(401, "Unauthorized", "agent ceremony refused");
+    }
+    return respond(200, "OK",
+		   ([ "principal" : result[0], "token" : result[1] ]));
+}
+
+private mixed *do_mint_agent(string authorization)
+{
+    string err, *result;
+
+    err = catch(result = AUTHD->mint_agent_with_token(
+					bearer_token(authorization)));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(201, "Created",
+		   ([ "uuid" : result[0], "token" : result[1] ]));
+}
+
+private mixed *do_list_agents(string authorization)
+{
+    mixed *rows, *out;
+    string err;
+    int i;
+
+    err = catch(rows = AUTHD->query_agents(bearer_token(authorization)));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    out = allocate(sizeof(rows));
+    for (i = 0; i < sizeof(rows); i++) {
+	out[i] = ([ "uuid" : rows[i][0], "suspended" : rows[i][1],
+		    "capabilities" : rows[i][2] ]);
+    }
+    return respond(200, "OK", ([ "agents" : out ]));
+}
+
+private mixed *do_agent_suspend(string uuid, string authorization)
+{
+    string err;
+    int revoked;
+
+    err = catch(revoked = AUTHD->suspend_agent(bearer_token(authorization),
+					       uuid));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(200, "OK", ([ "suspended" : uuid,
+				 "revoked" : revoked ]));
+}
+
+private mixed *do_agent_resume(string uuid, string authorization)
+{
+    string err;
+
+    err = catch(AUTHD->resume_agent(bearer_token(authorization), uuid));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(200, "OK", ([ "resumed" : uuid ]));
+}
+
+private mixed *do_agent_delegation(string uuid, string body,
+				   string authorization, int grant)
+{
+    mapping parsed;
+    mixed capability;
+    string err;
+
+    parsed = parse_body(body);
+    if (!parsed) {
+	return fail(400, "Bad Request", "malformed body");
+    }
+    capability = parsed["capability"];
+    if (typeof(capability) != T_STRING || capability == "") {
+	return fail(400, "Bad Request", "capability required");
+    }
+    if (grant) {
+	err = catch(AUTHD->delegate_capability(bearer_token(authorization),
+					       uuid, capability));
+    } else {
+	err = catch(AUTHD->undelegate_capability(bearer_token(authorization),
+						 uuid, capability));
+    }
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(200, "OK",
+		   ([ (grant ? "delegated" : "undelegated") : capability,
+		      "agent" : uuid ]));
+}
+
 private mixed *do_logout(string authorization)
 {
     string token;
@@ -320,7 +436,7 @@ private mixed *do_audit()
  */
 mixed *handle(string method, string path, string body, string authorization)
 {
-    string principal;
+    string principal, uuid;
     int id;
 
     /* the anonymous surfaces */
@@ -339,6 +455,9 @@ mixed *handle(string method, string path, string body, string authorization)
     if (method == "POST" && path == "/auth/logout") {
 	return do_logout(authorization);
     }
+    if (method == "POST" && path == "/auth/agent-login") {
+	return do_agent_login(body);
+    }
     if (method == "GET" && path == "/inventory/items") {
 	return do_list_items();
     }
@@ -350,6 +469,29 @@ mixed *handle(string method, string path, string body, string authorization)
     principal = bearer_principal(authorization);
     if (!principal) {
 	return fail(401, "Unauthorized", "authentication required");
+    }
+
+    if (path == "/auth/agents") {
+	if (method == "GET") {
+	    return do_list_agents(authorization);
+	}
+	if (method == "POST") {
+	    return do_mint_agent(authorization);
+	}
+    }
+    if (method == "POST") {
+	if (sscanf(path, "/auth/agents/%s/suspend", uuid) != 0) {
+	    return do_agent_suspend(uuid, authorization);
+	}
+	if (sscanf(path, "/auth/agents/%s/resume", uuid) != 0) {
+	    return do_agent_resume(uuid, authorization);
+	}
+	if (sscanf(path, "/auth/agents/%s/delegate", uuid) != 0) {
+	    return do_agent_delegation(uuid, body, authorization, TRUE);
+	}
+	if (sscanf(path, "/auth/agents/%s/undelegate", uuid) != 0) {
+	    return do_agent_delegation(uuid, body, authorization, FALSE);
+	}
     }
 
     if (method == "POST" && path == "/inventory/items") {
