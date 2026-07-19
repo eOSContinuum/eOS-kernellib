@@ -162,7 +162,7 @@ These methods exist because `Server1` (the library form, inheritable) does not c
 
 ## Platform contracts
 
-Four platform contracts apply to every HTTP/1 application server. The reference application honors all four. An application that omits any of them will fail to boot or fail at first request.
+Five platform contracts apply to every HTTP/1 application server. The reference application honors all five. An application that omits one fails to boot, fails at first request, or -- for the last -- silently wedges the platform at the `users` cap.
 
 ### Inherit from `/lib/`, not from `/obj/`
 
@@ -187,6 +187,12 @@ The application is responsible for remembering the request that produced the bod
 An application that does not call `expectEntity` for `POST`, `PUT`, or `PATCH` requests will accept the request line and headers but never receive the body. The connection stalls until the client times out.
 
 For chunked transfer encoding (`Transfer-Encoding: chunked`), use `expectChunk` instead of `expectEntity`. WebSocket framing has its own opt-in (`expectWsFrame`). The same pattern applies.
+
+### Release each completed request with `doneRequest()`
+
+When a response is complete, the server calls `this_object()->doneRequest()`: the flow layer completes the request cycle -- disconnecting when the request side asked for closure, re-arming line mode otherwise -- and either way the connection again reacts to its client, so a client that closes after the response tears the connection down and the kernel user slot recycles. The call routes through `this_object()->` because the flow layer verifies the caller is the server object.
+
+Omitting the call strands the connection mid-request: nothing disconnects, the client's own close goes unnoticed, and each request holds one of the `users` table's slots until the flow layer's 60-second inactivity timeout reaps it. Under load that outpaces that reclaim rate, the `users` cap exhausts, and at the cap the driver silently stops answering every port -- new connections complete their TCP connect and are never serviced, with nothing logged (`docs/execution-model.md` Under sustained load; `docs/operations.md` Common failure modes carries the triage row). A streaming response is the deliberate exception: a server holding a connection open for pushed frames (`docs/composite-applications.md` The event streams) does not release until the stream ends.
 
 ## Multiple applications on one port
 

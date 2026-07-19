@@ -34,7 +34,7 @@ The inverse router: the hooks and contracts the platform invokes on objects you 
 | The driver hooks (`runtime_error`, `compile`, and the rest) | Driver events, on the registered manager objects | [driver](#driver) below |
 | The userd hooks | Connection events, on registered telnet/binary managers | [userd](#userd) below |
 | Object-manager events (`compile`, `clone`, `destruct` notifications) | On the registered object manager, per lifecycle event | [driver](#driver) below (`set_object_manager`); the event surface narrative is [`code-lifecycle.md`](code-lifecycle.md) |
-| An HTTP server object's request methods | Per parsed request on your `Http1Server` subclass | [`http-applications.md`](http-applications.md), the four platform contracts |
+| An HTTP server object's request methods | Per parsed request on your `Http1Server` subclass | [`http-applications.md`](http-applications.md), the five platform contracts |
 | A Merry script bound on a property | At the bound timing when the property changes | [`dispatcher.md`](dispatcher.md) timings; [`merry-language.md`](merry-language.md) for what the script may call |
 
 ## Kernel overview

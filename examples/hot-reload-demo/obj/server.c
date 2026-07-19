@@ -72,6 +72,9 @@ private void emit(HttpResponse response, string body)
 	message->append(body);
     }
     sendMessage(message);
+    /* the response is complete: release the request so the flow layer
+     * closes or re-arms the connection and the user slot recycles */
+    this_object()->doneRequest();
 }
 
 private string drainBody(StringBuffer buf)

@@ -18,6 +18,35 @@ the labeled https port. That stack runs in interpreted LPC, so the number
 is the honest cost of native termination on this machine -- the figure the
 retired-reverse-proxy posture stands or falls on.
 
+Two standalone shapes measure the platform under parallel clients instead
+of the sequential loop. Each boots clean-slate instances with the
+http-app deployed and skips the growth/snapshot phases; giving either
+flag runs only the requested shapes:
+
+    --concurrent  for each client count, that many parallel clients each
+                  drive a serial loop of GET /health requests; reports
+                  aggregate requests/second and per-request latency.
+    --headline    head-of-line probe: one background client samples
+                  /health latency at a modest fixed rate while the admin
+                  console injects a burst of busy tasks, each an
+                  empty-loop calibrated live against the default 20M-tick
+                  budget so it completes rather than erroring; reports
+                  the latency the probing client observes before, during,
+                  and after the burst -- the serialization price
+                  docs/execution-model.md describes.
+
+Both parallel shapes budget their TOTAL request count per boot, and
+--concurrent boots a fresh instance per client count. The budget is a
+regression detector, not a workaround: the example servers release each
+connection's user slot when the response completes (doneRequest), so
+slots recycle -- but a release regression would otherwise walk the run
+into the config `users` cap, where the driver stops servicing ALL ports
+silently (new connections are accepted by the kernel but never
+answered). Bounding the per-boot request count keeps that failure mode
+loud (this rig refusing to exceed its budget) instead of silent, and
+the users= evidence line printed beside each measurement is the live
+check that slots are being reclaimed.
+
 Every number is wall-clock as observed from outside the driver, on the
 machine the report names. Nothing here is a guarantee; it is one measured
 run of one workload shape.
@@ -28,6 +57,9 @@ Usage:
     LPC_EXT_CRYPTO=/path/to/crypto DGD_BIN=/path/to/dgd \
         scripts/measure-baseline.py --tls [--tls-requests 200]
                                           [--handshakes 50]
+    DGD_BIN=/path/to/dgd scripts/measure-baseline.py --concurrent 2,8,32
+                                            [--concurrent-requests 100]
+    DGD_BIN=/path/to/dgd scripts/measure-baseline.py --headline
 
   --sizes     cumulative `code` growth calls per step (each call parks
               about 8 MB of integer arrays in the scratch object; the
@@ -41,6 +73,14 @@ Usage:
                   throughput figure (default 200)
   --handshakes    fresh TLS 1.3 handshakes to time for the latency figure
                   (default 50)
+  --concurrent    comma-separated parallel client counts (e.g. 2,8,32);
+                  each client is a serial loop of fresh-connection
+                  requests, so the count is the number of connections in
+                  flight; each count gets its own boot
+  --concurrent-requests  GET /health requests per client per count;
+                         default 0 = auto, splitting the per-boot user
+                         slot budget across the clients
+  --headline      run the head-of-line probe
 
 Writes the report to stdout and the raw transcript beside the boot logs
 under state/. Run from the repository root, like the other scripts here.
@@ -57,6 +97,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import threading
 import time
 import urllib.request
 
@@ -71,6 +112,20 @@ PARK_SRC = "mixed *d; void park(mixed v) { d += ({ v }); }" \
            " void create() { d = ({ }); }"
 CHUNK_EXPR = ("(" + " ".join(
     ['"%s"->park(allocate_int(32767)),' % PARK] * 32) + " 1)")
+BURN = "/usr/admin/burn"
+BURN_SRC = "int burn(int n) { int i; for (i = 0; i < n; i++) { } return i; }"
+HEALTH_URL = "http://%s:%d/health" % (HOST, HTTP_PORT)
+STATUS_URL = "http://%s:%d/status" % (HOST, HTTP_PORT)
+PROBE_INTERVAL = 0.08		# head-of-line probe pacing between samples
+HEADLINE_QUIET = 3.0		# quiet sampling before and after the burst
+HEADLINE_WINDOW = 2.0		# target injection-burst duration
+USER_BUDGET = 220		# per-boot request bound: a slot-release
+				# regression in the deployed example would
+				# wedge the driver at the 255-slot users
+				# cap (see the docstring); bounding here
+				# keeps that failure loud, with margin for
+				# warm-up, status reads, and the console
+WARM_REQUESTS = 4		# warm-up requests (each spends a slot)
 
 _dv_spec = importlib.util.spec_from_file_location(
     "drive_verbs", os.path.join(os.path.dirname(__file__), "drive-verbs.py"))
@@ -84,7 +139,9 @@ def clean_slate(root):
         shutil.rmtree(os.path.join(root, "src/usr", mount),
                       ignore_errors=True)
     for f in ("snapshot", "snapshot.old", "swap", "measure-boot1.log",
-              "measure-boot2.log", "measure.dgd", "measure-transcript.log"):
+              "measure-boot2.log", "measure.dgd", "measure-transcript.log",
+              "measure-concurrent-boot.log", "measure-headline-boot.log",
+              "measure-headline-transcript.log"):
         try:
             os.remove(os.path.join(root, "state", f))
         except FileNotFoundError:
@@ -173,6 +230,271 @@ def http_throughput(n):
                 ok += 1
     dt = time.monotonic() - t0
     return ok, n, dt
+
+
+def latency_stats(times):
+    """(median, p95, max) over per-request wall-clock seconds."""
+    s = sorted(times)
+    return (s[len(s) // 2], s[min(len(s) - 1, (len(s) * 95) // 100)], s[-1])
+
+
+def warm_http(proc, deadline=30.0):
+    """Wait until the deployed http-app answers GET /health (the binary
+    port accepts before the WWW domain finishes compiling on a cold boot),
+    then run a short sequential warm-up so the measured window never pays
+    first-request compilation."""
+    start = time.monotonic()
+    while True:
+        if proc.poll() is not None:
+            raise SystemExit("driver exited during warm-up; read the"
+                             " boot log")
+        try:
+            with urllib.request.urlopen(HEALTH_URL, timeout=2) as r:
+                if r.status == 200:
+                    break
+        except OSError:
+            pass
+        if time.monotonic() - start > deadline:
+            raise SystemExit("http-app not answering within %ds" % deadline)
+        time.sleep(0.1)
+    for _ in range(WARM_REQUESTS - 1):
+        urllib.request.urlopen(HEALTH_URL, timeout=5).close()
+
+
+def users_line():
+    """The deployed app's users=used/cap headroom line, printed beside
+    each measurement as live evidence that connection slots recycle."""
+    with urllib.request.urlopen(STATUS_URL, timeout=5) as r:
+        body = r.read().decode("ascii", "replace")
+    for ln in body.splitlines():
+        if ln.startswith("users="):
+            return ln
+    return "users=?"
+
+
+def concurrent_load(n, per_client):
+    """n parallel clients, each a serial loop of per_client GET /health
+    requests on a fresh connection (the server closes per response, so n
+    is the number of connections in flight). Returns (ok, errors, wall
+    seconds, per-request latency list)."""
+    barrier = threading.Barrier(n + 1)
+    lat = [[] for _ in range(n)]
+    err = [0] * n
+
+    def client(k):
+        barrier.wait()
+        for _ in range(per_client):
+            t0 = time.monotonic()
+            try:
+                with urllib.request.urlopen(HEALTH_URL, timeout=15) as r:
+                    if r.status == 200:
+                        lat[k].append(time.monotonic() - t0)
+                    else:
+                        err[k] += 1
+            except OSError:
+                err[k] += 1
+
+    threads = [threading.Thread(target=client, args=(k,)) for k in range(n)]
+    for t in threads:
+        t.start()
+    barrier.wait()
+    t0 = time.monotonic()
+    for t in threads:
+        t.join()
+    wall = time.monotonic() - t0
+    times = [x for per in lat for x in per]
+    return len(times), sum(err), wall, times
+
+
+def measure_concurrent(dgd, root, counts, per_client):
+    """Drive parallel GET /health load at each client count, reporting
+    aggregate throughput and per-request latency. Each count gets its own
+    clean-slate boot, and the request total stays inside USER_BUDGET (the
+    slot-release regression bound; docstring)."""
+    for n in counts:
+        clients = per_client or max(1, (USER_BUDGET - WARM_REQUESTS) // n)
+        print("== concurrent load, %d clients: clean slate, http-app"
+              " deployed as WWW ==" % n)
+        clean_slate(root)
+        config = write_config(root)
+
+        boot_log = open(os.path.join(root,
+                                     "state/measure-concurrent-boot.log"),
+                        "w")
+        proc = subprocess.Popen([dgd, config], stdout=boot_log,
+                                stderr=boot_log, cwd=root)
+        try:
+            t_boot = wait_port(TELNET_PORT, proc)
+            print("cold boot to console-ready: %.2fs" % t_boot)
+            warm_http(proc)
+
+            ok, errors, wall, times = concurrent_load(n, clients)
+            if not times:
+                print("  %2d clients: no successful requests (%d errors)"
+                      % (n, errors))
+                continue
+            med, p95, worst = latency_stats(times)
+            line = ("  %2d clients x %d requests: %d ok in %.2fs"
+                    " (%.0f req/s aggregate; latency median %.1f ms,"
+                    " p95 %.1f ms, max %.1f ms)"
+                    % (n, clients, ok, wall, ok / wall,
+                       med * 1e3, p95 * 1e3, worst * 1e3))
+            if errors:
+                line += " [%d ERRORS]" % errors
+            print(line)
+            print("  %2d clients: post-run %s" % (n, users_line()))
+        finally:
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGINT)
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            boot_log.close()
+
+
+def calibrate_burn(sess):
+    """Size the busy task against the documented default budget of
+    20,000,000 ticks per execution: probe rising empty-loop iteration
+    counts through the console `code` verb until the driver answers Out
+    of ticks, and keep the largest count that completed. Returns
+    (iterations, round-trip seconds) for the chosen size."""
+    sess.send_line('code compile_object("%s", "%s")' % (BURN, BURN_SRC))
+    sess.read_until([r"\$\d+ = "], timeout=15.0)
+
+    chosen = None
+    hit_ceiling = False
+    print("burn calibration against the default 20M-tick budget:")
+    for n in (100000, 300000, 1000000, 1500000, 2000000, 2500000,
+              3000000, 4000000, 6000000, 10000000):
+        t0 = time.monotonic()
+        sess.send_line('code "%s"->burn(%d)' % (BURN, n))
+        # a budget hit surfaces as a bare "Out of ticks" plus a stack
+        # trace, not through cmd_code's Error: prefix -- the whole input
+        # task is aborted, so the catch never runs
+        text = sess.read_until([r"\$\d+ = \d+", r"Out of ticks",
+                                r"Error:"], timeout=60.0)
+        dt = time.monotonic() - t0
+        if "Out of ticks" in text or "Error" in text:
+            print("  %8d iterations: out of ticks (task aborted after"
+                  " %.1f ms of driver time)" % (n, dt * 1e3))
+            hit_ceiling = True
+            break
+        print("  %8d iterations: completes in %.1f ms" % (n, dt * 1e3))
+        chosen = (n, dt)
+    if chosen is None:
+        raise SystemExit("even the smallest burn ran out of ticks")
+    if not hit_ceiling:
+        print("  (budget ceiling not reached in the probed range)")
+    # drain one round trip so a trailing error trace or prompt never
+    # bleeds into the burst's reads
+    sess.send_line("code 1")
+    sess.read_until([r"\$\d+ = 1"], timeout=15.0)
+    print("  -> burn size %d iterations, ~%.0f ms per task"
+          % (chosen[0], chosen[1] * 1e3))
+    return chosen
+
+
+def measure_headline(dgd, root):
+    """Boot a clean slate with the http-app deployed, then measure what a
+    steadily-probing HTTP client observes while the admin console runs a
+    burst of near-budget busy tasks back to back: the head-of-line
+    latency price docs/execution-model.md describes, reported before /
+    during / after the burst."""
+    print("== head-of-line probe: clean slate, http-app deployed as WWW ==")
+    clean_slate(root)
+    config = write_config(root)
+
+    boot_log = open(os.path.join(root, "state/measure-headline-boot.log"),
+                    "w")
+    proc = subprocess.Popen([dgd, config], stdout=boot_log, stderr=boot_log,
+                            cwd=root)
+    try:
+        t_boot = wait_port(TELNET_PORT, proc)
+        print("cold boot to console-ready: %.2fs" % t_boot)
+        warm_http(proc)
+
+        sess = drive_verbs.Session(
+            HOST, TELNET_PORT,
+            os.path.join(root, "state/measure-headline-transcript.log"))
+        drive_verbs.login(sess, "admin", "drive-verbs")
+        burn_n, burn_wall = calibrate_burn(sess)
+
+        samples = []		# (start, duration, ok) per probe request
+        stop = threading.Event()
+
+        def probe():
+            # bounded like every shape: a slot-release regression should
+            # stop the rig loudly, never wedge the driver silently
+            while not stop.is_set() and len(samples) < USER_BUDGET - 20:
+                t0 = time.monotonic()
+                ok = 0
+                try:
+                    with urllib.request.urlopen(HEALTH_URL, timeout=30) as r:
+                        ok = int(r.status == 200)
+                except OSError:
+                    pass
+                samples.append((t0, time.monotonic() - t0, ok))
+                stop.wait(PROBE_INTERVAL)
+
+        prober = threading.Thread(target=probe)
+        prober.start()
+        time.sleep(HEADLINE_QUIET)
+
+        win_start = time.monotonic()
+        burn_walls = []
+        while time.monotonic() - win_start < HEADLINE_WINDOW:
+            t0 = time.monotonic()
+            sess.send_line('code "%s"->burn(%d)' % (BURN, burn_n))
+            text = sess.read_until([r"\$\d+ = \d+", r"Out of ticks",
+                                    r"Error:"], timeout=60.0)
+            if "Out of ticks" in text or "Error" in text:
+                raise SystemExit("burn errored mid-burst: "
+                                 + text.strip()[-200:])
+            burn_walls.append(time.monotonic() - t0)
+        win_end = time.monotonic()
+        time.sleep(HEADLINE_QUIET)
+        stop.set()
+        prober.join()
+        slots = users_line()
+
+        sess.send_line("shutdown")
+        time.sleep(1.0)
+        sess.close()
+
+        bw = sorted(burn_walls)
+        print("injected %d busy tasks of %d iterations over %.2fs"
+              " (per-task wall median %.1f ms, max %.1f ms)"
+              % (len(bw), burn_n, win_end - win_start,
+                 bw[len(bw) // 2] * 1e3, bw[-1] * 1e3))
+        buckets = (
+            ("before", [s for s in samples if s[0] + s[1] < win_start]),
+            ("during", [s for s in samples
+                        if s[0] <= win_end and s[0] + s[1] >= win_start]),
+            ("after", [s for s in samples if s[0] > win_end]))
+        for label, bucket in buckets:
+            times = [s[1] for s in bucket if s[2]]
+            errs = len(bucket) - len(times)
+            if not times:
+                print("  %-6s: no successful samples (%d errors)"
+                      % (label, errs))
+                continue
+            med, p95, worst = latency_stats(times)
+            line = ("  %-6s: %3d samples, latency median %.1f ms,"
+                    " p95 %.1f ms, max %.1f ms"
+                    % (label, len(times), med * 1e3, p95 * 1e3, worst * 1e3))
+            if errs:
+                line += " [%d ERRORS]" % errs
+            print(line)
+        print("  post-run %s" % slots)
+    finally:
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        boot_log.close()
 
 
 def tls_client_context():
@@ -327,6 +649,14 @@ def main():
     ap.add_argument("--tls", action="store_true")
     ap.add_argument("--tls-requests", type=int, default=200)
     ap.add_argument("--handshakes", type=int, default=50)
+    ap.add_argument("--concurrent", default=None,
+                    help="comma-separated parallel client counts, e.g."
+                         " 2,8,32; runs the concurrent shape only")
+    ap.add_argument("--concurrent-requests", type=int, default=0,
+                    help="requests per client (default 0 = split the"
+                         " per-boot user slot budget across the clients)")
+    ap.add_argument("--headline", action="store_true",
+                    help="run the head-of-line probe only")
     args = ap.parse_args()
     steps = [int(x) for x in args.sizes.split(",")]
 
@@ -334,6 +664,15 @@ def main():
     if not dgd or not os.access(dgd, os.X_OK):
         raise SystemExit("set DGD_BIN=/path/to/dgd")
     root = os.getcwd()
+
+    if args.concurrent or args.headline:
+        if args.concurrent:
+            counts = [int(x) for x in args.concurrent.split(",")]
+            measure_concurrent(dgd, root, counts, args.concurrent_requests)
+        if args.headline:
+            measure_headline(dgd, root)
+        print("== done; transcript and boot logs under state/ ==")
+        return
 
     print("== measure-baseline: clean slate, http-app deployed as WWW ==")
     clean_slate(root)
