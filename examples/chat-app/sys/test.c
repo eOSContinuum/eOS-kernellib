@@ -77,7 +77,7 @@
  * no-snapshot) boot for the negative case.
  *
  * Pass/fail is observable via the sentinel file. The README's verify
- * command counts " OK" lines after the smoke harness completes.
+ * command counts " OK" lines after scripts/run-example.sh completes.
  *
  * Deferred to a call_out so System/initd's domain-load loop has run
  * to completion before any cross-domain call fires. The Chat domain
@@ -892,9 +892,10 @@ static void run_tests()
      * dump_state(FALSE) captures the room clone, the two user clones,
      * the three message mappings, the cross-clone mention-tracker
      * reference, and the scheduled persist_verify call_out. The
-     * external smoke harness restarts DGD against the snapshot; the
-     * surviving call_out fires phase 11 as soon as the system is back
-     * up (its scheduled time has elapsed during the restart).
+     * driving script (scripts/run-example.sh) restarts DGD against
+     * the snapshot; the surviving call_out fires phase 11 as soon as
+     * the system is back up (its scheduled time has elapsed during
+     * the restart).
      */
     catch {
 	mixed *msgs;

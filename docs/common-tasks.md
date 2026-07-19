@@ -35,10 +35,11 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 1. Give the clonable a `patch()` hook that is idempotent: check a format-version property, transform old fields to new, stamp the new version. `patch()` takes no arguments and runs inside an atomic context before the intercepted call proceeds.
 2. Recompile the changed sources through the upgrade cascade with patching queued: from the System login console, `upgrade -p <file.c>`.
 3. The upgrade daemon marks every live clone with `call_touch` and then drives the patch sweep itself, one zero-delay callout per object -- an eager sweep, not a wait-for-next-reference.
+4. If the domain persists through the Vault, the sweep above covered live clones only: stored XML under the Vault's data tree is untouched by `patch()`, and old-shape files meet the new schema at their next respawn (removed scalar fields dropped silently, a removed `lpc_obj` field able to fail the whole configure, added fields defaulted, renamed types skipping the import entirely). Run the respawn-and-re-store sweep in `docs/vault-applications.md` Schema evolution for the on-disk half, and grep `system.log` for `Warning:: Schema node` and `VAULT: Configuration failed` afterward.
 
 **Verify**: `issues <file.c>` reads back whether the cascade fully propagated; probe a pre-existing clone's format-version property with `code`.
 
-**Owning doc**: `docs/code-lifecycle.md` Touch; `docs/changing-a-running-system.md` rung 3.
+**Owning doc**: `docs/code-lifecycle.md` Touch; `docs/changing-a-running-system.md` rung 3; `docs/vault-applications.md` Schema evolution for the on-disk half.
 
 ## Grant another domain access to your files
 
