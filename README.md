@@ -55,7 +55,7 @@ atomic void increment_with_failure()
 }
 ```
 
-`private int counter` is persistent state: no serialize or restore method backs it, and the value survives a process restart because the runtime's statedump captures the whole object graph, this field included. `atomic void increment_with_failure()` demonstrates the atomicity primitive: the increment and the `error()` share one envelope, so the runtime restores `counter` to its pre-call value when the error fires. `examples/atomic-demo/smoke.sh` runs this exact rollback as a three-step HTTP probe and asserts the counter is unchanged; `docs/first-application.md` builds the same two primitives into a larger service and adds the restart-survival proof this excerpt only implies.
+`private int counter` is persistent state: no serialize or restore method backs it, and the value survives a process restart because the runtime's statedump captures the whole object graph, this field included. `atomic void increment_with_failure()` demonstrates the atomicity primitive: the increment and the `error()` share one envelope, so the runtime restores `counter` to its pre-call value when the error fires. `examples/atomic-demo/smoke.sh` runs this exact rollback as a three-step HTTP probe and asserts the counter is unchanged (`scripts/run-example.sh atomic-demo` asserts the same rollback headless); `docs/first-application.md` builds the same two primitives into a larger service and adds the restart-survival proof this excerpt only implies.
 
 ## Quickstart
 

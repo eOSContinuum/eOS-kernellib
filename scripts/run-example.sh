@@ -28,10 +28,10 @@
 # Sentinels are read from the deployed domain's data/test-result.log.
 # Boot output is captured under state/run-<example>-bootN.log.
 #
-# atomic-demo and http-app have no profile here: they verify against a
-# running server via live HTTP probes (see each example's README and
-# bundled smoke script). hot-reload-demo verifies both ways -- a headless
-# sentinel profile below, plus its bundled HTTP smoke.
+# http-app has no profile here: it verifies against a running server
+# via live HTTP probes (see its README). atomic-demo and hot-reload-demo
+# verify both ways -- a headless sentinel profile below, plus each
+# example's bundled HTTP smoke.
 #
 # Reruns start from a clean slate: the deployed domain, any snapshot,
 # and prior boot logs are removed first, so state never carries across
@@ -52,6 +52,7 @@ example_profile() {
                            # continuation (4 more sentinels) is driven
                            # by scripts/verbsets/agent-app.verbset --
                            # see the example README
+        atomic-demo)       echo "WWW 1 timed 3" ;;
         chat-app)          echo "Chat 3 selfexit 20" ;;
         composite-app)     echo "WWW+Inventory 2 selfexit 5" ;;
                            # 5 = transport-only subset; with the crypto
@@ -70,14 +71,14 @@ example_profile() {
 EXAMPLE="${1:-}"
 if [ -z "$EXAMPLE" ]; then
     echo "usage: scripts/run-example.sh <example>" >&2
-    echo "known examples: agent-app chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
+    echo "known examples: agent-app atomic-demo chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
     exit 2
 fi
 PROFILE=$(example_profile "$EXAMPLE")
 if [ -z "$PROFILE" ]; then
     echo "run-example.sh: no profile for '$EXAMPLE'; add one to example_profile()" >&2
-    echo "known examples: agent-app chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
-    echo "(atomic-demo and http-app verify via live HTTP probes; see their READMEs)" >&2
+    echo "known examples: agent-app atomic-demo chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
+    echo "(http-app verifies via live HTTP probes; see its README)" >&2
     exit 2
 fi
 set -- $PROFILE

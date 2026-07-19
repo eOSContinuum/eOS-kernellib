@@ -52,9 +52,18 @@ The unchanged counter across step 1 and step 3 is the rollback evidence. The `[a
 
 If the smoke reports `FAIL: counter changed`, the `atomic` modifier in `counter.c` is the binding piece — drop it and the same probe shows the mutation persisting.
 
+The example also verifies headless, with no running server or HTTP client: the sentinel profile performs the same caught-failure increment from a boot-time driver (`sys/test.c`), asserting the pre-call baseline, the deliberate error's own text (proof the atomic body ran to its `error()`), and the unchanged counter after the catch.
+
+```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh atomic-demo
+```
+
+`PASS` after 3 ` OK` sentinels (`INITIAL OK`, `BODY-RAN OK`, `ROLLBACK OK`) is the pass signal.
+
 ## Files
 
 - `counter.c` — the counter master. Holds the private int and the `atomic` increment.
 - `obj/server.c` — per-connection HTTP/1 server (clonable). The platform clones one per incoming connection. Inline routing to the counter.
-- `initd.c` — domain initd; compiles `counter` and `obj/server` at boot.
+- `initd.c` — domain initd; compiles `counter`, `obj/server`, and `sys/test` at boot.
+- `sys/test.c` — boot-time test driver: the same caught-failure increment in-process, backing the headless `run-example.sh` profile.
 - `smoke.sh` — POSIX-sh end-to-end verification script.
