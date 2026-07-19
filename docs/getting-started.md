@@ -4,7 +4,7 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 **Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the platform.
 
-**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.5 (arm64), 2026-07-12. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
+**Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated 2026-07-18. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
 
 ## Prerequisites
 
@@ -17,12 +17,12 @@ Clone the DGD source, build the driver, and install the binary:
 ```sh
 git clone https://github.com/dworkin/dgd.git
 cd dgd
-git checkout 1.7.9    # the release this platform is tested against
+git checkout 975e927f    # 1.7.9 + preprocess_file(); the kernel layer requires this kfun
 cd src
 make install
 ```
 
-The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the released driver as-is, and the Tested-against line above names the release it is validated on. Building upstream `master` usually works, but it is not what the doc set's transcripts were captured against.
+The driver binary lands at `dgd/bin/dgd`. See `docs/building.md` for platform-specific notes. DGD is an unmodified upstream dependency: the platform builds on the upstream driver as-is. The kernel layer requires `preprocess_file()`, added to upstream `master` on 2026-07-12 and not yet in a tagged release, so build from the pinned commit above (or any later `master`) -- the 1.7.9 release fails at boot with `undefined function ::preprocess_file`. Note that a `master` build's boot banner still prints `DGD 1.7.9`, so the banner does not distinguish the two.
 
 The build is small. From a clean checkout, `make install` (with the macOS bison workaround from `docs/building.md` where it applies) completes in about two seconds of wall time on an Apple M5 Max, and well under a minute on any recent hardware. There is no dependency fetch: the driver needs only a C++ toolchain and a yacc.
 

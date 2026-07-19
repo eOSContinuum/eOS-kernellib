@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Generate WebAuthn ceremony test vectors for the identity stack.
 
-Writes two generated fixtures (do not edit them by hand; rerun this):
+Writes three generated fixtures (do not edit them by hand; rerun this):
 
-  examples/webauthn-app/sys/vectors.h        LPC defines (hex strings)
-  scripts/verbsets/webauthn-ceremony.verbset console ceremony drive
+  examples/webauthn-app/sys/vectors.h         LPC defines (hex strings)
+  scripts/verbsets/webauthn-ceremony.verbset  console ceremony drive
+  scripts/verbsets/identity-recovery.verbset  recovery-doctrine console drive
 
 The signatures come from an independent implementation -- OpenSSL via
 the python 'cryptography' package -- so the platform's verify kfuns and

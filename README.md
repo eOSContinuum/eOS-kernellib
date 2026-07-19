@@ -1,6 +1,6 @@
 [![License: BSD-2-Clause-Patent](https://img.shields.io/badge/License-BSD--2--Clause--Patent-blue.svg)](LICENSE.md)
 [![Built on: DGD](https://img.shields.io/badge/Built_on-DGD-green.svg)](https://github.com/dworkin/dgd)
-[![Tested against: DGD 1.7.9](https://img.shields.io/badge/Tested_against-DGD_1.7.9-brightgreen.svg)](#quickstart)
+[![Tested against: DGD 1.7.9+](https://img.shields.io/badge/Tested_against-DGD_1.7.9%2B-brightgreen.svg)](#quickstart)
 
 # eOS-kernellib
 
@@ -69,7 +69,7 @@ DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
 
 A passing run ends with the expected `OK` sentinel count. `scripts/README.md` documents the harness; each example under `examples/` names its own profile.
 
-**Tested against**: DGD 1.7.9 (March 2026) on macOS 26.4 (arm64), validated as of 2026-05-15. Other POSIX-compatible systems should work; `docs/building.md` covers platform-specific build notes.
+**Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated as of 2026-07-18. Other POSIX-compatible systems should work; `docs/building.md` covers platform-specific build notes.
 
 ## Documentation
 
@@ -79,7 +79,7 @@ A passing run ends with the expected `OK` sentinel count. `scripts/README.md` do
 - **Writing applications** — `docs/lpc-essentials.md` (LPC language orientation, bridges to the formal spec), `docs/kernel-libraries.md` (the inheritable libraries under `src/lib/`), `docs/application-authoring.md` (general tier-E application patterns, non-HTTP transports), `docs/http-applications.md` (HTTP/1-specific patterns)
 - **Operations** — `docs/operations.md` (`.dgd` configuration, boot modes, state persistence, logging, resource limits, extension loading), `docs/admin-console.md` (operator console: connecting, console security posture, per-task operational reference, verb appendix)
 - **Reference** — `docs/source-map.md` (the source-tree map and subsystem index), `docs/glossary.md` (terms used across the doc set)
-- **Working examples** — nine runnable applications under `examples/`, from the minimal HTTP/1 service (`examples/http-app/`) through atomic rollback, hot reload, Vault persistence, signals, Merry scripting, and multi-user chat; the `docs/README.md` Working-examples section maps each to its companion doc
+- **Working examples** — thirteen runnable applications under `examples/`, from the minimal HTTP/1 service (`examples/http-app/`) through atomic rollback, hot reload, Vault persistence, signals, Merry scripting, multi-user chat, native TLS, the WebAuthn and agent-identity substrates, and the composite transport-connected application; the `docs/README.md` Working-examples section maps each to its companion doc
 
 ## How it composes
 
