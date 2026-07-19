@@ -99,6 +99,8 @@ The merrynode's own merryfuns escape sandbox shadowing using LPC's `::` operator
 
 ## Merryfun call surface
 
+This section is the signature home for the merryfuns; for other callable kinds, the router is `docs/kernel-reference.md` Where signatures live.
+
 Fifteen merryfuns are available to Merry source. Signatures below are the declarations in `merrynode.c`. The leading type is the return type.
 
 | Merryfun | Signature | Behavior |

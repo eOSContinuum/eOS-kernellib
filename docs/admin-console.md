@@ -314,6 +314,8 @@ To reset the admin password from outside the console: the kernel's auth state li
 
 ## Appendix: alphabetical verb reference
 
+This appendix is the signature home for the console verbs; for other callable kinds, the router is `docs/kernel-reference.md` Where signatures live.
+
 | Verb | Category | Brief |
 |---|---|---|
 | `access [<user>\|<directory>\|global]` | Permissions | Inspect access bits for a user, a directory, or globally |

@@ -46,7 +46,7 @@ The daemon's other entry points are internal (leaf generation is gated to the Sy
 
 ## errord -- `src/usr/System/sys/errord.c`
 
-The error manager has no application-facing query surface: its three functions (`runtime_error`, `atomic_error`, `compile_error`) are driver hooks, callable only by the kernel driver. Their dispatch, formatting, and logd persistence are documented in `docs/operations.md` (Logging and diagnostics) and `docs/debugging-applications.md` (Reading an error trace); the hook signatures live in `docs/kernel-reference/hook/driver`.
+The error manager has no application-facing query surface: its three functions (`runtime_error`, `atomic_error`, `compile_error`) are driver hooks, callable only by the kernel driver. Their dispatch, formatting, and logd persistence are documented in `docs/operations.md` (Logging and diagnostics) and `docs/debugging-applications.md` (Reading an error trace); the hook signatures live in `docs/kernel-reference.md` (the driver hooks section).
 
 ## logd -- `src/usr/System/sys/logd.c`
 
@@ -251,4 +251,4 @@ Public introspection over the name tree: the full nested mapping, the folder nam
 - [`docs/code-lifecycle.md`](code-lifecycle.md): the object-manager event surface objectd records and the upgrade model upgraded drives.
 - [`docs/operations.md`](operations.md): the logging pipeline and error dispatch these daemons implement.
 - [`docs/capability.md`](capability.md): the capability model behind capabilityd's store.
-- [`docs/kernel-reference/README.md`](kernel-reference/README.md): the "Where signatures live" router for every other kind of callable.
+- [`docs/kernel-reference.md`](kernel-reference.md): the "Where signatures live" router for every other kind of callable.
