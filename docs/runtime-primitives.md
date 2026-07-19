@@ -18,7 +18,7 @@ The architectural commitment behind this list (why these eight are surfaced as r
 
 | Primitive | Status | Demonstrated by | One-command proof |
 |---|---|---|---|
-| [Atomicity](#1-atomicity) | Validated | `examples/atomic-demo/` | `examples/atomic-demo/smoke.sh` (live HTTP probe; no run-example.sh profile) |
+| [Atomicity](#1-atomicity) | Validated | `examples/atomic-demo/` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh atomic-demo` |
 | [Capability separation](#2-capability-separation) | Partial | `examples/http-app/`, `examples/merry-app` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` |
 | [Persistent state](#3-persistent-state) | Validated | `examples/merry-app` (dump/restart cycle) | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app` |
 | [Hot reload](#4-hot-reload) | Validated | `examples/hot-reload-demo/`, `examples/hot-reload-master/`, `examples/upgrade-cascade/` | `DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh hot-reload-master` |
@@ -37,7 +37,7 @@ Operations commit wholly or roll back wholly. Partial effects do not escape on f
 
 **Foundation**: DGD atomic-function semantics. A function declared `atomic` that errors causes every state mutation performed inside it to roll back. The host runtime is the enforcement point. The application carries no roll-back code. The property is older than this repository. Christopher Allen's [2000 MUD-Dev description][allen-dgd-2000] names it: "atomic function calls allow full system-state rollback in the event of a run-time error."
 
-**Demonstration**: a deliberate-failure probe in `examples/atomic-demo/`. The counter master declares `atomic void increment_with_failure()` whose body mutates `counter` and then `error()`s. The HTTP route catches the error and reports it in the response body. The next `GET /counter` returns the pre-call value, evidence of rollback. The `[atomic]` annotation in the boot log on the error trace is the runtime's own marker of the atomic envelope. The smoke script (`examples/atomic-demo/smoke.sh`) exercises the three-step probe and asserts the rollback.
+**Demonstration**: a deliberate-failure probe in `examples/atomic-demo/`. The counter master declares `atomic void increment_with_failure()` whose body mutates `counter` and then `error()`s. The HTTP route catches the error and reports it in the response body. The next `GET /counter` returns the pre-call value, evidence of rollback. The `[atomic]` annotation in the boot log on the error trace is the runtime's own marker of the atomic envelope. The example verifies both ways: `scripts/run-example.sh atomic-demo` runs the same caught-failure increment headless from a boot-time driver (`sys/test.c`, asserting the baseline, the body-ran error text, and the post-catch rollback), and the smoke script (`examples/atomic-demo/smoke.sh`) exercises the three-step probe over HTTP.
 
 **Status**: Validated. Foundation present. Rollback demonstrated empirically by `examples/atomic-demo/`.
 
