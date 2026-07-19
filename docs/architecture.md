@@ -191,6 +191,17 @@ An extension you load today is one your statedump binds to: a snapshot taken wit
 
 Extension kfuns sit alongside built-in kfuns at the host-driver level, with the same per-tier access checks. An LPC file calling some kfun cannot tell from the call shape whether the kfun is a host built-in or a dlopen-loaded extension. The deployment's `.dgd` config determines which kfuns are present.
 
+## The driver dependency
+
+The runtime driver, [DGD], is an unmodified upstream work under AGPL-3.0, developed and distributed separately at `dworkin/dgd` and never bundled into this repository. eOS-kernellib is an LPC codebase the driver loads, released under the BSD 2-Clause Plus Patent License (`LICENSE.md`). The facts an adopter's counsel will ask about, stated as facts and not as legal advice:
+
+- Nothing in this repository compiles into, links against, or modifies the driver's C++ source. The boundary is the kfun/LPC interface: the driver is a separately built binary that reads this repository's source tree as input.
+- Application LPC source -- this repository's and yours -- is interpreted input to the driver process. It contains no driver code, and it is not built against the driver's C++ source or C++ headers. LPC compilation does read a small closed set of constant-definition files (`status.h`, `type.h`, `connect.h`, `limits.h`, `float.h`, `trace.h`, `kfun.h`) that the driver itself regenerates fresh at every boot; this repository excludes them from version control (`.gitignore`) precisely because they are driver output, not repository source.
+- The AGPL attaches to the driver itself. A deployer who modifies the driver's source and offers the modified driver's service over a network carries the AGPL section-13 source obligation for those driver modifications; the unmodified driver's source is already public at the upstream repository.
+- The kernel layer and application tiers carry their own licenses: this repository BSD 2-Clause Plus Patent, an application whatever its author chooses.
+
+Continuity has the same shape as the license boundary: an external dependency managed at a pinned interface. The platform pins the driver commit it is tested against (`docs/getting-started.md` Install DGD), so it builds reproducibly against fixed driver source regardless of upstream cadence, and the [eOSContinuum/dgd](https://github.com/eOSContinuum/dgd) fork tracks upstream to keep that source available. DGD has a single primary maintainer with a three-decade history; the pin-plus-fork posture is what bounds the platform's exposure to an upstream pause, and driver-layer contributions still belong upstream (`CONTRIBUTING.md`).
+
 ## Runtime primitives
 
 The kernel layer surfaces eight runtime primitives:
