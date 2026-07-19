@@ -10,6 +10,7 @@ src/kernel/data/access.data
 # Deployment targets for the examples/ directory:
 # canonical example source lives at examples/<name>/; src/usr/<Mount>/ is a
 # deployment artifact created via `cp -R examples/<name> src/usr/<Mount>`.
+src/usr/AgentApp/
 src/usr/MyApp/
 src/usr/SignalApp/
 src/usr/MerryApp/

@@ -12,7 +12,7 @@ A reader from C, C++, Java, or Go will recognize most of LPC's surface. Curly br
 
 ## What is surprising
 
-Five properties make LPC behave differently from most other languages a builder is likely to have written before. None are subtle once seen. All are subtle if missed.
+Six properties make LPC behave differently from most other languages a builder is likely to have written before. None are subtle once seen. All are subtle if missed.
 
 **Objects live in a persistent in-memory database.** Every "object" in LPC is a value in the host driver's persistent store. When the platform restarts, the object graph is reconstituted from a snapshot file and resumes where it left off. There is no separate "save to disk" step in normal operation. Persistence is the default. This is called *orthogonal persistence* in the systems literature.
 
@@ -23,6 +23,8 @@ Five properties make LPC behave differently from most other languages a builder 
 **No manual memory management.** No `malloc` / `free`, no `delete`. Masters and clones persist until explicitly removed with `destruct_object()`. Only lightweight objects (LWOs, see below) are reference-counted and deallocated when the last reference drops. Programs do not own memory. The host owns it.
 
 **Cross-object calls and inherited calls have their own operators.** `obj->func(arg)` calls `func` on a different object (the call traverses the kfun layer and goes through access checks). `::func()` calls the inherited version of `func` from this object's parent class. `name::func()` calls the inherited version when the inherit was given a name. A bare `func()` call is local to the current object.
+
+**A source file compiles in a fixed section order.** `inherit` statements come first, then declarations, then the code that uses them: the compiler resolves the inherit chain before anything else in the file, so a declaration -- even a forward declaration -- placed above the `inherit` block fails the compile. The C habit of prototypes at the very top of the file does not transfer. The stakes at boot are total: an uncaught compile failure in any domain's `initd.c` aborts the whole cold boot (`docs/debugging-applications.md` What an initd compile failure does to the rest of the boot).
 
 ## If you come from dynamic languages
 

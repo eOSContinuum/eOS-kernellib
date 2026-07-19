@@ -38,6 +38,8 @@ python3 scripts/drive-verbs.py scripts/verbsets/admin-baseline.verbset
 
 Logs into the console over telnet, then drives each block of a verbset file in session order. A verbset block is one `cmd:` line (the verb to send) plus zero or more `expect:` / `absent:` regex lines (`re.search`, `re.MULTILINE`) checked against the response; blocks separate on a blank line, `#` lines are comments. An `expect:` that fails to match, or an `absent:` that matches, both fail the entry; the run exits non-zero on any entry failure. Consecutive entries share one session, so a verbset can express mutate -> verify -> undo -> verify-undo. A block may also carry `capture: <name> <regex-with-one-group>` lines: on match, the group's text is stored and later `cmd:`/`expect:`/`absent:`/`capture:` lines can reference it as `%{name}` (regex-escaped inside patterns, raw in cmd lines) -- the mechanism for threading runtime values (a minted id, a generated secret shown once) through later verbs; a capture that does not match fails its block, and later references to it fail theirs.
 
+Two composability constraints when batching verbsets into one boot: a verbset asserting a daemon's module-less stand-down cannot share a module-bearing boot (the stand-down refusals it expects answer differently with the crypto module loaded), and a verbset asserting absolute counts (identity rosters, store totals, patch counters) needs its own boot -- state accumulated by earlier verbsets in the same session shifts the counts.
+
 The session logs in as `admin` unless the verbset declares otherwise: file-level `user:` / `password:` directives before the first block (overridable with `--user` / `--password`) let a verbset run as a registered non-admin operator -- the login shape that reaches the System console and its lifecycle verbs (`upgrade` and friends; see `docs/admin-console.md` Connecting). Cold boots register no such operator, so a registered-user verbset runs after a provisioning verbset driven as admin: `operator-provision.verbset` grants the operator, `operator-upgrade.verbset` (`user: testop`) then drives the console `upgrade -p` cascade against a deployed upgrade-cascade example.
 
 ## drive-verbs-smoke.sh
@@ -103,7 +105,7 @@ Both write generated fixtures; do not edit those by hand -- rerun the generator.
 
 ## Full regression sweep
 
-Run in this order for the complete pre-PR bar. Each line names the command and the pass signal to look for; `<dgd>` is the path to a built DGD binary.
+Run in this order for the complete pre-PR bar. Each line names the command and the pass signal to look for; `<dgd>` is the path to a built DGD binary. Expect the full bar to take on the order of fifteen minutes end to end on the measured-baseline hardware -- no single step exceeds about two minutes.
 
 1. `DGD_BIN=<dgd> scripts/run-example.sh chat-app` -- `PASS`, 20 " OK" sentinels across 3 boots (cold selfexit, snapshot restore, cold no-snapshot).
 2. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-demo` -- `PASS`, 2 " OK" sentinels (1 timed boot).
@@ -128,12 +130,23 @@ Run in this order for the complete pre-PR bar. Each line names the command and t
 21. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/session-smoke.sh` -- `SESSION-SMOKE PASS` after the session lifecycle (mint, validate, revoke, TTL expiry, revoke-principal) and the statedump-discipline scan: the plaintext token is absent from a live-session snapshot while its hash and principal are present. Needs the lpc-ext crypto module; the module-less stand-down is asserted by session-verbs in step 14.
 22. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/agent-smoke.sh` -- `AGENT-SMOKE PASS` after the foreign-signer key ceremony with the domain-tag refusal, the token ceremony with required expiry, the suspension and coexisting-grant semantics, and the statedump token-plaintext scan with its positive controls. Needs python3 and an OpenSSL 1.1.1+ CLI besides the module.
 23. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
-24. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
-25. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
-26. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+24. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`. Steps 24-26 are manual deploys with no built-in clean slate: before each, stop the running `dgd` and remove the prior deploy and state (`rm -rf src/usr/WWW state/snapshot state/snapshot.old state/swap`) -- `cp -R` into an existing mount nests the new example inside the old one instead of replacing it, silently deploying a broken tree.
+25. Same reset first, then deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
+26. Same reset first, then deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
 27. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
+
+## Adding a new example
+
+A whole new example registers at six points; missing one either breaks reruns or leaves the example undiscoverable:
+
+1. **The directory shape**: `examples/<name>/` with an `initd.c` (the domain entry point the System initd's `/usr/[A-Z]*/initd.c` iteration picks up) and a `sys/test.c` boot-time driver appending ` OK` / `FAIL` sentinels to the deployed domain's `data/test-result.log`.
+2. **`run-example.sh`, twice**: a profile line in `example_profile()` (deploy mount, boots, boot-1 mode, expected OK count) and the mount name added to the clean-slate removal loop -- a mount missing from that loop survives into other examples' runs and breaks their isolation.
+3. **The profile table** in this README, mirroring the new `example_profile()` line.
+4. **`examples/README.md`**: the index row (description, companion doc, verify path).
+5. **`docs/README.md` Working examples**: the map row.
+6. **`.gitignore`**: the deploy mount (`src/usr/<Mount>/`) -- deploy targets are individually ignored, and an unlisted mount shows up as untracked noise after every run.
 
 ## Adding a regression
 
