@@ -59,7 +59,7 @@ atomic void increment_with_failure()
 
 ## Quickstart
 
-New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime. Evaluating whether the platform fits before building on it? `docs/README.md`'s "Evaluate whether the platform fits" reading path collects the proofs, the ships-today-versus-next boundary, the capacity envelope, and the security posture in one path.
+New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime. Evaluating whether the platform fits before building on it? `docs/evaluating.md` is the one-page fit brief; `docs/README.md`'s "Evaluate whether the platform fits" reading path carries its depth links.
 
 **See it proven in one command.** With DGD built, the regression harness deploys an example, boots the platform, exercises it — including a full snapshot-and-restart persistence cycle — and counts the assertion sentinels:
 
@@ -89,6 +89,17 @@ eOS-kernellib sits between the [DGD] driver and the application built on top:
 - **Above**: An application uses the kernel layer's capability tiers, daemons, and primitives to express its own logic.
 
 The kernel layer is application-neutral. Long-running stateful workflows, customer-authored automation, durable memory for long-lived processes, agent-runtime harnesses, and other orthogonally-persistent-server use cases all build on the same runtime primitives.
+
+## Where it does not fit
+
+The boundaries are deliberate design decisions, stated up front:
+
+- **One process on one machine.** A single coherence domain by design: no horizontal scale-out, no multi-machine redundancy, no concurrent writers across machines (`docs/coming-from-contemporary-infrastructure.md` What does not translate).
+- **Stock-build ceilings.** 255 simultaneous users, 65535 objects, and a swap device capped at 65535 sectors -- about 64 MiB of pageable object storage at the demo config's 1 KiB sector size, scaling only through `sector_size` (`docs/operations.md` Limits and capacity states each ceiling and which rows have headroom).
+- **LPC is the in-image language.** The runtime's guarantees hold for LPC (and Merry) code inside the image; other languages integrate at the transport boundary as clients.
+- **No LSP, no step debugger.** LPC is edited as C files with `rg` for navigation; the console's introspection verbs stand in for a debugger (`docs/debugging-applications.md` The working environment, plainly).
+
+`docs/evaluating.md` is the one-page fit brief that weighs these against what the platform proves.
 
 ## Heritage
 
