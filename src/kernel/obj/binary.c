@@ -80,6 +80,13 @@ static void close(int dest)
 static void _flow_mode(int mode, int length)
 {
     ::length = length;
+    if (mode == MODE_NOCHANGE) {
+	/*
+	 * a flow decision that keeps the current mode: resume input,
+	 * which set_mode() would otherwise leave blocked
+	 */
+	mode = MODE_UNBLOCK;
+    }
     ::flow_mode(([ ]), mode);
 }
 
@@ -143,7 +150,7 @@ private void add_to_buffer(mapping tls, string str)
  */
 private void receive_buffer(mapping tls)
 {
-    int len;
+    int len, newmode;
     string str, head, pre;
 
     while (mode != MODE_BLOCK && mode != MODE_DISCONNECT) {
@@ -171,7 +178,17 @@ private void receive_buffer(mapping tls)
 		    }
 		}
 
-		set_mode(::receive_message(tls, str));
+		newmode = ::receive_message(tls, str);
+		set_mode(newmode);
+		if (newmode == MODE_BLOCK) {
+		    /*
+		     * the mode that processing this message will select
+		     * is not known yet (flow), or input was blocked
+		     * outright: don't frame the rest of the buffer with
+		     * the stale mode; a later mode change restarts it
+		     */
+		    break;
+		}
 	    } else {
 		noline = TRUE;
 		break;
