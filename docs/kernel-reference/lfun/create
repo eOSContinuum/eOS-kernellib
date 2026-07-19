@@ -1,9 +1,0 @@
-NAME
-	create - initialize object
-
-SYNOPSIS
-	void create()
-
-
-DESCRIPTION
-	This function is called when an object is initialized.
