@@ -388,12 +388,15 @@ static void run_xref_test()
 
     /* phase 6: dangling reference. A fresh driver-owned gamma stores
      * a peer reference to beta; with BOTH unloaded, importing gamma's
-     * peer errors inside the Vault's configure step ("no object"),
-     * which do_spawn catches internally. The create step already
-     * succeeded, so gamma exists -- with whatever attributes imported
-     * before the dangling one, and a nil peer. The assertion pins that
-     * boundary: a dangling lpc_obj reference does not throw to the
-     * spawn caller and leaves the object without its peer.
+     * peer errors during the configure-step parse ("no object"),
+     * before any attribute is imported, and do_spawn catches it
+     * internally. The create step already succeeded, so gamma exists
+     * -- but with only its create()-time state: the parse failure
+     * costs every attribute, not just the dangling peer (see
+     * docs/vault-applications.md Cross-object references). The
+     * assertion pins the caller-visible boundary: a dangling lpc_obj
+     * reference does not throw to the spawn caller and leaves the
+     * object without its peer.
      *
      * gamma is used instead of re-destructing alpha because the
      * respawned alpha is OWNED BY THE VAULT DAEMON (clone_object ran
