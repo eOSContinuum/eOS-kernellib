@@ -52,7 +52,7 @@ int listContains(string str)
  */
 string transport()
 {
-    return name + ((value) ?
+    return name + ((value != nil) ?
 		    ": " + transportValue(value, params,
 					  (lcName == "server" ||
 					   lcName == "user-agent")) :
