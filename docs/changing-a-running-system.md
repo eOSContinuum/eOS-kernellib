@@ -52,12 +52,23 @@ Reference: `docs/operations.md` boot modes and `docs/admin-console.md` Snapshot,
 
 A multi-file application release composes the ladder's rungs into one operator sequence. Nothing here is new mechanism -- it is the order that keeps every step recoverable.
 
-1. **Snapshot first.** `snapshot` writes the restore point (`docs/operations.md` Backing up and restoring state). If anything below goes wrong, the recovery is that snapshot, not a reverse migration.
+1. **Snapshot first.** `snapshot` writes the restore point (`docs/operations.md` Backing up and restoring state). If anything below fails midway, the recovery is that snapshot; for backing out a release that landed, Rolling back a release below weighs the two paths.
 2. **Sync the source tree.** Bring the domain's source to the release state (a git checkout or copy on the host). Nothing changes in the image yet: masters rebuild only when compiled.
 3. **Upgrade through the cascade.** For each changed library, `upgrade -a <file.c>` from the operator login (rung 2): the daemon recompiles every direct and transitive dependent, and `-a` makes the tree all-or-nothing, so a compile error anywhere leaves the whole release un-applied. Add `-p` when the release changes a clone's data shape (rung 3); the patch sweep runs eagerly after the recompile. Standalone masters with no shared library are a plain `compile <path>` each (rung 1).
 4. **Verify.** `issues <file.c>` per changed source reads back whether the cascade converged (more than one issue means older program versions are still bound); the application's own sentinel driver or a `code` probe exercises the changed behavior; `log 40` reads the error log for anything the release provoked.
 
 **Detecting image-versus-source drift.** No shipped tooling compares the compiled image against the on-disk tree, in either direction -- there is no manifest, no checksum walk, and no report of masters whose source changed since compile. The primitives to hand-roll a per-object check exist (an object's compile time via `status(obj)[O_COMPILETIME]`, the source's modification time via `file_info`), but nothing walks the tree for you. What holds drift down is discipline plus one structural fact: compile from files rather than the two-argument inline-source form (rung 1 names that escape hatch as exactly the drift hole), and drift does not survive a cold boot -- though not symmetrically. A cold boot starts from an empty object table and compiles what the initd cascade reaches from the tree: a stale on-disk master is rebuilt from the current file, while an inline-only master with no file behind it simply does not come back (it vanishes if nothing references its path again, and a later `compile_object` against the fileless path errors).
+
+## Rolling back a release
+
+Two recoveries exist, with opposite data-loss profiles. Neither is a replay: nothing in the runtime re-applies work committed after a restore point.
+
+- **Snapshot restore** (step 1's restore point) rewinds the whole image. Every write committed after the snapshot -- user state included -- is forfeited, potentially hours of it at the default `dump_interval` (`docs/operations.md` Availability and data-loss model). It is the correct recovery when the release failed midway or corrupted state broadly enough that the image's integrity is in doubt.
+- **Source revert and re-upgrade** rolls the code back while preserving user state: restore the old sources on disk and run the same cascade again. A rollback is a release like any other -- the runtime restores no prior dataspace values -- and it is the correct recovery when the release is behaviorally wrong but the state written since is worth keeping.
+
+The revert path carries one hard constraint, exercised live against the upgrade-cascade example: **if the release changed a clone's data shape, a naive revert silently destroys the new shape's data.** Recompiling the old source remaps each clone's variables by name and type against the immediately previous program; fields the old source no longer declares are dropped before any `patch()` can run, and they reappear zeroed rather than restored if a later version re-adds them -- with no console error and nothing in `system.log`. A reverse data migration therefore ships as an intermediate release, exactly like the forward one (rung 3): a version keeping the old behavior but still declaring the new fields, whose `patch()` maps them back onto the old shape (`upgrade -p`), then the plain old source once that sweep has landed on every clone. Confirm the intermediate sweep completed (a format-version or patch-counter probe via `code`) before the second upgrade: a clone whose intermediate patch is still pending meets the final recompile's remap with the new fields already gone.
+
+Two mechanism facts to hold while writing either direction: `patch()` runs after the recompile, on the newly compiled program, against the already-remapped dataspace -- so the migration logic ships in the incoming source; and the `-p` sweep re-runs `patch()` even when the recompiled source is unchanged, so `patch()` must be idempotent regardless of direction (the format-version stamp in `docs/common-tasks.md`'s recipe is that guard).
 
 ## Changing the kernel layer
 
@@ -79,7 +90,7 @@ The contributor's edit loop follows from the matrix: day-to-day kernel work is e
 Two properties hold under every rung above:
 
 - **Atomicity bounds the failure.** A failed compile, a failed atomic upgrade, an erroring observer, a misbehaving script: each rolls back its own envelope's mutations. Partial effects do not escape. The change either lands or it never happened (`docs/runtime-primitives.md` §1).
-- **The image is the recovery point.** Statedump snapshots capture the entire object graph. A deployment that needs a coarse undo restores the prior snapshot and replays from there (`docs/persistence.md`).
+- **The image is the recovery point.** Statedump snapshots capture the entire object graph. A deployment that needs a coarse undo restores the prior snapshot, forfeiting everything committed after it -- there is no replay mechanism (`docs/persistence.md`; Rolling back a release above weighs that loss against the source-revert path).
 
 ## What never happens
 
