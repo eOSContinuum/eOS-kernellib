@@ -106,7 +106,8 @@ Shell scripts under `examples/` follow POSIX conventions and target a portable i
 2. Create a branch named for the change shape: `feature/<short-name>`, `fix/<short-name>`, `docs/<short-name>`, or `refactor/<short-name>`.
 3. Commit per the conventions above.
 4. Open the PR against `main`. Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md) shape; fill in the linked issue, the change summary, and the verification steps.
-5. Maintainer review focuses on: does the change match an existing primitive or doc commitment; does it preserve capability-tier discipline; is the test evidence reproducible.
+5. Know that no automated checks run on a PR today -- there is no CI workflow, so nothing reruns the regression sweep for you. The PR's verification section is the reproducible evidence a reviewer reruns locally: include the exact commands and pass signals from the Full regression sweep (`scripts/README.md`) that your change touches.
+6. Maintainer review focuses on: does the change match an existing primitive or doc commitment; does it preserve capability-tier discipline; is the test evidence reproducible.
 
 ## Code of Conduct
 
