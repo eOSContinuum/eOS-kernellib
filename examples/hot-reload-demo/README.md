@@ -52,6 +52,14 @@ Step 3: GET /greet (post-recompile response)
 
 The response changing across the three-step probe is the hot-reload evidence: the same DGD process serves the cold-boot string in step 1 and the recompiled string in step 3, with `compile_object` (invoked through `POST /compile`) as the only mechanism that changed in between.
 
+The example also verifies headless, with no running server or HTTP client: the sentinel profile runs the same three-step reload from a boot-time driver (`sys/test.c`), asserting the `greet()` return value before the in-process `compile_object` and again from the next dispatch after it.
+
+```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh hot-reload-demo
+```
+
+`PASS` after 2 ` OK` sentinels (`INITIAL OK`, `RELOAD OK`) is the pass signal.
+
 ## Limits the demonstration does not cover
 
 - **In-flight calls during recompile.** The host-runtime guarantee is that calls already dispatched against the old master finish on the old program; only subsequent dispatches see the new program. A sequential `curl` smoke does not exercise this — the cold-boot GET finishes before the POST arrives, and the second GET starts after the recompile commits. Verifying the in-flight-finishes-with-old half requires a concurrent-request probe (out of scope for this example).
@@ -63,4 +71,5 @@ The response changing across the three-step probe is the hot-reload evidence: th
 - `greeting.c` — the target master. Single `greet()` function returning a string.
 - `obj/server.c` — per-connection HTTP/1 server (clonable). Inline routing for GET /greet and POST /compile.
 - `initd.c` — domain initd; compiles `greeting` and `obj/server` at boot.
+- `sys/test.c` — boot-time test driver: the same reload sequence in-process, with the post-recompile read deliberately made from a fresh dispatch, backing the headless `run-example.sh` profile.
 - `smoke.sh` — POSIX-sh three-call end-to-end verification script.

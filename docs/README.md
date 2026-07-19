@@ -71,6 +71,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - `../examples/hot-reload-master/`, clone-upgrade demonstration: recompiling a clonable master propagates the new program to existing clones while each keeps its state. Read alongside [code-lifecycle.md](code-lifecycle.md).
 - `../examples/upgrade-cascade/`, library-upgrade demonstration: upgrading a parent library through the upgrade daemon recompiles its inheritors and `call_touch`-patches their existing clones, each keeping its state. Read alongside [code-lifecycle.md](code-lifecycle.md) Library upgrade.
 - `../examples/webauthn-app/`, WebAuthn substrate demonstration: the base64url, CBOR, and COSE_Key decoding a relying party performs on credential payloads (RFC 4648 and RFC 8949 vectors with strict-reject batteries), plus -- with the crypto module -- registration and assertion ceremony verification against foreign-generated vectors including the negative batteries. Read alongside [kernel-libraries.md](kernel-libraries.md) Utilities.
+- `../examples/agent-app/`, the agent identity worked example: controller registration through the `authd` facade, self-service agent minting, the foreign-signed key ceremony with its refusal battery, delegation through the operator continuation, suspension and resume. Read alongside [identity.md](identity.md) Agent identities.
 
 ### Reference
 

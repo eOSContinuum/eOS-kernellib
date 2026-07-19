@@ -6,14 +6,14 @@ Building eOS-kernellib means building DGD. The kernel layer is LPC source that D
 
 ## DGD
 
-DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib targets DGD 1.7.x.
+DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib targets DGD 1.7.x, from upstream `master` at or after `975e927f` (`preprocess_file()`, 2026-07-12) -- the 1.7.9 release predates that kfun and fails to boot the kernel layer.
 
 ### Standard build
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
 cd dgd
-git checkout 1.7.9    # the release this platform is tested against
+git checkout 975e927f    # 1.7.9 + preprocess_file(); the kernel layer requires this kfun
 cd src
 make install
 ```

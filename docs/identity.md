@@ -62,7 +62,7 @@ An agent -- an automated process acting on a human's behalf -- is an ordinary id
 
 **Delegation** -- a controller granting its agent a subset of its own platform capabilities -- is the first consumer of the delegated-grant seam, with its own doctrine in `docs/capability.md` (Identity principals): per-capability operator-flagged delegability, delegation only from a controller to its own agent, a source-tracked eager revocation cascade, and an accountability claim rather than a confinement claim.
 
-`scripts/agent-smoke.sh` proves the ceremonies (against a foreign Ed25519 signer), the required token expiry, the suspension semantics, and the statedump discipline for agent tokens on a live boot.
+`scripts/agent-smoke.sh` proves the ceremonies (against a foreign Ed25519 signer), the required token expiry, the suspension semantics, and the statedump discipline for agent tokens on a live boot. `examples/agent-app/` is the worked binding of this doctrine as an application: the registration, minting, ceremony, and refusal battery run as a boot-time driver, with the operator half driven by `scripts/verbsets/agent-app.verbset`.
 
 ## The boundary: operator authentication is a separate circuit
 

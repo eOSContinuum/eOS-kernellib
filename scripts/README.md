@@ -2,7 +2,7 @@
 
 **Audience**: a contributor running or extending the headless boot regressions under `scripts/`; assumes DGD is built per `docs/getting-started.md`.
 
-Seven scripts drive the platform through boot cycles and assert or measure the result. The five shell scripts resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports; `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance.
+Ten scripts back the regression surface. The six shell scripts drive the platform through boot cycles and assert the result; they resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports. `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance; `measure-baseline.py` is the timing rig; the two `gen-*.py` vector generators write test fixtures and never launch the platform.
 
 ## run-example.sh
 
@@ -15,15 +15,20 @@ Deploys the named example fresh under `src/usr/<Deploy>`, runs its boot sequence
 
 | Example | Deploy | Boots | Boot 1 | Expected OK |
 |---|---|---|---|---|
+| agent-app | AgentApp | 1 | timed | 10 |
 | chat-app | Chat | 3 | selfexit | 20 |
+| composite-app | WWW+Inventory | 2 | selfexit | 5 |
 | hot-reload-demo | WWW | 1 | timed | 2 |
 | hot-reload-master | Reload | 1 | timed | 3 |
 | merry-app | MerryApp | 2 | selfexit | 28 |
 | signal-app | SignalApp | 1 | timed | 1 |
 | upgrade-cascade | Cascade | 1 | timed | 7 |
 | vault-app | MyApp | 1 | timed | 10 |
+| webauthn-app | WebAuthn | 1 | selfexit | 13 |
 
-`atomic-demo` and `http-app` have no profile here -- they verify over live HTTP (`atomic-demo` via its bundled `smoke.sh`, `http-app` via the probe commands in its README).
+A `+`-joined Deploy is a multi-domain example: one example subdirectory per part, each deployed as its own domain, with sentinels read from the last part's `data/`. Module notes: `agent-app` needs `LPC_EXT_CRYPTO` for every phase, and its operator continuation (4 more sentinels) is driven by `scripts/verbsets/agent-app.verbset` -- see the example README. `composite-app`'s 5 is the module-less transport subset; the full set is `LPC_EXT_CRYPTO=<module> EXPECTED_OK=38`. `webauthn-app`'s 13 is the codec half; the ceremony phases need the module (`EXPECTED_OK=26`).
+
+`atomic-demo` and `http-app` have no profile here -- they verify over live HTTP (`atomic-demo` via its bundled `smoke.sh`, `http-app` via the probe commands in its README); `https-app` verifies via `scripts/https-smoke.sh`; `hot-reload-demo` verifies both ways (its profile above, plus its bundled HTTP smoke).
 
 ## drive-verbs.py + scripts/verbsets/
 
@@ -62,6 +67,15 @@ DGD_BIN=/path/to/dgd/bin/dgd scripts/session-smoke.sh
 
 The session daemon end-to-end with its statedump-discipline proof. Boots with the crypto module and drives the session lifecycle over the console -- mint (capturing the plaintext token from the transcript), validate, revoke, TTL expiry, revoke-principal. The load-bearing phase takes a console `snapshot` while a session is live and scans the image for the plaintext token: it must be absent, while the token's SHA-256 hash and the principal string are present (their absence would mean the session never persisted and the scan is vacuous -- the positive control). `SESSION-SMOKE PASS` is the pass signal. Needs the lpc-ext crypto module (`make crypto` in `dworkin/lpc-ext`); the daemon's module-less stand-down is asserted by session-verbs in the drive-verbs default suite.
 
+## agent-smoke.sh
+
+```sh
+LPC_EXT_CRYPTO=/path/to/lpc-ext/crypto.<ver> \
+DGD_BIN=/path/to/dgd/bin/dgd scripts/agent-smoke.sh
+```
+
+Agent identity end-to-end with its statedump-discipline proof. Boots with the crypto module and drives, over the console: the key ceremony against a real foreign signer (Ed25519 via the `openssl` CLI, so the platform verifies bytes it did not produce), including the domain-tag refusal (a signature over the bare challenge is refused); the token ceremony including required expiry (a short-TTL token authenticates, then expires and is refused); suspension killing live sessions and delegated grants while a coexisting operator grant of the same capability survives on its own source, with resume restoring authentication but never grants; and the load-bearing scan -- a statedump taken with a live agent token and a live agent session is scanned for the token plaintext (must be absent) with the token's SHA-256 hash and the agent principal as positive controls. `AGENT-SMOKE PASS` is the pass signal. Needs python3 (stdlib only) and an `openssl` CLI with Ed25519 support (OpenSSL 1.1.1+; LibreSSL will not do), plus the crypto module like the other module-bearing steps.
+
 ## base-boot-guard.sh
 
 ```sh
@@ -78,6 +92,15 @@ DGD_BIN=/path/to/dgd scripts/measure-baseline.py [--sizes 4,12,28] [--requests 2
 
 The timing rig, not a pass/fail gate: boots cold (timed to console-ready), grows the image in steps by parking integer arrays in a scratch object, records the client-observed snapshot pause and the snapshot file size at each step, times a restore boot against the final snapshot, and drives sequential GETs against the deployed http-app for a throughput figure. It writes its own config copy with `sector_size` raised, because the stock build caps `swap_size` at 65535 sectors and the image must fit the swap device. Numbers land in `docs/operations.md` Limits and capacity; re-run there means re-measuring on your machine, not trusting ours.
 
+## Vector generators
+
+```sh
+python3 scripts/gen-webauthn-vectors.py
+python3 scripts/gen-agent-vectors.py
+```
+
+Both write generated fixtures; do not edit those by hand -- rerun the generator. `gen-webauthn-vectors.py` produces `examples/webauthn-app/sys/vectors.h`, `scripts/verbsets/webauthn-ceremony.verbset`, and `scripts/verbsets/identity-recovery.verbset`; `gen-agent-vectors.py` produces `examples/agent-app/sys/vectors.h`. The signatures come from independent implementations -- the python `cryptography` package for the WebAuthn ECDSA vectors, the `openssl` CLI for the agent Ed25519 vectors -- so the platform's verify kfuns and ceremony parsing are checked against foreign-generated payloads, not bytes the LPC stack produced itself. Regenerated files differ byte-for-byte (fresh keys, randomized ECDSA) while staying valid; the structures the LPC drivers assert against (rpId, origin, challenges, credential ids, the domain tag) are fixed in the generators. `gen-webauthn-vectors.py` needs python3 with the `cryptography` package; `gen-agent-vectors.py` needs python3 (stdlib only) and an `openssl` CLI with Ed25519 support (OpenSSL 1.1.1+; LibreSSL will not do).
+
 ## Full regression sweep
 
 Run in this order for the complete pre-PR bar. Each line names the command and the pass signal to look for; `<dgd>` is the path to a built DGD binary.
@@ -91,17 +114,24 @@ Run in this order for the complete pre-PR bar. Each line names the command and t
 7. `DGD_BIN=<dgd> scripts/run-example.sh vault-app` -- `PASS`, 10 " OK" sentinels (1 timed boot).
 8. `DGD_BIN=<dgd> scripts/run-example.sh webauthn-app` -- `PASS`, 13 " OK" sentinels (1 cold selfexit boot; the codec phases -- ceremony phases skip without the crypto module).
 9. `LPC_EXT_CRYPTO=<crypto-module> EXPECTED_OK=26 DGD_BIN=<dgd> scripts/run-example.sh webauthn-app` -- `PASS`, 26 " OK" sentinels: the codec phases plus the 13 ceremony phases (registration and assertion against foreign-generated vectors, with the negative batteries: bad type, bad challenge, bad origin, bad rpIdHash, bad format, bad signature, wrong key, and the Ed25519 pair). Without the module this step is the documented skip.
-10. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the ten default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, identity-verbs, session-verbs, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
-11. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-lifecycle.verbset` -- `DRIVE-VERBS PASS` after the active identity lifecycle (operator mint with recovery codes, single-use redemption, the never-zero-credentials invariant, atomic rotation rollback, revocation). Needs the lpc-ext crypto module like the https-smoke step; without it this step is the documented skip -- identityd's module-less stand-down is asserted by identity-verbs in step 10.
-12. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-capability.verbset` -- `DRIVE-VERBS PASS` after the operator grant path: minting an identity, granting a platform capability to its principal, confirming `capabilityd->is_allowed` answers true through the choke-point, the KERNEL()-gated `grant` refusing a console caller, and revocation. Needs the lpc-ext crypto module (minting); without it the skip is documented.
-13. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/webauthn-ceremony.verbset` -- `DRIVE-VERBS PASS` after the ceremony daemon's console drive: TOFU registration minting an identity, re-registration refused, assertion advancing signCount, the replay refusal, an unknown credential refused, and the System-tier gate. Regenerate the vectors (and this verbset) with `scripts/gen-webauthn-vectors.py`; without the module this step is the documented skip.
-14. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-recovery.verbset` -- `DRIVE-VERBS PASS` after the operator half of the recovery doctrine: mint-with-codes, the console `identity bind` verb verifying a foreign attestation before binding, the never-bare-re-bind refusal, single-use redemption, and the last-credential redemption refusal. Regenerated by the same vector script as step 13; without the module this step is the documented skip.
-15. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/session-smoke.sh` -- `SESSION-SMOKE PASS` after the session lifecycle (mint, validate, revoke, TTL expiry, revoke-principal) and the statedump-discipline scan: the plaintext token is absent from a live-session snapshot while its hash and principal are present. Needs the lpc-ext crypto module; the module-less stand-down is asserted by session-verbs in step 10.
-16. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
-17. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
-18. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
-19. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
-20. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
+10. `DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- `PASS`, 5 " OK" sentinels across 2 boots (cold selfexit, snapshot restore): the module-less transport subset.
+11. `LPC_EXT_CRYPTO=<crypto-module> EXPECTED_OK=38 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- `PASS`, 38 sentinels: the full composite set (WebAuthn/session authentication over the wire, the agent self-service panel, the server-sent-event streams, the recovery ceremony, and the restore boot). Without the module the subset at step 10 is the documented fallback.
+12. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/run-example.sh agent-app` -- `PASS`, 10 sentinels: controller registration through authd, self-service agent minting, the foreign-signed key ceremony with its refusals, and suspension/resume. Every phase needs the module; without it this step is the documented skip.
+13. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> DEPLOY="agent-app:AgentApp" scripts/drive-verbs-smoke.sh scripts/verbsets/agent-app.verbset` -- `DRIVE-VERBS PASS` after the operator continuation of step 12's example: the capability grant and delegable flip, then the driver's continuation sentinels (the delegation lands, the action gate opens, suspension kills the delegated grant, resume restores nothing).
+14. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh` -- `DRIVE-VERBS PASS` after the ten default verbsets (admin-baseline, logging-verbs, schema-verbs, dispatcher-verbs, port-labels, tls-cert, identity-verbs, session-verbs, operator-provision, operator-upgrade) run against the vault-app (MyApp) and upgrade-cascade (Cascade) deploys.
+15. `DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/code-eval-baseline.verbset scripts/verbsets/initd-laundering.verbset scripts/verbsets/kvstore-roundtrip.verbset scripts/verbsets/agent-records.verbset` -- `DRIVE-VERBS PASS` after the four module-less console regressions in one base boot: the code verb's float-classification and fault-reporting baseline, the removal of the initd port-manager laundering publics, the KVstore/BTree round-trip through node splits and merges, and the substrate-tier gating of the identityd agent operations.
+16. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-lifecycle.verbset` -- `DRIVE-VERBS PASS` after the active identity lifecycle (operator mint with recovery codes, single-use redemption, the never-zero-credentials invariant, atomic rotation rollback, revocation). Needs the lpc-ext crypto module like the https-smoke step; without it this step is the documented skip -- identityd's module-less stand-down is asserted by identity-verbs in step 14.
+17. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-capability.verbset` -- `DRIVE-VERBS PASS` after the operator grant path: minting an identity, granting a platform capability to its principal, confirming `capabilityd->is_allowed` answers true through the choke-point, the KERNEL()-gated `grant` refusing a console caller, and revocation. Needs the lpc-ext crypto module (minting); without it the skip is documented.
+18. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/webauthn-ceremony.verbset` -- `DRIVE-VERBS PASS` after the ceremony daemon's console drive: TOFU registration minting an identity, re-registration refused, assertion advancing signCount, the replay refusal, an unknown credential refused, and the System-tier gate. Regenerate the vectors (and this verbset) with `scripts/gen-webauthn-vectors.py`; without the module this step is the documented skip.
+19. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/identity-recovery.verbset` -- `DRIVE-VERBS PASS` after the operator half of the recovery doctrine: mint-with-codes, the console `identity bind` verb verifying a foreign attestation before binding, the never-bare-re-bind refusal, single-use redemption, and the last-credential redemption refusal. Regenerated by the same vector script as step 18; without the module this step is the documented skip.
+20. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/agent-auth.verbset scripts/verbsets/agent-console.verbset scripts/verbsets/agent-delegation.verbset` -- `DRIVE-VERBS PASS` after the agent substrate's three console suites in one module-bearing boot: the authd agent entry points (self-service minting, the token ceremony, structural non-transitivity, suspension semantics), the operator verb face (mint, show extensions, suspend/resume, operator-driven delegation), and the delegation registry with its source-tracked revocation cascade. Without the module these are the documented skip; the module-less gates are covered by agent-records in step 15.
+21. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/session-smoke.sh` -- `SESSION-SMOKE PASS` after the session lifecycle (mint, validate, revoke, TTL expiry, revoke-principal) and the statedump-discipline scan: the plaintext token is absent from a live-session snapshot while its hash and principal are present. Needs the lpc-ext crypto module; the module-less stand-down is asserted by session-verbs in step 14.
+22. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/agent-smoke.sh` -- `AGENT-SMOKE PASS` after the foreign-signer key ceremony with the domain-tag refusal, the token ceremony with required expiry, the suspension and coexisting-grant semantics, and the statedump token-plaintext scan with its positive controls. Needs python3 and an OpenSSL 1.1.1+ CLI besides the module.
+23. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
+24. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`.
+25. Deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
+26. Deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the three curl probes from `examples/http-app/README.md` Verify -- `ok`, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+27. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 
