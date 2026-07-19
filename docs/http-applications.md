@@ -223,6 +223,8 @@ The 0-second `call_out` runs after the System initd commits, which is after ever
 
 ## API signatures
 
+This section is the signature home for the HTTP API classes; for other callable kinds, the router is `docs/kernel-reference.md` Where signatures live.
+
 The signature reference for the HTTP API classes under `src/usr/HTTP/api/lib/`. The canonical-name `#define`s (`HttpRequest`, `Http1Server`, and the rest) come from the headers under `src/usr/HTTP/api/include/`. The source files are authoritative; internal protocol machinery (the parsing state machine in `Connection1.c`) is omitted here.
 
 ### `HttpRequest` (`src/usr/HTTP/api/lib/Request.c`) and `HttpResponse` (`src/usr/HTTP/api/lib/Response.c`)

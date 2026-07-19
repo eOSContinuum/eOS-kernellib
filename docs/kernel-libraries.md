@@ -6,6 +6,8 @@ For the LPC mechanics that make these libraries work (inherit syntax, type modif
 
 **Audience**: an LPC application author looking up which inheritable library serves a common need (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities); assumes `docs/lpc-essentials.md` for inherit syntax and `docs/architecture.md` for the tier model that bounds where each library is callable from.
 
+This doc is the signature home for the inheritable classes and the property surface; for every other callable kind (kernel efun overrides, per-object lfuns, hooks, merryfuns, console verbs, daemon APIs), the router is `docs/kernel-reference.md` Where signatures live.
+
 Each library below carries a per-class block listing its application-facing signatures. Each bullet gives a function's parameter and return types (the `varargs`, `mixed *`, and `args...` forms are LPC syntax; see `docs/lpc-essentials.md`); the `atomic` modifier is shown where a function runs as an atomic transaction, while the visibility modifiers (`static`, `nomask`) are omitted for brevity (the `src/lib/util/` helpers are `static` except where noted). `create` is the constructor the driver calls on instantiation, so its parameters are the arguments passed at `new_object` / `clone_object` time. Purely internal functions (declared `private`, or infrastructure callbacks) are omitted; where a class carries a large internal surface, the omission is noted.
 
 ## Strings

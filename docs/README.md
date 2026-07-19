@@ -34,7 +34,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Writing applications
 
 - [lpc-essentials.md](lpc-essentials.md): LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
-- [kernel-reference/](kernel-reference/README.md): man-page-style reference for the kernel layer's modified API surface (efun overrides, lfun and hook contracts, the kernel overview).
+- [kernel-reference.md](kernel-reference.md): the function-level kernel reference (efun overrides, per-object lfuns and hooks including `patch()`, the kernel overview, and the signature routers).
 - [kernel-libraries.md](kernel-libraries.md): inheritable libraries under `src/lib/` (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities).
 - [where-code-belongs.md](where-code-belongs.md), placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility), with the authority choke-point and composition-seam disciplines behind the choices.
 - [common-tasks.md](common-tasks.md): task-shaped recipes for the recurring author jobs -- test driver, recurring work, live-state migration, access grants, operator verbs, extra ports -- each linking the doc that owns its mechanism.
@@ -78,7 +78,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [source-map.md](source-map.md): a map of the source tree and a fast index from each subsystem to the code that implements it and the doc that explains it. The navigation companion to `architecture.md`.
 - [glossary.md](glossary.md): definitions for terms used inline across the doc set (atomic, auto-inheritance, dataspace, statedump, hotboot, capability tier, mount point, principal, master, clone, LWO, and similar).
-- [kernel-reference/README.md](kernel-reference/README.md) carries the "Where signatures live" router: which doc holds the signature for each kind of callable (efun override, library class, property surface, daemon LFUN, merryfun, console verb).
+- [kernel-reference.md](kernel-reference.md) carries the "Where signatures live" router: which doc holds the signature for each kind of callable (efun override, library class, property surface, daemon LFUN, merryfun, console verb).
 - [system-daemons.md](system-daemons.md): the System-daemon application surface -- per-function signatures, gating, and semantics for objectd, upgraded, errord, logd, capabilityd, identityd, webauthnd, sessiond, authd, and the Index daemon.
 - [references.md](references.md): citations for the orthogonal-persistence literature (Atkinson and Morrison 1995; KeyKOS / EROS), DGD mailing-list discussions (Allen 2000, Croes 2003, Croes 2010), and upstream documentation (DGD itself, lpc-doc, kernellib lineage).
 
@@ -109,7 +109,7 @@ Common goals and the docs that serve them.
 - **Debug a misbehaving application**: [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
 - **Cross-reference an unfamiliar term mid-document**: [glossary.md](glossary.md).
 - **Follow a citation back to its source**: [references.md](references.md).
-- **Contribute to the kernel layer**: `../CONTRIBUTING.md`, then [architecture.md](architecture.md) for the model, [source-map.md](source-map.md) to find your way around the tree, [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference/](kernel-reference/README.md) for the modified API surface. `../scripts/README.md` documents the regression harness a change must keep green. [architecture.md](architecture.md) The boot, in source order is the guided first read of the kernel source; ../CONTRIBUTING.md Anatomy of a mergeable change shows two merged units as templates.
+- **Contribute to the kernel layer**: `../CONTRIBUTING.md`, then [architecture.md](architecture.md) for the model, [source-map.md](source-map.md) to find your way around the tree, [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference.md](kernel-reference.md) for the modified API surface. `../scripts/README.md` documents the regression harness a change must keep green. [architecture.md](architecture.md) The boot, in source order is the guided first read of the kernel source; ../CONTRIBUTING.md Anatomy of a mergeable change shows two merged units as templates.
 
 [DGD]: https://github.com/dworkin/dgd
 [lpc-doc]: https://github.com/dworkin/lpc-doc

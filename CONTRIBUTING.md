@@ -67,6 +67,17 @@ Two documentation surfaces:
 
 New docs added to `docs/` use lowercase-hyphenated filenames matching the existing pattern. The `docs/README.md` folder index is updated to include any new doc in the appropriate audience group.
 
+A behavior change updates the document that owns it. At subsystem grain, `docs/source-map.md` maps each subsystem to its doc; the most-restated mechanisms cross subsystems, so their owners are named here directly -- update the owner first, and let other docs reference rather than restate:
+
+| Mechanism | Owning doc |
+|---|---|
+| `call_touch`, `patch()`, the upgrade cascade | `docs/code-lifecycle.md` |
+| The atomic envelope (what rolls back, where it sits in a task) | `docs/execution-model.md` |
+| The statedump cycle (dump, restore, hot boot) | `docs/persistence.md` |
+| The tick budget and execution-cost model | `docs/application-authoring.md` (What a tick is) |
+| Observer dispatch timing (pre/main/post, batching, cascade bounds) | `docs/dispatcher.md` |
+| Task serialization and run-to-completion | `docs/execution-model.md` |
+
 ## Testing
 
 Which kernel-tier changes recompile live and which need the cold-boot proof is stated once in `docs/changing-a-running-system.md` (Changing the kernel layer). Platform behavior is exercised through the bundled examples and the regression harness under `scripts/`: `run-example.sh <example>` boots an example profile and checks its sentinel assertions (including snapshot restore where the profile exercises it), `drive-verbs-smoke.sh` drives the admin-console verbsets under `scripts/verbsets/`, and `base-boot-guard.sh` guards the bare boot. `scripts/README.md`'s Full regression sweep section enumerates every command in this harness, in order, with the pass signal for each; that sweep is the pre-PR bar. Changes to capability tiers, daemons, or the primitive surfaces should include:

@@ -52,6 +52,8 @@ The implicit batch is recorded as `completed` in the batch-status log on exit. T
 
 ## Application surface
 
+This section is the signature home for the Merry daemon LFUNs; for other callable kinds, the router is `docs/kernel-reference.md` Where signatures live.
+
 ### `register_observer(object ob, mixed path, string timing, string source)`
 
 Registers a Merry-script observer at the given (`path`, `timing`) on `ob`. Stored as a property-list under `merry:on:<path>:<timing>`. Multiple observers may be registered for the same slot; they fire in registration order.
