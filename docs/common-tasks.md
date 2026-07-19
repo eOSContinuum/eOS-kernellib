@@ -89,6 +89,63 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/operations.md` Monitoring signals; `examples/http-app/` for the worked route.
 
+## Make an outbound HTTP request
+
+**Goal**: your code calls another service over HTTP or HTTPS.
+
+1. Inherit `Http1Client` (TLS variant `Http1TlsClient`) composed with `/usr/HTTP/api/lib/BufferedConnection1`, keeping the driver-level connection raw -- the shape `examples/composite-app`'s loopback client (`Inventory/obj/client.c`) uses. That client is the surface's first in-tree consumer; its header documents two of the plain-client path's three latent defects the buffered composition avoids, and the third (a double connect) sits in `obj/client1.c` itself (`docs/application-authoring.md` Outbound connections names all three).
+2. The constructor signatures live in `docs/http-applications.md` API signatures; the surface's proven-versus-shipped boundary is stated plainly in `docs/application-authoring.md` Outbound connections.
+
+**Verify**: `scripts/run-example.sh composite-app` drives the client end-to-end over real TCP among its phases.
+
+**Owning doc**: `docs/application-authoring.md` Outbound connections; `docs/http-applications.md` API signatures.
+
+## Encode or decode JSON
+
+**Goal**: convert between LPC values and JSON text.
+
+1. The in-tree idiom is inheritance: `inherit "/lib/util/json";` then `json::encode(value)` / `json::decode(str)` (`src/lib/util/json.c`; every shipped consumer uses this form). The registered singletons `src/sys/jsonencode.c` / `src/sys/jsondecode.c` expose the same pair callable directly, which is what the console probe below uses.
+2. The per-class block in `docs/kernel-libraries.md` (Utilities) states the supported value shapes and bounds.
+
+**Verify**: from the console, `code "/sys/jsonencode"->encode((["a": ({1, 2})]))`.
+
+**Owning doc**: `docs/kernel-libraries.md` Utilities.
+
+## Serve HTTPS on the labeled port
+
+**Goal**: the platform terminates TLS 1.3 natively for your application.
+
+1. Provide the three activation pieces: the lpc-ext crypto module in the `.dgd` `modules` mapping, a second `binary_port` entry (the port-label registry declares `https` for it), and PEM credentials at the configured paths. Anything missing is a logged stand-down, not an error.
+2. A certificate that lands after boot activates with the console `tls-cert reload`; renewals are just the file copy, read per connection. The host's ACME client owns issuance.
+3. `examples/https-app/` is the reference server subclass.
+
+**Verify**: `LPC_EXT_CRYPTO=<module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- the nine-phase end-to-end incl. the statedump key-scans.
+
+**Owning doc**: `docs/operations.md` Network boundary and transport security.
+
+## Inspect or hot-fix a live object from the console
+
+**Goal**: read a running object's state, or replace its code without a restart.
+
+1. Inspect: `status(<obj>)` for the runtime's per-object vector, `code <expr>` to evaluate against the live image (`docs/admin-console.md` Inspecting runtime state; console verbs resolve Index logical names beside paths).
+2. Hot-fix: edit the source file, then `compile <file.c>` -- the master is replaced in place, clone state survives, and a failed compile is a no-op (`docs/admin-console.md` Hot-fixing code in production).
+3. If the change alters a clone's data shape, use the cascade with patching instead: `upgrade -p <file.c>` (Migrate live state after a data-shape change above).
+
+**Verify**: `issues <file.c>` confirms the cascade converged; a `code` probe exercises the new behavior.
+
+**Owning doc**: `docs/admin-console.md`; `docs/changing-a-running-system.md` rungs 1-3.
+
+## Reset a development checkout to a clean slate
+
+**Goal**: a from-checkout boot with no residue from prior example runs or operator provisioning.
+
+1. Remove every deployed example mount (`src/usr/<Mount>/` -- the full list is `run-example.sh`'s clean-slate loop), the snapshot pair and swap (`state/snapshot`, `state/snapshot.old`, `state/swap`), and the provisioning residue the console flows create (`src/usr/testop/`, `src/kernel/data/access.data`).
+2. Or let the harness do it: every `scripts/drive-verbs-smoke.sh` run performs exactly this reset first; `scripts/run-example.sh` resets the mounts and state files but leaves the operator-provisioning residue (`src/usr/testop/`, `access.data`) in place (`scripts/README.md`).
+
+**Verify**: `git status --short` shows no untracked deploy artifacts; the next cold boot registers no leftover domains.
+
+**Owning doc**: `scripts/README.md` (the clean-slate steps and the Adding a new example checklist).
+
 ## Where to next
 
 - [`docs/application-authoring.md`](application-authoring.md): the pattern reference behind most of these recipes.

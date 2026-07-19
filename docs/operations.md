@@ -4,6 +4,26 @@ This document covers running an eOS-kernellib instance: configuring it via the `
 
 **Audience**: someone running the platform, responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `docs/application-authoring.md` and `docs/http-applications.md`.
 
+## The operator's task index
+
+The jobs this doc (and its task-shaped companions) cover, by name:
+
+| I need to... | Where |
+|---|---|
+| Choose config values, raise a ceiling | The .dgd configuration file; Limits and capacity |
+| Size a workload's storage shape | Limits and capacity, Sizing a workload |
+| Boot cold, restore a snapshot, hot-boot | Booting |
+| Take a backup now; restore one (same host or off-host) | Backing up and restoring state |
+| Schedule unattended off-host backups | Backing up and restoring state, Scheduled off-host backup, end to end |
+| Run under systemd, launchd, or another supervisor | Running under a supervisor |
+| Monitor headlessly and write alert rules | Monitoring signals |
+| Expose a machine-readable health endpoint | `docs/common-tasks.md` Expose a health check for monitoring |
+| Serve HTTPS on the labeled port | Network boundary and transport security; `docs/common-tasks.md` Serve HTTPS on the labeled port |
+| Load a host-driver extension | Loading host-driver extensions |
+| Diagnose a dead or misbehaving process | Common failure modes; Monitoring signals |
+| Ship a release; roll one back | `docs/changing-a-running-system.md` Shipping a release, Rolling back a release |
+| Provision, rotate, or offboard an operator credential | `docs/security-posture.md` Credential lifecycle |
+
 ## The .dgd configuration file
 
 The host driver reads its configuration from a `.dgd` file passed on the command line at boot. The fields below cover the operator-facing decisions. See the upstream DGD reference at <https://github.com/dworkin/dgd> for the full set.
