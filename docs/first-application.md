@@ -86,28 +86,30 @@ That is the whole service. `store` is an ordinary mapping held in a global varia
 
 ## 3. Compile and drive it
 
-Back at the console, compile the initd. Compiling it runs its `create()`, which compiles the daemon in turn:
+Back at the console, compile both files. At cold boot the System initd compiles your `initd.c` **and touches it**, which runs its `create()` and so compiles the daemon for you. The console `compile` verb does only the first half: it compiles the program and defers `create()` until the object's first use -- so nothing has compiled the daemon yet, and you compile it yourself:
 
 ```text
 # compile /usr/KV/initd.c
 $0 = </usr/KV/initd>
+# compile /usr/KV/sys/kv_daemon.c
+$1 = </usr/KV/sys/kv_daemon>
 ```
 
-You compiled only the initd, but its `create()` compiled `sys/kv_daemon` as a side effect, exactly what happens for every domain at cold boot. The daemon is live now. Prove it by driving its verbs. `code` evaluates an LPC expression, and `->` calls a method on the object named by its path:
+From the next cold boot onward the initd does this automatically; the two-step form is a console-session fact, not the platform's boot story. The daemon is live now (its `create()` runs at its first use, initializing the empty store). Prove it by driving its verbs. `code` evaluates an LPC expression, and `->` calls a method on the object named by its path:
 
 ```text
 # code "/usr/KV/sys/kv_daemon"->put("greeting", "hello")
-$1 = nil
+$2 = nil
 # code "/usr/KV/sys/kv_daemon"->get("greeting")
-$2 = "hello"
+$3 = "hello"
 # code "/usr/KV/sys/kv_daemon"->put("lang", "LPC")
-$3 = nil
+$4 = nil
 # code "/usr/KV/sys/kv_daemon"->get("lang")
-$4 = "LPC"
+$5 = "LPC"
 # code "/usr/KV/sys/kv_daemon"->remove("greeting")
-$5 = nil
-# code "/usr/KV/sys/kv_daemon"->get("greeting")
 $6 = nil
+# code "/usr/KV/sys/kv_daemon"->get("greeting")
+$7 = nil
 ```
 
 `put` and `remove` are declared `void`, so they return no value and the console shows `nil`. `get` returns what you stored. Your service is running: two keys went in, one came back out, one was removed. The store holds `"lang"` now.
@@ -118,11 +120,11 @@ $6 = nil
 
 ```text
 # code "/usr/KV/sys/kv_daemon"->query_counter()
-$7 = 0
+$8 = 0
 # code "/usr/KV/sys/kv_daemon"->increment_and_fail()
 Error: deliberate failure after mutating counter.
 # code "/usr/KV/sys/kv_daemon"->query_counter()
-$8 = 0
+$9 = 0
 ```
 
 The counter is still `0`. The `counter++` ran, then unhappened. That is the `atomic` modifier: a function declared `atomic` commits all of its state changes or none of them, and an error inside it rolls everything back. You wrote no rollback code. The runtime enforced it. Notice that the failed call consumed no `$N` slot. It produced no value, only an error.
@@ -144,11 +146,11 @@ Recompile just the daemon into the running image:
 
 ```text
 # compile /usr/KV/sys/kv_daemon.c
-$9 = </usr/KV/sys/kv_daemon>
+$10 = </usr/KV/sys/kv_daemon>
 # code "/usr/KV/sys/kv_daemon"->size()
-$10 = 1
+$11 = 1
 # code "/usr/KV/sys/kv_daemon"->get("lang")
-$11 = "LPC"
+$12 = "LPC"
 ```
 
 The new method answered immediately, with no restart and no redeploy. `size()` returned `1`, not `0`: the store you filled in section 3 survived the recompile intact, `"lang"` still in it. `compile` replaced the daemon's program while keeping the object's data. The same move fixes a bug in a live service: edit, recompile, done, with the service's state carried across untouched. [code-lifecycle.md](code-lifecycle.md) covers the mechanism, and [application-authoring.md](application-authoring.md) (Live code upgrade through call_touch) covers the harder case, migrating data when a recompile changes the variable layout, which adding a method does not.
@@ -189,6 +191,7 @@ The process died and came back, and the store is intact. No database, no seriali
 
 ## Where to next
 
+- **[first-http-endpoint.md](first-http-endpoint.md)** continues this build directly: an HTTP face on the service you just wrote, driven with `curl`, ending at the reference and assembly docs.
 - **[application-authoring.md](application-authoring.md)** covers the patterns behind this tutorial at reference depth: domain layout, owner and access, tick-aware code, object tracking, and when the four-file example shape stops fitting.
 - **[kernel-libraries.md](kernel-libraries.md)** documents the inheritable libraries you call from application code, including a `KVstore` library. This tutorial hand-rolled a mapping to keep the moving parts visible.
 - **[persistence.md](persistence.md)** is section 6 in full: what the snapshot carries, the persistence boundaries, and the backup and restore mechanics.
