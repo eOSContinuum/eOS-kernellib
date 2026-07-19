@@ -55,13 +55,17 @@ static void create()
 /*
  * the audit trail is a Merry reaction: fires synchronously inside
  * every EVENT_PROP write, appending the event to AUDIT_PROP on this
- * same host
+ * same host. The same script routes the event to the SSE broker
+ * (sys/streamd, the "stream" script space); the broker turns it into
+ * zero-delay push call_outs, so an aborted write rolls the pushes
+ * back with the mutation
  */
 static void bind_audit_observer()
 {
     MERRY->register_observer(this_object(), EVENT_PROP, "main",
 	"Set($this, \"" + AUDIT_PROP + "\", " +
-	"Get($this, \"" + AUDIT_PROP + "\") + ({ $new })); return TRUE;");
+	"Get($this, \"" + AUDIT_PROP + "\") + ({ $new })); " +
+	"stream::audit($entry: $new); return TRUE;");
 }
 
 /*

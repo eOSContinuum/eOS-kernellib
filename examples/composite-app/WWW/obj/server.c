@@ -20,6 +20,16 @@
  * wire objects; handlers see strings and return strings. A handler
  * error becomes a 500 without dropping the connection contract.
  *
+ * One return form extends the contract past one-shot: contentType
+ * "text/event-stream" with a nil body switches this connection to
+ * streaming. The server sends the head (chunked transfer encoding, no
+ * Content-Length, no Connection: close) and holds the connection open;
+ * a broker the handler subscribed the connection to (previous_object()
+ * during handle() is this clone) pushes server-sent-event frames
+ * through push_event, each a proper chunk via the platform's sendChunk
+ * -- its first in-tree consumer. Client disconnect destructs the clone
+ * and the broker's object-keyed registry forgets it on its own.
+ *
  * Inheritance, clone setup, and the binary-manager glue are replicated
  * from examples/http-app/obj/server.c -- see that file and
  * docs/http-applications.md for the platform contracts (library-form
@@ -41,6 +51,7 @@ inherit "/usr/System/lib/user";
 
 int received;				/* received at least one request */
 private HttpRequest pendingRequest;	/* awaiting body */
+private int streaming;			/* holding an event stream open */
 
 static void create()
 {
@@ -80,6 +91,58 @@ private void emitPlain(int code, string status, string body)
 {
     emit(makeResponse(code, status, "text/plain; charset=utf-8", body),
 	 body);
+}
+
+/*
+ * switch to streaming: send the head -- chunked transfer, no
+ * Content-Length, no Connection: close -- and keep the connection open
+ * for pushed frames
+ */
+private void startStream(int code, string status)
+{
+    HttpResponse response;
+    HttpFields headers;
+
+    response = new HttpResponse(1.1, code, status);
+    headers = new HttpFields();
+    headers->add(new HttpField("Content-Type", "text/event-stream"));
+    headers->add(new HttpField("Cache-Control", "no-cache"));
+    headers->add(new HttpField("Transfer-Encoding", ({ "chunked" })));
+    response->setHeaders(headers);
+    streaming = TRUE;
+    sendMessage(new StringBuffer(response->transport()));
+}
+
+/*
+ * broker entries: push one server-sent-event frame, or end the
+ * stream. Guarded to domain daemons -- the demo trusts any registered
+ * domain's sys tier; a production server would bind the broker at
+ * startStream time. sendChunk/endChunk go through call_other-to-self
+ * so the connection layer's relay guard sees this clone as the caller;
+ * the empty params array opts into chunk framing.
+ */
+void push_event(string event, string data)
+{
+    if (sscanf(previous_program(), "/usr/%*s/sys/%*s") == 0) {
+	error("Access denied");
+    }
+    if (streaming) {
+	this_object()->sendChunk(new StringBuffer("event: " + event +
+						  "\ndata: " + data + "\n\n"),
+				 ({ }));
+    }
+}
+
+void end_stream()
+{
+    if (sscanf(previous_program(), "/usr/%*s/sys/%*s") == 0) {
+	error("Access denied");
+    }
+    if (streaming) {
+	streaming = FALSE;
+	this_object()->endChunk();
+	call_out("_logout", 0, TRUE);
+    }
 }
 
 private string drainBody(StringBuffer buf)
@@ -134,6 +197,10 @@ private void dispatch(HttpRequest request, StringBuffer body)
 					auth : nil)) != nil ||
 	typeof(result) != T_ARRAY || sizeof(result) != 4) {
 	emitPlain(500, "Internal Server Error", "500 handler error\n");
+	return;
+    }
+    if (result[2] == "text/event-stream" && result[3] == nil) {
+	startStream(result[0], result[1]);
 	return;
     }
     emit(makeResponse(result[0], result[1], result[2], result[3]),

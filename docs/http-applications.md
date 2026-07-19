@@ -276,7 +276,7 @@ The TLS layer is inert unless the host driver provides secure randomness (see `d
 The HTTP/1.x protocol base both server and client inherit. Beyond the functions surfaced above, the flow controls an application may reach:
 
 - `void expectWsFrame()` -- switch to WebSocket frame receipt
-- `void sendChunk(StringBuffer chunk, varargs string *params)` / `void endChunk(varargs string *params, HttpFields trailers)` -- emit chunked transfer encoding
+- `void sendChunk(StringBuffer chunk, varargs string *params)` / `void endChunk(varargs string *params, HttpFields trailers)` -- emit chunked transfer encoding. Passing a params array (empty is fine) opts into chunk framing; nil params sends the buffer raw. First in-tree consumer: the composite example's server-sent-event streams (`docs/composite-applications.md` The event streams)
 - `void sendWsChunk(int opcode, int flags, varargs int mask, StringBuffer chunk)` -- emit a WebSocket frame
 - `void terminate()` -- break the connection
 - `int persistent()` / `int webSocket()` -- negotiated-state accessors

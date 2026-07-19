@@ -262,9 +262,15 @@ void expectChunk(varargs string compression)
 }
 
 /*
- * receive the first line of a chunk
+ * receive the first line of a chunk. The internal name deliberately
+ * differs from the relay callback: in the composed single-object
+ * pattern (the example servers and clients inherit this library, so
+ * relay == this_object()) a shared name would make the callback hit
+ * this incompatible signature and error on every chunk line; with
+ * distinct names, a relay that does not implement receiveChunkLine
+ * simply is not informed.
  */
-static void receiveChunkLine(string str)
+static void receiveChunkSize(string str)
 {
     string token, *params;
 
@@ -484,7 +490,7 @@ static void receiveBytes(string str)
 	 * chunk line
 	 */
 	try {
-	    receiveChunkLine(str);
+	    receiveChunkSize(str);
 	} catch (err) {
 	    relay->receiveError(err);
 	    disconnect();

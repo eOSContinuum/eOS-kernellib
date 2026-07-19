@@ -94,7 +94,15 @@ self-service entries (mint, the own-agents read, suspend/resume,
 delegate/undelegate) derive the controlling identity from a live
 session, never from the caller. The example binds them under
 `/auth/agents` and `/auth/agent-login`, and the demo page's agent
-panel drives them from the browser.
+panel drives them from the browser. The recovery ceremony completes
+the surface: `/auth/recover` carries a recovery code and a NEW
+passkey's registration payload in one request, composed atomically
+behind the facade (verify without mint, redeem-and-replace, session
+mint), with its challenge issued for that purpose only -- the
+handler's single-use store tags every challenge with the route family
+it was issued for, the reference discipline for an application running
+more than one ceremony kind (`docs/identity.md` Rotation and
+recovery).
 
 **Challenge ownership is the application's.** webauthnd holds no
 challenge state (the caller that issued a challenge owns it --
@@ -134,6 +142,38 @@ audit commit or roll back together, with no queue and no reconciliation
 job. `GET /inventory/audit` reads the trail back over the wire, and the
 restore boot proves the binding itself persists.
 
+## The event streams
+
+One handler return form extends the one-shot contract: `({ 200, "OK",
+"text/event-stream", nil })` tells the mount server to send the head
+(chunked transfer encoding, no Content-Length, no Connection: close)
+and hold the connection open. From then on the example's broker
+(`Inventory/sys/streamd.c`) pushes server-sent-event frames through
+the per-connection server clone, each framed by the connection
+library's `sendChunk` -- its first in-tree consumer. Two topics
+demonstrate the two honest event-sourcing shapes available today:
+
+- `GET /inventory/events` is mutation-driven. The audit observer's
+  Merry script routes each event to the broker (the "stream" script
+  space) inside the atomic property write, and the broker fans out as
+  zero-delay call_outs -- so an aborted mutation rolls its pushes back
+  and a stream never carries an event that did not commit.
+- `GET /auth/agents/stream?token=<session>` bridges a substrate
+  without notifications: the broker polls `authd->query_agents` per
+  subscriber at a short cadence and pushes a snapshot on change. If
+  the identity substrate ever grows mutation notifications, this poll
+  loop is the seam they replace. The token travels in the query string
+  because EventSource cannot set an Authorization header; the example
+  README states the tradeoff.
+
+Being first through the receive side, the driver's streaming client
+(`Inventory/obj/stream_client.c`, `expectChunk`) surfaced a latent
+defect in the composed connection pattern: the connection library's
+internal chunk-line parser shared its name with the relay callback it
+invokes, so in a single-object composition every chunked receive
+errored. Fixed by renaming the internal function
+(`src/usr/HTTP/lib/Connection1.c`).
+
 ## The outbound client seam
 
 The example's test driver reaches every phase over real TCP through
@@ -158,12 +198,16 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 27 sentinels with the
+multi-deploy profile form) and runs the driver: 38 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
-with examples/webauthn-app, plus the agent lifecycle -- mint,
-own-agents list, token ceremony, the ownership and delegability
-refusals, suspend and resume), 5 in the transport-only subset without
-it. Boot 2 restores the snapshot and re-drives the wire: items, a
+with examples/webauthn-app, the agent lifecycle -- mint, own-agents
+list, token ceremony, the ownership and delegability refusals, suspend
+and resume -- the event streams: open, observer-driven audit push,
+agent-state snapshot and change push, bad-token refusal -- and the
+recovery ceremony: self-provisioned codes, the bad-code and
+wrong-purpose and never-bare-re-bind refusals, atomic recover onto the
+same principal, login with the recovered passkey), 5 in the
+transport-only subset without it. Boot 2 restores the snapshot and re-drives the wire: items, a
 pre-restore session token, and the observer binding all survive. The
 sentinel comment block in `Inventory/sys/test.c` is the
 phase-by-phase map; `examples/composite-app/README.md` carries the

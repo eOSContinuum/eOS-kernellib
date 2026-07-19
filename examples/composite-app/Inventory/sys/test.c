@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (27 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (38 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -56,6 +56,29 @@
  *   AGENT-RESUME OK              resume restores the ability to
  *                                authenticate: the ceremony works
  *                                again
+ *   SSE-STREAM-OPEN OK           the audit event stream opens: 200,
+ *                                chunked, held open past the response
+ *   SSE-AUDIT-PUSH OK            a mutation's audit event reaches the
+ *                                open stream, observer-driven
+ *   SSE-AGENTS-SNAPSHOT OK       a fresh agent stream receives its
+ *                                own-agents snapshot within one poll
+ *   SSE-AGENTS-PUSH OK           an agent-state change (suspend)
+ *                                reaches the open stream as a new
+ *                                snapshot
+ *   SSE-AUTH-REFUSED OK          the agent stream refuses a bogus
+ *                                session token
+ *   RECOVERY-CODES OK            a live session provisions its own
+ *                                recovery codes (plaintext once)
+ *   RECOVER-BAD-CODE-REFUSED OK  a wrong code binds nothing
+ *   RECOVER-PURPOSE-REFUSED OK   a webauthn-purpose challenge cannot
+ *                                be spent on the recovery route
+ *   RECOVER OK                   code + new-passkey attestation in one
+ *                                shot: atomic redeem-and-replace onto
+ *                                the same principal, session minted
+ *   LOGIN-AFTER-RECOVER OK       the recovered passkey asserts
+ *   NEVER-BARE-REBIND OK         re-registering the bound credential
+ *                                refuses (a fresh registration cannot
+ *                                touch an existing record)
  *   PERSIST SETUP OK             restore probe armed, snapshot dumped
  *
  * Boot 2 (restore): the call_out armed before the dump fires and
@@ -71,7 +94,7 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=27 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=38 for the full set.
  */
 
 # include <type.h>
@@ -86,6 +109,7 @@ private inherit hex "/lib/util/hex";
 
 # define HANDLER		"/usr/Inventory/sys/handler"
 # define CLIENT			"/usr/Inventory/obj/client"
+# define STREAM_CLIENT		"/usr/Inventory/obj/stream_client"
 # define PERSIST_HELPER		"/usr/System/sys/persist_helper"
 # define RESULT_FILE		"/usr/Inventory/data/test-result.log"
 
@@ -115,11 +139,24 @@ private inherit hex "/lib/util/hex";
 # define P_AGENT_SUSPENDED	23
 # define P_AGENT_RESUME		24
 # define P_AGENT_RELOGIN	25
+# define P_SSE_AUDIT_OPEN	26
+# define P_SSE_AUDIT_PUSH	27
+# define P_SSE_AGENTS_OPEN	28
+# define P_SSE_AGENTS_PUSH	29
+# define P_SSE_BAD_TOKEN	30
+# define P_RV_CODES		31
+# define P_RV_BAD_CODE		32
+# define P_RV_PURPOSE		33
+# define P_RV_RECOVER		34
+# define P_RV_NEW_LOGIN		35
+# define P_RV_REBIND		36
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	26
-# define P_PERSIST_SESSION	27
-# define P_PERSIST_OBSERVER	28
-# define P_PERSIST_HTTP		29	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	37
+# define P_PERSIST_SESSION	38
+# define P_PERSIST_OBSERVER	39
+# define P_PERSIST_HTTP		40	/* no-crypto restore probe */
+
+# define STREAM_DEADLINE	8	/* seconds an awaited event may take */
 
 private int phase;		/* current phase */
 private int cryptoMode;		/* ceremony surface available */
@@ -134,9 +171,15 @@ private int itemId;		/* the created item */
 private int auditCount;		/* audit entries at dump time */
 private string agentUuid;	/* the minted agent */
 private string agentToken;	/* its mint-time token (plaintext) */
+private object auditStream;	/* held-open audit event stream */
+private object agentStream;	/* held-open agent-state event stream */
+private string rvUuid;		/* first identity's bare uuid */
+private string rvCode;		/* a provisioned recovery code */
 
 private void log_line(string msg);
 static void start_phase();
+private void arm_deadline();
+private void drop_streams();
 
 
 static void create()
@@ -234,6 +277,15 @@ private string login_body(string challenge, string credIdHex, string cdjHex,
 private string item_body(string name, int qty)
 {
     return json::encode(([ "name" : name, "qty" : qty ]));
+}
+
+private string recover_body(string uuid, string code, string challenge,
+			    string cdjHex, string aoHex)
+{
+    return json::encode(([ "uuid" : uuid, "code" : code,
+			   "challenge" : challenge,
+			   "clientDataJSON" : wire(cdjHex),
+			   "attestationObject" : wire(aoHex) ]));
 }
 
 
@@ -367,6 +419,81 @@ static void start_phase()
 	     bearer(token1), nil);
 	break;
 
+    case P_SSE_AUDIT_OPEN:
+	auditStream = clone_object(STREAM_CLIENT);
+	auditStream->open(this_object(), "/inventory/events");
+	arm_deadline();
+	break;
+
+    case P_SSE_AUDIT_PUSH:
+	/* an audited mutation while the stream is open; the sentinel
+	 * lands when the observer-driven event arrives on the wire */
+	http("POST", "/inventory/items", bearer(token1),
+	     item_body("streamed", 1));
+	arm_deadline();
+	break;
+
+    case P_SSE_AGENTS_OPEN:
+	agentStream = clone_object(STREAM_CLIENT);
+	agentStream->open(this_object(),
+			  "/auth/agents/stream?token=" + token1);
+	arm_deadline();
+	break;
+
+    case P_SSE_AGENTS_PUSH:
+	/* a state change while the agent stream is open */
+	http("POST", "/auth/agents/" + agentUuid + "/suspend",
+	     bearer(token1), nil);
+	arm_deadline();
+	break;
+
+    case P_SSE_BAD_TOKEN:
+	http("GET", "/auth/agents/stream?token=bogus", nil, nil);
+	break;
+
+    case P_RV_CODES:
+	http("POST", "/auth/recovery-codes", bearer(token1),
+	     json::encode(([ "n" : 2 ])));
+	break;
+
+    case P_RV_BAD_CODE:
+	HANDLER->arm_challenge(WA_CH_REG3, "recover");
+	http("POST", "/auth/recover", nil,
+	     recover_body(rvUuid, "not-a-code", WA_CH_REG3,
+			  WA_REG3_CDJ_HEX, WA_REG3_AO_HEX));
+	break;
+
+    case P_RV_PURPOSE:
+	/* right code, but the challenge was issued for the webauthn
+	 * routes: the store's purpose tag refuses it here */
+	HANDLER->arm_challenge(WA_CH_REG3, "webauthn");
+	http("POST", "/auth/recover", nil,
+	     recover_body(rvUuid, rvCode, WA_CH_REG3,
+			  WA_REG3_CDJ_HEX, WA_REG3_AO_HEX));
+	break;
+
+    case P_RV_RECOVER:
+	HANDLER->arm_challenge(WA_CH_REG3, "recover");
+	http("POST", "/auth/recover", nil,
+	     recover_body(rvUuid, rvCode, WA_CH_REG3,
+			  WA_REG3_CDJ_HEX, WA_REG3_AO_HEX));
+	break;
+
+    case P_RV_NEW_LOGIN:
+	HANDLER->arm_challenge(WA_CH_A4);
+	http("POST", "/auth/login", nil,
+	     login_body(WA_CH_A4, WA_ES2_CRED_ID_HEX, WA_A4_CDJ_HEX,
+			WA_A4_AD_HEX, WA_A4_SIG_HEX));
+	break;
+
+    case P_RV_REBIND:
+	/* the recovered credential is bound; a fresh registration
+	 * with the same attestation must refuse */
+	HANDLER->arm_challenge(WA_CH_REG3);
+	http("POST", "/auth/register", nil,
+	     register_body(WA_CH_REG3, WA_REG3_CDJ_HEX, WA_REG3_AO_HEX));
+	break;
+
     case P_PERSIST_ITEMS:
     case P_PERSIST_HTTP:
 	http("GET", "/inventory/items", nil, nil);
@@ -387,6 +514,32 @@ private void advance()
 {
     phase++;
     start_phase();
+}
+
+/*
+ * awaited-event deadline: if the phase has not moved on when this
+ * fires, the expected stream event never arrived
+ */
+private void arm_deadline()
+{
+    call_out("stream_deadline", STREAM_DEADLINE, phase);
+}
+
+static void stream_deadline(int armedPhase)
+{
+    if (phase == armedPhase) {
+	stop("stream event deadline in phase " + phase);
+    }
+}
+
+private void drop_streams()
+{
+    if (auditStream) {
+	destruct_object(auditStream);
+    }
+    if (agentStream) {
+	destruct_object(agentStream);
+    }
 }
 
 /*
@@ -695,6 +848,96 @@ void http_done(int code, string body)
 	    return;
 	}
 	pass("AGENT-RESUME");
+	advance();
+	break;
+
+    case P_SSE_AUDIT_PUSH:
+	/* the mutation's own response; the phase completes when the
+	 * event arrives in stream_event below */
+	if (code != 201) {
+	    stop("SSE-AUDIT-PUSH: create " + code + " " + body);
+	}
+	break;
+
+    case P_SSE_AGENTS_PUSH:
+	/* the suspend's own response; the phase completes on the
+	 * pushed snapshot */
+	if (code != 200) {
+	    stop("SSE-AGENTS-PUSH: suspend " + code + " " + body);
+	}
+	break;
+
+    case P_SSE_BAD_TOKEN:
+	if (code != 401) {
+	    stop("SSE-AUTH: expected 401, got " + code);
+	    return;
+	}
+	pass("SSE-AUTH-REFUSED");
+	advance();
+	break;
+
+    case P_RV_CODES:
+	parsed = jbody(body);
+	value = parsed["codes"];
+	if (code != 201 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 2 || typeof(value[0]) != T_STRING) {
+	    stop("RECOVERY-CODES: " + code + " " + body);
+	    return;
+	}
+	rvCode = value[0];
+	if (sscanf(principal1, "identity:%s", rvUuid) == 0) {
+	    stop("RECOVERY-CODES: unparsable principal " + principal1);
+	    return;
+	}
+	pass("RECOVERY-CODES");
+	advance();
+	break;
+
+    case P_RV_BAD_CODE:
+	if (code != 401) {
+	    stop("RECOVER-BAD-CODE: expected 401, got " + code);
+	    return;
+	}
+	pass("RECOVER-BAD-CODE-REFUSED");
+	advance();
+	break;
+
+    case P_RV_PURPOSE:
+	if (code != 400) {
+	    stop("RECOVER-PURPOSE: expected 400, got " + code);
+	    return;
+	}
+	pass("RECOVER-PURPOSE-REFUSED");
+	advance();
+	break;
+
+    case P_RV_RECOVER:
+	parsed = jbody(body);
+	if (code != 200 || parsed["principal"] != principal1 ||
+	    typeof(parsed["token"]) != T_STRING) {
+	    stop("RECOVER: " + code + " " + body);
+	    return;
+	}
+	pass("RECOVER");
+	advance();
+	break;
+
+    case P_RV_NEW_LOGIN:
+	parsed = jbody(body);
+	if (code != 200 || parsed["principal"] != principal1) {
+	    stop("LOGIN-AFTER-RECOVER: " + code + " " + body);
+	    return;
+	}
+	pass("LOGIN-AFTER-RECOVER");
+	advance();
+	break;
+
+    case P_RV_REBIND:
+	if (code != 400) {
+	    stop("NEVER-BARE-REBIND: expected 400, got " + code);
+	    return;
+	}
+	pass("NEVER-BARE-REBIND");
 	persist_setup();
 	break;
 
@@ -752,4 +995,71 @@ void http_fail(int errorcode)
 	error("Access denied");
     }
     stop("connect failed in phase " + phase + " (error " + errorcode + ")");
+}
+
+/*
+ * stream-client callbacks: response head, per-frame events, failure
+ */
+void stream_open(int code)
+{
+    if (sscanf(previous_program(), "/usr/Inventory/%*s") == 0) {
+	error("Access denied");
+    }
+    switch (phase) {
+    case P_SSE_AUDIT_OPEN:
+	if (code != 200) {
+	    stop("SSE-STREAM-OPEN: " + code);
+	    return;
+	}
+	pass("SSE-STREAM-OPEN");
+	advance();
+	break;
+
+    case P_SSE_AGENTS_OPEN:
+	if (code != 200) {
+	    stop("SSE-AGENTS: open " + code);
+	}
+	/* the sentinel lands on the snapshot event */
+	break;
+    }
+}
+
+void stream_event(string event, string data)
+{
+    if (sscanf(previous_program(), "/usr/Inventory/%*s") == 0) {
+	error("Access denied");
+    }
+    switch (phase) {
+    case P_SSE_AUDIT_PUSH:
+	if (event == "audit" && sscanf(data, "%*screate%*s") != 0) {
+	    pass("SSE-AUDIT-PUSH");
+	    advance();
+	}
+	break;
+
+    case P_SSE_AGENTS_OPEN:
+	if (event == "agents" && sscanf(data, "%*s" + agentUuid) != 0) {
+	    pass("SSE-AGENTS-SNAPSHOT");
+	    advance();
+	}
+	break;
+
+    case P_SSE_AGENTS_PUSH:
+	if (event == "agents" &&
+	    sscanf(data, "%*s\"suspended\":1%*s") != 0) {
+	    pass("SSE-AGENTS-PUSH");
+	    drop_streams();
+	    advance();
+	}
+	break;
+    }
+}
+
+void stream_fail(int errorcode)
+{
+    if (sscanf(previous_program(), "/usr/Inventory/%*s") == 0) {
+	error("Access denied");
+    }
+    stop("stream connect failed in phase " + phase +
+	 " (error " + errorcode + ")");
 }

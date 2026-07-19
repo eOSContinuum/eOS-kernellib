@@ -55,7 +55,7 @@ example_profile() {
         chat-app)          echo "Chat 3 selfexit 20" ;;
         composite-app)     echo "WWW+Inventory 2 selfexit 5" ;;
                            # 5 = transport-only subset; with the crypto
-                           # module: LPC_EXT_CRYPTO=... EXPECTED_OK=27
+                           # module: LPC_EXT_CRYPTO=... EXPECTED_OK=38
         hot-reload-demo)   echo "WWW 1 timed 2" ;;
         hot-reload-master) echo "Reload 1 timed 3" ;;
         merry-app)         echo "MerryApp 2 selfexit 28" ;;

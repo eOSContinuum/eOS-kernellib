@@ -20,8 +20,10 @@ static void create()
 {
     ::create();
     compile_object("sys/inventoryd");
+    compile_object("sys/streamd");
     compile_object("sys/handler");
     compile_object("obj/client");
+    compile_object("obj/stream_client");
     compile_object("sys/demo");
     compile_object("sys/test");
     call_out("register_routes", 0);

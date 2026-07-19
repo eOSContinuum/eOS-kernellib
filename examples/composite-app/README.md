@@ -25,8 +25,12 @@ Inventory/                the application domain
                           capability-gated wipe()
   sys/handler.c           routes, WebAuthn/session wire binding,
                           single-use challenge store
+  sys/streamd.c           SSE broker: observer-driven audit topic,
+                          poll-bridged agent-state topic
   obj/client.c            loopback HTTP/1 client (the client library's
                           first in-tree consumer)
+  obj/stream_client.c     loopback SSE client (first through the
+                          receive-side chunk surface)
   sys/test.c              boot-time driver: every phase over real TCP
   sys/vectors.h           foreign-generated WebAuthn vectors
                           (scripts/gen-webauthn-vectors.py output,
@@ -50,12 +54,17 @@ request becomes an authenticated principal -- is the companion doc
 | `POST /auth/login` | none | assertion ceremony; mints a session |
 | `POST /auth/logout` | bearer | session revocation |
 | `POST /auth/agent-login` | none | agent-token ceremony; mints an agent session |
+| `GET /auth/recover-challenge` | none | recovery-purpose challenge (the store tags purposes) |
+| `POST /auth/recover` | none | recovery ceremony: code + new-passkey attestation, atomic redeem-and-replace |
+| `POST /auth/recovery-codes` | bearer | provision own recovery codes (plaintext returned once) |
 | `GET /auth/agents` | bearer | the controller's own-agents view |
 | `POST /auth/agents` | bearer | mint an agent; the response carries the token's only plaintext |
 | `POST /auth/agents/<uuid>/suspend` | bearer | suspend an own agent; revokes its live sessions |
 | `POST /auth/agents/<uuid>/resume` | bearer | resume an own agent (restores authentication only) |
 | `POST /auth/agents/<uuid>/delegate` | bearer | delegate an own capability to an own agent |
 | `POST /auth/agents/<uuid>/undelegate` | bearer | withdraw the delegation |
+| `GET /inventory/events` | none | SSE stream: observer-driven audit events |
+| `GET /auth/agents/stream?token=<session>` | query token | SSE stream: own-agents snapshots on change |
 | `GET /inventory/items` | none | the persistent core, read side |
 | `POST /inventory/items` | bearer | authenticated mutation + audit observer |
 | `PUT /inventory/items/<id>` | bearer | application-tier authorization (creator only) |
@@ -80,13 +89,17 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=27 scripts/run-example.sh composite-app
+    EXPECTED_OK=38 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the twenty-five wire-level phases -- including the agent
-lifecycle: mint, own-agents list, token ceremony, the not-own and
-not-delegable refusals, suspend-revokes-sessions, and
-resume-restores-authentication -- and dumps a snapshot; boot 2
+Boot 1 runs the thirty-six wire-level phases -- the agent lifecycle
+(mint, own-agents list, token ceremony, the not-own and not-delegable
+refusals, suspend-revokes-sessions, resume-restores-authentication),
+the event streams (open, observer-driven audit push, agent-state
+snapshot and change push, bad-token refusal), and the recovery
+ceremony (self-provisioned codes, the bad-code, wrong-purpose, and
+never-bare-re-bind refusals, atomic recover, login with the recovered
+passkey) -- and dumps a snapshot; boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in
 `Inventory/sys/test.c` is the phase-by-phase map).
@@ -145,3 +158,27 @@ principal and lands in the audit trail under it, and the admin wipe (6)
 succeeds exactly when the delegation is in place. Passkey login (2)
 switches the page back to the controller; suspending the agent then
 revokes its sessions and refuses its ceremony until resume.
+
+Live updates (10) opens the server-sent-event streams: audit events
+arrive the moment a mutation commits (the observer routes them to the
+stream broker inside the atomic write), and the agent-state stream
+pushes an own-agents snapshot whenever it changes -- suspend or
+delegate in another tab and watch it arrive. The agent stream carries
+the session token in its URL because EventSource cannot set headers;
+that keeps the demo dependency-free, and a production deployment would
+prefer a cookie-bound session so tokens stay out of request logs.
+
+### Recovery from the browser
+
+Mint recovery codes (11) while logged in: the response is the only
+time the plaintext exists, and the page fills the uuid field -- store
+both, they are the recovery kit. To recover after losing the passkey
+(simulate by reloading the page, which drops the session), enter the
+uuid and one code, then Recover (12): the page fetches a
+recovery-purpose challenge, runs a fresh authenticator registration
+ceremony, and sends code and attestation in one request. The platform
+redeems the code and binds the new passkey atomically to the SAME
+identity -- the principal in the log matches the one you registered --
+and the code is spent: a second recover with it refuses. The old
+passkey, if it still exists, keeps working; revoking it is the
+operator `identity revoke` verb.

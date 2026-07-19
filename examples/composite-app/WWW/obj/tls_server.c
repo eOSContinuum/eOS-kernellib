@@ -34,6 +34,7 @@ inherit "/usr/System/lib/user";
 
 int received;				/* received at least one request */
 private HttpRequest pendingRequest;	/* awaiting body */
+private int streaming;			/* holding an event stream open */
 
 static void create()
 {
@@ -78,6 +79,51 @@ private void emitPlain(int code, string status, string body)
 {
     emit(makeResponse(code, status, "text/plain; charset=utf-8", body),
 	 body);
+}
+
+/*
+ * streaming support, identical to obj/server.c: sentinel handler
+ * return switches to chunked streaming; a broker pushes frames via
+ * push_event / end_stream (call_other-to-self for the relay guard;
+ * the empty params array opts into chunk framing)
+ */
+private void startStream(int code, string status)
+{
+    HttpResponse response;
+    HttpFields headers;
+
+    response = new HttpResponse(1.1, code, status);
+    headers = new HttpFields();
+    headers->add(new HttpField("Content-Type", "text/event-stream"));
+    headers->add(new HttpField("Cache-Control", "no-cache"));
+    headers->add(new HttpField("Transfer-Encoding", ({ "chunked" })));
+    response->setHeaders(headers);
+    streaming = TRUE;
+    sendMessage(new StringBuffer(response->transport()));
+}
+
+void push_event(string event, string data)
+{
+    if (sscanf(previous_program(), "/usr/%*s/sys/%*s") == 0) {
+	error("Access denied");
+    }
+    if (streaming) {
+	this_object()->sendChunk(new StringBuffer("event: " + event +
+						  "\ndata: " + data + "\n\n"),
+				 ({ }));
+    }
+}
+
+void end_stream()
+{
+    if (sscanf(previous_program(), "/usr/%*s/sys/%*s") == 0) {
+	error("Access denied");
+    }
+    if (streaming) {
+	streaming = FALSE;
+	this_object()->endChunk();
+	call_out("_logout", 0, TRUE);
+    }
 }
 
 private string drainBody(StringBuffer buf)
@@ -130,6 +176,10 @@ private void dispatch(HttpRequest request, StringBuffer body)
 					auth : nil)) != nil ||
 	typeof(result) != T_ARRAY || sizeof(result) != 4) {
 	emitPlain(500, "Internal Server Error", "500 handler error\n");
+	return;
+    }
+    if (result[2] == "text/event-stream" && result[3] == nil) {
+	startStream(result[0], result[1]);
 	return;
     }
     emit(makeResponse(result[0], result[1], result[2], result[3]),
