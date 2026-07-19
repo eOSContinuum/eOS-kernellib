@@ -1,0 +1,50 @@
+# identity recovery -- the operator half of the recovery doctrine on a
+# module-bearing boot (regenerate with scripts/gen-webauthn-vectors.py;
+# do not edit by hand):
+#   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
+#       scripts/verbsets/identity-recovery.verbset
+# Covers: mint-with-codes, the console bind verb (operator-mediated
+# re-bind through the same ceremony verifier the wire uses), the
+# never-bare-re-bind refusal, single-use redemption, and the
+# last-credential redemption refusal.
+
+# point the ceremony daemon at the vectors' rp
+cmd: webauthn rpid localhost
+expect: webauthn: rpId localhost
+
+cmd: webauthn origin https://localhost:8443
+expect: webauthn: origin https://localhost:8443
+
+# a record minted with recovery codes only
+cmd: identity mint 2
+expect: identity: minted identity:[0-9a-f-]+ with 2 recovery codes
+capture: uuid minted identity:([0-9a-f-]+)
+capture: code1 identity: code 1: ([A-Za-z0-9_-]+)
+
+# operator-mediated re-bind: the console verifies the attestation
+# through the same ceremony entry the wire uses, then binds
+cmd: identity bind %{uuid} 4OHi4-Tl5ufo6err7O3u7_Dx8vP09fb3-Pn6-_z9_v8 eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiNE9IaTQtVGw1dWZvNmVycjdPM3U3X0R4OHZQMDlmYjMtUG42LV96OV92OCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViUSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAACwAAAAAAAAAAAAAAAAAAAAAAEGBhYmNkZWZnaGlqa2xtbm-lAQIDJiABIVggtqzke-M2d-MusF1Q1amVox-OqJCEUlIm-nvB61kRkLkiWCD5GZgLYgXoZNNR-7__3vZZdz3I8otg5av9YEB_qJkKBQ
+expect: identity: bound passkey YGFiY2RlZmdoaWprbG1ubw to identity:%{uuid}
+
+cmd: identity show %{uuid}
+expect: identity: credentials: 3
+
+# never bare re-bind: an already-bound credential refuses
+cmd: identity bind %{uuid} 4OHi4-Tl5ufo6err7O3u7_Dx8vP09fb3-Pn6-_z9_v8 eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiNE9IaTQtVGw1dWZvNmVycjdPM3U3X0R4OHZQMDlmYjMtUG42LV96OV92OCIsIm9yaWdpbiI6Imh0dHBzOi8vbG9jYWxob3N0Ojg0NDMiLCJjcm9zc09yaWdpbiI6ZmFsc2V9 o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViUSZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NBAAAACwAAAAAAAAAAAAAAAAAAAAAAEGBhYmNkZWZnaGlqa2xtbm-lAQIDJiABIVggtqzke-M2d-MusF1Q1amVox-OqJCEUlIm-nvB61kRkLkiWCD5GZgLYgXoZNNR-7__3vZZdz3I8otg5av9YEB_qJkKBQ
+expect: identity: credential already bound
+
+# redemption is single-use
+cmd: identity redeem %{uuid} %{code1}
+expect: identity: redeemed
+
+cmd: identity redeem %{uuid} %{code1}
+expect: identity: unknown recovery code
+
+# the last credential cannot be redeemed away
+cmd: identity mint 1
+expect: identity: minted identity:[0-9a-f-]+ with 1 recovery codes
+capture: uuid2 minted identity:([0-9a-f-]+)
+capture: lastcode identity: code 1: ([A-Za-z0-9_-]+)
+
+cmd: identity redeem %{uuid2} %{lastcode}
+expect: cannot redeem the last credential

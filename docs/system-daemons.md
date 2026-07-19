@@ -138,6 +138,10 @@ The WebAuthn ceremony daemon: composes the pure verification library (`/lib/util
 
 A fresh single-use challenge, base64url (32 bytes of `secure_random`); errors without the crypto module.
 
+### `mapping verify_registration_payload(string challenge, string clientDataJSON, string attestationObject)`
+
+Registration-ceremony verification without a mint: returns the verified credential row, keyed under `"credentialId"` (base64url, the form the store binds). What happens to the row is the System-tier caller's composition -- `register_credential` mints a fresh identity, authd's recovery ceremony pairs it with a code redemption onto an existing record, and the operator `identity bind` verb attaches it directly. Never-bare-re-bind holds because no caller composes a bare re-bind out of the registration route.
+
 ### `string register_credential(string challenge, string clientDataJSON, string attestationObject)`
 
 The TOFU registration ceremony; returns the new principal string (`identity:<uuid>`).
@@ -209,6 +213,18 @@ The agent ceremonies (verified by agentauthd) plus session mint in one step; ret
 ### `string mint_agent(string sessionToken, string credentialId, mapping row)` / `string *mint_agent_with_token(string sessionToken, varargs int ttl)` / `int suspend_agent(string sessionToken, string agentUuid)` / `void resume_agent(string sessionToken, string agentUuid)` / `void delegate_capability(string sessionToken, string agentUuid, string capability)` / `void undelegate_capability(string sessionToken, string agentUuid, string capability)`
 
 Controller self-service: a live session proves the controlling identity, and every operation derives the controller from that proven principal, never from a caller-supplied argument -- the new agent's controller edge on the mint paths, and the own-agents constraint on suspend/resume/delegate/undelegate. The substrate enforces that only a human record controls agents, so an agent session cannot mint or manage agents (`docs/identity.md` Agent identities).
+
+### `mixed *query_agents(string sessionToken)`
+
+The session identity's own agents, read-only: one row per agent, `({ uuid, suspended, delegated capabilities })`. The controller derives from the live session, so a caller can only ever see its own; rows carry record state, never credential material.
+
+### `mixed *recover_identity(string uuid, string code, string challenge, string clientDataJSON, string attestationObject, varargs int ttl)`
+
+The recovery ceremony plus session mint: verifies the NEW passkey's registration payload without a mint, then redeems the recovery code and binds the verified credential in identityd's one atomic step (valid even on the record's last credential), then mints the session for the recovered principal. Both proofs travel in one call -- a wrong code binds nothing, a bad attestation redeems nothing, and there is no intermediate recovery state to hijack (`docs/identity.md` Rotation and recovery).
+
+### `string *rotate_recovery_codes(string sessionToken, int n)`
+
+Self-service recovery-code provisioning: a live identity session replaces its record's code set with `n` fresh codes and receives the plaintext -- the only time it exists. Without this entry a transport-registered identity would have no codes and no self-service recovery path.
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 

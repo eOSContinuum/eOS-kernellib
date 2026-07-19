@@ -94,7 +94,15 @@ self-service entries (mint, the own-agents read, suspend/resume,
 delegate/undelegate) derive the controlling identity from a live
 session, never from the caller. The example binds them under
 `/auth/agents` and `/auth/agent-login`, and the demo page's agent
-panel drives them from the browser.
+panel drives them from the browser. The recovery ceremony completes
+the surface: `/auth/recover` carries a recovery code and a NEW
+passkey's registration payload in one request, composed atomically
+behind the facade (verify without mint, redeem-and-replace, session
+mint), with its challenge issued for that purpose only -- the
+handler's single-use store tags every challenge with the route family
+it was issued for, the reference discipline for an application running
+more than one ceremony kind (`docs/identity.md` Rotation and
+recovery).
 
 **Challenge ownership is the application's.** webauthnd holds no
 challenge state (the caller that issued a challenge owns it --
@@ -190,12 +198,15 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 32 sentinels with the
+multi-deploy profile form) and runs the driver: 38 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
 with examples/webauthn-app, the agent lifecycle -- mint, own-agents
 list, token ceremony, the ownership and delegability refusals, suspend
-and resume -- and the event streams: open, observer-driven audit push,
-agent-state snapshot and change push, bad-token refusal), 5 in the
+and resume -- the event streams: open, observer-driven audit push,
+agent-state snapshot and change push, bad-token refusal -- and the
+recovery ceremony: self-provisioned codes, the bad-code and
+wrong-purpose and never-bare-re-bind refusals, atomic recover onto the
+same principal, login with the recovered passkey), 5 in the
 transport-only subset without it. Boot 2 restores the snapshot and re-drives the wire: items, a
 pre-restore session token, and the observer binding all survive. The
 sentinel comment block in `Inventory/sys/test.c` is the

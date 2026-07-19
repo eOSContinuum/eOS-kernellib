@@ -31,6 +31,14 @@
  *     about its own records; ceremony refusals below stay uniform.
  *   - /auth/agent-login runs the agent-token ceremony: the token is
  *     the proof, so there is no challenge round-trip.
+ *   - /auth/recover runs the recovery ceremony: a recovery code plus
+ *     a NEW passkey's registration payload in one request, composed
+ *     atomically behind authd (redeem + bind + session mint). Its
+ *     challenge must come from /auth/recover-challenge -- the store
+ *     tags every challenge with the purpose it was issued for.
+ *     /auth/recovery-codes (bearer) provisions the codes a
+ *     self-service recovery later depends on; the response is the
+ *     only time the plaintext exists.
  *   - The event streams: GET /inventory/events (public, like the audit
  *     read) and GET /auth/agents/stream?token=<session> subscribe the
  *     connection with the SSE broker (sys/streamd) and return the
@@ -66,7 +74,7 @@ private inherit base64 "/lib/util/base64";
 
 # define STREAM_SENTINEL	({ 200, "OK", "text/event-stream", nil })
 
-private mapping pendingChallenges;	/* challenge : issue time */
+private mapping pendingChallenges;	/* challenge : purpose */
 
 static void create()
 {
@@ -75,20 +83,27 @@ static void create()
 }
 
 /*
- * single-use challenge store: issue records, consume removes
+ * single-use challenge store: issue records, consume removes. Each
+ * challenge carries the purpose it was issued for ("webauthn" for the
+ * register/login ceremonies, which WebAuthn's clientDataJSON type
+ * field already separates cryptographically; "recover" for the
+ * recovery ceremony), and consumption checks it -- a challenge is
+ * only ever spendable on the route family that issued it. The
+ * reference discipline for an application running more than one
+ * ceremony kind over one store.
  */
-private string issue_challenge()
+private string issue_challenge(string purpose)
 {
     string challenge;
 
     challenge = AUTHD->issue_challenge();
-    pendingChallenges[challenge] = time();
+    pendingChallenges[challenge] = purpose;
     return challenge;
 }
 
-private int consume_challenge(string challenge)
+private int consume_challenge(string challenge, string purpose)
 {
-    if (challenge && pendingChallenges[challenge]) {
+    if (challenge && pendingChallenges[challenge] == purpose) {
 	pendingChallenges[challenge] = nil;
 	return TRUE;
     }
@@ -97,14 +112,15 @@ private int consume_challenge(string challenge)
 
 /*
  * test seam: plant a known challenge (foreign ceremony vectors embed a
- * fixed one). Same-domain callers only; not a production surface.
+ * fixed one), with an optional purpose (default "webauthn"). Same-
+ * domain callers only; not a production surface.
  */
-void arm_challenge(string challenge)
+void arm_challenge(string challenge, varargs string purpose)
 {
     if (sscanf(previous_program(), "/usr/Inventory/%*s") == 0) {
 	error("Access denied");
     }
-    pendingChallenges[challenge] = time();
+    pendingChallenges[challenge] = purpose ? purpose : "webauthn";
 }
 
 /*
@@ -182,11 +198,11 @@ private string raw_field(mapping body, string field)
 }
 
 
-private mixed *do_challenge()
+private mixed *do_challenge(string purpose)
 {
     string challenge;
 
-    if (catch(challenge = issue_challenge()) != nil) {
+    if (catch(challenge = issue_challenge(purpose)) != nil) {
 	return fail(503, "Service Unavailable", "ceremonies unavailable");
     }
     return respond(200, "OK", ([ "challenge" : challenge ]));
@@ -209,7 +225,7 @@ private mixed *do_register(string body)
 	!attestationObject) {
 	return fail(400, "Bad Request", "missing ceremony fields");
     }
-    if (!consume_challenge(challenge)) {
+    if (!consume_challenge(challenge, "webauthn")) {
 	return fail(400, "Bad Request", "unknown or consumed challenge");
     }
     if (catch(result = AUTHD->register_identity(challenge, clientDataJSON,
@@ -240,7 +256,7 @@ private mixed *do_login(string body)
 	!authenticatorData || !signature) {
 	return fail(400, "Bad Request", "missing ceremony fields");
     }
-    if (!consume_challenge(challenge)) {
+    if (!consume_challenge(challenge, "webauthn")) {
 	return fail(400, "Bad Request", "unknown or consumed challenge");
     }
     if (catch(result = AUTHD->authenticate(challenge, credentialId,
@@ -251,6 +267,74 @@ private mixed *do_login(string body)
     }
     return respond(200, "OK",
 		   ([ "principal" : result[0], "token" : result[1] ]));
+}
+
+/*
+ * the recovery ceremony: both proofs in one request. The challenge
+ * must have been issued for recovery; the code redemption and the
+ * new-credential bind are one atomic substrate step behind authd.
+ * Refusals are uniform like the login routes -- an unauthenticated
+ * caller learns nothing about which proof failed.
+ */
+private mixed *do_recover(string body)
+{
+    mapping parsed;
+    mixed uuid, code, challenge;
+    string clientDataJSON, attestationObject;
+    mixed *result;
+
+    parsed = parse_body(body);
+    if (!parsed) {
+	return fail(400, "Bad Request", "malformed body");
+    }
+    uuid = parsed["uuid"];
+    code = parsed["code"];
+    challenge = parsed["challenge"];
+    clientDataJSON = raw_field(parsed, "clientDataJSON");
+    attestationObject = raw_field(parsed, "attestationObject");
+    if (typeof(uuid) != T_STRING || uuid == "" ||
+	typeof(code) != T_STRING || code == "" ||
+	typeof(challenge) != T_STRING || !clientDataJSON ||
+	!attestationObject) {
+	return fail(400, "Bad Request", "missing recovery fields");
+    }
+    if (!consume_challenge(challenge, "recover")) {
+	return fail(400, "Bad Request", "unknown or consumed challenge");
+    }
+    if (catch(result = AUTHD->recover_identity(uuid, code, challenge,
+					       clientDataJSON,
+					       attestationObject)) != nil) {
+	return fail(401, "Unauthorized", "recovery refused");
+    }
+    return respond(200, "OK",
+		   ([ "principal" : result[0], "token" : result[1] ]));
+}
+
+/*
+ * self-service recovery-code provisioning: a live session replaces
+ * the record's code set; the response is the only time the plaintext
+ * exists
+ */
+private mixed *do_recovery_codes(string body, string authorization)
+{
+    mapping parsed;
+    mixed n;
+    string err, *codes;
+
+    parsed = parse_body(body);
+    if (!parsed) {
+	return fail(400, "Bad Request", "malformed body");
+    }
+    n = parsed["n"];
+    if (typeof(n) != T_INT || n < 1) {
+	return fail(400, "Bad Request", "n (codes to mint) required");
+    }
+    err = catch(codes = AUTHD->rotate_recovery_codes(
+					bearer_token(authorization), n));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(201, "Created", ([ "codes" : codes ]));
 }
 
 /*
@@ -476,7 +560,13 @@ mixed *handle(string method, string path, string body, string authorization)
 	return ({ 200, "OK", "text/plain; charset=utf-8", "ok\n" });
     }
     if (method == "GET" && path == "/auth/challenge") {
-	return do_challenge();
+	return do_challenge("webauthn");
+    }
+    if (method == "GET" && path == "/auth/recover-challenge") {
+	return do_challenge("recover");
+    }
+    if (method == "POST" && path == "/auth/recover") {
+	return do_recover(body);
     }
     if (method == "POST" && path == "/auth/register") {
 	return do_register(body);
@@ -511,6 +601,9 @@ mixed *handle(string method, string path, string body, string authorization)
 	return fail(401, "Unauthorized", "authentication required");
     }
 
+    if (method == "POST" && path == "/auth/recovery-codes") {
+	return do_recovery_codes(body, authorization);
+    }
     if (path == "/auth/agents") {
 	if (method == "GET") {
 	    return do_list_agents(authorization);

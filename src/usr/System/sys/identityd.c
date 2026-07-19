@@ -1035,6 +1035,8 @@ void cmd_identity(object user, string cmd, string str)
     string *parts, err;
     mixed *minted;
     string *codes;
+    mapping row;
+    string credentialId;
     int i;
 
     if (!KERNEL()) {
@@ -1109,6 +1111,33 @@ void cmd_identity(object user, string cmd, string str)
 	}
 	err = catch(redeem_recovery_code(parts[1], parts[2]));
 	_emit(user, err ? err + "\n" : "identity: redeemed\n");
+	return;
+
+    case "bind":
+	/* operator-mediated re-bind (docs/identity.md recovery step 3):
+	 * verify the new passkey's registration ceremony through the
+	 * same webauthnd entry the wire uses, then bind the verified
+	 * credential to the existing record. A deliberate human step
+	 * for a record whose credentials are all inaccessible. */
+	if (sizeof(parts) != 5) {
+	    _emit(user, "usage: " + cmd + " bind <uuid> <challenge> " +
+			"<clientDataJSON-b64u> <attestationObject-b64u>\n");
+	    return;
+	}
+	err = catch(row = WEBAUTHND->verify_registration_payload(parts[2],
+			base64::urlDecode(parts[3]),
+			base64::urlDecode(parts[4])));
+	if (!err) {
+	    credentialId = row["credentialId"];
+	    row["credentialId"] = nil;
+	    err = catch(bind_credential(parts[1], credentialId, row));
+	}
+	if (err) {
+	    _emit(user, err + "\n");
+	    return;
+	}
+	_emit(user, "identity: bound passkey " + credentialId +
+		    " to identity:" + parts[1] + "\n");
 	return;
 
     case "revoke":
@@ -1225,6 +1254,7 @@ void cmd_identity(object user, string cmd, string str)
     default:
 	_emit(user, "usage: " + cmd + " [mint <n> | show <uuid> | " +
 		    "rotate-codes <uuid> <n> | redeem <uuid> <code> | " +
+		    "bind <uuid> <challenge> <cdj-b64u> <ao-b64u> | " +
 		    "revoke <uuid> <id> | grant <uuid> <capability> | " +
 		    "ungrant <uuid> <capability> | " +
 		    "mint-agent <controller> token [ttl] | " +
