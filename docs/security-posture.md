@@ -1,6 +1,6 @@
 # Security posture
 
-The platform's security boundaries in one place: what the tiers protect, what the operator is responsible for, and what the platform does not defend against. For the authority mechanism in depth, read `docs/capability.md`. For how to report a vulnerability, see `SECURITY.md`.
+The platform's security boundaries in one place: what the tiers protect, what the operator is responsible for, and what the platform does not defend against. Per-subsystem docs label their own security-relevant caveats as **Limitation** blocks; those roll up into Non-goals and known limits below, so a Limitation added elsewhere lands with a matching entry here. For the authority mechanism in depth, read `docs/capability.md`. For how to report a vulnerability, see `SECURITY.md`.
 
 **Audience**: an operator or evaluator who needs the platform's trust boundaries and their own operational responsibilities before deploying.
 
@@ -42,6 +42,8 @@ The platform enforces the authority model; the deployment enforces the perimeter
 - **Extension-loaded behavior is unverified against two primitives.** Whether atomicity and hot reload hold through an extension-compiled codepath is an open empirical question (`docs/operations.md` Open empirical questions). An operator who loads an extension in production owns that risk.
 - **The Merry sandbox is a language restriction, not a separate process.** It bounds what a script may call; it is not an operating-system isolation boundary.
 - **Only Merry source is sandboxed.** Plain LPC loaded through `compile_object` runs at the loading object's tier, unsandboxed. An application that exposes a compile path (a `POST /compile` route, say) runs that code at its own tier; bounded loading of arbitrary plain LPC is not yet available (`docs/runtime-primitives.md`).
+- **The capability library's own Limitations apply as written.** `docs/capability.md` Limitations enumerates six mechanism-level limits; beyond the ambient-authority item restated above they are: the check seam is split across two front doors, the single choke-point means single dynamic membership (structural always-pass rules stay inline), the capability table is world-readable by design, `set_raw_property` deliberately bypasses the dispatched observer-property gate (bounded by object-reference access control), and the bootstrap seed grants are declared trust, auditable but not mediated.
+- **Observer-pool eviction is a public, transient-cost surface.** Any code holding a compiled-program reference can call that node's public `suicide()` and force a recompile at its next fire; only the bulk eviction pass is daemon-gated. The exposure is transient recompile cost, not correctness (`docs/observers.md`, the labeled Limitation).
 - **This is not a hardened multi-tenant boundary.** Peer domains are separated by discretionary access control inside one process, not an isolation barrier, and the single coherence domain means one runaway domain is a shared-fate risk to the others. The containment story for untrusted code is the Merry sandbox, not domain separation.
 
 ## Credential lifecycle

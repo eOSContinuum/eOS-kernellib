@@ -311,6 +311,16 @@ dynamic:     429476 /    780288 ( 55%) +  other:         0            (  0%) +
 Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
 ```
 
+**Reading the block, field by field.** Every line is a slot of the no-argument `status()` vector (the `ST_*` indices a health probe reads directly):
+
+- `sectors: used / total (%)` -- swap-device occupancy against the `.dgd` `swap_size` cap, with `sector size` echoing `sector_size`. This is the one fatal ceiling: an image that outgrows the swap device dies with a fatal `out of sectors` error (Limits and capacity above), so this percentage belongs in the alert set, with an earlier threshold than the degrading signals (table below).
+- `swap average: a, b` -- objects swapped out per second, averaged over the last minute and the last five minutes (the driver counts swapouts per window; the console divides by 60 and 300). Near zero when the resident set fits memory; sustained non-zero values are the "sustained churn" the alert table names -- every access is paging.
+- `static:` / `dynamic:` -- bytes in use versus bytes allocated from the host, for the two allocators: static holds the boot-time infrastructure tables (sized to the `.dgd` caps) and long-lived driver buffers, dynamic holds compiled programs and object data; the third row is their sum. The runtime grows both by chunks (`static_chunk` / `dynamic_chunk`), so the percentage reads utilization of the current allocation, not distance to a configured ceiling -- for capacity planning watch the absolute totals and the process RSS, not the percentage.
+- `short:` / `other:` -- queued callouts, split by the driver's scheduling horizon: whole-second callouts due soon (within roughly the next two minutes) versus longer-dated and millisecond-delay ones; then their sum against the `call_outs` table cap -- the alert-table row.
+- `Objects:` -- objects in use (masters plus clones) against the `objects` cap.
+- `Users:` -- live connections against the `users` cap.
+- `Server`, `Start time`, `Uptime` -- the driver banner (a `master`-built driver still prints the base release string, `docs/getting-started.md`), boot wall-clock, and time since -- the unexpected-reset signal.
+
 **What an alertable line looks like.** A runtime error persists into `system.log` as a multi-line block: one timestamped `ERROR` header line carrying the message, then the indented trace frames beneath it (observed by tailing the log after a forced fault). Match alerting rules on the header (` ERROR `), not on frame lines; one fault produces one header and many frames.
 
 **Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (Limits and capacity above):
@@ -319,6 +329,7 @@ Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
 |---|---|---|
 | call_out count vs the `call_outs` cap | Approaching the cap | A backlog of deferred work: new `call_out`s begin to fail |
 | object count vs the `objects` cap | Approaching the cap | Allocation headroom is running out: clones and new objects begin to fail |
+| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (Limits and capacity above). The durable fix is a `sector_size` raise and a reboot from snapshot |
 | swap activity | Sustained churn | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot |
 | uptime, last reboot | Reset unexpectedly | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
 
@@ -389,6 +400,8 @@ Both questions are open. Empirical verification requires running the platform un
 | Cold boot fails with compile error in initd cascade | Missing or broken `/usr/<Domain>/initd.c` | Check the message path. The driver names the file and line |
 | Snapshot restore fails | Snapshot corrupt or `.dgd` config changed incompatibly (different `auto_object`, different `driver_object`, missing `modules` extension) | Restore from `<dump_file>.old`. If same failure, cold-boot from clean state |
 | `dump_state` errors out | Disk full, permissions on `dump_file` directory, or snapshot exceeds available memory | Check disk space and permissions. Consider `swapout()` first |
+| Platform dies with a fatal `out of sectors` error | The in-memory image outgrew the swap device: `swap_size` (capped at 65535 sectors in the stock build) times `sector_size` (Limits and capacity above) | Raise `sector_size` in the `.dgd` config and reboot from the latest snapshot. Alert on the `status` swap-sector percentage before it gets here (Monitoring signals above) |
+| `system.log` grows without bound, repeating the same block | Error-manager feedback storm: an error caught inside an `atomic` function re-entering the error manager and looping a file write | Read the repeating block's trace for the atomic call site. `logd`'s deferred writes exist to prevent the class (Logging and diagnostics above); `scripts/base-boot-guard.sh` is its regression guard |
 | Application kfun call returns "unknown function" or "extension not loaded" | A required `modules` entry is missing | Check `.dgd modules` mapping. Load the missing extension or remove the application code that depends on it |
 | Per-owner ticks exhausted | Owner code is consuming ticks faster than `rsrc` allows | Use admin_console `quota` to inspect. Either raise the owner's quota or fix the looping code |
 | `shutdown(1)` raises "Hotbooting is disabled" | The `.dgd` config has no `hotboot` tuple | Add the tuple to the `.dgd` config (see The .dgd configuration file above) and reboot, or use cold reboot via `shutdown()` instead |
