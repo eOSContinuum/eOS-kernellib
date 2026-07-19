@@ -200,7 +200,7 @@ src/usr/KV/
         kv_daemon.c    — singleton holding the mapping
 ```
 
-The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, value)` assigns, `get(key)` reads, and `remove(key)` deletes. The platform guarantees:
+The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, value)` assigns, `get(key)` reads, and `remove(key)` deletes. (A single mapping caps at 32,767 entries on a stock build; when a real store approaches that, `docs/kernel-libraries.md` Choosing a collection and `docs/operations.md` Sizing a workload carry the decision rule.) The platform guarantees:
 
 - **Persistence**: the `store` mapping survives restart without explicit serialization.
 - **Atomicity**: a multi-step write (e.g., transactional rename of a key) is atomic if wrapped in a single function call. A partial failure rolls back.

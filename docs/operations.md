@@ -208,6 +208,33 @@ Ceilings that are not `.dgd` fields:
 | Per-execution tick budget | 20,000,000 ticks, default | Set at boot in `src/kernel/sys/driver.c`. Raised or lowered per owner via `quota <owner> ticks <limit>` (Resource limits above) |
 | LPC `int` width | 32-bit signed | `docs/lpc-essentials.md` Types and values |
 
+**Sizing a workload.** Which storage shape holds N records, and which ceiling binds first. One constant the tables above do not carry: **a single mapping caps at 32,767 key-value pairs** on a stock build -- the `array_size` knob governs mappings as well as arrays, and exceeding it raises `"Mapping too large"` at construction or `"Mapping too large to grow"` on assignment past the cap (verified against the driver source; the same knob is already at its driver ceiling, so there is no config headroom). The planned two-level mapping is the roadmap's answer for one logical mapping beyond that bound (`docs/runtime-platform-roadmap.md` Wave 3).
+
+| Shape | First-binding ceiling | 10^5 records, stock build | 10^6 records |
+|---|---|---|---|
+| One clone per record | The `objects` table (65535, shared with every platform and application object) | No | No |
+| One `mapping` | 32,767 key-value pairs per mapping | No | No |
+| `/lib/Array` (integer-indexed) | Structurally 32767^2 elements; in practice the holder's single dataspace -- the swap device must hold it and the snapshot writes it every cycle | Yes | Yes, with the swap sized for the dataspace |
+| `/lib/KVstore` (string keys) | The `objects` table again, through node clones: roughly N/(fan-out/2) leaves plus a thin interior layer; per-node arrays bound fan-out by `array_size` | Yes (fan-out 100: ~1,000-2,000 nodes) | Yes (fan-out 100: ~10,000-20,000 nodes; fan-out 1,000: ~1,000-2,000) |
+
+The residency profiles differ more than the counts: a mapping or an `Array` lives in one dataspace that pages in and out as a unit and contributes its full size to every snapshot, while a `KVstore` pages at node granularity (an access faults in the touched nodes, not the whole set) at the price of `objects`-table slots. `docs/kernel-libraries.md` Choosing a collection carries the author-facing decision rule; the wider-index driver rebuild that would raise the object ceiling is observed to segfault naively (`docs/building.md`), so treat 65535 objects as the practical bound.
+
+**A production-shape starting point.** The sizing-relevant fields of a non-demo `.dgd`, each set against the tables above -- splice into a copy of `example.dgd` (these lines alone are not a bootable config), and treat it as a starting point, not a guarantee:
+
+```text
+users           = 255;      /* stock ceiling (one-byte count) */
+editors         = 255;      /* headroom to the same cap; demo ships 10 */
+array_size      = 32767;    /* driver ceiling; also caps each mapping at 32767 pairs */
+objects         = 65535;    /* demo ships 10000; stock ceiling */
+call_outs       = 65534;    /* demo ships 10000; stock ceiling */
+swap_size       = 65535;    /* the sector-count cap: capacity scales through sector_size */
+sector_size     = 16384;    /* 65535 x 16 KiB = ~1 GiB pageable object storage */
+dump_file       = "../state/snapshot";   /* rotation writes <dump_file>.old beside it */
+dump_interval   = 3600;     /* the data-loss window on snapshot restore */
+```
+
+Raising `sector_size` takes effect at the next boot (the swap file is per-boot scratch, rebuilt empty each start), and a restore boot accepts the new value. `users` and `array_size` are already at stock ceilings; the rest have the headroom shown in the field table above.
+
 **Snapshot-pause scaling, measured once.** The dump-time pause scales with in-memory image size, not with the config caps above ("a multi-gigabyte image can take seconds to write; the runtime briefly blocks during the dump", `docs/persistence.md` The statedump cycle). Measured 2026-07-12 on an Apple M5 Max (macOS 26.5, arm64, local NVMe) with `scripts/measure-baseline.py`: the client-observed pause -- the window a connected console waits after `snapshot` -- stayed at or under 0.12 s from a 2 MB base image through a 237 MB image, and was not monotonic across steps (filesystem caching and swap-file growth dominate at these sizes). The same runs measured cold boot to console-ready at roughly 0.1 s, a restore boot against the 237 MB snapshot reaching console-ready in under 0.1 s (state pages in on demand after readiness), and the bundled http-app answering about 1,600 sequential one-connection-per-request `GET /health` requests per second. A companion `--tls` run of the same script over the native TLS 1.3 stack -- the reference HTTPS application, a self-signed certificate activated through the `tls-cert` reload verb -- measured the same one-connection-per-request `GET /health` shape at about 470 requests per second with a median TLS handshake of roughly 1.5 ms, on that run about a third of the cleartext rate: the expected cost of terminating TLS in interpreted LPC, with a cheap handshake. One machine, one workload shape, two consistent runs: a rig and a datum, not a guarantee. Two capacity facts the rig surfaced: the stock build caps `swap_size` at 65535 sectors, so swap capacity scales through `sector_size`; and an image that outgrows the swap device dies with a fatal `out of sectors` error.
 
 **Unmeasured today.** Dump-pause behavior beyond a quarter-gigabyte image, sustained concurrent throughput near the `objects` / `call_outs` / `array_size` ceilings (the measured figure above is a sequential single-client shape), and the memory cost of a driver rebuilt with wider index types are not measured against this codebase. Treat the tables above as compiled-in ceilings and documented defaults, not throughput guarantees.
