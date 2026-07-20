@@ -42,12 +42,14 @@
  *   - The event streams: GET /inventory/events (public, like the audit
  *     read) and GET /auth/agents/stream?token=<session> subscribe the
  *     connection with the SSE broker (sys/streamd) and return the
- *     streaming sentinel the WWW servers act on. The agent stream
- *     authenticates by token in the query string because EventSource
- *     cannot set an Authorization header; the token is validated here
- *     at subscribe time and re-validated by the broker's poll, and a
- *     production surface would prefer a cookie-bound session to keep
- *     tokens out of request logs.
+ *     streaming sentinel the WWW servers act on. ?heartbeat=1 on the
+ *     audit stream opts the subscriber into the broker's server-pushed
+ *     tick events. The agent stream authenticates by token in the
+ *     query string because EventSource cannot set an Authorization
+ *     header; the token is validated here at subscribe time and
+ *     re-validated by the broker's poll, and a production surface
+ *     would prefer a cookie-bound session to keep tokens out of
+ *     request logs.
  *
  * Wire format: JSON bodies; WebAuthn binary fields (clientDataJSON,
  * attestationObject, authenticatorData, signature) travel
@@ -342,9 +344,9 @@ private mixed *do_recovery_codes(string body, string authorization)
  * caller of handle()) with the broker, then hand the server the
  * streaming sentinel
  */
-private mixed *do_audit_stream()
+private mixed *do_audit_stream(int heartbeat)
 {
-    STREAMD->subscribe_audit(previous_object());
+    STREAMD->subscribe_audit(previous_object(), heartbeat);
     return STREAM_SENTINEL;
 }
 
@@ -553,7 +555,7 @@ private mixed *do_audit()
 mixed *handle(string method, string path, string body, string authorization)
 {
     string principal, uuid, streamToken;
-    int id;
+    int id, heartbeat;
 
     /* the anonymous surfaces */
     if (method == "GET" && path == "/inventory/health") {
@@ -580,8 +582,10 @@ mixed *handle(string method, string path, string body, string authorization)
     if (method == "POST" && path == "/auth/agent-login") {
 	return do_agent_login(body);
     }
-    if (method == "GET" && path == "/inventory/events") {
-	return do_audit_stream();
+    if (method == "GET" &&
+	(path == "/inventory/events" ||
+	 sscanf(path, "/inventory/events?heartbeat=%d", heartbeat) != 0)) {
+	return do_audit_stream(heartbeat);
     }
     if (method == "GET" &&
 	(path == "/auth/agents/stream" ||
