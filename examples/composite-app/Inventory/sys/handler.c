@@ -73,6 +73,7 @@ private inherit base64 "/lib/util/base64";
 # define AUTHD		"/usr/System/sys/authd"
 # define INVENTORYD	"/usr/Inventory/sys/inventoryd"
 # define STREAMD	"/usr/Inventory/sys/streamd"
+# define DEMO_PROVISIOND	"/usr/System/sys/demo_provisiond"
 
 # define STREAM_SENTINEL	({ 200, "OK", "text/event-stream", nil })
 
@@ -182,6 +183,26 @@ private mapping parse_body(string body)
 }
 
 /*
+ * Demo seam: when the browser-demo bring-up has compiled the demo
+ * provisioner (examples/composite-app/System/demo_provisiond.c, a
+ * System-tier stand-in for the operator's grant verb), announce a
+ * fresh registration so the demo capability is pre-provisioned. In
+ * every headless profile the provisioner is absent and this is a
+ * no-op; a provisioner failure never breaks registration itself.
+ */
+private void announce_registration(string principal)
+{
+    object provisiond;
+    string uuid;
+
+    provisiond = find_object(DEMO_PROVISIOND);
+    if (provisiond && principal &&
+	sscanf(principal, "identity:%s", uuid) != 0) {
+	catch(provisiond->welcome(uuid));
+    }
+}
+
+/*
  * a base64url field decoded to raw bytes, or nil
  */
 private string raw_field(mapping body, string field)
@@ -234,6 +255,7 @@ private mixed *do_register(string body)
 						attestationObject)) != nil) {
 	return fail(400, "Bad Request", "registration refused");
     }
+    announce_registration(result[0]);
     return respond(201, "Created",
 		   ([ "principal" : result[0], "token" : result[1] ]));
 }
