@@ -105,5 +105,6 @@ The two boots bracket a snapshot restore, so the PERSIST sentinels prove applica
 - [`docs/architecture.md`](architecture.md) covers the platform's tier model, daemons, and boot sequence; [`docs/runtime-primitives.md`](runtime-primitives.md) covers the per-primitive foundation-and-proof statement.
 - [`docs/application-authoring.md`](application-authoring.md) covers writing a tier-E application on top of the platform (non-HTTP transports, owner/access conventions, the `call_touch` upgrade model).
 - [`docs/building.md`](building.md) covers DGD build details and platform-specific notes.
+- Contributing? [`scripts/README.md`](../scripts/README.md)'s Full regression sweep is the pre-PR bar; its prerequisites list names the optional pieces worth installing early (the lpc-ext crypto module, the vector-generator toolchain).
 
 [DGD]: https://github.com/dworkin/dgd

@@ -201,7 +201,7 @@ if printf '%s\n' "$SENTINELS" | grep -qi fail; then
     exit 1
 fi
 if [ "$OK_COUNT" -ne "$EXPECTED_OK" ]; then
-    echo "FAIL: sentinel count $OK_COUNT != expected $EXPECTED_OK" >&2
+    echo "FAIL: sentinel count $OK_COUNT != expected $EXPECTED_OK (sentinels: $RESULT; boot logs: ${LOG_PREFIX}N.log)" >&2
     exit 1
 fi
 echo "PASS"
