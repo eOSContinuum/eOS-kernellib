@@ -59,7 +59,7 @@ atomic void increment_with_failure()
 
 ## Quickstart
 
-New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime. Evaluating whether the platform fits before building on it? `docs/evaluating.md` is the one-page fit brief; `docs/README.md`'s "Evaluate whether the platform fits" reading path carries its depth links.
+New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of DGD plus this repository, then run the bundled example configuration — the driver builds from a clean checkout in well under a minute on recent hardware (seconds on current Apple silicon), with no dependency fetch. Then take the hands-on hour: `docs/first-hour.md` walks from a fresh boot to watching your own objects, state, and reactions survive a process restart. After that, `docs/architecture.md` orients you to the platform model and `docs/application-authoring.md` covers writing your own application on top. Arriving from a cloud-services stack? `docs/coming-from-contemporary-infrastructure.md` maps the familiar components onto the runtime. Evaluating whether the platform fits before building on it? `docs/evaluating.md` is the one-page fit brief; `docs/README.md`'s "Evaluate whether the platform fits" reading path carries its depth links.
 
 **See it proven in one command.** With DGD built, the regression harness deploys an example, boots the platform, exercises it — including a full snapshot-and-restart persistence cycle — and counts the assertion sentinels:
 
@@ -67,12 +67,13 @@ New to eOS-kernellib? Read `docs/getting-started.md` for first-time install of D
 DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
 ```
 
-A passing run ends with the expected `OK` sentinel count. `scripts/README.md` documents the harness; each example under `examples/` names its own profile.
+A passing run ends with the expected `OK` sentinel count. `scripts/README.md` documents the harness; each example under `examples/` names its own profile, and the Full regression sweep there is the complete bar — every example and smoke in about fifteen minutes end to end on the measured-baseline hardware.
 
 **Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated as of 2026-07-18. Other POSIX-compatible systems should work; `docs/building.md` covers platform-specific build notes.
 
 ## Documentation
 
+- **Evaluate** — `docs/evaluating.md` (the one-page fit brief: what is proven today, the measured envelope, the ceilings, and the adoption risks priced)
 - **Setup** — `docs/getting-started.md` (first-time setup, install DGD, run the example configuration), `docs/first-hour.md` (hands-on tutorial: from a fresh boot to the persistence loop), `docs/building.md` (DGD build details, platform-specific notes)
 - **Orientation** — `docs/coming-from-contemporary-infrastructure.md` (the translation bridge from database/queue/deploy-pipeline/IAM stacks to the runtime's mechanisms)
 - **Platform model** — `docs/architecture.md` (capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions), `docs/runtime-primitives.md` (the eight runtime primitives with per-primitive foundation and status), `docs/persistence.md` (orthogonal persistence, statedump cycle, hot boot), `docs/code-lifecycle.md` (compile / clone / destruct / call_touch / object-manager events)
@@ -97,6 +98,7 @@ The boundaries are deliberate design decisions, stated up front:
 - **One process on one machine.** A single coherence domain by design: no horizontal scale-out, no multi-machine redundancy, no concurrent writers across machines (`docs/coming-from-contemporary-infrastructure.md` What does not translate).
 - **Stock-build ceilings.** 255 simultaneous users, 65535 objects, and a swap device capped at 65535 sectors -- about 64 MiB of pageable object storage at the demo config's 1 KiB sector size, scaling only through `sector_size` (`docs/operations.md` Limits and capacity states each ceiling and which rows have headroom).
 - **LPC is the in-image language.** The runtime's guarantees hold for LPC (and Merry) code inside the image; other languages integrate at the transport boundary as clients.
+- **One task at a time.** Exactly one task runs in the image at any instant, to completion; concurrent connections queue whole tasks, so added concurrency buys queueing, not CPU parallelism (`docs/execution-model.md` Run to completion).
 - **No LSP, no step debugger.** LPC is edited as C files with `rg` for navigation; the console's introspection verbs stand in for a debugger (`docs/debugging-applications.md` The working environment, plainly).
 
 `docs/evaluating.md` is the one-page fit brief that weighs these against what the platform proves.
