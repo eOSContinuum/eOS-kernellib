@@ -14,6 +14,7 @@ It is the wrong platform, by design and not by immaturity, when any of these hol
 - The workload needs **more than 255 concurrent connections** on a stock driver build, or a working set beyond the stock ceilings below.
 - The team needs **polyglot code inside the state domain**. LPC (and the Merry dialect) is the in-image language; everything else integrates at the transport boundary as a client.
 - The workload needs **declarative cross-entity queries**. There is no query planner over the image; enumeration and indexing are application structures.
+- The workload needs **multi-core CPU parallelism inside the state domain**. Exactly one task runs in the image at any instant, to completion; more cores do not parallelize in-image work, and added concurrency buys queueing, not parallelism (`execution-model.md` Run to completion; measured in `operations.md` Limits and capacity).
 
 ## What is proven today
 
@@ -23,7 +24,7 @@ It is the wrong platform, by design and not by immaturity, when any of these hol
 DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
 ```
 
-which exercises persistence across a real dump-and-restart cycle among its assertions. The roadmap (`runtime-platform-roadmap.md`) commits forward surfaces on named activation triggers, not dates; What ships today is its authoritative shipped inventory.
+which exercises persistence across a real dump-and-restart cycle among its assertions. The whole surface is provable in one sitting: the Full regression sweep in `scripts/README.md` runs every example and smoke in about fifteen minutes end to end on the measured-baseline hardware, with the crypto-gated steps documented skips on a module-less build. The roadmap (`runtime-platform-roadmap.md`) commits forward surfaces on named activation triggers, not dates; What ships today is its authoritative shipped inventory.
 
 ## The measured envelope
 
@@ -31,7 +32,7 @@ One machine, one workload shape, a rig and a datum rather than a guarantee (`ope
 
 - Snapshot pause stayed at or under 0.12 s from a 2 MB through a 237 MB image; cold boot and a 237 MB restore both reach console-ready in about 0.1 s.
 - The bundled HTTP example answered about 1,600 sequential one-connection-per-request requests per second cleartext, and about 470 over native TLS 1.3 (median handshake roughly 1.5 ms).
-- The throughput figure is sequential single-client; sustained concurrent behavior near the ceilings is explicitly unmeasured.
+- Concurrency has been measured once at moderate scale: aggregate throughput saturates at the same level across the measured client counts -- added concurrency buys queueing, not parallelism -- and the head-of-line worst case under a saturated queue is bounded by the tick budget, clearing immediately after the burst (`operations.md` Limits and capacity carries the numbers). Sustained behavior near the ceilings remains unmeasured.
 
 ## The ceilings
 
@@ -39,9 +40,10 @@ Stock-build compiled bounds, not tuning knobs (`operations.md` Limits and capaci
 
 ## Adoption risks, priced
 
-- **The language.** In-image code is LPC, edited as C files. `lpc-essentials.md` is the bridge; it is a small language, but it is not one your team knows.
+- **The language.** In-image code is LPC, edited as C files. `lpc-essentials.md` is the bridge; it is a small language, but it is not one your team knows. The ramp is short and sequenced: `lpc-essentials.md` plus the three tutorials take a developer from a fresh boot to their own persistent HTTP endpoint (`first-hour.md` is an hour by its own clock; `first-application.md` and `first-http-endpoint.md` complete the chain).
 - **The tooling.** No language server, no step debugger, no formatter; navigation is `rg` plus the source map, and the console's introspection verbs stand in for a debugger. Tests are boot-time sentinel drivers asserted by an external script, and CI is the same harness run headless (`debugging-applications.md` The working environment, plainly).
 - **The exit cost.** Three paths export state to portable form today (`save_object` text, Vault+Schema XML, the property-table ascii marshal); a typed object graph with no schema and no property-table shape has no export walker (`persistence.md` Getting data out).
+- **The durability model.** Persistence is periodic statedump, not per-transaction commit: the recovery point is the operator-chosen `dump_interval`, a sizing decision rather than a guarantee, and an unclean stop loses everything since the last completed dump (`operations.md` Availability and data-loss model).
 - **The driver dependency.** The runtime driver is an unmodified AGPL-3.0 upstream with a single primary maintainer; the license boundary and the pin-plus-fork continuity posture are stated factually in `architecture.md` The driver dependency.
 - **The security envelope.** Trust boundaries, the operator's responsibilities, and the non-goals (including what the capability model does not claim) are consolidated in `security-posture.md`.
 
