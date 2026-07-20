@@ -148,6 +148,10 @@ Everything the sweep needs, gathered once:
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 
+One doc-hygiene check rides the same bar and needs no DGD binary:
+
+29. `python3 scripts/gen-function-index.py --check` -- exits 0 when `docs/function-index.md` matches what the generator would produce from the current signature homes. A non-zero exit means a signature heading was added, renamed, or moved without regenerating the index; run `python3 scripts/gen-function-index.py` and commit the result.
+
 ## When a run fails
 
 The harness leaves a failed run's evidence in place. The artifact map:
