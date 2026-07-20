@@ -165,8 +165,8 @@ One handler return form extends the one-shot contract: `({ 200, "OK",
 and hold the connection open. From then on the example's broker
 (`Inventory/sys/streamd.c`) pushes server-sent-event frames through
 the per-connection server clone, each framed by the connection
-library's `sendChunk` -- its first in-tree consumer. Two topics
-demonstrate the two honest event-sourcing shapes available today:
+library's `sendChunk` -- its first in-tree consumer. Three topics
+demonstrate the honest event shapes available today:
 
 - `GET /inventory/events` is mutation-driven. The audit observer's
   Merry script routes each event to the broker (the "stream" script
@@ -180,6 +180,12 @@ demonstrate the two honest event-sourcing shapes available today:
   loop is the seam they replace. The token travels in the query string
   because EventSource cannot set an Authorization header; the example
   README states the tradeoff.
+- `GET /inventory/events?heartbeat=1` opts the audit subscriber into
+  the timer-driven shape: a tick every ten seconds from the broker's
+  self-re-arming call_out, so a live page shows the runtime's
+  async-event machinery working continuously between mutations.
+  Opt-in keeps the headless driver's stream phases deterministic -- a
+  subscriber that did not ask for ticks never receives one.
 
 Being first through the receive side, the driver's streaming client
 (`Inventory/obj/stream_client.c`, `expectChunk`) surfaced a latent

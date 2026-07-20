@@ -109,15 +109,18 @@ observer binding all survived (the sentinel comment block in
 `WWW/obj/tls_server.c` mounts the same registry behind the labeled
 `https` port, and `GET /demo` serves a page that drives the full flow
 -- register, login, authenticated create, audit read, capability-gate
-refusal, and the agent-management panel -- with a real authenticator.
-The headless profile verifies the
+refusal, agent management and delegation, auto-established live
+streams with a server heartbeat, and recovery -- with a real
+authenticator, numbered steps, and a session-state banner that always
+names the acting principal. The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
 the other. To run the browser session:
 
 ```sh
-# deploy both parts
+# deploy both parts, plus the demo-only System-tier provisioner
 cp -R examples/composite-app/WWW src/usr/WWW
 cp -R examples/composite-app/Inventory src/usr/Inventory
+cp examples/composite-app/System/demo_provisiond.c src/usr/System/sys/
 
 # a certificate the browser genuinely trusts (a clicked-through warning
 # is not a secure context, and WebAuthn refuses); mkcert is the easy way
@@ -125,56 +128,86 @@ mkdir -p src/usr/System/data/tls
 mkcert -cert-file src/usr/System/data/tls/cert.pem        -key-file  src/usr/System/data/tls/key.pem  localhost 127.0.0.1
 
 # config: second binary port 8443 (the "https" label) + crypto module,
-# as scripts/https-smoke.sh generates it; then boot and open
-#   https://localhost:8443/demo
+# as scripts/https-smoke.sh generates it; then boot
 ```
+
+The self-exiting test driver (sys/test.c) dumps and stops the boot
+after its phases run -- for an interactive session, remove `sys/test.c`
+from the deployed copy and its `compile_object` line from the deployed
+initd.
+
+After boot, two operator verbs on the admin console
+(`docs/admin-console.md` Connecting) pre-provision the delegation walk
+-- compile the provisioner and flag the demo capability delegable:
+
+```text
+compile /usr/System/sys/demo_provisiond.c
+capability delegable example:delegation-demo on
+```
+
+then open `https://localhost:8443/demo`. The provisioner is the demo's
+stand-in for the operator's grant verb: it grants
+`example:delegation-demo` to each identity the page registers, so the
+Delegate step completes browser-only, while `example:inventory-admin`
+stays ungranted and the admin-wipe 403 keeps teaching the same
+boundary. It is demo-only: deployed by this recipe alone, part of no
+headless profile -- remove the copied file (and the deployed mounts)
+at teardown.
 
 The origin must match webauthnd's relying-party configuration (default
 `https://localhost:8443`, rpId `localhost`); a different host or port
-needs the `webauthn` console verb first. The self-exiting test driver
-(sys/test.c) dumps and stops the boot after its phases run -- for an
-interactive session, remove `sys/test.c` from the deployed copy and its
-`compile_object` line from the deployed initd.
+needs the `webauthn` console verb first.
 
 ### Agents from the browser
 
-Buttons 7-9 are authd's controller self-service, driven by the logged-in
-passkey session. Mint an agent (7): the response is the only time the
-token plaintext exists, and the page fills it into the agent-token field
--- copy it now or lose it. List (8) shows each of your agents with its
-suspension state and delegated capabilities. Suspend/Resume and
-Delegate/Undelegate act on the uuid field (mint and list fill it);
-delegation refuses until an operator grants the controller the
-capability and flags it delegable on the console:
+Steps 8-14 are authd's controller self-service, driven by the
+logged-in passkey session; the banner names the principal every action
+will run as, and controller-only steps disable under an agent session.
+Mint an agent (8): the response is the only time the token plaintext
+exists, and the page fills it into the agent-login field -- copy it
+now or lose it. List (9) shows each of your agents with its suspension
+state and delegated capabilities. Suspend/Resume (10/11) and
+Delegate/Undelegate (12/13) act on the uuid field (mint and list fill
+it). Delegate succeeds out of the box for `example:delegation-demo` --
+the provisioner granted it to your controller, and the bring-up
+flagged it delegable. Any other capability shows the refusal an
+operator has not enabled; `example:inventory-admin` delegates only
+after the console runs the real verbs:
 
 ```text
 identity grant <controller-uuid> example:inventory-admin
 capability delegable example:inventory-admin on
 ```
 
-Agent login (9) trades the minted token for an agent session: the page's
-bearer session becomes the agent's, so an item create runs as the agent
-principal and lands in the audit trail under it, and the admin wipe (6)
-succeeds exactly when the delegation is in place. Passkey login (2)
-switches the page back to the controller; suspending the agent then
-revokes its sessions and refuses its ceremony until resume.
+Agent login (14) trades the minted token for an agent session: the
+page's bearer session becomes the agent's, so an item create runs as
+the agent principal and lands in the audit trail under it -- and the
+admin wipe (7) stays 403 unless an operator ran the
+`example:inventory-admin` verbs above and you delegated it to the
+logged-in agent. Passkey login (2) switches the page back to the
+controller; suspending the agent then revokes its sessions and refuses
+its ceremony until resume.
 
-Live updates (10) opens the server-sent-event streams: audit events
-arrive the moment a mutation commits (the observer routes them to the
-stream broker inside the atomic write), and the agent-state stream
-pushes an own-agents snapshot whenever it changes -- suspend or
-delegate in another tab and watch it arrive. The agent stream carries
-the session token in its URL because EventSource cannot set headers;
-that keeps the demo dependency-free, and a production deployment would
-prefer a cookie-bound session so tokens stay out of request logs.
+The event streams open on their own: the audit stream (with the
+server's ten-second heartbeat tick) when the page loads, the agent
+stream with each controller session. The banner shows both, and the
+heartbeat line in the log updates in place while you work -- suspend
+or delegate in another tab and watch the agent snapshot arrive. The
+agent stream carries the session token in its URL because EventSource
+cannot set headers; that keeps the demo dependency-free, and a
+production deployment would prefer a cookie-bound session so tokens
+stay out of request logs.
 
 ### Recovery from the browser
 
-Mint recovery codes (11) while logged in: the response is the only
-time the plaintext exists, and the page fills the uuid field -- store
-both, they are the recovery kit. To recover after losing the passkey
+Recovery is the human flow, and the page enforces it: minting codes
+disables under an agent session, and Recover refuses the agent uuid
+with the controller uuid to use instead. Mint recovery codes (15)
+while logged in as the controller: the response is the only time the
+plaintext exists, and the page fills the uuid field -- store both,
+they are the recovery kit. To recover after losing the passkey
 (simulate by reloading the page, which drops the session), enter the
-uuid and one code, then Recover (12): the page fetches a
+uuid and one code, then Recover (16): the page fetches a
 recovery-purpose challenge, runs a fresh authenticator registration
 ceremony, and sends code and attestation in one request. The platform
 redeems the code and binds the new passkey atomically to the SAME
