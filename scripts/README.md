@@ -110,6 +110,13 @@ Both write generated fixtures; do not edit those by hand -- rerun the generator.
 
 Run in this order for the complete pre-PR bar. Each line names the command and the pass signal to look for; `<dgd>` is the path to a built DGD binary. Expect the full bar to take on the order of fifteen minutes end to end on the measured-baseline hardware -- no single step exceeds about two minutes.
 
+Everything the sweep needs, gathered once:
+
+- **A built DGD binary** (`docs/getting-started.md` Install DGD); every step takes it as `DGD_BIN=<dgd>`.
+- **The lpc-ext crypto module** for the module-gated steps: clone [dworkin/lpc-ext](https://github.com/dworkin/lpc-ext), run `make crypto`, and pass the shared object it leaves at that repository's root (`crypto.<ver>`) as `LPC_EXT_CRYPTO=/path/to/lpc-ext/crypto.<ver>`. Without the module those steps are the documented skips named on their lines, and the sweep still passes at its module-less bar.
+- **python3**; with the `cryptography` package only if you regenerate the WebAuthn vectors (Vector generators above -- the checked-in fixtures make regeneration optional for a normal sweep).
+- **An `openssl` CLI** for the TLS smokes' client probes; regenerating the agent vectors additionally needs OpenSSL 1.1.1+ with Ed25519 support (LibreSSL will not do -- Vector generators above).
+
 1. `DGD_BIN=<dgd> scripts/run-example.sh chat-app` -- `PASS`, 20 " OK" sentinels across 3 boots (cold selfexit, snapshot restore, cold no-snapshot).
 2. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-demo` -- `PASS`, 2 " OK" sentinels (1 timed boot).
 3. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-master` -- `PASS`, 3 " OK" sentinels (1 timed boot).
@@ -141,6 +148,16 @@ Run in this order for the complete pre-PR bar. Each line names the command and t
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 
+## When a run fails
+
+The harness leaves a failed run's evidence in place. The artifact map:
+
+- **Boot logs**: `state/run-<example>-boot<N>.log` for run-example.sh; each smoke names its own (`state/https-smoke-boot.log`, `state/drive-verbs-boot.log`, and so on). Compile errors and runtime traces land here.
+- **Sentinels**: the deployed domain's `data/test-result.log` (`src/usr/<Mount>/data/test-result.log`) -- one line per test phase, in phase order, ` OK` or a failure note.
+- **The deploy itself**: a failed run does not clean up; the deployed mount, the generated config, and the state files are still there to inspect (the clean-slate reset runs at the START of the next run).
+
+Triage in that order: the sentinel log names the first failing phase; the boot log carries the compile error or error trace behind it; and when the failure needs live inspection, boot the still-deployed example yourself against the generated config the run left behind (`<dgd> state/run-example.dgd`) and poke it from the console (`docs/admin-console.md`). `docs/debugging-applications.md` owns trace reading and the error-message index. A `password rejected` failure from any drive-verbs-based smoke is the credential contract above: delete `src/kernel/data/admin.pwd` and rerun.
+
 ## Adding a new example
 
 A whole new example registers at six points; missing one either breaks reruns or leaves the example undiscoverable:
@@ -159,6 +176,7 @@ A whole new example registers at six points; missing one either breaks reruns or
 | Console / operator-visible behavior | A verbset block, added to an existing file or a new one under `scripts/verbsets/` | Add a `cmd:` line plus `expect:`/`absent:` regex lines per the block format in the `drive-verbs.py + scripts/verbsets/` section above; wire a new file into `drive-verbs-smoke.sh`'s default verbset list (or drive it explicitly) so the sweep runs it. |
 | Boot-time or primitive behavior | A sentinel phase in the example's `sys/test.c`, plus the profile's expected-OK bump in `run-example.sh` | Add a phase that appends an " OK" (or a `FAIL`) line to the deployed domain's `data/test-result.log`, then bump the matching `ok` field in `example_profile()`. The script's own header names this mechanic directly: "bump when a test-driver phase adds a sentinel". |
 | Boot hygiene / noise | `base-boot-guard.sh`'s line bound (`MAX_LINES`, default 400) | A change that adds legitimate boot-log or `system.log` output raises the guard's baseline; if the new output pushes past the bound, raise `MAX_LINES` deliberately with a stated reason rather than silencing the guard -- an unexplained jump toward the bound is the atomic-write-storm regression this guard exists to catch. |
+| Shared base library (`src/lib/`) | A verbset driving the library through the console `code` verb, or a sentinel phase in an example that consumes it | `scripts/verbsets/kvstore-roundtrip.verbset` is the template: `code` expressions exercise the library's entry points against a base boot, `expect:` lines pin the results, no dedicated example needed. Mind the composability constraints above. A new library also gets its `docs/kernel-libraries.md` catalog entry -- `docs/source-map.md` names that doc as `src/lib/`'s owner. |
 
 ## Where to next
 

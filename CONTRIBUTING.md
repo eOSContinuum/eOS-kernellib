@@ -5,7 +5,9 @@ Thanks for your interest in eOS-kernellib. This document covers the conventions 
 ## Before you start
 
 - Read [README.md](README.md) for the project's framing and what the runtime platform provides.
-- Read [docs/architecture.md](docs/architecture.md) for the architectural model: capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions.
+- Build and boot the platform per [docs/getting-started.md](docs/getting-started.md) before proposing code changes -- the Testing section's regression sweep assumes a built DGD and a bootable checkout, and the sweep's Prerequisites block in [scripts/README.md](scripts/README.md) lists the optional pieces worth installing early.
+- If LPC is new to you, read [docs/lpc-essentials.md](docs/lpc-essentials.md) first -- it exists to give you enough LPC literacy to read platform code, and the kernel source assumes it.
+- Read [docs/architecture.md](docs/architecture.md) for the architectural model: capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions. Its section The boot, in source order is the guided first read of the kernel source itself.
 - Skim [docs/source-map.md](docs/source-map.md) to find your way around the source tree: what lives in each directory, and which document owns each subsystem.
 - Read [docs/where-code-belongs.md](docs/where-code-belongs.md) for placement doctrine: which tier and which shape (library, daemon, cloneable, utility) new code takes, and the authority choke-point behind those choices.
 - Read [docs/runtime-primitives.md](docs/runtime-primitives.md) for the eight runtime primitives, each with foundation, demonstration status, supporting extensions, and open work.
@@ -94,8 +96,10 @@ A behavior change updates the document that owns it: `docs/source-map.md`'s "Fin
 
 Two merged units show the full shape the sections above ask for; read their diffs as templates.
 
-- **A fix** (PR #52): a focused two-file type correction in the collection stack, shipped in the same PR as the regression verbset that drives exactly the fixed path (plus a companion console-baseline verbset), verified against a live boot and the default sweep. Internals-only, so no doc touch -- the test is the evidence.
-- **A feature** (PR #31): a diagnostics-routing change across two domains, shipped with the verbset assertion that proves the new visibility end to end and the five documentation updates that keep the owning docs true. Code, proof, and prose land as one reviewed unit.
+- **A fix** ([PR #52](https://github.com/eOSContinuum/eOS-kernellib/pull/52)): a focused two-file type correction in the collection stack, shipped in the same PR as the regression verbset that drives exactly the fixed path (plus a companion console-baseline verbset), verified against a live boot and the default sweep. Internals-only, so no doc touch -- the test is the evidence.
+- **A feature** ([PR #31](https://github.com/eOSContinuum/eOS-kernellib/pull/31)): a diagnostics-routing change across two domains, shipped with the verbset assertion that proves the new visibility end to end and the five documentation updates that keep the owning docs true. Code, proof, and prose land as one reviewed unit.
+
+From a clone, without GitHub: `git log --oneline --grep='#52'` (or `'#31'`) finds the merge commit, and `git show -m <sha>` prints its diff.
 
 The common skeleton: one logical change, the regression that demonstrates it (sentinel driver phase, verbset entry, or example assertion), and whatever documentation the change makes stale -- in the same PR.
 
