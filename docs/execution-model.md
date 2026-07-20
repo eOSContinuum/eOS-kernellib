@@ -21,6 +21,19 @@ A task runs to completion before the next one begins. There is no preemption and
 
 This single serialization point is why application code needs no locks: two callers contending for the same state never run at the same instant, so a write always sees the prior write's committed result, not a torn intermediate. It is the foundation of the multi-agent-coherence primitive. See `docs/runtime-primitives.md` §7, whose demonstration is exactly two tasks racing for one resource and losing the race deterministically rather than corrupting it.
 
+## What serialization does not give you
+
+The no-locks guarantee is scoped to one task. Within a task, no other code runs; between tasks, anything can. A logical operation that spans a task boundary re-admits the interleaving the single task removed: other tasks run between your first task and its continuation, and state read in the first may be stale by the second.
+
+The platform ships several surfaces that split one logical operation across tasks, and each is a place this bites:
+
+- **`call_out` chunking slices** (The price below; `docs/application-authoring.md` Spreading work across timeslices): every fired slice is a fresh task, and other tasks run between slices.
+- **HTTP body receipt** (`docs/http-applications.md` Call `expectEntity` for body-bearing methods): the request line and headers parse in one task, the body arrives in another, and the application itself carries state between them (the `pendingRequest` idiom).
+- **Outbound-connection callbacks** (`docs/application-authoring.md` Outbound connections): the connect, response, and close callbacks are each their own task.
+- **Merry `$delay()` continuations** (`docs/merry-language.md`): the resume re-enters the script later, in a new task.
+
+The discipline: make the decision and the write share one task -- re-read and re-validate at write time instead of acting on values a prior task read. `examples/chat-app` demonstrates the read-at-write-time half directly: `claim_slot` reads the member list at the instant it writes, so a second caller sees the first's committed result and yields (phase 9), while `claim_slot_stale` writes from a snapshot captured earlier and reproduces the lost update (phase 9b) -- `examples/chat-app/obj/room.c` carries both. That contrast runs within one task there; across a task boundary it is the same discipline against a stronger adversary, because now another task really does run between your read and your write. And if mid-operation state must never be visible to other tasks, the operation cannot span tasks at all -- shrink it into one, because there is no lock to take.
+
 ## The price: head-of-line latency
 
 Serialization has a cost: a long-running task delays every other task waiting behind it, including other connections' input, other `call_out`s due to fire, and the next boot step. Nothing else in the process runs until the current task returns or errors.

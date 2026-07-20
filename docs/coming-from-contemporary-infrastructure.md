@@ -39,6 +39,7 @@ Habits that produce redundant or wrong code on this platform:
 - **No deploy step.** If your change process ends with "restart the server," you have re-imported the habit the platform removed. Restarts are for host-binary upgrades (hot boot), not code changes.
 - **No external identity service.** Capability checks are structural. An "auth middleware" layer guarding internal calls duplicates what the tier boundary already enforces. Put authorization logic at the transport edge where external principals enter, not between internal objects.
 - **No migration framework.** There is no schema to version. Version the *code's* handling of old state shapes, and lean on `call_touch`.
+- **No transactions across continuations.** The await-shaped habit -- read state, defer (a `call_out` slice, an HTTP body arrival, an outbound callback, a Merry `$delay`), then write from the earlier read -- ships a lost update here: atomicity and the no-locks guarantee are per-task, and other tasks run between yours. Re-read at write time ([execution-model.md](execution-model.md) What serialization does not give you).
 
 ## What does not translate
 
