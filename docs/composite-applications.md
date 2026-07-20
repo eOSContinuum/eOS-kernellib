@@ -19,6 +19,18 @@ multi-domain service; and a platform evaluator tracing how the
 authentication substrate ([identity.md](identity.md)) binds to a real
 transport.
 
+## Reading the example in stages
+
+The example is large because it composes everything; your first real service should not start by reading all of it. It separates cleanly into three stages, and the walkthrough below follows the same order:
+
+**Stage 1 -- the identity-free core, the skeleton to copy.** A working HTTP service with a persistent daemon, a synchronous audit observer, and a static page, with no identity machinery at all: `WWW/sys/router.c` (the route registry), `WWW/obj/server.c` (the per-connection mount-point server; `tls_server.c` is its HTTPS twin), `Inventory/sys/inventoryd.c` (the daemon -- its plain-mapping store, its dispatched event property, and the audit observer bound to it), `Inventory/sys/demo.c` (the one-route static page), and the `handle()` contract that joins them. The handler's unauthenticated routes (`/inventory/health`, the read-only item and audit lists) complete the shape. This stage is what the harness's module-less profile drives end to end -- transport, routing, and the restore probe, none of which need the crypto module. The audit observer belongs to it as code (identity-free, registered at boot in every profile), but its firing rides an authenticated write, so the module-less phases exercise its registration, not its callback -- the crypto-gated phases do that.
+
+**Stage 2 -- the authd binding.** `Inventory/sys/handler.c`'s ceremony surface: challenge issue and single-use consumption, registration, login, bearer-token validation in front of the mutating routes, and the capability-gated admin route (the check lives in the daemon at the choke-point, not in the handler). Read it against The connection-object-to-daemon seam and Authenticating a wire request below.
+
+**Stage 3 -- the full composition.** The agent self-service surface, the event streams (`Inventory/sys/streamd.c` and the two loopback clients), the recovery ceremony, and the persistence phases that re-drive the whole surface across a restore boot. These are the parts to read when you need each feature, not before.
+
+`sys/test.c` follows the same split: its transport phases exercise stage 1 alone, and the crypto-gated phases add stages 2 and 3 (`examples/composite-app/README.md` maps phases to sentinel counts).
+
 ## The shape
 
 ```text
