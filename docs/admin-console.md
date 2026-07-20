@@ -40,8 +40,8 @@ telnet localhost 8023
 
 First-connection behavior depends on whether the kernel has admin credentials persisted:
 
-- **Cold boot, no prior admin**: the kernel prompts to set an admin password. The hash is persisted across statedumps (runtime primitive §3), so subsequent boots find it.
-- **Subsequent connections**: name and password prompt; the hash is checked against the persisted credential.
+- **Cold boot, no prior admin**: the kernel prompts to set an admin password. The hash is written to `src/kernel/data/admin.pwd` the moment it is set, so subsequent boots find it -- with or without a snapshot (the file, not the image, is the credential's home; see Bootstrap and authentication below).
+- **Subsequent connections**: name and password prompt; the hash is re-read from the credential file at every login and checked.
 
 An operator authenticated as `admin` has tier-spanning reach (kernel and System tiers, plus cross-domain visibility into user-tier code). Other authenticated operators have access bounded by their owner's directory tree and the access-daemon grants on top. A cold boot registers no operator beyond `admin`: the System telnet manager accepts only names on the kernel access list, so a new operator is provisioned live from the admin console. `grant <user> access` registers the name (creating `/usr/<user>`), directory grants scope what the new operator may touch, and the operator's first login walks the set-a-password flow. `scripts/verbsets/operator-provision.verbset` automates exactly this sequence.
 
@@ -306,11 +306,13 @@ The investigative moves from the task sections above, consolidated into one walk
 On first cold boot with no persisted admin password:
 
 1. Telnet to the kernel's `telnet_port`.
-2. The kernel prompts to set the initial admin password.
-3. The password hash persists into the platform's snapshot via the persistence primitive (§3); no separate "save credentials" step.
+2. The kernel prompts to set the initial admin password (`Pick a new password:`).
+3. The hash is written to `src/kernel/data/admin.pwd` via `save_object` the moment it is set, and re-read from that file at every subsequent login. The file, not the image, is the credential's home: it governs the next login with or without a snapshot (`docs/persistence.md` What persists).
 4. Subsequent connections prompt for the credential.
 
-To reset the admin password from outside the console: the kernel's auth state lives in the access daemon (`/kernel/sys/access_daemon`). Cold-boot from a snapshot taken before the password was set, OR boot with the snapshot removed (cold boot from scratch). Both are operator-level actions outside the console.
+A connected admin rotates the credential in place with the `password` command (old password, new password, retype); the new hash is written to the file immediately and governs the next login, no restart involved.
+
+To reset a lost admin password: stop the driver, delete `src/kernel/data/admin.pwd`, and boot again -- cold or from a snapshot. The next `admin` login re-enters the first-claim flow (`Pick a new password:`). No snapshot manipulation is needed and no other state is lost: every incoming connection clones a fresh login object that reads the file, so no in-image copy of the hash from an earlier session participates in a later login. Snapshot juggling, by contrast, does not reset anything -- because the file is independent of the image, a boot from a pre-credential snapshot, or from no snapshot at all, still demands the old password as long as the file exists.
 
 ## Appendix: alphabetical verb reference
 
@@ -338,6 +340,7 @@ This appendix is the signature home for the console verbs; for other callable ki
 | `mv <file> [...] <target>` | Filesystem | Rename / move files |
 | `new <obj>\|$N` | Code lifecycle | Instantiate an LWO from a `data/` master |
 | `observers <obj_path> [<path> [timing]] [-effective]` | Dispatcher | List observers: local slot (indexed), observed-path enumeration, or effective walk view (extension) |
+| `password` | Session | Rotate the connected operator's password (old, new, retype); the new hash is written to the credential file immediately |
 | `people` | Connections | List active connections |
 | `pwd` | Filesystem | Print session directory |
 | `query-approved-registrars` | Dispatcher | List MERRY's approved-registrars set (extension) |

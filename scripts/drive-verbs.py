@@ -163,7 +163,11 @@ def login(sess: Session, user: str, password: str) -> None:
         sess.send_line(password)
         text = sess.read_until([PROMPT, r"login: "])
         if not re.search(PROMPT, text):
-            raise RuntimeError("password rejected")
+            raise RuntimeError(
+                "password rejected (default is 'drive-verbs'; if the console"
+                " was claimed with another password, delete"
+                " src/kernel/data/admin.pwd and rerun -- the next connect"
+                " re-claims it)")
     elif not re.search(PROMPT, text):
         raise RuntimeError(f"unexpected login response: {text!r}")
 
