@@ -64,7 +64,7 @@ The verb categories below are organized around the operational situation an oper
 
 **Verbs**: `status`, `code`, `people`, `pwd`, `cd`, `ls`, `history`
 
-**Why**: the platform's value is that the running image is queryable; you do not need a debugger attached to know what the runtime is doing. `status` walks the host's system-wide health vector (memory, swap, objects, users, uptime, call_outs); `code` evaluates an arbitrary LPC expression in the operator's domain and returns the result with history-pointer assignment (`$N`); `people` enumerates live connections.
+**Why**: the platform's value is that the running image is queryable; you do not need a debugger attached to know what the runtime is doing. `status` walks the host's system-wide health vector (memory, swap, objects, users, uptime, call_outs); `code` evaluates an arbitrary LPC expression in the operator's domain and returns the result with history-pointer assignment (`$N`); `people` lists live login sessions (not application transport connections -- for the connection-count total against the cap, use `status`).
 
 **How**:
 
@@ -222,14 +222,14 @@ For substantial edits, prefer a host-side editor. The `ed` verb is for cases whe
 
 **Verbs**: `people`
 
-**Why**: the platform's connection layer (`/kernel/sys/userd`) maintains the live list of active connections. Operators inspect that list for capacity planning, incident response, and security audit.
+**Why**: the platform's connection layer (`/kernel/sys/userd`) maintains the live list of login sessions. Operators inspect that list for incident response and security audit.
 
-**How**: `people` queries the host's `query_users()` kfun and prints, per user: connection state, address, current command (when in the editor), idle time. The verb name reflects the runtime's MUD heritage; the underlying mechanism is connection enumeration.
+**How**: `people` queries the host's `query_users()` kfun and prints, per login session: connection state, address, current command (when in the editor), idle time. The verb name reflects the runtime's MUD heritage; the underlying mechanism is login-session enumeration. It lists login sessions only -- application transport connections (HTTP included) do not appear, so `people`'s row count is not the connection total.
 
 **What for**:
 
-- **Incident response**: who's connected when the platform is misbehaving? Compare against expected operator population.
-- **Capacity check**: connection count against the `users` cap in `.dgd`.
+- **Incident response**: who's logged in when the platform is misbehaving? Compare against expected operator population.
+- **Capacity check**: the connection-count total against the `users` cap is `status`'s Users line, not `people`'s row count (`people` sees login sessions only).
 - **Audit**: combine with `status` for full snapshot of who-is-on plus what-is-going-on.
 
 ## Dispatcher operator surface
@@ -295,7 +295,7 @@ The investigative moves from the task sections above, consolidated into one walk
 
 **A property write fails with a cascade or batch error.** This is dispatcher territory: `cascade-depth` for the current bound, `batch-status <id>` for the failing batch's status and propagated reason, `observers <obj_path> <path>` for what is registered where, `dispatch-trace on` for per-dispatch visibility into the next occurrence. The worked example in the Dispatcher operator surface section above walks the full sequence.
 
-**Something an operator did, or a stray connection, is interfering.** `people` lists live connections with addresses and idle time. Compare against the expected operator population. Combine with `status` for the who-is-on plus what-is-going-on snapshot. The console's own sessions appear here too: `people` marks who is in the editor, and editor sessions come from a small fixed pool (the `editors` field in the `.dgd` configuration).
+**Something an operator did, or a stray connection, is interfering.** `people` lists live login sessions with addresses and idle time -- login sessions only: application transport connections (HTTP included) do not appear there. Compare against the expected operator population. Combine with `status` for the who-is-on plus what-is-going-on snapshot. The console's own sessions appear here too: `people` marks who is in the editor, and editor sessions come from a small fixed pool (the `editors` field in the `.dgd` configuration). What the console cannot do is end a connection -- there is no disconnect verb, and connection objects are kernel-owned, beyond `destruct`'s reach; interference from a wedged or hostile connection resolves at the application layer or by platform restart (`docs/operations.md` Network boundary and transport security).
 
 **The platform is degrading slowly across days.** Capacity creep: `rsrc objects` and `rsrc callouts` against the `.dgd` caps show whether the platform is drifting toward a hard ceiling; `status` swap numbers show whether the image has outgrown memory. A `swapout` relieves memory pressure immediately (objects page back in on access); a config raise needs a reboot and belongs to `docs/operations.md`.
 
@@ -341,7 +341,7 @@ This appendix is the signature home for the console verbs; for other callable ki
 | `new <obj>\|$N` | Code lifecycle | Instantiate an LWO from a `data/` master |
 | `observers <obj_path> [<path> [timing]] [-effective]` | Dispatcher | List observers: local slot (indexed), observed-path enumeration, or effective walk view (extension) |
 | `password` | Session | Rotate the connected operator's password (old, new, retype); the new hash is written to the credential file immediately |
-| `people` | Connections | List active connections |
+| `people` | Connections | List login sessions with address and idle time (application transport connections do not appear) |
 | `pwd` | Filesystem | Print session directory |
 | `query-approved-registrars` | Dispatcher | List MERRY's approved-registrars set (extension) |
 | `quota [<user> [<rsrc> [<limit>]]]` | Resources | Read or set per-owner resource limits |
