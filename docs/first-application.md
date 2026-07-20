@@ -95,7 +95,7 @@ $0 = </usr/KV/initd>
 $1 = </usr/KV/sys/kv_daemon>
 ```
 
-From the next cold boot onward the initd does this automatically; the two-step form is a console-session fact, not the platform's boot story. The daemon is live now (its `create()` runs at its first use, initializing the empty store). Prove it by driving its verbs. `code` evaluates an LPC expression, and `->` calls a method on the object named by its path:
+From the next cold boot onward the initd does this automatically; the two-step form is a console-session fact, not the platform's boot story. The daemon is live now (its `create()` runs at its first use, initializing the empty store). Prove it by driving its verbs. `code` evaluates an LPC expression, and `->` calls a method on the object named by its path. (If you have run anything extra at the console, your `$N` indices will be higher: history numbers every value-producing command in sequence, so any experiment shifts all later slots. Compare the values to the right of the `=`, not the slot numbers.)
 
 ```text
 # code "/usr/KV/sys/kv_daemon"->put("greeting", "hello")

@@ -106,6 +106,8 @@ $1 = </usr/WWW/initd>
 $2 = </usr/WWW/obj/server>
 ```
 
+(As in `first-application.md`: the `$N` indices assume you have run nothing extra at the console. Any additional value-producing command shifts every later slot, so compare the values, not the slot numbers.)
+
 From a second terminal on the host, drive the service over TCP (the binary port from `example.dgd` is 8080):
 
 ```sh
@@ -189,6 +191,10 @@ The process died and came back, and the first HTTP request finds the store intac
 | 4 | One state behind two surfaces | [runtime-primitives.md](runtime-primitives.md) |
 | 5 | Hot reload on a live network service | [code-lifecycle.md](code-lifecycle.md) |
 | 6 | Orthogonal persistence observed through a transport | [persistence.md](persistence.md) |
+
+## Cleaning up
+
+Your domain lives at `src/usr/WWW`, and that mount name collides with the harness: any `scripts/run-example.sh` or `scripts/drive-verbs-smoke.sh` run removes `src/usr/WWW` in its clean-slate step, taking your tutorial domain with it -- copy anything you want to keep before running the example regressions. When you are done, reset the checkout per [common-tasks.md](common-tasks.md) Reset a development checkout to a clean slate; that recipe also names `src/usr/Pet` and `src/usr/KV` from the earlier tutorials, which the harness does not remove on its own.
 
 ## Where to next
 
