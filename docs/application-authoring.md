@@ -27,6 +27,38 @@ src/usr/<App>/
 
 The four subdirectory conventions (`lib`, `obj`, `sys`, `data`) are not just style. The host driver enforces the `/lib/` requirement on `inherit_program`. The System auto's `find_object` discipline depends on path-based type recognition. The System auto's `clone_object` wrapper only accepts paths containing `/obj/`. An application that puts a cloneable under `lib/` cannot clone it. An application that tries to inherit from an object under `obj/` will get a compile-time rejection.
 
+Where the data inside those objects belongs -- the property table versus plain typed members, per datum -- is placement doctrine with its own consequences (`docs/where-code-belongs.md` Where state belongs). Modeling domain data below covers the shapes and lookup patterns that sit on top of that choice.
+
+## Modeling domain data
+
+The platform's pitch -- the object graph IS the storage layer -- leaves the author the half a database schema used to do: choosing entity shapes, finding things again, and enumerating safely. The patterns:
+
+**Entity shape: rows in a daemon, or clones.** Small and uniform domain data lives as mappings in the owning `sys/` daemon (the composite example's inventory: one `items` mapping, ids to rows). Entities with real identity -- per-instance behavior, cross-references, independent lifecycle -- are clones, each its own persistent dataspace. The fork is sizing as much as style: one mapping caps at the driver's pair ceiling and swaps as one unit, while clones spend `objects`-table slots (`docs/kernel-libraries.md` Choosing a collection; `docs/operations.md` Sizing a workload).
+
+**Identity lookup: logical names.** An entity that other domains find by name registers one: `set_object_name("App:things:name")` at create, `find_named(name)` from anywhere -- global and O(1) through the Index daemon, and the same registry the Vault and `OBJ(...)` references resolve through (`docs/kernel-libraries.md` /lib/util/named.c).
+
+**Field lookup: a secondary index is a mapping you maintain at the write site.** There is no query planner; "find items by creator" is a second mapping kept beside the first, updated in the same atomic function that mutates the store:
+
+```c
+private mapping items;          /* id : row */
+private mapping byCreator;      /* creator : ({ ids }) */
+
+atomic int create_item(string name, int qty, string creator)
+{
+    id = nextId++;
+    items[id] = ([ "name" : name, "qty" : qty, "creator" : creator ]);
+    if (!byCreator[creator]) byCreator[creator] = ({ });
+    byCreator[creator] += ({ id });
+    return id;
+}
+```
+
+Atomicity is what makes this cheap where it was hard elsewhere: the store write and the index write share one atomic task, so they commit or roll back together -- an index can never half-agree with its store, and no lock or reconciliation job exists to write. When the write site is not yours to edit (the writes are dispatched properties), attach the index as an observer instead (`docs/dispatcher.md` register_observer) and it updates synchronously in the same envelope.
+
+**Enumeration under the tick budget.** Walking a large store in one task risks `Out of ticks`; the idiom is the sliced sweep -- process a bounded chunk, save the cursor, re-arm with `call_out` -- shown at Spreading work across timeslices below, with the cross-task staleness rule it carries (`docs/execution-model.md` What serialization does not give you).
+
+**When the mapping outgrows.** The collection fork (`/lib/Array`, `KVstore`, `BTree`) trades dataspace-granularity paging against `objects`-table slots; take it before the first real domain model outgrows the demo shapes (`docs/kernel-libraries.md` Choosing a collection).
+
 ## The initd's role
 
 Every tier-E domain must have an `initd.c` at its root. The System initd compiles each domain's `initd.c` during cold boot. The domain's `initd::create()` runs inside the System initd's create envelope.
