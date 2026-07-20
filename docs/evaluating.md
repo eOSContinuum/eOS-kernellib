@@ -45,7 +45,7 @@ Stock-build compiled bounds, not tuning knobs (`operations.md` Limits and capaci
 - **The exit cost.** Three paths export state to portable form today (`save_object` text, Vault+Schema XML, the property-table ascii marshal); a typed object graph with no schema and no property-table shape has no export walker (`persistence.md` Getting data out).
 - **The durability model.** Persistence is periodic statedump, not per-transaction commit: the recovery point is the operator-chosen `dump_interval`, a sizing decision rather than a guarantee, and an unclean stop loses everything since the last completed dump (`operations.md` Availability and data-loss model).
 - **The driver dependency.** The runtime driver is an unmodified AGPL-3.0 upstream with a single primary maintainer; the license boundary and the pin-plus-fork continuity posture are stated factually in `architecture.md` The driver dependency.
-- **The security envelope.** Trust boundaries, the operator's responsibilities, and the non-goals (including what the capability model does not claim) are consolidated in `security-posture.md`.
+- **The security envelope.** Trust boundaries, the operator's responsibilities, and the non-goals (including what the capability model does not claim) are consolidated in `security-posture.md` -- among them the native TLS stack's assurance status: a from-scratch interpreted-LPC implementation, unaudited, with the reverse proxy as the higher-assurance alternative.
 
 ## Spending the rest of the budget
 
