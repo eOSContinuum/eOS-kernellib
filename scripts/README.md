@@ -43,6 +43,8 @@ Two composability constraints when batching verbsets into one boot: a verbset as
 
 The session logs in as `admin` unless the verbset declares otherwise: file-level `user:` / `password:` directives before the first block (overridable with `--user` / `--password`) let a verbset run as a registered non-admin operator -- the login shape that reaches the System console and its lifecycle verbs (`upgrade` and friends; see `docs/admin-console.md` Connecting). Cold boots register no such operator, so a registered-user verbset runs after a provisioning verbset driven as admin: `operator-provision.verbset` grants the operator, `operator-upgrade.verbset` (`user: testop`) then drives the console `upgrade -p` cascade against a deployed upgrade-cascade example.
 
+The default admin password is `drive-verbs`, and this is a standing contract with the smoke scripts: their clean-slate resets deliberately leave the credential file (`src/kernel/data/admin.pwd`) in place, so every drive-verbs-based run either claims the console with the default on a fresh checkout or logs back in with it. If you have claimed the console with your own password -- the tutorials have you do exactly that -- a smoke run fails with `password rejected` (and downstream phase failures that look like TLS or snapshot trouble). The fix is one file: delete `src/kernel/data/admin.pwd` and rerun; the smoke re-claims the console on its next connect (`docs/admin-console.md` Bootstrap and authentication).
+
 ## drive-verbs-smoke.sh
 
 ```sh

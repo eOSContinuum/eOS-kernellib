@@ -119,7 +119,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 2. A certificate that lands after boot activates with the console `tls-cert reload`; renewals are just the file copy, read per connection. The host's ACME client owns issuance.
 3. `examples/https-app/` is the reference server subclass.
 
-**Verify**: `LPC_EXT_CRYPTO=<module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- the nine-phase end-to-end incl. the statedump key-scans.
+**Verify**: `LPC_EXT_CRYPTO=<module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- the nine-phase end-to-end incl. the statedump key-scans. The smoke logs in as `admin` with the default password `drive-verbs`; if you have claimed the console with your own password, delete `src/kernel/data/admin.pwd` first, or the run fails with `password rejected` (`scripts/README.md`).
 
 **Owning doc**: `docs/operations.md` Network boundary and transport security.
 
@@ -139,8 +139,9 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: a from-checkout boot with no residue from prior example runs or operator provisioning.
 
-1. Remove every deployed example mount (`src/usr/<Mount>/` -- the full list is `run-example.sh`'s clean-slate loop), the snapshot pair and swap (`state/snapshot`, `state/snapshot.old`, `state/swap`), and the provisioning residue the console flows create (`src/usr/testop/`, `src/kernel/data/access.data`).
-2. Or let the harness do it: every `scripts/drive-verbs-smoke.sh` run performs exactly this reset first; `scripts/run-example.sh` resets the mounts and state files but leaves the operator-provisioning residue (`src/usr/testop/`, `access.data`) in place (`scripts/README.md`).
+1. Remove every deployed example mount (`src/usr/<Mount>/` -- the full list is `run-example.sh`'s clean-slate loop, and it includes `WWW`, the same mount name the `first-http-endpoint.md` tutorial uses), plus the tutorial domains the harness does not know about (`src/usr/Pet`, `src/usr/KV`) -- leftover domains re-register on every cold boot. Remove the snapshot pair and swap (`state/snapshot`, `state/snapshot.old`, `state/swap`) and the provisioning residue the console flows create (`src/usr/testop/`, `src/kernel/data/access.data`).
+2. For a full reset, also delete the admin credential (`src/kernel/data/admin.pwd`): the next console login re-claims it, and the smoke scripts expect the default password `drive-verbs` there, not one you picked in the tutorials (`scripts/README.md`).
+3. Or let the harness do it: every `scripts/drive-verbs-smoke.sh` run performs the mount-and-state reset first; `scripts/run-example.sh` resets the mounts and state files but leaves the operator-provisioning residue (`src/usr/testop/`, `access.data`) in place. Both remove `src/usr/WWW` -- it is in the example-mount list, and a tutorial-authored WWW domain goes with it -- but neither touches `admin.pwd`, `src/usr/Pet`, or `src/usr/KV` (`scripts/README.md`).
 
 **Verify**: `git status --short` shows no untracked deploy artifacts; the next cold boot registers no leftover domains.
 
