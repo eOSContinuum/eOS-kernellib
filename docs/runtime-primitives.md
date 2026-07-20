@@ -150,7 +150,7 @@ Five-axis containment, as shipped: **language** (the grammar refuses `->`, `rlim
 Event delivery is atomic with the state change that produced it.
 
 **Foundation**:
-- Host-runtime `call_out` kfun. Schedules a future invocation. The deferred call runs in its own atomic envelope after the scheduling call commits.
+- Host-runtime `call_out` kfun. Schedules a future invocation. The deferred call runs as a new task after the scheduling call commits, under the kernel's `call_limited` resource envelope -- an ordinary non-atomic call unless the scheduled function is itself declared `atomic` (`docs/execution-model.md` Deferred work ordering).
 - Atomic function semantics (§1) bound each call_out's execution slice. A failed deferred call rolls back its own mutations, not the dispatching state change.
 - Single-coherence-domain architecture: one execution slot at a time, no concurrent state mutation, deterministic ordering without cross-domain coordination.
 
@@ -179,7 +179,7 @@ Multiple callers see a consistent view of state without user-land coordination.
 - Single-coherence-domain architecture: one address space, one execution slot at a time, no concurrent state mutation. Cross-domain coordination is unnecessary because the platform provides serializability natively.
 - Atomicity (§1) prevents partial-state visibility: a reader observing an in-progress write sees either pre-state or post-state, never a torn intermediate.
 
-**Demonstration**: the `examples/chat-app` coherence phases exercise multi-caller semantics directly. Two users contending for a capacity-1 room slot serialize without a lock: each claim re-reads current membership at write time in its own atomic task, so exactly one wins (phase 9). The same contention run against a stale pre-read snapshot reproduces the lost-update the coherent read removes (phase 9b). Three readers of one message log observe identical content because the log is one runtime property rather than per-reader copies, and a cached copy demonstrably diverges (phase 9c). A cross-room write through the batch surface commits or rolls back both sides as one unit, with the non-atomic contrast leaving the partial state the envelope removes (phase 9d).
+**Demonstration**: the `examples/chat-app` coherence phases exercise multi-caller semantics directly. Two users contending for a capacity-1 room slot serialize without a lock: each claim re-reads current membership at write time, so the second sees the first's committed result and exactly one wins (phase 9). The same contention run against a stale pre-read snapshot reproduces the lost-update the coherent read removes (phase 9b). Three readers of one message log observe identical content because the log is one runtime property rather than per-reader copies, and a cached copy demonstrably diverges (phase 9c). A cross-room write through the batch surface commits or rolls back both sides as one unit, with the non-atomic contrast leaving the partial state the envelope removes (phase 9d). The doctrine these demonstrate -- that the no-locks guarantee is per-task, so a logical operation spanning tasks must re-read and re-validate at write time -- is stated at `docs/execution-model.md` What serialization does not give you.
 
 **Status**: Partial. Serialization, lost-update contrast, read coherence, and cross-object atomic batching demonstrated at the LPC call surface by the cited phases. The same behavior observed through concurrent transport-level requests is pending.
 

@@ -182,7 +182,7 @@ The HTTP/1 connection library implements `receiveRequest` as a `relay->receiveRe
 
 The HTTP/1 connection library does not read request bodies automatically. After the request line and headers parse, the library calls `receiveRequest` and waits in line-receiving mode until the application either responds (via `sendMessage`) or opts into body receipt via `expectEntity(length)`. Calling `expectEntity(length)` switches the connection to raw-byte mode for exactly `length` bytes, after which the library calls `receiveEntity(chunk)` with the body.
 
-The application is responsible for remembering the request that produced the body. The reference application saves it to a `private HttpRequest pendingRequest` member at the moment `expectEntity` is called, and consumes it in `receiveEntity`.
+The application is responsible for remembering the request that produced the body. The reference application saves it to a `private HttpRequest pendingRequest` member at the moment `expectEntity` is called, and consumes it in `receiveEntity`. That window spans tasks: other requests can run between `expectEntity` and `receiveEntity`, so anything checked at header time gets re-checked when the body is acted on, not trusted from the earlier task (`docs/execution-model.md` What serialization does not give you).
 
 An application that does not call `expectEntity` for `POST`, `PUT`, or `PATCH` requests will accept the request line and headers but never receive the body. The connection stalls until the client times out.
 
