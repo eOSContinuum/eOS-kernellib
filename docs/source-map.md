@@ -53,8 +53,8 @@ An application adds its own tier-E domain under `src/usr/<App>/` the same way. S
 
 ### Outside `src/`
 
-- `examples/` holds the runnable reference applications, one subdirectory each (`http-app`, `vault-app`, `signal-app`, `merry-app`, `chat-app`, `atomic-demo`, `hot-reload-demo`, `hot-reload-master`, `upgrade-cascade`). The harness deploys each into a running platform. See `examples/README.md`.
-- `scripts/` holds the boot-and-drive harness: `run-example.sh` (example regressions), `drive-verbs.py` with `verbsets/` (the console driver), and the boot guards.
+- `examples/` holds the runnable reference applications, one subdirectory each. `examples/README.md` is the authoritative index (name, purpose, companion doc, verify command); `docs/README.md` Working examples carries the reading-path context.
+- `scripts/` holds the boot-and-drive regression harness. `scripts/README.md` documents every script and the pre-PR Full regression sweep.
 - `docs/` holds this documentation set; `docs/README.md` is the map.
 
 ## Finding a subsystem
