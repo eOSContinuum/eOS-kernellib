@@ -35,7 +35,9 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Writing applications
 
 - [lpc-essentials.md](lpc-essentials.md): LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
-- [kernel-reference.md](kernel-reference.md): the function-level kernel reference (efun overrides, per-object lfuns and hooks including `patch()`, the kernel overview, and the signature routers).
+- [kernel-reference.md](kernel-reference.md): the function-level kernel reference (efun overrides, per-object lfuns and hooks including `patch()`, and the signature routers).
+- [kernel-heritage-model.md](kernel-heritage-model.md): the kernel library's conceptual overview inherited from the upstream `dworkin/cloud-server` documentation -- motivation, directory structure, resource control, file security, and user management, for the contributor mapping the kernel tier to its origins.
+- [function-index.md](function-index.md): a generated alphabetical index of every platform-authored callable -- name, kind, and the document that carries its signature.
 - [kernel-libraries.md](kernel-libraries.md): inheritable libraries under `src/lib/` (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities).
 - [where-code-belongs.md](where-code-belongs.md), placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility), with the authority choke-point and composition-seam disciplines behind the choices.
 - [common-tasks.md](common-tasks.md): task-shaped recipes for the recurring author jobs -- test driver, recurring work, live-state migration, access grants, operator verbs, extra ports -- each linking the doc that owns its mechanism.
