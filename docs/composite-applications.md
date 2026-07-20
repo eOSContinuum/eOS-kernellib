@@ -72,7 +72,10 @@ path is:
        -> ({ code, phrase, contentType, body })
    ```
 
-   The server stays the only object that touches
+   A handler may append an optional fifth element -- a mapping of
+   extra response header name : value pairs -- when a resource needs
+   a header beyond the defaults (the demo page sends `Cache-Control:
+   no-store` this way). The server stays the only object that touches
    HttpRequest/HttpResponse wire objects; handlers see strings and
    return strings. A handler error becomes a 500 without breaking the
    connection contract.
