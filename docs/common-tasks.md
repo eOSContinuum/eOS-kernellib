@@ -111,6 +111,18 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/kernel-libraries.md` Utilities.
 
+## Find objects by a field value
+
+**Goal**: answer "which entities have field = X" without walking the whole store.
+
+1. Keep a second mapping beside the store, keyed by the field, updated in the same `atomic` function as every store mutation -- the two writes commit or roll back together, so the index cannot drift (`docs/application-authoring.md` Modeling domain data has the worked form).
+2. If the store's writes are dispatched properties you do not own, register an observer on the property instead; it fires synchronously inside the write's atomic envelope (`docs/dispatcher.md`).
+3. For name-to-object resolution (not field queries), use logical names: `set_object_name` at create, `find_named` anywhere (`docs/kernel-libraries.md` /lib/util/named.c).
+
+**Verify**: from the console, `code` the daemon's query surface for a known field value and confirm the ids match the store.
+
+**Owning doc**: `docs/application-authoring.md` Modeling domain data.
+
 ## Serve HTTPS on the labeled port
 
 **Goal**: the platform terminates TLS 1.3 natively for your application.

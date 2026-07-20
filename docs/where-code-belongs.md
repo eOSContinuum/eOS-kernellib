@@ -49,6 +49,40 @@ The System auto object, the program every user-tier object inherits, ends its so
 
 The routing guidance: when a change wants to extend the System auto, evaluate `EXT` first. It is the lower-merge-friction path, since the data file lives outside the versioned tree and survives platform upgrades without a merge. Editing auto.c remains correct for core platform features, which belong in the versioned source every checkout carries. Two properties to keep in view: `EXT` content compiles into the auto object with full System-tier trust (this is an operator extension point, not a sandbox), and the recompile that picks up a change cascades an upgrade across every inheritor (`docs/code-lifecycle.md` Library upgrade).
 
+## Where state belongs
+
+The behavior fork above has a state twin. Once a datum's holder is chosen (a `sys/` daemon for once-per-domain state, a clonable for per-instance state), the datum itself takes one of two representations, and the choice carries the platform's biggest consequences:
+
+- **A plain typed member** (`private mapping items;`): invisible to everything but your own LPC. Writes are free of dispatch cost, and nothing outside the object can see or react to them.
+- **A property** (`set_property("app:key", val)` on a `/lib/util/properties` inheritor): part of the platform's shared state surface. A dispatched write fires registered observers synchronously in the same atomic envelope (`docs/dispatcher.md`), Merry scripts can read and write it (`Get`/`Set` reach properties only, not plain members -- `docs/merry-language.md`), and the property table has a built-in export path (`docs/persistence.md` Getting data out).
+
+The deciding questions, per datum:
+
+| Question | If yes | If no |
+|---|---|---|
+| Must anything react to this write? | Property -- observers fire only on the dispatched `set_property` path, never on a plain assignment | Plain member |
+| Must it export or marshal (backup beyond the image, Vault XML, wire)? | Property table or a registered schema -- a typed object graph with neither has no export walker | Plain member (image-only state) |
+| Must Merry scripts reach it? | Property -- the sandbox's `Get`/`Set` reach the property table, not plain members | Plain member |
+| Is it high-churn internal bookkeeping? | Plain member -- every dispatched write pays the observer walk | Either |
+
+Migration differs too. Live clones migrate through `patch()` under the upgrade cascade in both cases (`docs/code-lifecycle.md`); the on-disk half rides whichever persistence the state uses -- typed members under a registered per-app schema evolve through the Vault respawn-and-re-store sweep (`docs/vault-applications.md` Schema evolution), while property-table state marshals through the built-in `Core:Entries` schema with no registration (`docs/schema.md` Property-table marshaling).
+
+The shipped reference pattern is the hybrid, not either pole. `examples/composite-app`'s inventory daemon keeps its working store in a plain mapping and writes one dispatched event property as its observable seam:
+
+```c
+private mapping items;              /* the store: plain, fast, internal */
+
+atomic int create_item(string name, int qty, string creator)
+{
+    id = nextId++;
+    items[id] = ([ "name" : name, "qty" : qty, "creator" : creator ]);
+    set_property(EVENT_PROP, "create " + id + " by " + creator);   /* the seam */
+    return id;
+}
+```
+
+The store stays cheap and private; the audit observer, the event stream, and any future reaction attach to the one property that narrates changes (`docs/composite-applications.md` The audit observer). Model the seam deliberately: the property is the part of your state you are publishing.
+
 ## Authority: one choke-point, never inline checks
 
 When new code needs a gate ("may this caller do this?"), the answer is never a fresh inline `previous_program()` comparison. The platform routes every authority decision through the capability store's single membership check (`capabilityd::is_allowed` / `require_member`), whether reached by inheriting the check face or by calling the daemon directly (`docs/capability.md` The mechanism). One store, one denial message, one place a future mediation mode attaches. Scattered inline checks are how the pre-consolidation platform accumulated six heterogeneous gates. The consolidation exists so that number stays one.
