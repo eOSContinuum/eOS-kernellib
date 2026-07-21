@@ -17,9 +17,9 @@
 #     own source; resume restoring authentication but never grants;
 #   - the load-bearing check: a statedump taken with a live agent token
 #     and a live agent session is scanned for the token plaintext
-#     (must be absent) with the token's SHA-256 hash and the agent
-#     principal as positive controls (their absence would mean the
-#     scan is vacuous).
+#     (must be absent) with the token's SHA-256 hash and the agent's
+#     principal string as positive controls (their absence would mean
+#     the scan is vacuous).
 #
 # Usage:
 #   LPC_EXT_CRYPTO=/path/to/lpc-ext/crypto.<ver> \
@@ -361,7 +361,7 @@ if token in snap:
 if tok_hash not in snap:
     fails.append("positive control missing: token hash absent (scan vacuous)")
 if principal not in snap:
-    fails.append("positive control missing: agent principal absent (scan vacuous)")
+    fails.append("positive control missing: principal string absent (scan vacuous)")
 if fails:
     print("FAIL: " + "; ".join(fails))
     sys.exit(1)

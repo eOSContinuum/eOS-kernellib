@@ -150,7 +150,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 ## Mint an agent identity and delegate a capability to it
 
-**Goal**: a human controller mints an agent principal, hands it a credential, and delegates a capability that dies with suspension.
+**Goal**: a human controller mints an agent identity, hands it a credential, and delegates a capability that dies with suspension.
 
 1. Mint from the controller's session: `AUTHD->mint_agent_with_token(controllerToken)` returns the agent's uuid and its token -- plaintext once, at mint, never again.
 2. The agent logs in with `AUTHD->authenticate_agent_token(agentToken)`, receiving its principal (`identity:<uuid>`) and its own session token.

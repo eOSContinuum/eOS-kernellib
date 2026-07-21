@@ -68,8 +68,8 @@ An agent -- an automated process acting on a human's behalf -- is an ordinary id
 
 Operator (DGD-admin) authentication is **not** part of this substrate, and the separation is load-bearing. An operator is a kernel access-list entry plus a password hash in the operator's user object, authenticated by password over the tunneled telnet console (`docs/admin-console.md` Connecting, `docs/security-posture.md` Credential lifecycle). That circuit is unchanged and independent:
 
-- A passkey identity is **never** minted as a kernel user or owner. Identities live in the System-tier substrate under `identity:<uuid>` principals; they are not access-list entries and hold no owner tier.
-- A passkey identity **never** attaches to the operator circuit. Authenticating as an identity does not grant console access; console access is the operator password path, gated separately.
+- A platform identity is **never** minted as a kernel user or owner. Identities live in the System-tier substrate under `identity:<uuid>` principals; they are not access-list entries and hold no owner tier.
+- A platform identity **never** attaches to the operator circuit. Authenticating as an identity does not grant console access; console access is the operator password path, gated separately.
 - The operator is the one who runs the identity substrate's privileged operations (minting, operator-mediated re-bind, platform-capability grants) *through* the console -- but the operator's own authentication is the password circuit, not a passkey.
 
 Keeping these apart means an application-user compromise cannot escalate to console (host-shell-equivalent) authority, and a console compromise is bounded by the operator credential lifecycle, not by any identity's credentials.

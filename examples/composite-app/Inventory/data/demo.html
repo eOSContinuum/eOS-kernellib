@@ -31,10 +31,15 @@
   agent can and cannot do.</div>
 </div>
 <div class="legend">
-  <b>Principal and agents.</b> Your passkey identity is the
-  <b>principal</b> -- the party on whose behalf everything here runs;
-  step 7 mints <b>agents</b> it controls (the API's routes and console
-  verbs call the principal the agent's "controller"). The page holds
+  <b>Principal and agents.</b> YOU are the <b>principal</b> -- the
+  party on whose behalf everything here runs. Your passkeys
+  AUTHENTICATE you (several can prove the same identity, and recovery
+  codes are the fallback -- losing one authenticator never loses the
+  identity). What you may DO is authorized separately: an operator
+  grants capabilities to your identity, and step 7 mints <b>agents</b>
+  to which you can delegate a subset of what you hold (the API's
+  routes and console verbs call the principal the agent's
+  "controller"). The page holds
   one session at a time; the banner above always says who is acting,
   and buttons that need a different session disable themselves and say
   why. One wire note: API responses name the ACTING identity's subject

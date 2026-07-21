@@ -20,7 +20,7 @@
  *
  * The agent entry points extend the same rule rather than weaken it:
  * an agent ceremony (verified by agentauthd) mints a session only for
- * the proven agent principal, and the controller self-service entries
+ * the agent's proven principal, and the controller self-service entries
  * derive the controlling identity from a live session's proven
  * principal -- the new agent's controller edge, and the own-agents
  * constraint on suspend/resume, are never caller-supplied.
@@ -97,7 +97,7 @@ mixed *authenticate(string challenge, string credentialId,
 
 /*
  * agent ceremonies: the same ceremony-plus-mint composition for agent
- * principals. agentauthd checks the record's kind and suspended state
+ * identities. agentauthd checks the record's kind and suspended state
  * at ceremony time; a session is minted only for the proven principal.
  */
 mixed *authenticate_agent_key(string challenge, string credentialId,

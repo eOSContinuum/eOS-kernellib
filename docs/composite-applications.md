@@ -104,7 +104,7 @@ mints a session for a principal a ceremony did not just prove.
 `sessiond->mint(principal)` stays out of tier-E reach by design:
 minting for an arbitrary principal string would be authority forgery.
 The agent surface extends the same rule: `authenticate_agent_token`
-mints only for the ceremony-proven agent principal, and the controller
+mints only for the ceremony-proven agent identity, and the controller
 self-service entries (mint, the own-agents read, suspend/resume,
 delegate/undelegate) derive the controlling identity from a live
 session, never from the caller. The example binds them under

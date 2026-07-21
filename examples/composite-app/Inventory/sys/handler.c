@@ -23,7 +23,7 @@
  *     validate through authd; the validated principal is what the
  *     domain's authorization (inventoryd) decides against.
  *   - /auth/agents binds authd's controller self-service: a live
- *     identity session mints agent principals (the agent token is in
+ *     identity session mints agent identities (the agent token is in
  *     the response once, at mint, the only time the plaintext exists),
  *     lists its own agents, suspends and resumes them, and delegates
  *     or withdraws its own capabilities. Management refusals surface
