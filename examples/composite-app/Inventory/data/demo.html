@@ -356,6 +356,7 @@ function setSession(newToken, newSubject, kind) {
     principalUuid = uuidOf(newSubject);
     try { localStorage.setItem('demo-principal-uuid', principalUuid); }
     catch (e) {}
+    el('rvuuid').value = principalUuid;
   }
   openAgentStream();
   updateUI();
