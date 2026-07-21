@@ -26,9 +26,9 @@
   <div class="who" id="who">Session: logged out</div>
   <div class="stream" id="stream">Streaming: connecting&hellip;</div>
   <div class="agentnote" id="agentnote" hidden>Agent session: steps
-  7-12 and 15 need the principal's session &mdash; passkey login (1b)
-  switches back. Try the report (14) to see what delegation
-  changes.</div>
+  8-12 and 15-17 need the principal's session &mdash; passkey login
+  (1b) switches back. Try mint (7) and the report (14) to see what an
+  agent can and cannot do.</div>
 </div>
 <div class="legend">
   <b>Principal and agents.</b> Your passkey identity is the
@@ -48,10 +48,12 @@
   keeps one refusal alive on purpose so you see the boundary.<br>
   <b>The walk:</b> 1a register &rarr; 3 create &rarr; 5 audit &rarr;
   6 wipe (403) &rarr; 14 report (200) &rarr; 7 mint &rarr; 8 list
-  &rarr; 13 agent login &rarr; 14 report (403) &rarr; 1b back &rarr;
-  11 delegate &rarr; 13 agent login &rarr; 14 report (200, delegated)
-  &rarr; 3 create as the agent &rarr; 1b back &rarr; 9/10 suspend
-  &amp; resume &rarr; 15 recovery kit &rarr; 1c recover.
+  &rarr; 13 agent login &rarr; 14 report (403) &rarr; 7 mint as the
+  agent (403) &rarr; 1b back &rarr; 11 delegate &rarr; 13 agent login
+  &rarr; 14 report (200, delegated) &rarr; 3 create as the agent
+  &rarr; 1b back &rarr; 9/10 suspend &amp; resume &rarr; 15 recovery
+  kit &rarr; 1c recover &rarr; 16 list passkeys &rarr; 17 revoke the
+  old one.
   Streams are live the whole time; the heartbeat pinned under the log
   is the server pushing over SSE every 10 seconds.
 </div>
@@ -66,9 +68,8 @@ recovery kit (uuid + one code, provisioned at 15): <b>1c</b> enrolls a
 fresh passkey on THIS device and atomically binds it to your EXISTING
 identity, spending the code -- recovery never logs in with an old
 passkey. 1c serves the new-device case (the old passkey keeps working:
-two devices, one identity) and the lost-device case (an operator then
-revokes the old credential on the console: identity revoke;
-self-service revocation is not part of this demo's surface). The uuid
+two devices, one identity) and the lost-device case: recover here,
+then list (16) and revoke (17) the lost device's passkey. The uuid
 is the demo's account handle -- the platform keys identity by uuid,
 the passkey sheet's demo@localhost label is decorative, and a real app
 would layer a verified handle-to-identity directory on top; this page
@@ -110,7 +111,11 @@ console (identity grant &lt;uuid&gt; example:inventory-admin).</p>
 
 <h2>Agents and delegation (management needs the principal's session)</h2>
 <p class="note">7 mints an agent -- the response is the only time the
-token plaintext exists, and the page fills it into step 13's field. 8
+token plaintext exists, and the page fills it into step 13's field.
+7 stays enabled under an AGENT session as the standing lesson: it
+refuses (only human identities control agents), because delegation
+grants capabilities, never the principal's own standing -- an agent
+cannot mint, manage, or re-delegate. 8
 lists your agents with suspension state and delegated capabilities.
 9/10 suspend and resume the agent named in the uuid field (suspend
 also revokes its live sessions). 11 delegates the capability in the
@@ -146,15 +151,26 @@ the live agent stream reflect each change.</p>
   <button id="report">14. Fetch report (needs example:delegation-demo)</button>
 </p>
 
-<h2>Recovery kit (principal session only)</h2>
+<h2>Recovery kit and passkeys (principal session only)</h2>
 <p class="note">15 provisions recovery codes for the PRINCIPAL while
 its session is live -- the response is the only time the plaintext
 exists, and the log prints the kit (uuid + codes) to save as one
-unit: it is exactly what 1c needs on a new device. The kit is the
-principal's: 15 disables under an agent session, and passkey login
+unit: it is exactly what 1c needs on a new device. 16 lists the
+passkeys bound to your identity (bookkeeping only, never key
+material; the one this browser holds is marked) and fills the field
+with the oldest OTHER one -- after a 1c recovery, that is the lost
+device's. 17 revokes the passkey in the field: the lost-device
+story's second half. The facade refuses to revoke your LAST passkey,
+so a fresh identity with a single passkey answers 403 until 1c binds
+a second. All three disable under an agent session; passkey login
 (1b) is the way back.</p>
 <p>
   <button id="mintcodes">15. Mint recovery codes</button>
+  <button id="passkeys">16. List my passkeys</button>
+</p>
+<p>
+  <input id="credid" placeholder="passkey credential id" size="38">
+  <button id="revokekey">17. Revoke passkey</button>
 </p>
 <div id="log">ready.
 </div>
@@ -221,7 +237,8 @@ function updateUI() {
   need('logout', !!token, 'no session to log out');
   need('create', !!token, 'login first (1a or 1b)');
   need('wipe', !!token, 'login first (1a or 1b) -- then expect the 403');
-  need('mint', human, 'principal session required -- passkey login (1b)');
+  need('mint', !!token,
+    'login first (1a or 1b) -- as the agent, expect the refusal');
   need('agents', human, 'principal session required -- passkey login (1b)');
   const uuid = el('agentuuid').value.trim();
   need('suspend', human && uuid, human ?
@@ -244,11 +261,15 @@ function updateUI() {
   need('mintcodes', human, sessionKind === 'agent' ?
     'the kit is the principal\'s -- passkey login (1b) first' :
     'principal session required -- passkey login (1b)');
+  need('passkeys', human, 'principal session required -- passkey login (1b)');
+  need('revokekey', human && el('credid').value.trim() !== '', human ?
+    'passkey credential id required (16 fills it)' :
+    'principal session required -- passkey login (1b)');
   need('recover', el('rvuuid').value.trim() !== '' &&
     el('rvcode').value.trim() !== '',
     'principal uuid and one recovery code required (15 provisions them)');
 }
-['agentuuid', 'cap', 'agenttoken', 'rvuuid', 'rvcode']
+['agentuuid', 'cap', 'agenttoken', 'rvuuid', 'rvcode', 'credid']
   .forEach(id => el(id).addEventListener('input', updateUI));
 
 /*
@@ -428,7 +449,15 @@ el('mint').onclick = async () => {
         'exists): ' + res.body.token);
     updateUI();
   } else {
-    log('mint: ' + res.status + ' ' + JSON.stringify(res.body), 'err');
+    log('mint (as ' + (sessionKind || 'nobody') + '): ' + res.status +
+        ' ' + JSON.stringify(res.body),
+        sessionKind === 'agent' && res.status === 403 ? 'ok' : 'err');
+    if (sessionKind === 'agent' && res.status === 403) {
+      log('the standing lesson: only human identities control agents. ' +
+          'Delegation grants capabilities (the report, 14), never the ' +
+          'principal\'s standing -- an agent cannot mint, manage, or ' +
+          're-delegate', 'hint');
+    }
   }
 };
 
@@ -495,6 +524,39 @@ el('report').onclick = async () => {
         'delegation stands: switch back (1b), delegate (11), agent ' +
         'login (13) again, then retry -- and undelegate (12) takes ' +
         'it away again', 'hint');
+  }
+};
+
+el('passkeys').onclick = async () => {
+  const r = await fetch('/auth/passkeys', { headers: token ?
+    { 'Authorization': 'Bearer ' + token } : {} });
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 200) {
+    log('passkeys (' + body.passkeys.length + '):');
+    let firstOther = '';
+    body.passkeys.forEach(p => {
+      const mine = p.id === credId;
+      if (!mine && !firstOther) firstOther = p.id;
+      log('  ' + p.id.slice(0, 16) + '…' +
+          (mine ? '  (this browser\'s current)' : '') +
+          '  created ' + new Date(p.created * 1000).toLocaleTimeString());
+    });
+    if (firstOther) el('credid').value = firstOther;
+    updateUI();
+  } else {
+    log('passkeys: ' + r.status + ' ' + JSON.stringify(body), 'err');
+  }
+};
+
+el('revokekey').onclick = async () => {
+  const id = el('credid').value.trim();
+  const res = await post('/auth/passkeys/' + id + '/revoke', {}, true);
+  log('revoke passkey: ' + res.status + ' ' + JSON.stringify(res.body),
+      res.status === 200 ? 'ok' : 'err');
+  if (res.status === 200) {
+    log('the revoked passkey can no longer log in; the identity\'s ' +
+        'remaining passkeys still can -- the lost-device story is ' +
+        'complete', 'hint');
   }
 };
 
@@ -565,7 +627,7 @@ el('reset').onclick = () => {
     localStorage.removeItem('demo-principal-uuid');
     localStorage.removeItem('demo-controller-uuid');
   } catch (e) {}
-  ['agentuuid', 'agenttoken', 'rvuuid', 'rvcode'].forEach(
+  ['agentuuid', 'agenttoken', 'rvuuid', 'rvcode', 'credid'].forEach(
     id => el(id).value = '');
   el('itemname').value = 'browser-widget';
   el('cap').value = 'example:delegation-demo';

@@ -39,6 +39,11 @@
  *     /auth/recovery-codes (bearer) provisions the codes a
  *     self-service recovery later depends on; the response is the
  *     only time the plaintext exists.
+ *   - /auth/passkeys (bearer) lists the session identity's own
+ *     passkey credentials (bookkeeping, never key material), and
+ *     /auth/passkeys/<id>/revoke (bearer) removes one -- the lost
+ *     device's, after a recovery bound its replacement. The facade
+ *     refuses the last passkey.
  *   - The event streams: GET /inventory/events (public, like the audit
  *     read) and GET /auth/agents/stream?token=<session> subscribe the
  *     connection with the SSE broker (sys/streamd) and return the
@@ -361,6 +366,36 @@ private mixed *do_recovery_codes(string body, string authorization)
     return respond(201, "Created", ([ "codes" : codes ]));
 }
 
+private mixed *do_list_passkeys(string authorization)
+{
+    mixed *rows, *out;
+    string err;
+    int i;
+
+    err = catch(rows = AUTHD->query_passkeys(bearer_token(authorization)));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    out = allocate(sizeof(rows));
+    for (i = 0; i < sizeof(rows); i++) {
+	out[i] = ([ "id" : rows[i][0], "created" : rows[i][1],
+		    "lastUsed" : rows[i][2] ]);
+    }
+    return respond(200, "OK", ([ "passkeys" : out ]));
+}
+
+private mixed *do_revoke_passkey(string credentialId, string authorization)
+{
+    string err;
+
+    err = catch(AUTHD->revoke_passkey(bearer_token(authorization),
+				      credentialId));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(200, "OK", ([ "revoked" : credentialId ]));
+}
+
 /*
  * the event streams: subscribe the per-connection server clone (the
  * caller of handle()) with the broker, then hand the server the
@@ -588,7 +623,7 @@ private mixed *do_audit()
  */
 mixed *handle(string method, string path, string body, string authorization)
 {
-    string principal, uuid, streamToken;
+    string principal, uuid, streamToken, credentialId;
     int id, heartbeat;
 
     /* the anonymous surfaces */
@@ -641,6 +676,13 @@ mixed *handle(string method, string path, string body, string authorization)
 
     if (method == "POST" && path == "/auth/recovery-codes") {
 	return do_recovery_codes(body, authorization);
+    }
+    if (method == "GET" && path == "/auth/passkeys") {
+	return do_list_passkeys(authorization);
+    }
+    if (method == "POST" &&
+	sscanf(path, "/auth/passkeys/%s/revoke", credentialId) != 0) {
+	return do_revoke_passkey(credentialId, authorization);
     }
     if (path == "/auth/agents") {
 	if (method == "GET") {

@@ -57,6 +57,8 @@ request becomes an authenticated principal -- is the companion doc
 | `GET /auth/recover-challenge` | none | recovery-purpose challenge (the store tags purposes) |
 | `POST /auth/recover` | none | recovery ceremony: code + new-passkey attestation, atomic redeem-and-replace |
 | `POST /auth/recovery-codes` | bearer | provision own recovery codes (plaintext returned once) |
+| `GET /auth/passkeys` | bearer | the session identity's own passkeys (bookkeeping, no key material) |
+| `POST /auth/passkeys/<id>/revoke` | bearer | revoke one own passkey; the last one refuses |
 | `GET /auth/agents` | bearer | the controller's own-agents view |
 | `POST /auth/agents` | bearer | mint an agent; the response carries the token's only plaintext |
 | `POST /auth/agents/<uuid>/suspend` | bearer | suspend an own agent; revokes its live sessions |
@@ -166,7 +168,10 @@ the human party agents act on behalf of (the API's routes and console
 verbs call the principal the agent's "controller"). Management (7-12)
 is authd's controller self-service, driven by the logged-in passkey
 session; the banner names who is acting, and principal-only steps
-disable under an agent session.
+disable under an agent session -- except mint (7), which stays
+enabled as the standing lesson: under an agent session it refuses
+("an agent's controller must be a human identity"), because
+delegation grants capabilities, never the principal's standing.
 Mint an agent (7): the response is the only time the token plaintext
 exists, and the page fills it into the agent-login field -- copy it
 now or lose it. List (8) shows each of your agents with its suspension
@@ -230,5 +235,9 @@ redeems the code and binds the new passkey atomically to the SAME
 identity -- the identity string in the log matches the one you
 registered --
 and the code is spent: a second recover with it refuses. The old
-passkey, if it still exists, keeps working; revoking it is the
-operator `identity revoke` verb.
+passkey keeps working until revoked -- which is now the walk's last
+step: list your passkeys (16, bookkeeping only, the current one
+marked) and revoke the lost device's (17). The facade refuses your
+last passkey, so a single-passkey identity answers 403 until 1c binds
+a second; the operator-plane `identity revoke` verb remains for
+records an operator manages.
