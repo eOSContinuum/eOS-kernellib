@@ -11,7 +11,7 @@ is the runnable form of the multi-application router sketched in
 [http-applications.md](http-applications.md) "Multiple applications on
 one port", and the reference for the seams that sketch leaves open:
 how a connection object reaches a persistent daemon, and how a wire
-request becomes an authenticated principal.
+request becomes an authenticated subject.
 
 **Audience**: an application author who has read
 [http-applications.md](http-applications.md) and is composing a
@@ -98,11 +98,11 @@ The identity substrate's daemons gate every entry to System/kernel
 callers, so a tier-E transport cannot call them directly. The seam is
 `src/usr/System/sys/authd.c`, the transport authentication facade: it
 exposes exactly the ceremony-plus-session flow -- `issue_challenge`,
-`register_identity`, `authenticate` (both returning the principal and
+`register_identity`, `authenticate` (both returning the subject and
 a freshly minted session token), `validate`, `logout` -- and never
-mints a session for a principal a ceremony did not just prove.
+mints a session for a subject a ceremony did not just prove.
 `sessiond->mint(principal)` stays out of tier-E reach by design:
-minting for an arbitrary principal string would be authority forgery.
+minting for an arbitrary subject string would be authority forgery.
 The agent surface extends the same rule: `authenticate_agent_token`
 mints only for the ceremony-proven agent identity, and the controller
 self-service entries (mint, the own-agents read, suspend/resume,
@@ -135,7 +135,8 @@ consume (CHALLENGE-REPLAY-REFUSED) and the deeper webauthnd negatives
 (`src/usr/HTTP/api/lib/Authentication.c`) without enforcing anything;
 the WWW server re-serializes it to its wire form, and the handler
 parses `Bearer <token>` and validates through authd. The validated
-principal is what the domain's authorization decides against.
+subject is what the domain's authorization decides against -- the
+same string the capability store records as a principal.
 
 The [identity.md](identity.md) three-layer split, played out on real
 routes:
@@ -234,7 +235,7 @@ subscribed observer with exact data, the resume's event paired with
 its wire response, a refused mutation delivering nothing -- and the
 recovery ceremony: self-provisioned codes, the bad-code and
 wrong-purpose and never-bare-re-bind refusals, atomic recover onto the
-same principal, login with the recovered passkey), 5 in the
+same identity, login with the recovered passkey), 5 in the
 transport-only subset without it. Boot 2 restores the snapshot and re-drives the wire: items, a
 pre-restore session token, and the observer binding all survive. The
 sentinel comment block in `Inventory/sys/test.c` is the

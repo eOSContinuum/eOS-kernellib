@@ -45,8 +45,9 @@
   one session at a time; the banner above the log always says who is
   acting, and buttons that need a different session disable themselves
   and say why. One wire note: API responses name the ACTING identity's subject
-  string in a field called <code>principal</code> -- even for an
-  agent's actions; this page keeps "principal" for you, the party
+  string in a field called <code>subject</code>; the capability store
+  records exactly that string as a principal when deciding what it
+  may do -- while this page keeps "principal" for you, the party
   agents act for.<br>
   <b>Two planes.</b> This page is the application plane; grants and
   delegable flags belong to the <b>operator console</b>. The demo deploy
@@ -426,8 +427,8 @@ el('reg').onclick = async () => {
     });
     if (res.status === 201) {
       const prev = principalUuid;
-      setSession(res.body.token, res.body.principal, 'human');
-      log('[1a] REGISTER OK: ' + res.body.principal +
+      setSession(res.body.token, res.body.subject, 'human');
+      log('[1a] REGISTER OK: ' + res.body.subject +
           ' -- you are the principal', 'ok');
       log('the demo deploy granted this identity ' +
           'example:delegation-demo at registration; step 11 will use it',
@@ -472,8 +473,8 @@ el('login').onclick = async () => {
     });
     if (res.status === 200) {
       credId = b64u.enc(cred.rawId);
-      setSession(res.body.token, res.body.principal, 'human');
-      log('[1b] LOGIN OK: ' + res.body.principal +
+      setSession(res.body.token, res.body.subject, 'human');
+      log('[1b] LOGIN OK: ' + res.body.subject +
           ' -- principal session (back from any agent session)', 'ok');
     } else {
       log('[1b] LOGIN refused: ' + res.status + ' ' +
@@ -632,9 +633,9 @@ el('agentlogin').onclick = async () => {
   const t = el('agenttoken').value.trim();
   const res = await post('/auth/agent-login', { token: t });
   if (res.status === 200) {
-    setSession(res.body.token, res.body.principal, 'agent');
-    lastAgentUuid = uuidOf(res.body.principal);
-    log('[13] AGENT LOGIN OK: ' + res.body.principal, 'ok');
+    setSession(res.body.token, res.body.subject, 'agent');
+    lastAgentUuid = uuidOf(res.body.subject);
+    log('[13] AGENT LOGIN OK: ' + res.body.subject, 'ok');
     log('the page session is now the agent\'s: item create (3a) runs ' +
         'as the agent, principal-only steps 8-12 and 15-17 disable, ' +
         'and passkey login (1b) switches back -- try the report (14), ' +
@@ -778,8 +779,8 @@ el('recover').onclick = async () => {
     });
     if (res.status === 200) {
       credId = b64u.enc(cred.rawId);
-      setSession(res.body.token, res.body.principal, 'human');
-      log('[1c] RECOVER OK: ' + res.body.principal + ' -- the new passkey ' +
+      setSession(res.body.token, res.body.subject, 'human');
+      log('[1c] RECOVER OK: ' + res.body.subject + ' -- the new passkey ' +
           'is bound to the SAME identity, the code is spent, and this ' +
           'session is live', 'ok');
     } else {

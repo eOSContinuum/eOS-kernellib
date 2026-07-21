@@ -18,9 +18,9 @@
  *     cryptography runs.
  *   - /auth/register and /auth/login run the ceremonies through authd
  *     and hand the client a bearer session token, minted by the
- *     platform only for a ceremony-proven principal.
+ *     platform only for a ceremony-proven subject.
  *   - Authenticated routes parse "Authorization: Bearer <token>" and
- *     validate through authd; the validated principal is what the
+ *     validate through authd; the validated subject is what the
  *     domain's authorization (inventoryd) decides against.
  *   - /auth/agents binds authd's controller self-service: a live
  *     identity session mints agent identities (the agent token is in
@@ -152,9 +152,9 @@ private string bearer_token(string authorization)
 }
 
 /*
- * the validated principal for the request, or nil
+ * the validated subject for the request, or nil
  */
-private string bearer_principal(string authorization)
+private string bearer_subject(string authorization)
 {
     string token;
 
@@ -201,14 +201,14 @@ private mapping parse_body(string body)
  * every headless profile the provisioner is absent and this is a
  * no-op; a provisioner failure never breaks registration itself.
  */
-private void announce_registration(string principal)
+private void announce_registration(string subject)
 {
     object provisiond;
     string uuid;
 
     provisiond = find_object(DEMO_PROVISIOND);
-    if (provisiond && principal &&
-	sscanf(principal, "identity:%s", uuid) != 0) {
+    if (provisiond && subject &&
+	sscanf(subject, "identity:%s", uuid) != 0) {
 	catch(provisiond->welcome(uuid));
     }
 }
@@ -268,7 +268,7 @@ private mixed *do_register(string body)
     }
     announce_registration(result[0]);
     return respond(201, "Created",
-		   ([ "principal" : result[0], "token" : result[1] ]));
+		   ([ "subject" : result[0], "token" : result[1] ]));
 }
 
 private mixed *do_login(string body)
@@ -301,7 +301,7 @@ private mixed *do_login(string body)
 	return fail(401, "Unauthorized", "assertion refused");
     }
     return respond(200, "OK",
-		   ([ "principal" : result[0], "token" : result[1] ]));
+		   ([ "subject" : result[0], "token" : result[1] ]));
 }
 
 /*
@@ -342,7 +342,7 @@ private mixed *do_recover(string body)
 	return fail(401, "Unauthorized", "recovery refused");
     }
     return respond(200, "OK",
-		   ([ "principal" : result[0], "token" : result[1] ]));
+		   ([ "subject" : result[0], "token" : result[1] ]));
 }
 
 /*
@@ -470,7 +470,7 @@ private mixed *do_agent_login(string body)
 	return fail(401, "Unauthorized", "agent ceremony refused");
     }
     return respond(200, "OK",
-		   ([ "principal" : result[0], "token" : result[1] ]));
+		   ([ "subject" : result[0], "token" : result[1] ]));
 }
 
 private mixed *do_mint_agent(string authorization)
@@ -584,7 +584,7 @@ private mixed *do_list_items()
     return respond(200, "OK", ([ "items" : out ]));
 }
 
-private mixed *do_create_item(string body, string principal)
+private mixed *do_create_item(string body, string subject)
 {
     mapping parsed;
     mixed name, qty;
@@ -599,11 +599,11 @@ private mixed *do_create_item(string body, string principal)
     if (typeof(name) != T_STRING || name == "" || typeof(qty) != T_INT) {
 	return fail(400, "Bad Request", "name and qty required");
     }
-    id = INVENTORYD->create_item(name, qty, principal);
+    id = INVENTORYD->create_item(name, qty, subject);
     return respond(201, "Created", ([ "id" : id ]));
 }
 
-private mixed *do_update_item(int id, string body, string principal)
+private mixed *do_update_item(int id, string body, string subject)
 {
     mapping parsed;
     mixed name, qty;
@@ -617,7 +617,7 @@ private mixed *do_update_item(int id, string body, string principal)
     if (typeof(name) != T_STRING || name == "" || typeof(qty) != T_INT) {
 	return fail(400, "Bad Request", "name and qty required");
     }
-    switch (INVENTORYD->update_item(id, name, qty, principal)) {
+    switch (INVENTORYD->update_item(id, name, qty, subject)) {
     case 1:
 	return respond(200, "OK", ([ "id" : id ]));
     case 0:
@@ -627,20 +627,20 @@ private mixed *do_update_item(int id, string body, string principal)
     }
 }
 
-private mixed *do_wipe(string principal)
+private mixed *do_wipe(string subject)
 {
-    if (INVENTORYD->wipe(principal) != 1) {
+    if (INVENTORYD->wipe(subject) != 1) {
 	return fail(403, "Forbidden",
 		    "requires the example:inventory-admin capability");
     }
     return respond(200, "OK", ([ "wiped" : 1 ]));
 }
 
-private mixed *do_report(string principal)
+private mixed *do_report(string subject)
 {
     mixed summary;
 
-    summary = INVENTORYD->report(principal);
+    summary = INVENTORYD->report(subject);
     if (typeof(summary) != T_MAPPING) {
 	return fail(403, "Forbidden",
 		    "requires the example:delegation-demo capability");
@@ -659,7 +659,7 @@ private mixed *do_audit()
  */
 mixed *handle(string method, string path, string body, string authorization)
 {
-    string principal, uuid, streamToken, credentialId;
+    string subject, uuid, streamToken, credentialId;
     int id, heartbeat;
 
     /* the anonymous surfaces */
@@ -705,8 +705,8 @@ mixed *handle(string method, string path, string body, string authorization)
     }
 
     /* everything below requires an authenticated identity */
-    principal = bearer_principal(authorization);
-    if (!principal) {
+    subject = bearer_subject(authorization);
+    if (!subject) {
 	return fail(401, "Unauthorized", "authentication required");
     }
 
@@ -750,17 +750,17 @@ mixed *handle(string method, string path, string body, string authorization)
     }
 
     if (method == "GET" && path == "/inventory/report") {
-	return do_report(principal);
+	return do_report(subject);
     }
     if (method == "POST" && path == "/inventory/items") {
-	return do_create_item(body, principal);
+	return do_create_item(body, subject);
     }
     if (method == "PUT" &&
 	sscanf(path, "/inventory/items/%d", id) != 0) {
-	return do_update_item(id, body, principal);
+	return do_update_item(id, body, subject);
     }
     if (method == "DELETE" && path == "/inventory/items") {
-	return do_wipe(principal);
+	return do_wipe(subject);
     }
 
     return fail(404, "Not Found", "no such route");

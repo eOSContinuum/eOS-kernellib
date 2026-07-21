@@ -41,7 +41,7 @@ This directory grounds the "Multiple applications on one port" pattern
 in docs/http-applications.md: `WWW/sys/router.c` and the registering
 initd are the files that section sketches. The seam walkthrough --
 how a connection object reaches a persistent daemon, and how a wire
-request becomes an authenticated principal -- is the companion doc
+request becomes an authenticated subject -- is the companion doc
 (docs/composite-applications.md).
 
 ## Routes

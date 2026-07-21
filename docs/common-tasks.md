@@ -140,9 +140,9 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 **Goal**: a route that answers only to an authenticated session, in your own transport-facing domain.
 
 1. Issue a challenge from an unauthenticated route: `AUTHD->issue_challenge()` returns the value the client's WebAuthn ceremony signs; consume it single-use at registration (`examples/composite-app/Inventory/sys/handler.c` is the worked form).
-2. Register: `AUTHD->register_identity(challenge, clientDataJSON, attestationObject)` verifies the ceremony and returns the principal and a session token.
-3. Gate: parse the bearer token from the `Authorization` header and resolve it with `AUTHD->validate(token)` -- a principal string, or nil to refuse with 401. Pass the principal, not the token, into your domain daemons.
-4. For an admin-only route, gate in the daemon at the capability choke-point -- `CAPABILITYD->is_allowed(<capability>, principal)` -- and let the handler translate the refusal to 403 (the composite example's wipe route).
+2. Register: `AUTHD->register_identity(challenge, clientDataJSON, attestationObject)` verifies the ceremony and returns the subject string and a session token.
+3. Gate: parse the bearer token from the `Authorization` header and resolve it with `AUTHD->validate(token)` -- the subject string (`identity:<uuid>`), or nil to refuse with 401. Pass the subject, not the token, into your domain daemons.
+4. For an admin-only route, gate in the daemon at the capability choke-point -- `CAPABILITYD->is_allowed(<capability>, subject)`, the subject string being exactly what the store records as a principal -- and let the handler translate the refusal to 403 (the composite example's wipe route).
 
 **Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=51 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
 
@@ -153,7 +153,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 **Goal**: a human controller mints an agent identity, hands it a credential, and delegates a capability that dies with suspension.
 
 1. Mint from the controller's session: `AUTHD->mint_agent_with_token(controllerToken)` returns the agent's uuid and its token -- plaintext once, at mint, never again.
-2. The agent logs in with `AUTHD->authenticate_agent_token(agentToken)`, receiving its principal (`identity:<uuid>`) and its own session token.
+2. The agent logs in with `AUTHD->authenticate_agent_token(agentToken)`, receiving its subject string (`identity:<uuid>`) and its own session token.
 3. Delegate: `AUTHD->delegate_capability(controllerToken, uuid, capability)`; the reverse is `undelegate_capability`. The grant traces to the controller edge in the store.
 4. Suspend and resume with `AUTHD->suspend_agent` / `resume_agent`: suspension kills the delegated grant; resume restores nothing by itself.
 

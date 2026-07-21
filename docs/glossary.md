@@ -112,6 +112,10 @@ The architectural property that an object's lifetime is decoupled from the lifet
 
 The capability-bearing identity under which code runs. Principals are tier-bound (a tier-E principal can only call tier-E or tier-D APIs the access daemon grants it). The `previous_program()` chain is how a callee determines the caller's principal. In the capability library a principal is the opaque string key a grant is recorded under (a domain, a caller-program path, an object name, or an authenticated identity as `identity:<uuid>`), supplied by the gating surface, never inferred by the store. Load-bearing in [architecture.md](architecture.md) Capability tiers and [capability.md](capability.md).
 
+## subject
+
+The acting identity's `identity:<uuid>` string as authentication surfaces return it: the `authd` facade's ceremony-plus-mint entries and the composite example's wire responses name it `subject`. It names whoever is acting -- the principal in person, or an agent acting for one -- and the capability store records exactly this string as a principal when a gate checks what the identity may do (`principal` above). Distinct from the agency-law principal, the party on whose behalf agents act. Load-bearing in [system-daemons.md](system-daemons.md) authd and [composite-applications.md](composite-applications.md) Authenticating a wire request.
+
 ## restore_object
 
 The DGD kfun that reads a single-object save file (written by `save_object`) and restores the object's variables. Distinct from the substrate-wide statedump-restore boot path. Load-bearing in [persistence.md](persistence.md) save_object / restore_object.
