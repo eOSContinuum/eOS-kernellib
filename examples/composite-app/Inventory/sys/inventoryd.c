@@ -123,25 +123,6 @@ atomic int wipe(string principal)
 }
 
 /*
- * the delegable-capability-gated read: an inventory summary for
- * subjects holding REPORT_CAPABILITY -- the same is_allowed
- * choke-point as wipe(), gating a different capability. The demo
- * pre-provisions this one delegable, so the principal holds it from
- * registration and an agent exactly while a delegation stands.
- * -1 = the subject does not hold it.
- */
-mixed report(string principal)
-{
-    if (!principal ||
-	!CAPABILITYD->is_allowed(REPORT_CAPABILITY, principal)) {
-	return -1;
-    }
-    return ([ "items" : map_sizeof(items),
-	      "audit" : sizeof(query_audit()),
-	      "nextId" : nextId ]);
-}
-
-/*
  * item by id (a copy), or nil
  */
 mapping query_item(int id)
@@ -175,4 +156,25 @@ mixed *query_audit()
 
     audit = query_raw_property(AUDIT_PROP);
     return (typeof(audit) == T_ARRAY) ? audit[..] : ({ });
+}
+
+/*
+ * the delegable-capability-gated read: an inventory summary for
+ * subjects holding REPORT_CAPABILITY -- the same is_allowed
+ * choke-point as wipe(), gating a different capability. The demo
+ * pre-provisions this one delegable, so the principal holds it from
+ * registration and an agent exactly while a delegation stands.
+ * Defined after query_audit(), which it calls (LPC resolves calls
+ * textually; there are no forward references without declarations).
+ * -1 = the subject does not hold it.
+ */
+mixed report(string principal)
+{
+    if (!principal ||
+	!CAPABILITYD->is_allowed(REPORT_CAPABILITY, principal)) {
+	return -1;
+    }
+    return ([ "items" : map_sizeof(items),
+	      "audit" : sizeof(query_audit()),
+	      "nextId" : nextId ]);
 }
