@@ -21,6 +21,14 @@
  *     substrate ever grows mutation notifications, this poll loop is
  *     the seam they replace.
  *
+ *   - tick: server-pushed heartbeat. A call_out loop pushes a tick
+ *     event (counter + server time) to every audit subscriber that
+ *     opted in at subscribe time, so a live stream shows the runtime's
+ *     async-event machinery working continuously, not only when a
+ *     mutation happens to land. Opt-in keeps the headless driver's
+ *     stream phases deterministic: a subscriber that did not ask for
+ *     ticks never receives one.
+ *
  * Subscription entries are gated to this domain (the handler); pushes
  * reach the server clone through its push_event/end_stream entries. A
  * destructed clone (client went away) drops out of the object-keyed
@@ -40,16 +48,21 @@ private mixed *agent_rows(string sessionToken);
 # define MERRY_DAEMON	"/usr/Merry/sys/merry"
 
 # define POLL_INTERVAL	2	/* agent-topic poll cadence, seconds */
+# define TICK_INTERVAL	10	/* heartbeat cadence, seconds */
 
 private mapping auditStreams;	/* server clone : 1 */
 private mapping agentStreams;	/* server clone : ({ session, last }) */
+private mapping tickStreams;	/* server clone : 1 (heartbeat opt-ins) */
 private int pollArmed;		/* one poll call_out outstanding */
+private int tickArmed;		/* one tick call_out outstanding */
+private int tickCount;		/* heartbeats pushed since boot */
 
 static void create()
 {
     ::create();
     auditStreams = ([ ]);
     agentStreams = ([ ]);
+    tickStreams = ([ ]);
     /* Merry compiles after this domain (alphabetical initd order);
      * defer the script-space registration like the audit observer */
     call_out("register_space", 0);
@@ -121,10 +134,41 @@ private void check_domain()
     }
 }
 
-void subscribe_audit(object server)
+void subscribe_audit(object server, varargs int heartbeat)
 {
     check_domain();
     auditStreams[server] = 1;
+    if (heartbeat) {
+	tickStreams[server] = 1;
+	if (!tickArmed) {
+	    tickArmed = TRUE;
+	    call_out("push_tick", TICK_INTERVAL);
+	}
+    }
+}
+
+/*
+ * one heartbeat: push a tick to every opted-in subscriber, re-arm
+ * while any remain (a destructed clone drops out of the object-keyed
+ * mapping on its own, like the other topics)
+ */
+static void push_tick()
+{
+    object *servers;
+    string data;
+    int i;
+
+    tickArmed = FALSE;
+    servers = map_indices(tickStreams);
+    if (sizeof(servers) != 0) {
+	tickCount++;
+	data = json::encode(([ "n" : tickCount, "t" : time() ]));
+	for (i = 0; i < sizeof(servers); i++) {
+	    catch(servers[i]->push_event("tick", data));
+	}
+	tickArmed = TRUE;
+	call_out("push_tick", TICK_INTERVAL);
+    }
 }
 
 void subscribe_agents(object server, string sessionToken)

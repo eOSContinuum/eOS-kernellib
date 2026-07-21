@@ -42,11 +42,11 @@ expect: Error: agentauth: unknown token
 
 # structural non-transitivity: an agent session cannot mint agents
 cmd: code "/usr/System/sys/authd"->mint_agent_with_token("%{asession}")
-expect: Error: identity: an agent's controller must be a human identity
+expect: Error: identity: an agent's principal must be a human identity
 
 # own-agents scoping: the agent's own session cannot suspend it
 cmd: code "/usr/System/sys/authd"->suspend_agent("%{asession}", "%{agent}")
-expect: Error: auth: no such agent of this controller
+expect: Error: auth: no such agent of this principal
 
 # the controller suspends the agent; its live session dies now
 cmd: code "/usr/System/sys/authd"->suspend_agent("%{csession}", "%{agent}")

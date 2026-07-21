@@ -54,7 +54,7 @@ expect: Error: identity: delegator does not hold platform.other
 
 # an agent session cannot delegate (no agent of an agent)
 cmd: code "/usr/System/sys/authd"->delegate_capability("%{asession}", "%{agent}", "platform.demo")
-expect: Error: identity: no such agent of this controller
+expect: Error: identity: no such agent of this principal
 
 # the delegation lands and the choke-point answers true for the agent
 cmd: code "/usr/System/sys/authd"->delegate_capability("%{csession}", "%{agent}", "platform.demo")

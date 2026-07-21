@@ -51,16 +51,24 @@ static void create()
 }
 
 private HttpResponse makeResponse(int code, string status, string ctype,
-				  string body)
+				  string body, varargs mapping extra)
 {
     HttpResponse response;
     HttpFields headers;
+    string *names;
+    int i;
 
     response = new HttpResponse(1.1, code, status);
     headers = new HttpFields();
     headers->add(new HttpField("Content-Type", ctype));
     headers->add(new HttpField("Content-Length", strlen(body)));
     headers->add(new HttpField("Connection", "close"));
+    if (extra) {
+	names = map_indices(extra);
+	for (i = 0; i < sizeof(names); i++) {
+	    headers->add(new HttpField(names[i], extra[names[i]]));
+	}
+    }
     response->setHeaders(headers);
     return response;
 }
@@ -178,7 +186,9 @@ private void dispatch(HttpRequest request, StringBuffer body)
 				       drainBody(body),
 				       (typeof(auth) == T_STRING) ?
 					auth : nil)) != nil ||
-	typeof(result) != T_ARRAY || sizeof(result) != 4) {
+	typeof(result) != T_ARRAY ||
+	(sizeof(result) != 4 &&
+	 (sizeof(result) != 5 || typeof(result[4]) != T_MAPPING))) {
 	emitPlain(500, "Internal Server Error", "500 handler error\n");
 	return;
     }
@@ -186,7 +196,8 @@ private void dispatch(HttpRequest request, StringBuffer body)
 	startStream(result[0], result[1]);
 	return;
     }
-    emit(makeResponse(result[0], result[1], result[2], result[3]),
+    emit(makeResponse(result[0], result[1], result[2], result[3],
+		      (sizeof(result) == 5) ? result[4] : nil),
 	 result[3]);
 }
 

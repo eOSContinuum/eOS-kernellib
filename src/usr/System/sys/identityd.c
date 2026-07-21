@@ -467,7 +467,7 @@ private object new_agent(string controllerUuid, string uuid)
 
     controller = need_identity(controllerUuid);
     if (controller->query_kind() != ID_KIND_HUMAN) {
-	error("identity: an agent's controller must be a human identity");
+	error("identity: an agent's principal must be a human identity");
     }
     identity = clone_object(OBJ_IDENTITY);
     identity->configure(uuid, controllerUuid);
@@ -804,7 +804,7 @@ atomic void delegate_capability(string controllerUuid, string agentUuid,
     agent = need_identity(agentUuid);
     if (agent->query_kind() != ID_KIND_AGENT ||
 	agent->query_controller() != controllerUuid) {
-	error("identity: no such agent of this controller");
+	error("identity: no such agent of this principal");
     }
     if (agent->query_suspended()) {
 	error("identity: agent suspended");

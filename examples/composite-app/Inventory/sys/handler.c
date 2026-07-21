@@ -39,15 +39,22 @@
  *     /auth/recovery-codes (bearer) provisions the codes a
  *     self-service recovery later depends on; the response is the
  *     only time the plaintext exists.
+ *   - /auth/passkeys (bearer) lists the session identity's own
+ *     passkey credentials (bookkeeping, never key material), and
+ *     /auth/passkeys/<id>/revoke (bearer) removes one -- the lost
+ *     device's, after a recovery bound its replacement. The facade
+ *     refuses the last passkey.
  *   - The event streams: GET /inventory/events (public, like the audit
  *     read) and GET /auth/agents/stream?token=<session> subscribe the
  *     connection with the SSE broker (sys/streamd) and return the
- *     streaming sentinel the WWW servers act on. The agent stream
- *     authenticates by token in the query string because EventSource
- *     cannot set an Authorization header; the token is validated here
- *     at subscribe time and re-validated by the broker's poll, and a
- *     production surface would prefer a cookie-bound session to keep
- *     tokens out of request logs.
+ *     streaming sentinel the WWW servers act on. ?heartbeat=1 on the
+ *     audit stream opts the subscriber into the broker's server-pushed
+ *     tick events. The agent stream authenticates by token in the
+ *     query string because EventSource cannot set an Authorization
+ *     header; the token is validated here at subscribe time and
+ *     re-validated by the broker's poll, and a production surface
+ *     would prefer a cookie-bound session to keep tokens out of
+ *     request logs.
  *
  * Wire format: JSON bodies; WebAuthn binary fields (clientDataJSON,
  * attestationObject, authenticatorData, signature) travel
@@ -71,6 +78,7 @@ private inherit base64 "/lib/util/base64";
 # define AUTHD		"/usr/System/sys/authd"
 # define INVENTORYD	"/usr/Inventory/sys/inventoryd"
 # define STREAMD	"/usr/Inventory/sys/streamd"
+# define DEMO_PROVISIOND	"/usr/System/sys/demo_provisiond"
 
 # define STREAM_SENTINEL	({ 200, "OK", "text/event-stream", nil })
 
@@ -180,6 +188,26 @@ private mapping parse_body(string body)
 }
 
 /*
+ * Demo seam: when the browser-demo bring-up has compiled the demo
+ * provisioner (examples/composite-app/System/demo_provisiond.c, a
+ * System-tier stand-in for the operator's grant verb), announce a
+ * fresh registration so the demo capability is pre-provisioned. In
+ * every headless profile the provisioner is absent and this is a
+ * no-op; a provisioner failure never breaks registration itself.
+ */
+private void announce_registration(string principal)
+{
+    object provisiond;
+    string uuid;
+
+    provisiond = find_object(DEMO_PROVISIOND);
+    if (provisiond && principal &&
+	sscanf(principal, "identity:%s", uuid) != 0) {
+	catch(provisiond->welcome(uuid));
+    }
+}
+
+/*
  * a base64url field decoded to raw bytes, or nil
  */
 private string raw_field(mapping body, string field)
@@ -232,6 +260,7 @@ private mixed *do_register(string body)
 						attestationObject)) != nil) {
 	return fail(400, "Bad Request", "registration refused");
     }
+    announce_registration(result[0]);
     return respond(201, "Created",
 		   ([ "principal" : result[0], "token" : result[1] ]));
 }
@@ -337,14 +366,44 @@ private mixed *do_recovery_codes(string body, string authorization)
     return respond(201, "Created", ([ "codes" : codes ]));
 }
 
+private mixed *do_list_passkeys(string authorization)
+{
+    mixed *rows, *out;
+    string err;
+    int i;
+
+    err = catch(rows = AUTHD->query_passkeys(bearer_token(authorization)));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    out = allocate(sizeof(rows));
+    for (i = 0; i < sizeof(rows); i++) {
+	out[i] = ([ "id" : rows[i][0], "created" : rows[i][1],
+		    "lastUsed" : rows[i][2] ]);
+    }
+    return respond(200, "OK", ([ "passkeys" : out ]));
+}
+
+private mixed *do_revoke_passkey(string credentialId, string authorization)
+{
+    string err;
+
+    err = catch(AUTHD->revoke_passkey(bearer_token(authorization),
+				      credentialId));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(200, "OK", ([ "revoked" : credentialId ]));
+}
+
 /*
  * the event streams: subscribe the per-connection server clone (the
  * caller of handle()) with the broker, then hand the server the
  * streaming sentinel
  */
-private mixed *do_audit_stream()
+private mixed *do_audit_stream(int heartbeat)
 {
-    STREAMD->subscribe_audit(previous_object());
+    STREAMD->subscribe_audit(previous_object(), heartbeat);
     return STREAM_SENTINEL;
 }
 
@@ -541,6 +600,18 @@ private mixed *do_wipe(string principal)
     return respond(200, "OK", ([ "wiped" : 1 ]));
 }
 
+private mixed *do_report(string principal)
+{
+    mixed summary;
+
+    summary = INVENTORYD->report(principal);
+    if (typeof(summary) != T_MAPPING) {
+	return fail(403, "Forbidden",
+		    "requires the example:delegation-demo capability");
+    }
+    return respond(200, "OK", summary);
+}
+
 private mixed *do_audit()
 {
     return respond(200, "OK", ([ "audit" : INVENTORYD->query_audit() ]));
@@ -552,8 +623,8 @@ private mixed *do_audit()
  */
 mixed *handle(string method, string path, string body, string authorization)
 {
-    string principal, uuid, streamToken;
-    int id;
+    string principal, uuid, streamToken, credentialId;
+    int id, heartbeat;
 
     /* the anonymous surfaces */
     if (method == "GET" && path == "/inventory/health") {
@@ -580,8 +651,10 @@ mixed *handle(string method, string path, string body, string authorization)
     if (method == "POST" && path == "/auth/agent-login") {
 	return do_agent_login(body);
     }
-    if (method == "GET" && path == "/inventory/events") {
-	return do_audit_stream();
+    if (method == "GET" &&
+	(path == "/inventory/events" ||
+	 sscanf(path, "/inventory/events?heartbeat=%d", heartbeat) != 0)) {
+	return do_audit_stream(heartbeat);
     }
     if (method == "GET" &&
 	(path == "/auth/agents/stream" ||
@@ -603,6 +676,13 @@ mixed *handle(string method, string path, string body, string authorization)
 
     if (method == "POST" && path == "/auth/recovery-codes") {
 	return do_recovery_codes(body, authorization);
+    }
+    if (method == "GET" && path == "/auth/passkeys") {
+	return do_list_passkeys(authorization);
+    }
+    if (method == "POST" &&
+	sscanf(path, "/auth/passkeys/%s/revoke", credentialId) != 0) {
+	return do_revoke_passkey(credentialId, authorization);
     }
     if (path == "/auth/agents") {
 	if (method == "GET") {
@@ -627,6 +707,9 @@ mixed *handle(string method, string path, string body, string authorization)
 	}
     }
 
+    if (method == "GET" && path == "/inventory/report") {
+	return do_report(principal);
+    }
     if (method == "POST" && path == "/inventory/items") {
 	return do_create_item(body, principal);
     }
