@@ -94,10 +94,10 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=44 scripts/run-example.sh composite-app
+    EXPECTED_OK=48 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the forty-three wire-level phases -- the agent lifecycle
+Boot 1 runs the forty-seven wire-level phases -- the agent lifecycle
 (mint, own-agents list, token ceremony, the standing refusal on an
 agent session, the not-own and not-delegable refusals,
 suspend-revokes-sessions, resume-restores-authentication), the
@@ -107,7 +107,9 @@ change push, bad-token refusal), the recovery ceremony
 (self-provisioned codes, the bad-code, wrong-purpose, and
 never-bare-re-bind refusals, atomic recover, login with the recovered
 passkey), and passkey self-service (list, unknown-id refusal,
-revocation of the original passkey, the last-passkey guard) -- and
+revocation of the original passkey, the last-passkey guard, and
+enrollment: the wrong-purpose and agent-session refusals, the bind,
+the list showing both) -- and
 dumps a snapshot; boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in
@@ -120,7 +122,7 @@ observer binding all survived (the sentinel comment block in
 -- register, login, authenticated create, audit read, capability-gate
 refusal, agent management and delegation, auto-established live
 streams with a server heartbeat, and recovery -- with a real
-authenticator, numbered steps, and a session-state banner that always
+authenticator, numbered steps, and a session-state banner that
 always names who is acting. The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
 the other. `scripts/demo-composite.sh` packages this whole recipe --

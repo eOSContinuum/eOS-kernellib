@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (44 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (48 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -61,6 +61,10 @@
  *   AGENT-RESUME OK              resume restores the ability to
  *                                authenticate: the ceremony works
  *                                again
+ *   ENROLL-AGENT-REFUSED OK      a live agent session presenting a
+ *                                valid enrollment payload refuses:
+ *                                human rows bind only to human
+ *                                records
  *   SSE-STREAM-OPEN OK           the audit event stream opens: 200,
  *                                chunked, held open past the response
  *   SSE-AUDIT-PUSH OK            a mutation's audit event reaches the
@@ -91,6 +95,13 @@
  *                                the recovered one
  *   LAST-PASSKEY-KEPT OK         the record's last passkey refuses
  *                                revocation
+ *   ENROLL-PURPOSE-REFUSED OK    a webauthn-purpose challenge cannot
+ *                                be spent on enrollment
+ *   ENROLLED OK                  the principal's session binds an
+ *                                additional passkey (second-device
+ *                                path, no recovery code spent)
+ *   ENROLL-LISTED OK             the list shows both passkeys, the
+ *                                enrolled one present
  *   NEVER-BARE-REBIND OK         re-registering the bound credential
  *                                refuses (a fresh registration cannot
  *                                touch an existing record)
@@ -109,7 +120,7 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=44 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=48 for the full set.
  */
 
 # include <type.h>
@@ -156,27 +167,31 @@ private inherit hex "/lib/util/hex";
 # define P_AGENT_SUSPENDED	25
 # define P_AGENT_RESUME		26
 # define P_AGENT_RELOGIN	27
-# define P_SSE_AUDIT_OPEN	28
-# define P_SSE_AUDIT_PUSH	29
-# define P_SSE_AGENTS_OPEN	30
-# define P_SSE_AGENTS_PUSH	31
-# define P_SSE_BAD_TOKEN	32
-# define P_RV_CODES		33
-# define P_RV_BAD_CODE		34
-# define P_RV_PURPOSE		35
-# define P_RV_RECOVER		36
-# define P_RV_NEW_LOGIN		37
-# define P_PK_LIST		38
-# define P_PK_UNKNOWN		39
-# define P_PK_REVOKE		40
-# define P_PK_LIST_AFTER	41
-# define P_PK_LAST		42
-# define P_RV_REBIND		43
+# define P_ENROLL_AGENT		28
+# define P_SSE_AUDIT_OPEN	29
+# define P_SSE_AUDIT_PUSH	30
+# define P_SSE_AGENTS_OPEN	31
+# define P_SSE_AGENTS_PUSH	32
+# define P_SSE_BAD_TOKEN	33
+# define P_RV_CODES		34
+# define P_RV_BAD_CODE		35
+# define P_RV_PURPOSE		36
+# define P_RV_RECOVER		37
+# define P_RV_NEW_LOGIN		38
+# define P_PK_LIST		39
+# define P_PK_UNKNOWN		40
+# define P_PK_REVOKE		41
+# define P_PK_LIST_AFTER	42
+# define P_PK_LAST		43
+# define P_ENROLL_PURPOSE	44
+# define P_ENROLL		45
+# define P_ENROLL_LIST		46
+# define P_RV_REBIND		47
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	44
-# define P_PERSIST_SESSION	45
-# define P_PERSIST_OBSERVER	46
-# define P_PERSIST_HTTP		47	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	48
+# define P_PERSIST_SESSION	49
+# define P_PERSIST_OBSERVER	50
+# define P_PERSIST_HTTP		51	/* no-crypto restore probe */
 
 # define STREAM_DEADLINE	8	/* seconds an awaited event may take */
 
@@ -455,6 +470,15 @@ static void start_phase()
 	     bearer(token1), nil);
 	break;
 
+    case P_ENROLL_AGENT:
+	/* a LIVE agent session presents a valid enrollment payload:
+	 * verification passes, the substrate's row-kind rule refuses
+	 * (human rows bind only to human records) */
+	HANDLER->arm_challenge(WA_CH_REG4, "enroll");
+	http("POST", "/auth/enroll", bearer(agentSession),
+	     register_body(WA_CH_REG4, WA_REG4_CDJ_HEX, WA_REG4_AO_HEX));
+	break;
+
     case P_SSE_AUDIT_OPEN:
 	auditStream = clone_object(STREAM_CLIENT);
 	auditStream->open(this_object(), "/inventory/events");
@@ -543,6 +567,25 @@ static void start_phase()
 	 * refuses to revoke a principal out of login */
 	http("POST", "/auth/passkeys/" + wire(WA_ES2_CRED_ID_HEX) +
 	     "/revoke", bearer(token1), nil);
+	break;
+
+    case P_ENROLL_PURPOSE:
+	/* a webauthn-purpose challenge cannot be spent on enrollment */
+	HANDLER->arm_challenge(WA_CH_REG4, "webauthn");
+	http("POST", "/auth/enroll", bearer(token1),
+	     register_body(WA_CH_REG4, WA_REG4_CDJ_HEX, WA_REG4_AO_HEX));
+	break;
+
+    case P_ENROLL:
+	/* the principal's live session binds an ADDITIONAL passkey --
+	 * the second-device path, no recovery code spent */
+	HANDLER->arm_challenge(WA_CH_REG4, "enroll");
+	http("POST", "/auth/enroll", bearer(token1),
+	     register_body(WA_CH_REG4, WA_REG4_CDJ_HEX, WA_REG4_AO_HEX));
+	break;
+
+    case P_ENROLL_LIST:
+	http("GET", "/auth/passkeys", bearer(token1), nil);
 	break;
 
     case P_RV_REBIND:
@@ -925,7 +968,19 @@ void http_done(int code, string body)
 	    stop("AGENT-RESUME: relogin " + code + " " + body);
 	    return;
 	}
+	agentSession = parsed["token"];
 	pass("AGENT-RESUME");
+	advance();
+	break;
+
+    case P_ENROLL_AGENT:
+	parsed = jbody(body);
+	if (code != 403 || parsed["error"] !=
+			   "identity: human credential on an agent record") {
+	    stop("ENROLL-AGENT: " + code + " " + body);
+	    return;
+	}
+	pass("ENROLL-AGENT-REFUSED");
 	advance();
 	break;
 
@@ -1060,6 +1115,40 @@ void http_done(int code, string body)
 	    return;
 	}
 	pass("LAST-PASSKEY-KEPT");
+	advance();
+	break;
+
+    case P_ENROLL_PURPOSE:
+	if (code != 400) {
+	    stop("ENROLL-PURPOSE: expected 400, got " + code);
+	    return;
+	}
+	pass("ENROLL-PURPOSE-REFUSED");
+	advance();
+	break;
+
+    case P_ENROLL:
+	parsed = jbody(body);
+	if (code != 201 ||
+	    parsed["enrolled"] != wire(WA_ES3_CRED_ID_HEX)) {
+	    stop("ENROLLED: " + code + " " + body);
+	    return;
+	}
+	pass("ENROLLED");
+	advance();
+	break;
+
+    case P_ENROLL_LIST:
+	parsed = jbody(body);
+	value = parsed["passkeys"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 2 ||
+	    (value[0]["id"] != wire(WA_ES3_CRED_ID_HEX) &&
+	     value[1]["id"] != wire(WA_ES3_CRED_ID_HEX))) {
+	    stop("ENROLL-LISTED: " + code + " " + body);
+	    return;
+	}
+	pass("ENROLL-LISTED");
 	advance();
 	break;
 
