@@ -24,9 +24,9 @@
 <div class="legend">
   <b>Principal and agents.</b> YOU are the <b>principal</b> -- the
   party on whose behalf everything here runs. Your passkeys
-  AUTHENTICATE you (several can prove the same identity, and recovery
-  codes are the fallback -- losing one authenticator never loses the
-  identity). What you may DO is authorized separately: an operator
+  AUTHENTICATE you (several can prove the same platform identity,
+  and recovery codes are the fallback -- losing one authenticator
+  never loses the identity). What you may DO is authorized separately: an operator
   grants capabilities to your identity, and step 7 mints <b>agents</b>
   to which you can delegate a subset of what you hold (the API's
   routes and console verbs call the principal the agent's
@@ -58,9 +58,9 @@
 
 <h2>1. Ways in (unauthenticated -- pick by what you hold)</h2>
 <p class="note">Every path starts logged out; the three entries differ
-only in what you hold. Nothing yet: <b>1a</b> creates a NEW identity
-bound to this device's passkey (the demo grants it
-example:delegation-demo at registration). A passkey on this device:
+only in what you hold. Nothing yet: <b>1a</b> creates a NEW platform
+identity whose first credential is this device's passkey (the demo
+grants it example:delegation-demo at registration). A passkey on this device:
 <b>1b</b> logs in -- also the way back from an agent session. A
 recovery kit (uuid + one code, provisioned at 15): <b>1c</b> enrolls a
 fresh passkey on THIS device and atomically binds it to your EXISTING
@@ -68,7 +68,7 @@ identity, spending the code -- recovery never logs in with an old
 passkey. 1c serves the new-device case (the old passkey keeps working:
 two devices, one identity) and the lost-device case: recover here,
 then list (16) and revoke (17) the lost device's passkey. The uuid
-is the demo's account handle -- the platform keys identity by uuid,
+is the demo's account handle -- the platform keys identities by uuid,
 the passkey sheet's demo@localhost label is decorative, and a real app
 would layer a verified handle-to-identity directory on top; this page
 remembers your principal uuid in this browser and prefills the
@@ -407,8 +407,9 @@ el('reg').onclick = async () => {
           'hint');
       if (prev && prev !== principalUuid) {
         log('note: this page previously remembered principal ' +
-            short(prev) + ' -- registering created a DIFFERENT identity ' +
-            '(the 1a-vs-1c fork). The old identity still recovers with ' +
+            short(prev) + ' -- registering created a DIFFERENT ' +
+            'platform identity (the 1a-vs-1c fork). The old identity ' +
+            'still recovers with ' +
             'ITS uuid + code; the uuid field now prefills the new one.',
             'hint');
       }
