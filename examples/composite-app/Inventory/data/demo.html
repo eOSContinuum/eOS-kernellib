@@ -6,8 +6,8 @@
   button { font: inherit; padding: .4rem .9rem; margin: 0 .4rem .4rem 0; }
   button:disabled { opacity: .45; }
   input { font: inherit; padding: .3rem; }
-  #banner { position: sticky; top: 0; background: #fff; border-bottom: 2px solid #ccc;
-            padding: .6rem 0; margin-bottom: 1rem; z-index: 1; }
+  #banner { background: #fff; border-bottom: 2px solid #ccc;
+            padding: .6rem 0; margin: 1rem 0 .4rem; }
   #banner .who { font-weight: 600; }
   #banner .out { color: #666; } #banner .human { color: #06600e; } #banner .agent { color: #6a1fa0; }
   #banner .stream { font-size: 13px; color: #666; }
@@ -21,15 +21,6 @@
   .ok { color: #06600e; } .err { color: #a11; } .hint { color: #555; font-style: italic; }
 </style>
 <h1>composite-app: browser-real WebAuthn</h1>
-<div id="banner">
-  <button id="reset" title="forget this page's session and log, keep the server's state">Reset demo</button>
-  <div class="who" id="who">Session: logged out</div>
-  <div class="stream" id="stream">Streaming: connecting&hellip;</div>
-  <div class="agentnote" id="agentnote" hidden>Agent session: steps
-  8-12 and 15-18 need the principal's session &mdash; passkey login
-  (1b) switches back. Try mint (7) and the report (14) to see what an
-  agent can and cannot do.</div>
-</div>
 <div class="legend">
   <b>Principal and agents.</b> YOU are the <b>principal</b> -- the
   party on whose behalf everything here runs. Your passkeys
@@ -40,9 +31,9 @@
   to which you can delegate a subset of what you hold (the API's
   routes and console verbs call the principal the agent's
   "controller"). The page holds
-  one session at a time; the banner above always says who is acting,
-  and buttons that need a different session disable themselves and say
-  why. One wire note: API responses name the ACTING identity's subject
+  one session at a time; the banner above the log always says who is
+  acting, and buttons that need a different session disable themselves
+  and say why. One wire note: API responses name the ACTING identity's subject
   string in a field called <code>principal</code> -- even for an
   agent's actions; this page keeps "principal" for you, the party
   agents act for.<br>
@@ -190,6 +181,15 @@ passkey login (1b) is the way back.</p>
   <button id="revokekey">17. Revoke passkey</button>
   <button id="enroll">18. Enroll another passkey</button>
 </p>
+<div id="banner">
+  <button id="reset" title="forget this page's session and log, keep the server's state">Reset demo</button>
+  <div class="who" id="who">Session: logged out</div>
+  <div class="stream" id="stream">Streaming: connecting&hellip;</div>
+  <div class="agentnote" id="agentnote" hidden>Agent session: steps
+  8-12 and 15-18 need the principal's session &mdash; passkey login
+  (1b) switches back. Try mint (7) and the report (14) to see what an
+  agent can and cannot do.</div>
+</div>
 <div id="log">ready.
 </div>
 <div id="tickfoot">server heartbeat: waiting for the first tick&hellip;</div>
