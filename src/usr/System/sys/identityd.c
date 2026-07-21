@@ -16,7 +16,8 @@
  *     minting response;
  *   - agent records carry an immutable controller edge that must name
  *     a human record, so control never chains (an agent cannot control
- *     an agent) and every agent action is attributable to a human;
+ *     an agent) and every agent action is attributable to a natural
+ *     person;
  *   - agent credential rows bind only to agent records and human rows
  *     only to human records, checked at the single bind choke point;
  *   - agent tokens follow the recovery-code secret discipline (stored
