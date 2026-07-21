@@ -565,6 +565,18 @@ private mixed *do_wipe(string principal)
     return respond(200, "OK", ([ "wiped" : 1 ]));
 }
 
+private mixed *do_report(string principal)
+{
+    mixed summary;
+
+    summary = INVENTORYD->report(principal);
+    if (typeof(summary) != T_MAPPING) {
+	return fail(403, "Forbidden",
+		    "requires the example:delegation-demo capability");
+    }
+    return respond(200, "OK", summary);
+}
+
 private mixed *do_audit()
 {
     return respond(200, "OK", ([ "audit" : INVENTORYD->query_audit() ]));
@@ -653,6 +665,9 @@ mixed *handle(string method, string path, string body, string authorization)
 	}
     }
 
+    if (method == "GET" && path == "/inventory/report") {
+	return do_report(principal);
+    }
     if (method == "POST" && path == "/inventory/items") {
 	return do_create_item(body, principal);
     }

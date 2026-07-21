@@ -69,6 +69,7 @@ request becomes an authenticated principal -- is the companion doc
 | `POST /inventory/items` | bearer | authenticated mutation + audit observer |
 | `PUT /inventory/items/<id>` | bearer | application-tier authorization (creator only) |
 | `DELETE /inventory/items` | bearer + capability | platform capability `example:inventory-admin` via `is_allowed` |
+| `GET /inventory/report` | bearer + capability | the delegable capability `example:delegation-demo` via the same `is_allowed` choke-point |
 | `GET /inventory/audit` | none | the observer-written audit trail |
 | `GET /demo` | none | the browser demo page (data/demo.html) |
 

@@ -15,9 +15,11 @@
  * demo handler announces each fresh registration here, and this object
  * grants the demo capability (example:delegation-demo) to the verified
  * HUMAN record, standing exactly where a human operator would type
- * `identity grant <uuid> example:delegation-demo`. The delegable flag
- * stays a real console verb in the bring-up recipe: `capability
- * delegable example:delegation-demo on`.
+ * `identity grant <uuid> example:delegation-demo`. The capability also
+ * gates the demo's report read (inventoryd report()), so a delegation
+ * of it does observable work. The delegable flag stays a real console
+ * verb in the bring-up recipe: `capability delegable
+ * example:delegation-demo on`.
  *
  * Demo-only, by construction and by deployment: this file lives in the
  * example tree, is copied to /usr/System/sys/ and console-compiled

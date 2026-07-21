@@ -18,7 +18,10 @@
  *     LFUN. It asks capabilityd's public is_allowed choke-point whether
  *     the caller-proven principal holds ADMIN_CAPABILITY; the grant
  *     itself is operator work ("identity grant <uuid> ..." on the
- *     console) and cannot be performed from this tier.
+ *     console) and cannot be performed from this tier. report() gates
+ *     a read on REPORT_CAPABILITY through the same choke-point; the
+ *     demo pre-provisions that one delegable, so it is the surface
+ *     where a delegation's effect is directly observable.
  *
  * Application-tier authorization (who may edit an item) is decided
  * here too, but against plain application state (the item's creator),
@@ -35,6 +38,7 @@ inherit "/lib/util/properties";
 # define CAPABILITYD	"/kernel/sys/capabilityd"
 
 # define ADMIN_CAPABILITY	"example:inventory-admin"
+# define REPORT_CAPABILITY	"example:delegation-demo"
 # define EVENT_PROP		"inventory:last-event"
 # define AUDIT_PROP		"inventory:audit-log"
 
@@ -116,6 +120,25 @@ atomic int wipe(string principal)
     items = ([ ]);
     set_property(EVENT_PROP, "wipe by " + principal);
     return 1;
+}
+
+/*
+ * the delegable-capability-gated read: an inventory summary for
+ * subjects holding REPORT_CAPABILITY -- the same is_allowed
+ * choke-point as wipe(), gating a different capability. The demo
+ * pre-provisions this one delegable, so the principal holds it from
+ * registration and an agent exactly while a delegation stands.
+ * -1 = the subject does not hold it.
+ */
+mixed report(string principal)
+{
+    if (!principal ||
+	!CAPABILITYD->is_allowed(REPORT_CAPABILITY, principal)) {
+	return -1;
+    }
+    return ([ "items" : map_sizeof(items),
+	      "audit" : sizeof(query_audit()),
+	      "nextId" : nextId ]);
 }
 
 /*
