@@ -58,9 +58,9 @@
  *     tick events. The agent stream authenticates by token in the
  *     query string because EventSource cannot set an Authorization
  *     header; the token is validated here at subscribe time and
- *     re-validated by the broker's poll, and a production surface
- *     would prefer a cookie-bound session to keep tokens out of
- *     request logs.
+ *     re-validated at each of the broker's event-driven refreshes,
+ *     and a production surface would prefer a cookie-bound session to
+ *     keep tokens out of request logs.
  *
  * Wire format: JSON bodies; WebAuthn binary fields (clientDataJSON,
  * attestationObject, authenticatorData, signature) travel

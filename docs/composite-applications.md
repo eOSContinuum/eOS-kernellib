@@ -173,13 +173,17 @@ demonstrate the honest event shapes available today:
   space) inside the atomic property write, and the broker fans out as
   zero-delay call_outs -- so an aborted mutation rolls its pushes back
   and a stream never carries an event that did not commit.
-- `GET /auth/agents/stream?token=<session>` bridges a substrate
-  without notifications: the broker polls `authd->query_agents` per
-  subscriber at a short cadence and pushes a snapshot on change. If
-  the identity substrate ever grows mutation notifications, this poll
-  loop is the seam they replace. The token travels in the query string
-  because EventSource cannot set an Authorization header; the example
-  README states the tradeoff.
+- `GET /auth/agents/stream?token=<session>` is mutation-driven from
+  the identity substrate: the broker subscribes to identityd's
+  mutation events (`subscribe_events` / `identity_event`,
+  `docs/system-daemons.md`), and on any event that can change a
+  controller's own-agents view it recomputes each subscriber's
+  snapshot against `authd->query_agents` and pushes the ones that
+  changed. The events are armed inside the atomic mutators, so this
+  topic carries the same commit-or-nothing property as the audit
+  topic: an aborted mutation delivers nothing. The token travels in
+  the query string because EventSource cannot set an Authorization
+  header; the example README states the tradeoff.
 - `GET /inventory/events?heartbeat=1` opts the audit subscriber into
   the timer-driven shape: a tick every ten seconds from the broker's
   self-re-arming call_out, so a live page shows the runtime's

@@ -70,10 +70,12 @@
  *   SSE-AUDIT-PUSH OK            a mutation's audit event reaches the
  *                                open stream, observer-driven
  *   SSE-AGENTS-SNAPSHOT OK       a fresh agent stream receives its
- *                                own-agents snapshot within one poll
+ *                                own-agents snapshot, pushed by the
+ *                                sweep armed at subscribe time
  *   SSE-AGENTS-PUSH OK           an agent-state change (suspend)
  *                                reaches the open stream as a new
- *                                snapshot
+ *                                snapshot, driven by the substrate's
+ *                                identity events
  *   SSE-AUTH-REFUSED OK          the agent stream refuses a bogus
  *                                session token
  *   RECOVERY-CODES OK            a live session provisions its own

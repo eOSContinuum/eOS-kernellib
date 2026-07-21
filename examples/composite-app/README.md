@@ -26,7 +26,7 @@ Inventory/                the application domain
   sys/handler.c           routes, WebAuthn/session wire binding,
                           single-use challenge store
   sys/streamd.c           SSE broker: observer-driven audit topic,
-                          poll-bridged agent-state topic
+                          identity-event-driven agent-state topic
   obj/client.c            loopback HTTP/1 client (the client library's
                           first in-tree consumer)
   obj/stream_client.c     loopback SSE client (first through the
