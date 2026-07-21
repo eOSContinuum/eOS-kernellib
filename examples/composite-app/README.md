@@ -160,14 +160,14 @@ needs the `webauthn` console verb first.
 
 ### Agents from the browser
 
-Steps 8-14 are authd's controller self-service, driven by the
+Steps 7-13 are authd's controller self-service, driven by the
 logged-in passkey session; the banner names the principal every action
 will run as, and controller-only steps disable under an agent session.
-Mint an agent (8): the response is the only time the token plaintext
+Mint an agent (7): the response is the only time the token plaintext
 exists, and the page fills it into the agent-login field -- copy it
-now or lose it. List (9) shows each of your agents with its suspension
-state and delegated capabilities. Suspend/Resume (10/11) and
-Delegate/Undelegate (12/13) act on the uuid field (mint and list fill
+now or lose it. List (8) shows each of your agents with its suspension
+state and delegated capabilities. Suspend/Resume (9/10) and
+Delegate/Undelegate (11/12) act on the uuid field (mint and list fill
 it). Delegate succeeds out of the box for `example:delegation-demo` --
 the provisioner granted it to your controller, and the bring-up
 flagged it delegable. Any other capability shows the refusal an
@@ -179,12 +179,12 @@ identity grant <controller-uuid> example:inventory-admin
 capability delegable example:inventory-admin on
 ```
 
-Agent login (14) trades the minted token for an agent session: the
+Agent login (13) trades the minted token for an agent session: the
 page's bearer session becomes the agent's, so an item create runs as
 the agent principal and lands in the audit trail under it -- and the
-admin wipe (7) stays 403 unless an operator ran the
+admin wipe (6) stays 403 unless an operator ran the
 `example:inventory-admin` verbs above and you delegated it to the
-logged-in agent. Passkey login (2) switches the page back to the
+logged-in agent. Passkey login (1b) switches the page back to the
 controller; suspending the agent then revokes its sessions and refuses
 its ceremony until resume.
 
@@ -200,21 +200,22 @@ stay out of request logs.
 
 ### Recovery from the browser
 
-Recovery is the second way in, not just disaster repair, and the page
-presents the fork at the entry point: registering on a new device
-would create a fresh identity, so an existing identity's holder skips
-Register and uses Recover -- the stored uuid plus one code bind the
-new device's passkey to the SAME identity. The old passkey keeps
-working (two devices, one identity); after a lost device, revocation
-is the operator plane's half. Recovery is also the human flow, and
-the page enforces it: minting codes disables under an agent session,
-and Recover refuses the agent uuid with the controller uuid to use
-instead. Mint recovery codes (15)
-while logged in as the controller: the response is the only time the
-plaintext exists, and the page fills the uuid field -- store both,
-they are the recovery kit. To recover after losing the passkey
-(simulate by reloading the page, which drops the session), enter the
-uuid and one code, then Recover (16): the page fetches a
+Recovery is one of the page's three ways in: the entry triad -- 1a
+Register, 1b Login, 1c Recover -- is picked by what you hold
+(nothing, a passkey on this device, or a recovery kit), so a
+returning user on a new device is never funneled into Register
+forking a fresh identity. The stored uuid plus one code bind the new
+device's passkey to the SAME identity; the old passkey keeps working
+(two devices, one identity), and after a lost device, revocation is
+the operator plane's half. Recovery is also the human flow, and the
+page enforces it: kit minting disables under an agent session, and
+Recover refuses the agent uuid with the controller uuid to use
+instead. Mint recovery codes (14) while logged in as the controller:
+the response is the only time the plaintext exists, and the log
+prints the kit (uuid + codes) to save as one unit. To recover after
+losing the passkey (simulate by reloading the page, which drops the
+session), enter the uuid and one code, then Recover (1c): the page
+fetches a
 recovery-purpose challenge, runs a fresh authenticator registration
 ceremony, and sends code and attestation in one request. The platform
 redeems the code and binds the new passkey atomically to the SAME
