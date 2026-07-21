@@ -605,7 +605,7 @@ el('passkeys').onclick = async () => {
     body.passkeys.forEach(p => {
       const mine = p.id === credId;
       if (!mine && !firstOther) firstOther = p.id;
-      log('  ' + p.id.slice(0, 16) + '…' +
+      log('  ' + p.id +
           (mine ? '  (this browser\'s current)' : '') +
           '  created ' + new Date(p.created * 1000).toLocaleTimeString());
     });
@@ -651,7 +651,7 @@ el('enroll').onclick = async () => {
     }, true);
     if (res.status === 201) {
       log('ENROLLED: an additional passkey (' +
-          String(res.body.enrolled).slice(0, 16) + '…) is bound to ' +
+          String(res.body.enrolled) + ') is bound to ' +
           'your identity -- no recovery code spent; list (16) shows ' +
           'both, and either logs in', 'ok');
       updateUI();
