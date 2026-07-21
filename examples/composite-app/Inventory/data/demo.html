@@ -16,7 +16,8 @@
   .legend { background: #f8f6ee; border: 1px solid #ddd; padding: .6rem .8rem; font-size: 14px; }
   h2 { font-size: 16px; margin: 1.2rem 0 .3rem; }
   .note { font-size: 13px; color: #555; margin: 0 0 .4rem; }
-  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; }
+  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; max-height: 22rem; overflow-y: auto; }
+  #tickfoot { background: #f4f4f4; border: 1px solid #ccc; border-top: 0; padding: .3rem .8rem; font: 13px/1.45 ui-monospace, monospace; color: #06600e; font-style: italic; }
   .ok { color: #06600e; } .err { color: #a11; } .hint { color: #555; font-style: italic; }
 </style>
 <h1>composite-app: browser-real WebAuthn</h1>
@@ -43,8 +44,8 @@
   7 wipe (403) &rarr; 8 mint &rarr; 9 list &rarr; 12 delegate &rarr;
   14 agent login &rarr; 4 create as the agent &rarr; 2 switch back &rarr;
   10/11 suspend &amp; resume &rarr; 15 recovery codes &rarr; 16 recover.
-  Streams are live the whole time; the banner's heartbeat is the
-  server pushing over SSE every 10 seconds.
+  Streams are live the whole time; the heartbeat pinned under the log
+  is the server pushing over SSE every 10 seconds.
 </div>
 
 <h2>Session (your passkey, the human controller)</h2>
@@ -123,13 +124,17 @@ the CONTROLLER uuid, and passkey login (2) is the way back.</p>
 </p>
 <div id="log">ready.
 </div>
+<div id="tickfoot">server heartbeat: waiting for the first tick&hellip;</div>
 <script>
 const log = (m, cls) => {
   const d = document.getElementById('log');
+  const nearBottom =
+    d.scrollHeight - d.scrollTop - d.clientHeight < 40;
   const s = document.createElement('div');
   if (cls) s.className = cls;
   s.textContent = m;
   d.appendChild(s);
+  if (nearBottom) d.scrollTop = d.scrollHeight;
 };
 const b64u = {
   enc: buf => btoa(String.fromCharCode(...new Uint8Array(buf)))
@@ -143,7 +148,6 @@ let controllerUuid = null;     // uuid of the last human session's identity
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
-let lastTick = null;           // last server heartbeat, banner-displayed
 
 const short = u => u ? u.slice(0, 8) + '…' : '?';
 const uuidOf = p => (p || '').replace('identity:', '');
@@ -171,9 +175,7 @@ function updateUI() {
   const parts = [];
   parts.push(auditLive ? 'audit live' : 'audit connecting…');
   if (liveAgents) parts.push(agentsLive ? 'agents live' : 'agents connecting…');
-  el('stream').textContent = 'Streaming: ' + parts.join(', ') +
-    (lastTick ? ' — server heartbeat #' + lastTick.n + ' at ' +
-     lastTick.at + ' (a call_out pushing over SSE every 10s)' : '');
+  el('stream').textContent = 'Streaming: ' + parts.join(', ');
   el('agentnote').hidden = sessionKind !== 'agent';
 
   const need = (id, ok, why) => {
@@ -225,9 +227,10 @@ function openAuditStream() {
   liveAudit.addEventListener('audit', e => log('live audit: ' + e.data, 'ok'));
   liveAudit.addEventListener('tick', e => {
     const t = JSON.parse(e.data);
-    lastTick = { n: t.n, at: new Date(t.t * 1000).toLocaleTimeString() };
-    auditLive = true;
-    updateUI();
+    el('tickfoot').textContent = 'server heartbeat #' + t.n + ' at ' +
+      new Date(t.t * 1000).toLocaleTimeString() +
+      ' (a call_out pushing over SSE every 10s)';
+    if (!auditLive) { auditLive = true; updateUI(); }
   });
   liveAudit.onerror = () => { auditLive = false; updateUI(); };
 }
