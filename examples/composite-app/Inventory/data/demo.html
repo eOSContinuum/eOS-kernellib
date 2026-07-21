@@ -2,12 +2,21 @@
 <meta charset="utf-8">
 <title>composite-app WebAuthn demo</title>
 <style>
-  body { font: 15px/1.5 system-ui, sans-serif; max-width: 46rem; margin: 0 auto 2rem; padding: 0 1rem; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 82rem; margin: 0 auto 2rem; padding: 0 1rem; }
+  #page { display: grid; grid-template-columns: minmax(0, 46rem) minmax(22rem, 1fr); gap: 0 2rem; }
+  #left { min-width: 0; }
+  #right { min-width: 0; position: sticky; top: 1rem; align-self: start; }
+  @media (max-width: 64rem) {
+    #page { grid-template-columns: 1fr; }
+    #right { position: static; }
+    #banner { margin-top: 1rem; }
+    #log { max-height: 22rem; }
+  }
   button { font: inherit; padding: .4rem .9rem; margin: 0 .4rem .4rem 0; }
   button:disabled { opacity: .45; }
   input { font: inherit; padding: .3rem; }
   #banner { background: #fff; border-bottom: 2px solid #ccc;
-            padding: .6rem 0; margin: 1rem 0 .4rem; }
+            padding: .6rem 0; margin: 0 0 .4rem; }
   #banner .who { font-weight: 600; }
   #banner .out { color: #666; } #banner .human { color: #06600e; } #banner .agent { color: #6a1fa0; }
   #banner .stream { font-size: 13px; color: #666; }
@@ -16,11 +25,13 @@
   .legend { background: #f8f6ee; border: 1px solid #ddd; padding: .6rem .8rem; font-size: 14px; }
   h2 { font-size: 16px; margin: 1.2rem 0 .3rem; }
   .note { font-size: 13px; color: #555; margin: 0 0 .4rem; }
-  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; max-height: 22rem; overflow-y: auto; }
+  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; max-height: calc(100vh - 16rem); overflow-y: auto; }
   #tickfoot { background: #f4f4f4; border: 1px solid #ccc; border-top: 0; padding: .3rem .8rem; font: 13px/1.45 ui-monospace, monospace; color: #06600e; font-style: italic; }
   .ok { color: #06600e; } .err { color: #a11; } .hint { color: #555; font-style: italic; }
 </style>
 <h1>composite-app: browser-real WebAuthn</h1>
+<div id="page">
+<div id="left">
 <div class="legend">
   <b>Principal and agents.</b> YOU are the <b>principal</b> -- the
   party on whose behalf everything here runs. Your passkeys
@@ -181,6 +192,8 @@ passkey login (1b) is the way back.</p>
   <button id="revokekey">17. Revoke passkey</button>
   <button id="enroll">18. Enroll another passkey</button>
 </p>
+</div>
+<div id="right">
 <div id="banner">
   <button id="reset" title="forget this page's session and log, keep the server's state">Reset demo</button>
   <div class="who" id="who">Session: logged out</div>
@@ -193,6 +206,8 @@ passkey login (1b) is the way back.</p>
 <div id="log">ready.
 </div>
 <div id="tickfoot">server heartbeat: waiting for the first tick&hellip;</div>
+</div>
+</div>
 <script>
 const log = (m, cls) => {
   const d = document.getElementById('log');
