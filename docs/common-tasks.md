@@ -165,8 +165,8 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: your service answers a route with a file-backed page instead of a string literal.
 
-1. Implement the handler contract's one-shot form and read the file per request: return `({ 200, "OK", "text/html; charset=utf-8", read_file("/usr/<App>/data/page.html") })`, with a 500 when the read returns nil and your 404 fallback for other paths -- `examples/composite-app/Inventory/sys/demo.c` is the whole pattern in thirty lines.
-2. What the platform gives you: `read_file` is access-checked against your domain's tree, and the per-request read means an edited file shows on the next reload, no cache to bust.
+1. Implement the handler contract's one-shot form and read the file per request: return `({ 200, "OK", "text/html; charset=utf-8", read_file("/usr/<App>/data/page.html"), ([ "Cache-Control" : "no-store" ]) })`, with a 500 when the read returns nil and your 404 fallback for other paths -- `examples/composite-app/Inventory/sys/demo.c` is the whole pattern.
+2. What the platform gives you: `read_file` is access-checked against your domain's tree, and the per-request read keeps the server current -- an edited file is what the next request reads. The browser is a second cache the server does not control: without a header saying otherwise, Safari heuristically caches the page and a returning visitor can sit on a stale copy until a hard refresh, which is why step 1's fifth element -- the handler contract's optional mapping of extra response headers (`docs/composite-applications.md`) -- sends `Cache-Control: no-store`.
 3. What it does not: no MIME table (state the Content-Type yourself), no caching, no directory serving -- one route, one file, which is exactly the admin-panel and demo-page shape.
 4. If the page drives WebAuthn, serve it over the labeled `https` port with an origin matching the relying-party configuration -- the browser requires a secure context (`examples/composite-app/README.md`).
 
