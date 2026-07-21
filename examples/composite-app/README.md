@@ -191,9 +191,10 @@ capability delegable example:inventory-admin on
 Agent login (13) trades the minted token for an agent session: the
 page's bearer session becomes the agent's, so an item create runs as
 the agent and lands in the audit trail under the agent's identity
-string -- and the admin wipe (6) stays 403 unless an operator ran the
-`example:inventory-admin` verbs above and you delegated it to the
-logged-in agent. The report (14) makes the delegation observable:
+string; updating the principal's item as the agent refuses (the
+application-tier creator check, the page's 3b), and the admin wipe
+(6) stays 403 unless an operator ran the `example:inventory-admin`
+verbs above and you delegated it to the logged-in agent. The report (14) makes the delegation observable:
 gated by `example:delegation-demo` at the same `is_allowed`
 choke-point as the wipe, it answers 200 for the principal from
 registration, 403 for the agent until a delegation stands, 200 while

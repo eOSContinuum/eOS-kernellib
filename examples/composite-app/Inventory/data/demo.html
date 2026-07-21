@@ -46,14 +46,14 @@
   pre-provisions the only operator actions the walk needs (a delegable
   demo capability, granted to the principal at registration); step 6
   keeps one refusal alive on purpose so you see the boundary.<br>
-  <b>The walk:</b> 1a register &rarr; 3 create &rarr; 5 audit &rarr;
+  <b>The walk:</b> 1a register &rarr; 3a create &rarr; 5 audit &rarr;
   6 wipe (403) &rarr; 14 report (200) &rarr; 7 mint &rarr; 8 list
   &rarr; 13 agent login &rarr; 14 report (403) &rarr; 7 mint as the
   agent (403) &rarr; 1b back &rarr; 11 delegate &rarr; 13 agent login
-  &rarr; 14 report (200, delegated) &rarr; 3 create as the agent
-  &rarr; 1b back &rarr; 9/10 suspend &amp; resume &rarr; 15 recovery
-  kit &rarr; 1c recover &rarr; 16 list passkeys &rarr; 17 revoke the
-  old one.
+  &rarr; 14 report (200, delegated) &rarr; 3a create as the agent
+  &rarr; 3b update the principal's item (403) &rarr; 1b back &rarr;
+  9/10 suspend &amp; resume &rarr; 15 recovery kit &rarr; 1c recover
+  &rarr; 16 list passkeys &rarr; 17 revoke the old one.
   Streams are live the whole time; the heartbeat pinned under the log
   is the server pushing over SSE every 10 seconds.
 </div>
@@ -93,19 +93,26 @@ the banner always names the acting principal.</p>
 </p>
 
 <h2>Items and audit (any session; reads are public)</h2>
-<p class="note">3 mutates as WHOEVER is logged in -- watch the audit
+<p class="note">3a mutates as WHOEVER is logged in -- watch the audit
 trail and the live stream attribute it to the principal or the agent.
-4 and 5 are public reads, no session needed. 6 is gated by
-example:inventory-admin, which nobody in this demo holds: expect 403
-from the capability check -- in production an operator grants it on the
-console (identity grant &lt;uuid&gt; example:inventory-admin).</p>
+3b is the APPLICATION-TIER refusal: only an item's CREATOR may update
+it, so the agent cannot touch the principal's items even while
+delegated -- create as the principal, switch to the agent (13), then
+3b on that item answers 403 "not the item's creator" (3a fills the id
+field with the last created item). 4 and 5 are public reads, no
+session needed. 6 is gated by example:inventory-admin, which nobody
+in this demo holds: expect 403 from the capability check -- in
+production an operator grants it on the console (identity grant
+&lt;uuid&gt; example:inventory-admin).</p>
 <p>
   <input id="itemname" value="browser-widget" size="16">
-  <button id="create">3. Create item (authenticated)</button>
-  <button id="list">4. List items</button>
-  <button id="audit">5. Audit trail (observer)</button>
+  <button id="create">3a. Create item (authenticated)</button>
+  <input id="itemid" placeholder="item id" size="8">
+  <button id="update">3b. Update item (creator only)</button>
 </p>
 <p>
+  <button id="list">4. List items</button>
+  <button id="audit">5. Audit trail (observer)</button>
   <button id="wipe">6. Admin wipe (expect 403)</button>
 </p>
 
@@ -236,6 +243,11 @@ function updateUI() {
   const human = sessionKind === 'human' && token;
   need('logout', !!token, 'no session to log out');
   need('create', !!token, 'login first (1a or 1b)');
+  need('update', !!token && el('itemid').value.trim() !== '',
+    'login and an item id required (3a fills it)');
+  el('mint').textContent = sessionKind === 'agent' ?
+    '7. Mint agent (as the agent: expect 403)' :
+    '7. Mint agent (token shown once)';
   need('wipe', !!token, 'login first (1a or 1b) -- then expect the 403');
   need('mint', !!token,
     'login first (1a or 1b) -- as the agent, expect the refusal');
@@ -269,8 +281,8 @@ function updateUI() {
     el('rvcode').value.trim() !== '',
     'principal uuid and one recovery code required (15 provisions them)');
 }
-['agentuuid', 'cap', 'agenttoken', 'rvuuid', 'rvcode', 'credid']
-  .forEach(id => el(id).addEventListener('input', updateUI));
+['agentuuid', 'cap', 'agenttoken', 'rvuuid', 'rvcode', 'credid',
+ 'itemid'].forEach(id => el(id).addEventListener('input', updateUI));
 
 /*
  * streams: the audit stream (with the server heartbeat) opens with the
@@ -413,6 +425,28 @@ el('create').onclick = async () => {
   log('create item (as ' + (sessionKind || 'nobody') + '): ' +
       res.status + ' ' + JSON.stringify(res.body),
       res.status === 201 ? 'ok' : 'err');
+  if (res.status === 201 && res.body.id) {
+    el('itemid').value = res.body.id;
+    updateUI();
+  }
+};
+
+el('update').onclick = async () => {
+  const id = el('itemid').value.trim();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const r = await fetch('/inventory/items/' + id, { method: 'PUT',
+    headers, body: JSON.stringify({ name: el('itemname').value,
+                                    qty: 2 }) });
+  const body = await r.json().catch(() => ({}));
+  log('update item ' + id + ' (as ' + (sessionKind || 'nobody') + '): ' +
+      r.status + ' ' + JSON.stringify(body),
+      r.status === 200 ? 'ok' : 'err');
+  if (r.status === 403) {
+    log('application-tier authorization: the item\'s CREATOR decides, ' +
+        'and delegation does not transfer ownership -- the third ' +
+        'layer beside capabilities (6, 14) and standing (7)', 'hint');
+  }
 };
 
 el('list').onclick = async () => {
@@ -503,10 +537,11 @@ el('agentlogin').onclick = async () => {
     setSession(res.body.token, res.body.principal, 'agent');
     lastAgentUuid = uuidOf(res.body.principal);
     log('AGENT LOGIN OK: ' + res.body.principal, 'ok');
-    log('the page session is now the agent\'s: item create (3) runs ' +
-        'as the agent, principal-only steps 7-12 and the recovery ' +
-        'kit (15) disable, and passkey login (1b) switches back -- ' +
-        'try the report (14) to see what delegation changes', 'hint');
+    log('the page session is now the agent\'s: item create (3a) runs ' +
+        'as the agent, principal-only steps 8-12 and 15-17 disable, ' +
+        'and passkey login (1b) switches back -- try the report (14), ' +
+        'mint (7), and updating the principal\'s item (3b) to see ' +
+        'what the agent can and cannot do', 'hint');
   } else {
     log('agent login refused: ' + res.status + ' ' +
         JSON.stringify(res.body), 'err');
@@ -627,8 +662,8 @@ el('reset').onclick = () => {
     localStorage.removeItem('demo-principal-uuid');
     localStorage.removeItem('demo-controller-uuid');
   } catch (e) {}
-  ['agentuuid', 'agenttoken', 'rvuuid', 'rvcode', 'credid'].forEach(
-    id => el(id).value = '');
+  ['agentuuid', 'agenttoken', 'rvuuid', 'rvcode', 'credid',
+   'itemid'].forEach(id => el(id).value = '');
   el('itemname').value = 'browser-widget';
   el('cap').value = 'example:delegation-demo';
   el('log').textContent = '';
