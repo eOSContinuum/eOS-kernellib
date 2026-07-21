@@ -232,9 +232,13 @@ let expired = false;           // last session ended by TTL/revocation
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
+let regHintShown = false, auditHintShown = false, createHintShown = false;
+let suspendHintShown = false, delegateHintShown = false;
 
 const short = u => u ? u.slice(0, 8) + '…' : '?';
 const uuidOf = p => (p || '').replace('identity:', '');
+const actor = () => sessionKind === 'agent' ? 'the agent' :
+  sessionKind === 'human' ? 'the principal' : 'nobody';
 const el = id => document.getElementById(id);
 
 /*
@@ -323,7 +327,15 @@ function openAuditStream() {
   auditLive = false;
   liveAudit = new EventSource('/inventory/events?heartbeat=1');
   liveAudit.onopen = () => { auditLive = true; updateUI(); };
-  liveAudit.addEventListener('audit', e => log('live audit: ' + e.data, 'ok'));
+  liveAudit.addEventListener('audit', e => {
+    log('live audit: ' + e.data, 'ok');
+    if (!auditHintShown) {
+      auditHintShown = true;
+      log('live audit lines are a Merry property observer on ' +
+          'inventoryd, relayed over SSE: mutations dispatch observers, ' +
+          'nothing polls', 'hint');
+    }
+  });
   liveAudit.addEventListener('tick', e => {
     const t = JSON.parse(e.data);
     el('tickfoot').textContent = 'server heartbeat #' + t.n + ' at ' +
@@ -415,11 +427,18 @@ el('reg').onclick = async () => {
     if (res.status === 201) {
       const prev = principalUuid;
       setSession(res.body.token, res.body.principal, 'human');
-      log('REGISTER OK: ' + res.body.principal +
+      log('[1a] REGISTER OK: ' + res.body.principal +
           ' -- you are the principal', 'ok');
       log('the demo deploy granted this identity ' +
           'example:delegation-demo at registration; step 11 will use it',
           'hint');
+      if (!regHintShown) {
+        regHintShown = true;
+        log('behind 1a: webauthnd verified the WebAuthn ceremony and ' +
+            'sessiond minted the bearer session in one authd step; the ' +
+            'token is stored hashed, so the plaintext never reaches a ' +
+            'statedump', 'hint');
+      }
       if (prev && prev !== principalUuid) {
         log('note: this page previously remembered principal ' +
             short(prev) + ' -- registering created a DIFFERENT ' +
@@ -429,10 +448,10 @@ el('reg').onclick = async () => {
             'hint');
       }
     } else {
-      log('REGISTER refused: ' + res.status + ' ' +
+      log('[1a] REGISTER refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('register: ' + e, 'err'); }
+  } catch (e) { log('[1a] register: ' + e, 'err'); }
 };
 
 el('login').onclick = async () => {
@@ -454,35 +473,42 @@ el('login').onclick = async () => {
     if (res.status === 200) {
       credId = b64u.enc(cred.rawId);
       setSession(res.body.token, res.body.principal, 'human');
-      log('LOGIN OK: ' + res.body.principal +
+      log('[1b] LOGIN OK: ' + res.body.principal +
           ' -- principal session (back from any agent session)', 'ok');
     } else {
-      log('LOGIN refused: ' + res.status + ' ' +
+      log('[1b] LOGIN refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('login: ' + e, 'err'); }
+  } catch (e) { log('[1b] login: ' + e, 'err'); }
 };
 
 el('logout').onclick = async () => {
   const res = await post('/auth/logout', {}, true);
   setSession(null, null, null);
-  log('logout: ' + res.status + ' ' + JSON.stringify(res.body));
+  log('[2] logout: ' + res.status + ' ' + JSON.stringify(res.body));
 };
 
 el('create').onclick = async () => {
+  log('[3a] create "' + el('itemname').value + '" as ' + actor() + ' ->');
   const res = await post('/inventory/items',
     { name: el('itemname').value, qty: 1 }, true);
-  log('create item (as ' + (sessionKind || 'nobody') + '): ' +
-      res.status + ' ' + JSON.stringify(res.body),
+  log('[3a] create item: ' + res.status + ' ' + JSON.stringify(res.body),
       res.status === 201 ? 'ok' : 'err');
   if (res.status === 201 && res.body.id) {
     el('itemid').value = res.body.id;
+    if (!createHintShown) {
+      createHintShown = true;
+      log('the item and its audit entry committed in one atomic ' +
+          'function -- all or nothing; a failure would roll back both',
+          'hint');
+    }
     updateUI();
   }
 };
 
 el('update').onclick = async () => {
   const id = el('itemid').value.trim();
+  log('[3b] update item ' + id + ' as ' + actor() + ' ->');
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   const r = await fetch('/inventory/items/' + id, { method: 'PUT',
@@ -490,9 +516,8 @@ el('update').onclick = async () => {
                                     qty: 2 }) });
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
-  log('update item ' + id + ' (as ' + (sessionKind || 'nobody') + '): ' +
-      r.status + ' ' + JSON.stringify(body),
-      r.status === 200 ? 'ok' : 'err');
+  log('[3b] update item ' + id + ': ' + r.status + ' ' +
+      JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
   if (r.status === 403) {
     log('application-tier authorization: the item\'s CREATOR decides, ' +
         'and delegation does not transfer ownership -- the third ' +
@@ -502,12 +527,12 @@ el('update').onclick = async () => {
 
 el('list').onclick = async () => {
   const r = await fetch('/inventory/items');
-  log('items: ' + JSON.stringify(await r.json()));
+  log('[4] items: ' + JSON.stringify(await r.json()));
 };
 
 el('audit').onclick = async () => {
   const r = await fetch('/inventory/audit');
-  log('audit: ' + JSON.stringify(await r.json()));
+  log('[5] audit: ' + JSON.stringify(await r.json()));
 };
 
 el('wipe').onclick = async () => {
@@ -515,7 +540,7 @@ el('wipe').onclick = async () => {
     headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
-  log('wipe: ' + r.status + ' ' + JSON.stringify(body),
+  log('[6] wipe: ' + r.status + ' ' + JSON.stringify(body),
       r.status === 403 ? 'ok' : 'err');
   if (r.status === 403) {
     log('403 is the lesson: example:inventory-admin is a platform ' +
@@ -525,17 +550,18 @@ el('wipe').onclick = async () => {
 };
 
 el('mint').onclick = async () => {
+  log('[7] mint agent as ' + actor() + ' ->');
   const res = await post('/auth/agents', {}, true);
   if (res.status === 201) {
     el('agentuuid').value = res.body.uuid;
     el('agenttoken').value = res.body.token;
     lastAgentUuid = res.body.uuid;
-    log('AGENT MINTED: ' + res.body.uuid, 'ok');
+    log('[7] AGENT MINTED: ' + res.body.uuid, 'ok');
     log('agent token (this response is the only time the plaintext ' +
         'exists): ' + res.body.token);
     updateUI();
   } else {
-    log('mint (as ' + (sessionKind || 'nobody') + '): ' + res.status +
+    log('[7] mint (as ' + actor() + '): ' + res.status +
         ' ' + JSON.stringify(res.body),
         sessionKind === 'agent' && res.status === 403 ? 'ok' : 'err');
     if (sessionKind === 'agent' && res.status === 403) {
@@ -553,27 +579,46 @@ el('agents').onclick = async () => {
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
-    log('agents (' + body.agents.length + '):');
+    log('[8] agents (' + body.agents.length + '):');
     body.agents.forEach(a => log('  ' + a.uuid +
       (a.suspended ? ' [suspended]' : ' [active]') +
       (a.capabilities.length ?
         '  caps: ' + a.capabilities.join(', ') : '')));
   } else {
-    log('agents: ' + r.status + ' ' + JSON.stringify(body), 'err');
+    log('[8] agents: ' + r.status + ' ' + JSON.stringify(body), 'err');
   }
 };
 
-const agentOp = async (op, extra) => {
+const agentOp = async (op, step, extra) => {
   const uuid = el('agentuuid').value.trim();
+  log('[' + step + '] ' + op + ' ' + short(uuid) + ' ->');
   const res = await post('/auth/agents/' + uuid + '/' + op, extra || {}, true);
-  log(op + ': ' + res.status + ' ' + JSON.stringify(res.body),
-      res.status === 200 ? 'ok' : 'err');
+  log('[' + step + '] ' + op + ': ' + res.status + ' ' +
+      JSON.stringify(res.body), res.status === 200 ? 'ok' : 'err');
+  return res;
 };
-el('suspend').onclick = () => agentOp('suspend');
-el('resume').onclick = () => agentOp('resume');
+el('suspend').onclick = async () => {
+  const res = await agentOp('suspend', 9);
+  if (res.status === 200 && !suspendHintShown) {
+    suspendHintShown = true;
+    log('suspension is one atomic operation: ceremonies now refuse, ' +
+        'live sessions are revoked (revoked: ' + res.body.revoked +
+        (res.body.revoked ? '' : ' -- none was live') + '), and ' +
+        'delegated grants die with them; resume (10) restores ' +
+        'authentication only', 'hint');
+  }
+};
+el('resume').onclick = () => agentOp('resume', 10);
 el('delegate').onclick = async () => {
   const cap = el('cap').value.trim();
-  await agentOp('delegate', { capability: cap });
+  const res = await agentOp('delegate', 11, { capability: cap });
+  if (res.status === 200 && !delegateHintShown) {
+    delegateHintShown = true;
+    log('the grant is a source-tracked store entry: this delegation ' +
+        'is one source, an operator grant of the same capability ' +
+        'would be another, and the entry dies only with its last ' +
+        'source', 'hint');
+  }
   if (cap !== 'example:delegation-demo') {
     log('example:delegation-demo is the capability the demo deploy ' +
         'pre-provisioned (granted + delegable); other capabilities ' +
@@ -581,7 +626,7 @@ el('delegate').onclick = async () => {
   }
 };
 el('undelegate').onclick = () =>
-  agentOp('undelegate', { capability: el('cap').value.trim() });
+  agentOp('undelegate', 12, { capability: el('cap').value.trim() });
 
 el('agentlogin').onclick = async () => {
   const t = el('agenttoken').value.trim();
@@ -589,14 +634,14 @@ el('agentlogin').onclick = async () => {
   if (res.status === 200) {
     setSession(res.body.token, res.body.principal, 'agent');
     lastAgentUuid = uuidOf(res.body.principal);
-    log('AGENT LOGIN OK: ' + res.body.principal, 'ok');
+    log('[13] AGENT LOGIN OK: ' + res.body.principal, 'ok');
     log('the page session is now the agent\'s: item create (3a) runs ' +
         'as the agent, principal-only steps 8-12 and 15-17 disable, ' +
         'and passkey login (1b) switches back -- try the report (14), ' +
         'mint (7), and updating the principal\'s item (3b) to see ' +
         'what the agent can and cannot do', 'hint');
   } else {
-    log('agent login refused: ' + res.status + ' ' +
+    log('[13] agent login refused: ' + res.status + ' ' +
         JSON.stringify(res.body), 'err');
   }
 };
@@ -606,7 +651,7 @@ el('report').onclick = async () => {
     { 'Authorization': 'Bearer ' + token } : {} });
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
-  log('report (as ' + (sessionKind || 'nobody') + '): ' + r.status +
+  log('[14] report (as ' + actor() + '): ' + r.status +
       ' ' + JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
   if (r.status === 403 && sessionKind === 'agent') {
     log('the agent holds example:delegation-demo only while a ' +
@@ -622,7 +667,7 @@ el('passkeys').onclick = async () => {
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
-    log('passkeys (' + body.passkeys.length + '):');
+    log('[16] passkeys (' + body.passkeys.length + '):');
     let firstOther = '';
     body.passkeys.forEach(p => {
       const mine = p.id === credId;
@@ -634,15 +679,15 @@ el('passkeys').onclick = async () => {
     if (firstOther) el('credid').value = firstOther;
     updateUI();
   } else {
-    log('passkeys: ' + r.status + ' ' + JSON.stringify(body), 'err');
+    log('[16] passkeys: ' + r.status + ' ' + JSON.stringify(body), 'err');
   }
 };
 
 el('revokekey').onclick = async () => {
   const id = el('credid').value.trim();
   const res = await post('/auth/passkeys/' + id + '/revoke', {}, true);
-  log('revoke passkey: ' + res.status + ' ' + JSON.stringify(res.body),
-      res.status === 200 ? 'ok' : 'err');
+  log('[17] revoke passkey: ' + res.status + ' ' +
+      JSON.stringify(res.body), res.status === 200 ? 'ok' : 'err');
   if (res.status === 200) {
     log('the revoked passkey can no longer log in; the identity\'s ' +
         'remaining passkeys still can -- the lost-device story is ' +
@@ -672,29 +717,30 @@ el('enroll').onclick = async () => {
       attestationObject: b64u.enc(cred.response.attestationObject),
     }, true);
     if (res.status === 201) {
-      log('ENROLLED: an additional passkey (' +
+      log('[18] ENROLLED: an additional passkey (' +
           String(res.body.enrolled) + ') is bound to ' +
           'your identity -- no recovery code spent; list (16) shows ' +
           'both, and either logs in', 'ok');
       updateUI();
     } else {
-      log('enroll refused: ' + res.status + ' ' +
+      log('[18] enroll refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('enroll: ' + e, 'err'); }
+  } catch (e) { log('[18] enroll: ' + e, 'err'); }
 };
 
 el('mintcodes').onclick = async () => {
   const res = await post('/auth/recovery-codes', { n: 2 }, true);
   if (res.status === 201) {
     el('rvuuid').value = principalUuid || '';
-    log('RECOVERY KIT -- save the uuid and codes TOGETHER; the codes ' +
-        'exist only in this response, and recovery needs both:', 'ok');
+    log('[15] RECOVERY KIT -- save the uuid and codes TOGETHER; the ' +
+        'codes exist only in this response, and recovery needs both:',
+        'ok');
     log('  principal uuid: ' + (principalUuid || '?'));
     res.body.codes.forEach((c, i) => log('  code ' + (i + 1) + ': ' + c));
     updateUI();
   } else {
-    log('recovery codes: ' + res.status + ' ' +
+    log('[15] recovery codes: ' + res.status + ' ' +
         JSON.stringify(res.body), 'err');
   }
 };
@@ -704,12 +750,12 @@ el('recover').onclick = async () => {
     const uuid = el('rvuuid').value.trim();
     const code = el('rvcode').value.trim();
     if (lastAgentUuid && uuid === lastAgentUuid) {
-      log('recover: that is the AGENT uuid -- recovery re-binds your ' +
+      log('[1c] recover: that is the AGENT uuid -- recovery re-binds your ' +
           'PRINCIPAL identity (' + (principalUuid || 'register first') +
           '); use the principal uuid step 15 filled in', 'err');
       return;
     }
-    log('recover: enrolling a REPLACEMENT passkey -- Safari will now ' +
+    log('[1c] recover: enrolling a REPLACEMENT passkey -- Safari will now ' +
         'prompt to create one; the uuid names the identity, the code ' +
         'proves the right, and the new key binds in the same atomic ' +
         'step (recovery never logs in with an old passkey)', 'hint');
@@ -733,14 +779,14 @@ el('recover').onclick = async () => {
     if (res.status === 200) {
       credId = b64u.enc(cred.rawId);
       setSession(res.body.token, res.body.principal, 'human');
-      log('RECOVER OK: ' + res.body.principal + ' -- the new passkey ' +
+      log('[1c] RECOVER OK: ' + res.body.principal + ' -- the new passkey ' +
           'is bound to the SAME identity, the code is spent, and this ' +
           'session is live', 'ok');
     } else {
-      log('recover refused: ' + res.status + ' ' +
+      log('[1c] recover refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('recover: ' + e, 'err'); }
+  } catch (e) { log('[1c] recover: ' + e, 'err'); }
 };
 
 el('reset').onclick = () => {
@@ -748,6 +794,8 @@ el('reset').onclick = () => {
   token = null; subject = null; sessionKind = null;
   principalUuid = null; lastAgentUuid = null; credId = null;
   expired = false;
+  regHintShown = auditHintShown = createHintShown = false;
+  suspendHintShown = delegateHintShown = false;
   try {
     localStorage.removeItem('demo-principal-uuid');
     localStorage.removeItem('demo-controller-uuid');
