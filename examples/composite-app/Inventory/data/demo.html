@@ -11,11 +11,11 @@
   #banner .who { font-weight: 600; }
   #banner .out { color: #666; } #banner .human { color: #06600e; } #banner .agent { color: #6a1fa0; }
   #banner .stream { font-size: 13px; color: #666; }
+  #banner .agentnote { font-size: 13px; color: #6a1fa0; }
   #reset { float: right; font-size: 13px; padding: .2rem .6rem; }
   .legend { background: #f8f6ee; border: 1px solid #ddd; padding: .6rem .8rem; font-size: 14px; }
   h2 { font-size: 16px; margin: 1.2rem 0 .3rem; }
   .note { font-size: 13px; color: #555; margin: 0 0 .4rem; }
-  #tickline { color: #06600e; font-style: italic; }
   #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; }
   .ok { color: #06600e; } .err { color: #a11; } .hint { color: #555; font-style: italic; }
 </style>
@@ -24,6 +24,9 @@
   <button id="reset" title="forget this page's session and log, keep the server's state">Reset demo</button>
   <div class="who" id="who">Session: logged out</div>
   <div class="stream" id="stream">Streaming: connecting&hellip;</div>
+  <div class="agentnote" id="agentnote" hidden>Agent session: steps
+  8-13 and 15 are controller-only &mdash; passkey login (2) switches
+  back.</div>
 </div>
 <div class="legend">
   <b>Two principals.</b> Your passkey identity is the <b>human
@@ -40,8 +43,8 @@
   7 wipe (403) &rarr; 8 mint &rarr; 9 list &rarr; 12 delegate &rarr;
   14 agent login &rarr; 4 create as the agent &rarr; 2 switch back &rarr;
   10/11 suspend &amp; resume &rarr; 15 recovery codes &rarr; 16 recover.
-  Streams are live the whole time; the heartbeat line in the log below
-  is the server pushing over SSE every 10 seconds.
+  Streams are live the whole time; the banner's heartbeat is the
+  server pushing over SSE every 10 seconds.
 </div>
 
 <h2>Session (your passkey, the human controller)</h2>
@@ -118,7 +121,7 @@ the CONTROLLER uuid, and passkey login (2) is the way back.</p>
   <input id="rvcode" placeholder="recovery code" size="22">
   <button id="recover">16. Recover (new passkey)</button>
 </p>
-<div id="log"><div id="tickline">server heartbeat: waiting for the first tick&hellip;</div>ready.
+<div id="log">ready.
 </div>
 <script>
 const log = (m, cls) => {
@@ -140,6 +143,7 @@ let controllerUuid = null;     // uuid of the last human session's identity
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
+let lastTick = null;           // last server heartbeat, banner-displayed
 
 const short = u => u ? u.slice(0, 8) + '…' : '?';
 const uuidOf = p => (p || '').replace('identity:', '');
@@ -167,7 +171,10 @@ function updateUI() {
   const parts = [];
   parts.push(auditLive ? 'audit live' : 'audit connecting…');
   if (liveAgents) parts.push(agentsLive ? 'agents live' : 'agents connecting…');
-  el('stream').textContent = 'Streaming: ' + parts.join(', ');
+  el('stream').textContent = 'Streaming: ' + parts.join(', ') +
+    (lastTick ? ' — server heartbeat #' + lastTick.n + ' at ' +
+     lastTick.at + ' (a call_out pushing over SSE every 10s)' : '');
+  el('agentnote').hidden = sessionKind !== 'agent';
 
   const need = (id, ok, why) => {
     const b = el(id);
@@ -218,10 +225,9 @@ function openAuditStream() {
   liveAudit.addEventListener('audit', e => log('live audit: ' + e.data, 'ok'));
   liveAudit.addEventListener('tick', e => {
     const t = JSON.parse(e.data);
-    el('tickline').textContent = 'server heartbeat #' + t.n + ' -- ' +
-      new Date(t.t * 1000).toLocaleTimeString() +
-      ' (a call_out pushing over SSE every 10s)';
-    if (!auditLive) { auditLive = true; updateUI(); }
+    lastTick = { n: t.n, at: new Date(t.t * 1000).toLocaleTimeString() };
+    auditLive = true;
+    updateUI();
   });
   liveAudit.onerror = () => { auditLive = false; updateUI(); };
 }
@@ -489,10 +495,7 @@ el('reset').onclick = () => {
     id => el(id).value = '');
   el('itemname').value = 'browser-widget';
   el('cap').value = 'example:delegation-demo';
-  const d = el('log');
-  while (d.lastChild && d.lastChild.id !== 'tickline') {
-    d.removeChild(d.lastChild);
-  }
+  el('log').textContent = '';
   log('reset: page state cleared (server-side items, audit trail, and ' +
       'identities persist -- register (1) starts a fresh controller)');
   updateUI();
