@@ -113,7 +113,7 @@ observer binding all survived (the sentinel comment block in
 refusal, agent management and delegation, auto-established live
 streams with a server heartbeat, and recovery -- with a real
 authenticator, numbered steps, and a session-state banner that always
-names the acting principal. The headless profile verifies the
+always names who is acting. The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
 the other. To run the browser session:
 
@@ -161,16 +161,19 @@ needs the `webauthn` console verb first.
 
 ### Agents from the browser
 
-Steps 7-13 are authd's controller self-service, driven by the
-logged-in passkey session; the banner names the principal every action
-will run as, and controller-only steps disable under an agent session.
+Steps 7-14 are the agent surface. The page reserves "principal" for
+the human party agents act on behalf of (the API's routes and console
+verbs call the principal the agent's "controller"). Management (7-12)
+is authd's controller self-service, driven by the logged-in passkey
+session; the banner names who is acting, and principal-only steps
+disable under an agent session.
 Mint an agent (7): the response is the only time the token plaintext
 exists, and the page fills it into the agent-login field -- copy it
 now or lose it. List (8) shows each of your agents with its suspension
 state and delegated capabilities. Suspend/Resume (9/10) and
 Delegate/Undelegate (11/12) act on the uuid field (mint and list fill
 it). Delegate succeeds out of the box for `example:delegation-demo` --
-the provisioner granted it to your controller, and the bring-up
+the provisioner granted it to the principal, and the bring-up
 flagged it delegable. Any other capability shows the refusal an
 operator has not enabled; `example:inventory-admin` delegates only
 after the console runs the real verbs:
@@ -182,16 +185,20 @@ capability delegable example:inventory-admin on
 
 Agent login (13) trades the minted token for an agent session: the
 page's bearer session becomes the agent's, so an item create runs as
-the agent principal and lands in the audit trail under it -- and the
-admin wipe (6) stays 403 unless an operator ran the
+the agent and lands in the audit trail under the agent's identity
+string -- and the admin wipe (6) stays 403 unless an operator ran the
 `example:inventory-admin` verbs above and you delegated it to the
-logged-in agent. Passkey login (1b) switches the page back to the
-controller; suspending the agent then revokes its sessions and refuses
-its ceremony until resume.
+logged-in agent. The report (14) makes the delegation observable:
+gated by `example:delegation-demo` at the same `is_allowed`
+choke-point as the wipe, it answers 200 for the principal from
+registration, 403 for the agent until a delegation stands, 200 while
+it does, and 403 again after undelegate. Passkey login (1b) switches
+the page back to the principal; suspending the agent then revokes its
+sessions and refuses its ceremony until resume.
 
 The event streams open on their own: the audit stream (with the
 server's ten-second heartbeat tick) when the page loads, the agent
-stream with each controller session. The banner shows both, and the
+stream with each principal session. The banner shows both, and the
 heartbeat line in the log updates in place while you work -- suspend
 or delegate in another tab and watch the agent snapshot arrive. The
 agent stream carries the session token in its URL because EventSource
@@ -210,8 +217,8 @@ device's passkey to the SAME identity; the old passkey keeps working
 (two devices, one identity), and after a lost device, revocation is
 the operator plane's half. Recovery is also the human flow, and the
 page enforces it: kit minting disables under an agent session, and
-Recover refuses the agent uuid with the controller uuid to use
-instead. Mint recovery codes (14) while logged in as the controller:
+Recover refuses the agent uuid with the principal uuid to use
+instead. Mint recovery codes (15) while logged in as the principal:
 the response is the only time the plaintext exists, and the log
 prints the kit (uuid + codes) to save as one unit. To recover after
 losing the passkey (simulate by reloading the page, which drops the
@@ -220,7 +227,8 @@ fetches a
 recovery-purpose challenge, runs a fresh authenticator registration
 ceremony, and sends code and attestation in one request. The platform
 redeems the code and binds the new passkey atomically to the SAME
-identity -- the principal in the log matches the one you registered --
+identity -- the identity string in the log matches the one you
+registered --
 and the code is spent: a second recover with it refuses. The old
 passkey, if it still exists, keeps working; revoking it is the
 operator `identity revoke` verb.

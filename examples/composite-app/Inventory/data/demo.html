@@ -26,25 +26,32 @@
   <div class="who" id="who">Session: logged out</div>
   <div class="stream" id="stream">Streaming: connecting&hellip;</div>
   <div class="agentnote" id="agentnote" hidden>Agent session: steps
-  7-12 and 14 are controller-only &mdash; passkey login (1b) switches
-  back.</div>
+  7-12 and 15 need the principal's session &mdash; passkey login (1b)
+  switches back. Try the report (14) to see what delegation
+  changes.</div>
 </div>
 <div class="legend">
-  <b>Two principals.</b> Your passkey identity is the <b>human
-  controller</b>; step 7 mints <b>agents</b> it controls. The page holds
-  one session at a time; the banner above always says which principal is
-  acting, and buttons that need a different session disable themselves
-  and say why.<br>
+  <b>Principal and agents.</b> Your passkey identity is the
+  <b>principal</b> -- the party on whose behalf everything here runs;
+  step 7 mints <b>agents</b> it controls (the API's routes and console
+  verbs call the principal the agent's "controller"). The page holds
+  one session at a time; the banner above always says who is acting,
+  and buttons that need a different session disable themselves and say
+  why. One wire note: API responses name the ACTING identity's subject
+  string in a field called <code>principal</code> -- even for an
+  agent's actions; this page keeps "principal" for you, the party
+  agents act for.<br>
   <b>Two planes.</b> This page is the application plane; grants and
   delegable flags belong to the <b>operator console</b>. The demo deploy
   pre-provisions the only operator actions the walk needs (a delegable
-  demo capability, granted to your controller at registration); step 6
+  demo capability, granted to the principal at registration); step 6
   keeps one refusal alive on purpose so you see the boundary.<br>
   <b>The walk:</b> 1a register &rarr; 3 create &rarr; 5 audit &rarr;
-  6 wipe (403) &rarr; 7 mint &rarr; 8 list &rarr; 11 delegate &rarr;
-  13 agent login &rarr; 3 create as the agent &rarr; 1b switch back
-  &rarr; 9/10 suspend &amp; resume &rarr; 14 recovery kit &rarr;
-  1c recover.
+  6 wipe (403) &rarr; 14 report (200) &rarr; 7 mint &rarr; 8 list
+  &rarr; 13 agent login &rarr; 14 report (403) &rarr; 1b back &rarr;
+  11 delegate &rarr; 13 agent login &rarr; 14 report (200, delegated)
+  &rarr; 3 create as the agent &rarr; 1b back &rarr; 9/10 suspend
+  &amp; resume &rarr; 15 recovery kit &rarr; 1c recover.
   Streams are live the whole time; the heartbeat pinned under the log
   is the server pushing over SSE every 10 seconds.
 </div>
@@ -55,7 +62,7 @@ only in what you hold. Nothing yet: <b>1a</b> creates a NEW identity
 bound to this device's passkey (the demo grants it
 example:delegation-demo at registration). A passkey on this device:
 <b>1b</b> logs in -- also the way back from an agent session. A
-recovery kit (uuid + one code, provisioned at 14): <b>1c</b> enrolls a
+recovery kit (uuid + one code, provisioned at 15): <b>1c</b> enrolls a
 fresh passkey on THIS device and atomically binds it to your EXISTING
 identity, spending the code -- recovery never logs in with an old
 passkey. 1c serves the new-device case (the old passkey keeps working:
@@ -65,14 +72,14 @@ self-service revocation is not part of this demo's surface). The uuid
 is the demo's account handle -- the platform keys identity by uuid,
 the passkey sheet's demo@localhost label is decorative, and a real app
 would layer a verified handle-to-identity directory on top; this page
-remembers your last controller uuid in this browser and prefills the
+remembers your principal uuid in this browser and prefills the
 field.</p>
 <p>
   <button id="reg">1a. Register (create passkey)</button>
   <button id="login">1b. Login (assert passkey)</button>
 </p>
 <p>
-  <input id="rvuuid" placeholder="identity uuid" size="38">
+  <input id="rvuuid" placeholder="principal uuid" size="38">
   <input id="rvcode" placeholder="recovery code" size="22">
   <button id="recover">1c. Recover (new passkey)</button>
 </p>
@@ -86,7 +93,7 @@ the banner always names the acting principal.</p>
 
 <h2>Items and audit (any session; reads are public)</h2>
 <p class="note">3 mutates as WHOEVER is logged in -- watch the audit
-trail and the live stream attribute it to the controller or the agent.
+trail and the live stream attribute it to the principal or the agent.
 4 and 5 are public reads, no session needed. 6 is gated by
 example:inventory-admin, which nobody in this demo holds: expect 403
 from the capability check -- in production an operator grants it on the
@@ -101,17 +108,22 @@ console (identity grant &lt;uuid&gt; example:inventory-admin).</p>
   <button id="wipe">6. Admin wipe (expect 403)</button>
 </p>
 
-<h2>Agents and delegation (controller session only)</h2>
-<p class="note">7 mints an agent principal -- the response is the only
-time the token plaintext exists, and the page fills it into step 13's
-field. 8 lists your agents with suspension state and delegated
-capabilities. 9/10 suspend and resume the agent named in the uuid
-field (suspend also revokes its live sessions). 11 delegates the
-capability in the field to that agent: example:delegation-demo succeeds
-because the demo deploy granted it to your controller and flagged it
-delegable -- try example:inventory-admin to see the refusal an unheld,
-non-delegable capability gets. 12 withdraws the delegation. Watch step
-8 or the live agent stream reflect each change.</p>
+<h2>Agents and delegation (management needs the principal's session)</h2>
+<p class="note">7 mints an agent -- the response is the only time the
+token plaintext exists, and the page fills it into step 13's field. 8
+lists your agents with suspension state and delegated capabilities.
+9/10 suspend and resume the agent named in the uuid field (suspend
+also revokes its live sessions). 11 delegates the capability in the
+field to that agent: example:delegation-demo succeeds because the demo
+deploy granted it to you at registration and flagged it delegable --
+try example:inventory-admin to see the refusal an unheld,
+non-delegable capability gets. 12 withdraws the delegation. 13 trades
+the minted token for the AGENT's session. 14 makes the delegation
+observable: the report is gated by example:delegation-demo, so it
+answers 200 as the principal, 403 as the agent until 11 delegates,
+200 while the delegation stands, and 403 again after 12 -- while wipe
+(6) stays 403 for both, a power neither was granted. Watch step 8 or
+the live agent stream reflect each change.</p>
 <p>
   <button id="mint">7. Mint agent (token shown once)</button>
   <button id="agents">8. List my agents</button>
@@ -130,16 +142,19 @@ non-delegable capability gets. 12 withdraws the delegation. Watch step
   <input id="agenttoken" placeholder="agent token (from mint)" size="38">
   <button id="agentlogin">13. Agent login (the token is the proof)</button>
 </p>
+<p>
+  <button id="report">14. Fetch report (needs example:delegation-demo)</button>
+</p>
 
-<h2>Recovery kit (controller session only)</h2>
-<p class="note">14 provisions recovery codes for the CONTROLLER while
+<h2>Recovery kit (principal session only)</h2>
+<p class="note">15 provisions recovery codes for the PRINCIPAL while
 its session is live -- the response is the only time the plaintext
 exists, and the log prints the kit (uuid + codes) to save as one
 unit: it is exactly what 1c needs on a new device. The kit is the
-human flow's: 14 disables under an agent session, and passkey login
+principal's: 15 disables under an agent session, and passkey login
 (1b) is the way back.</p>
 <p>
-  <button id="mintcodes">14. Mint recovery codes</button>
+  <button id="mintcodes">15. Mint recovery codes</button>
 </p>
 <div id="log">ready.
 </div>
@@ -161,9 +176,9 @@ const b64u = {
   dec: str => Uint8Array.from(
     atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
 };
-let token = null, credId = null, principal = null;
+let token = null, credId = null, subject = null;
 let sessionKind = null;        // null | 'human' | 'agent'
-let controllerUuid = null;     // uuid of the last human session's identity
+let principalUuid = null;      // uuid of the last principal session
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
@@ -182,15 +197,15 @@ function updateUI() {
     who.textContent = 'Session: logged out';
     who.className = 'who out';
   } else if (sessionKind === 'agent') {
-    who.textContent = 'Session: AGENT ' + short(uuidOf(principal)) +
-      ' (controller: ' + short(controllerUuid) + ')';
+    who.textContent = 'Session: AGENT ' + short(uuidOf(subject)) +
+      ' (principal: ' + short(principalUuid) + ')';
     who.className = 'who agent';
   } else {
-    who.textContent = 'Session: HUMAN CONTROLLER ' +
-      short(uuidOf(principal));
+    who.textContent = 'Session: PRINCIPAL ' +
+      short(uuidOf(subject));
     who.className = 'who human';
   }
-  who.title = principal || 'no session';
+  who.title = subject || 'no session';
   const parts = [];
   parts.push(auditLive ? 'audit live' : 'audit connecting…');
   if (liveAgents) parts.push(agentsLive ? 'agents live' : 'agents connecting…');
@@ -206,37 +221,39 @@ function updateUI() {
   need('logout', !!token, 'no session to log out');
   need('create', !!token, 'login first (1a or 1b)');
   need('wipe', !!token, 'login first (1a or 1b) -- then expect the 403');
-  need('mint', human, 'controller session required -- passkey login (1b)');
-  need('agents', human, 'controller session required -- passkey login (1b)');
+  need('mint', human, 'principal session required -- passkey login (1b)');
+  need('agents', human, 'principal session required -- passkey login (1b)');
   const uuid = el('agentuuid').value.trim();
   need('suspend', human && uuid, human ?
     'agent uuid required (mint or list first)' :
-    'controller session required -- passkey login (1b)');
+    'principal session required -- passkey login (1b)');
   need('resume', human && uuid, human ?
     'agent uuid required (mint or list first)' :
-    'controller session required -- passkey login (1b)');
+    'principal session required -- passkey login (1b)');
   const cap = el('cap').value.trim();
   need('delegate', human && uuid && cap, human ?
     'agent uuid and capability required' :
-    'controller session required -- passkey login (1b)');
+    'principal session required -- passkey login (1b)');
   need('undelegate', human && uuid && cap, human ?
     'agent uuid and capability required' :
-    'controller session required -- passkey login (1b)');
+    'principal session required -- passkey login (1b)');
   need('agentlogin', el('agenttoken').value.trim() !== '',
     'agent token required (mint first)');
+  need('report', !!token,
+    'login first (1a or 1b) -- the answer depends on who is acting');
   need('mintcodes', human, sessionKind === 'agent' ?
-    'recovery is the human flow -- passkey login (1b) first' :
-    'controller session required -- passkey login (1b)');
+    'the kit is the principal\'s -- passkey login (1b) first' :
+    'principal session required -- passkey login (1b)');
   need('recover', el('rvuuid').value.trim() !== '' &&
     el('rvcode').value.trim() !== '',
-    'identity uuid and one recovery code required (14 provisions them)');
+    'principal uuid and one recovery code required (15 provisions them)');
 }
 ['agentuuid', 'cap', 'agenttoken', 'rvuuid', 'rvcode']
   .forEach(id => el(id).addEventListener('input', updateUI));
 
 /*
  * streams: the audit stream (with the server heartbeat) opens with the
- * page; the agent stream opens with each controller session
+ * page; the agent stream opens with each principal session
  */
 function openAuditStream() {
   if (liveAudit) liveAudit.close();
@@ -271,11 +288,11 @@ function closeAgentStream() {
   if (liveAgents) liveAgents.close();
   liveAgents = null; agentsLive = false;
 }
-function setSession(newToken, newPrincipal, kind) {
-  token = newToken; principal = newPrincipal; sessionKind = kind;
+function setSession(newToken, newSubject, kind) {
+  token = newToken; subject = newSubject; sessionKind = kind;
   if (kind === 'human') {
-    controllerUuid = uuidOf(newPrincipal);
-    try { localStorage.setItem('demo-controller-uuid', controllerUuid); }
+    principalUuid = uuidOf(newSubject);
+    try { localStorage.setItem('demo-principal-uuid', principalUuid); }
     catch (e) {}
   }
   openAgentStream();
@@ -314,15 +331,15 @@ el('reg').onclick = async () => {
       attestationObject: b64u.enc(cred.response.attestationObject),
     });
     if (res.status === 201) {
-      const prev = controllerUuid;
+      const prev = principalUuid;
       setSession(res.body.token, res.body.principal, 'human');
       log('REGISTER OK: ' + res.body.principal +
-          ' -- you are the human controller', 'ok');
+          ' -- you are the principal', 'ok');
       log('the demo deploy granted this identity ' +
           'example:delegation-demo at registration; step 11 will use it',
           'hint');
-      if (prev && prev !== controllerUuid) {
-        log('note: this page previously remembered controller ' +
+      if (prev && prev !== principalUuid) {
+        log('note: this page previously remembered principal ' +
             short(prev) + ' -- registering created a DIFFERENT identity ' +
             '(the 1a-vs-1c fork). The old identity still recovers with ' +
             'ITS uuid + code; the uuid field now prefills the new one.',
@@ -355,7 +372,7 @@ el('login').onclick = async () => {
       credId = b64u.enc(cred.rawId);
       setSession(res.body.token, res.body.principal, 'human');
       log('LOGIN OK: ' + res.body.principal +
-          ' -- controller session (back from any agent session)', 'ok');
+          ' -- principal session (back from any agent session)', 'ok');
     } else {
       log('LOGIN refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
@@ -458,22 +475,36 @@ el('agentlogin').onclick = async () => {
     lastAgentUuid = uuidOf(res.body.principal);
     log('AGENT LOGIN OK: ' + res.body.principal, 'ok');
     log('the page session is now the agent\'s: item create (3) runs ' +
-        'as the agent, controller-only steps 7-12 and the recovery ' +
-        'kit (14) disable, and passkey login (1b) switches back',
-        'hint');
+        'as the agent, principal-only steps 7-12 and the recovery ' +
+        'kit (15) disable, and passkey login (1b) switches back -- ' +
+        'try the report (14) to see what delegation changes', 'hint');
   } else {
     log('agent login refused: ' + res.status + ' ' +
         JSON.stringify(res.body), 'err');
   }
 };
 
+el('report').onclick = async () => {
+  const r = await fetch('/inventory/report', { headers: token ?
+    { 'Authorization': 'Bearer ' + token } : {} });
+  const body = await r.json().catch(() => ({}));
+  log('report (as ' + (sessionKind || 'nobody') + '): ' + r.status +
+      ' ' + JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
+  if (r.status === 403 && sessionKind === 'agent') {
+    log('the agent holds example:delegation-demo only while a ' +
+        'delegation stands: switch back (1b), delegate (11), agent ' +
+        'login (13) again, then retry -- and undelegate (12) takes ' +
+        'it away again', 'hint');
+  }
+};
+
 el('mintcodes').onclick = async () => {
   const res = await post('/auth/recovery-codes', { n: 2 }, true);
   if (res.status === 201) {
-    el('rvuuid').value = controllerUuid || '';
+    el('rvuuid').value = principalUuid || '';
     log('RECOVERY KIT -- save the uuid and codes TOGETHER; the codes ' +
         'exist only in this response, and recovery needs both:', 'ok');
-    log('  identity uuid: ' + (controllerUuid || '?'));
+    log('  principal uuid: ' + (principalUuid || '?'));
     res.body.codes.forEach((c, i) => log('  code ' + (i + 1) + ': ' + c));
     updateUI();
   } else {
@@ -488,8 +519,8 @@ el('recover').onclick = async () => {
     const code = el('rvcode').value.trim();
     if (lastAgentUuid && uuid === lastAgentUuid) {
       log('recover: that is the AGENT uuid -- recovery re-binds your ' +
-          'HUMAN identity (' + (controllerUuid || 'register first') +
-          '); use the controller uuid step 14 filled in', 'err');
+          'PRINCIPAL identity (' + (principalUuid || 'register first') +
+          '); use the principal uuid step 15 filled in', 'err');
       return;
     }
     log('recover: enrolling a REPLACEMENT passkey -- Safari will now ' +
@@ -529,23 +560,27 @@ el('recover').onclick = async () => {
 el('reset').onclick = () => {
   closeAgentStream();
   token = null; principal = null; sessionKind = null;
-  controllerUuid = null; lastAgentUuid = null; credId = null;
-  try { localStorage.removeItem('demo-controller-uuid'); } catch (e) {}
+  principalUuid = null; lastAgentUuid = null; credId = null;
+  try {
+    localStorage.removeItem('demo-principal-uuid');
+    localStorage.removeItem('demo-controller-uuid');
+  } catch (e) {}
   ['agentuuid', 'agenttoken', 'rvuuid', 'rvcode'].forEach(
     id => el(id).value = '');
   el('itemname').value = 'browser-widget';
   el('cap').value = 'example:delegation-demo';
   el('log').textContent = '';
   log('reset: page state cleared (server-side items, audit trail, and ' +
-      'identities persist -- register (1a) starts a fresh controller)');
+      'identities persist -- register (1a) starts a fresh principal)');
   updateUI();
 };
 
 try {
-  controllerUuid = localStorage.getItem('demo-controller-uuid') || null;
+  principalUuid = localStorage.getItem('demo-principal-uuid') ||
+    localStorage.getItem('demo-controller-uuid') || null;
 } catch (e) {}
-if (controllerUuid && !el('rvuuid').value) {
-  el('rvuuid').value = controllerUuid;
+if (principalUuid && !el('rvuuid').value) {
+  el('rvuuid').value = principalUuid;
 }
 openAuditStream();
 updateUI();
