@@ -49,10 +49,15 @@
 </div>
 
 <h2>Session (your passkey, the human controller)</h2>
-<p class="note">1 creates the controller identity and logs it in (the
-demo grants it example:delegation-demo at registration); 2 logs in with
-the existing passkey and is also how you switch back from an agent
-session; 3 revokes the current session, whoever it belongs to.</p>
+<p class="note"><b>Two ways in.</b> First time here: <b>1 Register</b>
+creates a NEW identity bound to this device's passkey (the demo grants
+it example:delegation-demo at registration). Existing identity on a
+new device: do NOT register again -- <a href="#recovery">jump to
+Recover (16)</a>, where your stored uuid and one recovery code bind
+this device's fresh passkey to the SAME identity. 2 logs in with a
+passkey this device already holds and is also how you switch back from
+an agent session; 3 revokes the current session, whoever it belongs
+to.</p>
 <p>
   <button id="reg">1. Register (create passkey)</button>
   <button id="login">2. Login (assert passkey)</button>
@@ -106,12 +111,17 @@ non-delegable capability gets. 13 withdraws the delegation. Watch step
   <button id="agentlogin">14. Agent login (the token is the proof)</button>
 </p>
 
-<h2>Recovery (human flow only)</h2>
+<h2 id="recovery">Recovery (human flow only)</h2>
 <p class="note">15 provisions recovery codes for the CONTROLLER while
 its session is live -- the response is the only time the plaintext
-exists; store them with the uuid the page fills in. 16 recovers after a
-lost passkey: it runs a fresh registration ceremony and atomically
-binds the new passkey to the SAME identity, spending the code. Both are
+exists; store them with the uuid the page fills in (they are the
+recovery kit a new device will need). 16 runs a fresh registration
+ceremony on THIS device and atomically binds the new passkey to the
+SAME identity, spending the code. Two scenarios it serves: a NEW
+DEVICE joining -- the old passkey keeps working, so two devices hold
+passkeys for one identity -- and a LOST device: bind here, then an
+operator revokes the old credential on the console (identity revoke);
+self-service revocation is not part of this demo's surface. Both are
 the human flow: 15 disables under an agent session, 16 always re-binds
 the CONTROLLER uuid, and passkey login (2) is the way back.</p>
 <p>

@@ -200,9 +200,16 @@ stay out of request logs.
 
 ### Recovery from the browser
 
-Recovery is the human flow, and the page enforces it: minting codes
-disables under an agent session, and Recover refuses the agent uuid
-with the controller uuid to use instead. Mint recovery codes (15)
+Recovery is the second way in, not just disaster repair, and the page
+presents the fork at the entry point: registering on a new device
+would create a fresh identity, so an existing identity's holder skips
+Register and uses Recover -- the stored uuid plus one code bind the
+new device's passkey to the SAME identity. The old passkey keeps
+working (two devices, one identity); after a lost device, revocation
+is the operator plane's half. Recovery is also the human flow, and
+the page enforces it: minting codes disables under an agent session,
+and Recover refuses the agent uuid with the controller uuid to use
+instead. Mint recovery codes (15)
 while logged in as the controller: the response is the only time the
 plaintext exists, and the page fills the uuid field -- store both,
 they are the recovery kit. To recover after losing the passkey
