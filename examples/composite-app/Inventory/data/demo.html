@@ -202,6 +202,7 @@ const b64u = {
 let token = null, credId = null, subject = null;
 let sessionKind = null;        // null | 'human' | 'agent'
 let principalUuid = null;      // uuid of the last principal session
+let expired = false;           // last session ended by TTL/revocation
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
@@ -217,7 +218,9 @@ const el = id => document.getElementById(id);
 function updateUI() {
   const who = el('who');
   if (!token) {
-    who.textContent = 'Session: logged out';
+    who.textContent = expired ?
+      'Session: EXPIRED -- passkey login (1b) to continue' :
+      'Session: logged out';
     who.className = 'who out';
   } else if (sessionKind === 'agent') {
     who.textContent = 'Session: AGENT ' + short(uuidOf(subject)) +
@@ -321,8 +324,22 @@ function closeAgentStream() {
   if (liveAgents) liveAgents.close();
   liveAgents = null; agentsLive = false;
 }
+/*
+ * a bearer request answering 401 while the page still holds a token
+ * means the platform's session died underneath us (TTL expiry, or
+ * revocation by suspension) -- guide instead of walling
+ */
+function sessionLost() {
+  setSession(null, null, null);
+  expired = true;
+  updateUI();
+  log('session expired or revoked -- platform sessions carry a TTL; ' +
+      'passkey login (1b) resumes as the principal', 'err');
+}
+
 function setSession(newToken, newSubject, kind) {
   token = newToken; subject = newSubject; sessionKind = kind;
+  if (newToken) expired = false;
   if (kind === 'human') {
     principalUuid = uuidOf(newSubject);
     try { localStorage.setItem('demo-principal-uuid', principalUuid); }
@@ -339,9 +356,13 @@ async function challenge() {
 }
 async function post(path, body, bearer) {
   const headers = { 'Content-Type': 'application/json' };
-  if (bearer && token) headers['Authorization'] = 'Bearer ' + token;
+  const hadToken = bearer && token;
+  if (hadToken) headers['Authorization'] = 'Bearer ' + token;
   const r = await fetch(path, { method: 'POST', headers,
                                 body: JSON.stringify(body) });
+  if (r.status === 401 && hadToken && path !== '/auth/logout') {
+    sessionLost();
+  }
   return { status: r.status, body: await r.json().catch(() => ({})) };
 }
 
@@ -438,6 +459,7 @@ el('update').onclick = async () => {
   const r = await fetch('/inventory/items/' + id, { method: 'PUT',
     headers, body: JSON.stringify({ name: el('itemname').value,
                                     qty: 2 }) });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   log('update item ' + id + ' (as ' + (sessionKind || 'nobody') + '): ' +
       r.status + ' ' + JSON.stringify(body),
@@ -462,6 +484,7 @@ el('audit').onclick = async () => {
 el('wipe').onclick = async () => {
   const r = await fetch('/inventory/items', { method: 'DELETE',
     headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   log('wipe: ' + r.status + ' ' + JSON.stringify(body),
       r.status === 403 ? 'ok' : 'err');
@@ -498,6 +521,7 @@ el('mint').onclick = async () => {
 el('agents').onclick = async () => {
   const r = await fetch('/auth/agents', { headers: token ?
     { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
     log('agents (' + body.agents.length + '):');
@@ -551,6 +575,7 @@ el('agentlogin').onclick = async () => {
 el('report').onclick = async () => {
   const r = await fetch('/inventory/report', { headers: token ?
     { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   log('report (as ' + (sessionKind || 'nobody') + '): ' + r.status +
       ' ' + JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
@@ -565,6 +590,7 @@ el('report').onclick = async () => {
 el('passkeys').onclick = async () => {
   const r = await fetch('/auth/passkeys', { headers: token ?
     { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
     log('passkeys (' + body.passkeys.length + '):');
@@ -658,6 +684,7 @@ el('reset').onclick = () => {
   closeAgentStream();
   token = null; principal = null; sessionKind = null;
   principalUuid = null; lastAgentUuid = null; credId = null;
+  expired = false;
   try {
     localStorage.removeItem('demo-principal-uuid');
     localStorage.removeItem('demo-controller-uuid');
