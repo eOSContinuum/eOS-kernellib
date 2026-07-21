@@ -63,6 +63,15 @@ DGD_BIN=/path/to/dgd/bin/dgd scripts/https-smoke.sh
 
 Native-TLS end-to-end, covering the binding and its certificate surface in nine phases. Deploys `examples/https-app` as the `WWW` domain and boots with a second binary port and the lpc-ext crypto module loaded but no certificate (the `LPC_EXT_CRYPTO` path is appended as a `modules` line to the generated config -- the checked-in `example.dgd` stays module-less). Phase 1 proves the bootstrap stood down honestly (`tls-cert` status, no HTTPS service); phase 2 generates a throwaway self-signed P-256 certificate under `src/usr/System/data/tls/` (removed after the run) and activates it with `tls-cert reload` -- registration without a restart; phases 3-7 drive the service probes (`GET /health`, negotiated TLS 1.3, `POST /echo` round-trip, 404 route, cleartext refusal); phases 8-9 take a console `snapshot` twice -- idle and with a live established TLS connection held open -- and scan the statedump for the private key in every in-memory representation (DER, PEM base64, raw scalar), with the port registry's `https` label as the scan's positive control. HTTP probes use `openssl s_client`, not curl -- the stock macOS curl's SecureTransport backend cannot speak TLS 1.3; console phases ride `drive-verbs.py` with an ephemeral verbset under `state/`. `HTTPS-SMOKE PASS` is the pass signal.
 
+## demo-composite.sh
+
+```sh
+LPC_EXT_CRYPTO=/path/to/lpc-ext/crypto.<ver> \
+DGD_BIN=/path/to/dgd/bin/dgd scripts/demo-composite.sh
+```
+
+One-command bring-up for the composite-app browser demo -- the executable form of that example README's browser-path recipe. Clean slate, deploy the interactive shape (the self-exiting test driver stripped, the demo-only System-tier provisioner staged), an mkcert certificate the browser genuinely trusts, boot with native TLS on the labeled https port, the two bring-up console verbs (compile the provisioner, flag `example:delegation-demo` delegable), and a TLS 1.3 probe of the page. Unlike the smokes, success deliberately leaves the instance RUNNING and prints the URL and driver pid -- `DEMO READY` is the signal, and the teardown commands are in the script header. Needs mkcert with its CA installed (`mkcert -install`, once per machine), python3, openssl, and the crypto module.
+
 ## session-smoke.sh
 
 ```sh

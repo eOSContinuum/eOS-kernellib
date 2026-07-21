@@ -117,7 +117,9 @@ streams with a server heartbeat, and recovery -- with a real
 authenticator, numbered steps, and a session-state banner that always
 always names who is acting. The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
-the other. To run the browser session:
+the other. `scripts/demo-composite.sh` packages this whole recipe --
+deploy, certificate, config, boot, and the bring-up console verbs --
+as one command and prints the URL; the manual steps it automates:
 
 ```sh
 # deploy both parts, plus the demo-only System-tier provisioner
