@@ -10,9 +10,11 @@
 #   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \
 #       scripts/verbsets/identity-lifecycle.verbset
 
-# status reports the module-less stand-down
+# status reports the module-less stand-down; no event observer is
+# subscribed on a base boot (the seam's consumers are example daemons)
 cmd: identity
 expect: identity: identities: 0
+expect: identity: observers: 0
 expect: crypto module: absent
 
 # minting refuses cleanly without the module
@@ -36,6 +38,13 @@ expect: Error: Access denied
 cmd: code "/usr/System/sys/identityd"->query_identity_count()
 expect: Error: Access denied
 
+# the event-subscription gate admits sys-tier daemons only; _code
+# compiles outside any sys/ directory, so the tier check refuses it
+# before the argument is even examined
+cmd: code "/usr/System/sys/identityd"->subscribe_events(nil)
+expect: Error: Access denied
+
 # the refusals left nothing behind
 cmd: identity
 expect: identity: identities: 0
+expect: identity: observers: 0

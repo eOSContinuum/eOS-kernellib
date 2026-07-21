@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (48 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (51 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -78,6 +78,16 @@
  *                                identity events
  *   SSE-AUTH-REFUSED OK          the agent stream refuses a bogus
  *                                session token
+ *   EVENT-SUSPENDED-DELIVERED OK the suspend delivered exactly its own
+ *                                event to a subscribed observer (this
+ *                                driver): suspended, the right agent,
+ *                                the one live session counted
+ *   EVENT-RESUMED-DELIVERED OK   the wire resume answered 200 AND its
+ *                                resumed event arrived, in either
+ *                                order
+ *   EVENT-REFUSED-SILENT OK      a refused delegation (aborted inside
+ *                                identityd) delivered nothing through
+ *                                the silence window
  *   RECOVERY-CODES OK            a live session provisions its own
  *                                recovery codes (plaintext once)
  *   RECOVER-BAD-CODE-REFUSED OK  a wrong code binds nothing
@@ -122,11 +132,12 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=48 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=51 for the full set.
  */
 
 # include <type.h>
 # include <kernel/kernel.h>
+# include <identityd.h>
 
 inherit "/usr/System/lib/auto";
 private inherit json "/lib/util/json";
@@ -175,27 +186,33 @@ private inherit hex "/lib/util/hex";
 # define P_SSE_AGENTS_OPEN	31
 # define P_SSE_AGENTS_PUSH	32
 # define P_SSE_BAD_TOKEN	33
-# define P_RV_CODES		34
-# define P_RV_BAD_CODE		35
-# define P_RV_PURPOSE		36
-# define P_RV_RECOVER		37
-# define P_RV_NEW_LOGIN		38
-# define P_PK_LIST		39
-# define P_PK_UNKNOWN		40
-# define P_PK_REVOKE		41
-# define P_PK_LIST_AFTER	42
-# define P_PK_LAST		43
-# define P_ENROLL_PURPOSE	44
-# define P_ENROLL		45
-# define P_ENROLL_LIST		46
-# define P_RV_REBIND		47
+# define P_EVT_SUSPENDED	34
+# define P_EVT_RESUME		35
+# define P_EVT_SILENT		36
+# define P_RV_CODES		37
+# define P_RV_BAD_CODE		38
+# define P_RV_PURPOSE		39
+# define P_RV_RECOVER		40
+# define P_RV_NEW_LOGIN		41
+# define P_PK_LIST		42
+# define P_PK_UNKNOWN		43
+# define P_PK_REVOKE		44
+# define P_PK_LIST_AFTER	45
+# define P_PK_LAST		46
+# define P_ENROLL_PURPOSE	47
+# define P_ENROLL		48
+# define P_ENROLL_LIST		49
+# define P_RV_REBIND		50
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	48
-# define P_PERSIST_SESSION	49
-# define P_PERSIST_OBSERVER	50
-# define P_PERSIST_HTTP		51	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	51
+# define P_PERSIST_SESSION	52
+# define P_PERSIST_OBSERVER	53
+# define P_PERSIST_HTTP		54	/* no-crypto restore probe */
 
 # define STREAM_DEADLINE	8	/* seconds an awaited event may take */
+# define SILENCE_WINDOW		2	/* seconds a refused mutation gets
+					   to leak an event before the
+					   silent verdict lands */
 
 private int phase;		/* current phase */
 private int cryptoMode;		/* ceremony surface available */
@@ -215,11 +232,18 @@ private object auditStream;	/* held-open audit event stream */
 private object agentStream;	/* held-open agent-state event stream */
 private string rvUuid;		/* first identity's bare uuid */
 private string rvCode;		/* a provisioned recovery code */
+private mixed *seamEvents;	/* identity events recorded while the
+				   suspend window is open */
+private int evtResp;		/* the wire resume answered 200 */
+private int evtResumed;		/* the resumed event arrived */
+private int silentResp;		/* the refused delegation answered 403 */
 
 private void log_line(string msg);
 static void start_phase();
 private void arm_deadline();
 private void drop_streams();
+private void judge_suspend_events();
+private void finish_evt_resume();
 
 
 static void create()
@@ -503,7 +527,14 @@ static void start_phase()
 	break;
 
     case P_SSE_AGENTS_PUSH:
-	/* a state change while the agent stream is open */
+	/* a state change while the agent stream is open. The driver
+	 * also subscribes itself to the substrate's events here (it is
+	 * a sys-tier daemon, so the subscription gate admits it): the
+	 * suspend's own event lands in identity_event below while the
+	 * pushed snapshot proves streamd's consumption of the same
+	 * mutation */
+	seamEvents = ({ });
+	IDENTITYD->subscribe_events(this_object());
 	http("POST", "/auth/agents/" + agentUuid + "/suspend",
 	     bearer(token1), nil);
 	arm_deadline();
@@ -511,6 +542,30 @@ static void start_phase()
 
     case P_SSE_BAD_TOKEN:
 	http("GET", "/auth/agents/stream?token=bogus", nil, nil);
+	break;
+
+    case P_EVT_SUSPENDED:
+	/* no wire action: judge the events the suspend delivered */
+	judge_suspend_events();
+	break;
+
+    case P_EVT_RESUME:
+	evtResp = evtResumed = FALSE;
+	http("POST", "/auth/agents/" + agentUuid + "/resume",
+	     bearer(token1), nil);
+	arm_deadline();
+	break;
+
+    case P_EVT_SILENT:
+	/* the delegation refusal aborts inside identityd (the session
+	 * identity does not hold the capability), so nothing may reach
+	 * a subscribed observer; the verdict lands when the silence
+	 * window closes */
+	silentResp = FALSE;
+	http("POST", "/auth/agents/" + agentUuid + "/delegate",
+	     bearer(token1),
+	     json::encode(([ "capability" : "example:inventory-admin" ])));
+	call_out("silence_pass", SILENCE_WINDOW, phase);
 	break;
 
     case P_RV_CODES:
@@ -1011,6 +1066,27 @@ void http_done(int code, string body)
 	advance();
 	break;
 
+    case P_EVT_RESUME:
+	/* the wire half; the phase completes in finish_evt_resume once
+	 * the resumed event has also arrived, in either order */
+	if (code != 200) {
+	    stop("EVENT-RESUMED: resume " + code + " " + body);
+	    return;
+	}
+	evtResp = TRUE;
+	finish_evt_resume();
+	break;
+
+    case P_EVT_SILENT:
+	/* the refusal's own response; the verdict waits for the
+	 * silence window */
+	if (code != 403) {
+	    stop("EVENT-REFUSED-SILENT: expected 403, got " + code);
+	    return;
+	}
+	silentResp = TRUE;
+	break;
+
     case P_RV_CODES:
 	parsed = jbody(body);
 	value = parsed["codes"];
@@ -1284,4 +1360,89 @@ void stream_fail(int errorcode)
     }
     stop("stream connect failed in phase " + phase +
 	 " (error " + errorcode + ")");
+}
+
+/*
+ * the identity substrate's mutation events, delivered to the driver
+ * as a subscribed sys-tier observer. Armed inside the atomic
+ * mutators, so only committed mutations reach here; events outside
+ * the phases below (the recovery and passkey arcs also mutate
+ * identity state, and there is no unsubscribe) are ignored.
+ */
+void identity_event(string event, mapping data)
+{
+    if (sscanf(previous_program(), "/usr/System/%*s") == 0) {
+	error("Access denied");
+    }
+    switch (phase) {
+    case P_SSE_AGENTS_PUSH:
+	seamEvents += ({ ({ event, data }) });
+	break;
+
+    case P_EVT_RESUME:
+	if (event == IDEV_RESUMED && data["uuid"] == agentUuid) {
+	    evtResumed = TRUE;
+	    finish_evt_resume();
+	}
+	break;
+
+    case P_EVT_SILENT:
+	stop("EVENT-REFUSED-SILENT: " + event + " leaked past the abort");
+	break;
+    }
+}
+
+/*
+ * the suspend window's verdict: the mutation delivered exactly its
+ * own event -- suspended, the right agent, the one live agent session
+ * counted -- and nothing else (no delegation stood, so no undelegated
+ * events accompany it)
+ */
+private void judge_suspend_events()
+{
+    mapping data;
+
+    if (sizeof(seamEvents) != 1 || seamEvents[0][0] != IDEV_SUSPENDED) {
+	stop("EVENT-SUSPENDED: expected the one suspended event, got " +
+	     (string) sizeof(seamEvents) + " event(s)" +
+	     ((sizeof(seamEvents) != 0) ? ", first " + seamEvents[0][0]
+					: ""));
+	return;
+    }
+    data = seamEvents[0][1];
+    if (data["uuid"] != agentUuid || data["revoked"] != 1) {
+	stop("EVENT-SUSPENDED: wrong data for agent " + agentUuid);
+	return;
+    }
+    pass("EVENT-SUSPENDED-DELIVERED");
+    advance();
+}
+
+/*
+ * the resume phase completes on BOTH signals -- the wire 200 and the
+ * delivered resumed event -- in whichever order the response bytes
+ * and the local delivery call_out land
+ */
+private void finish_evt_resume()
+{
+    if (evtResp && evtResumed) {
+	pass("EVENT-RESUMED-DELIVERED");
+	advance();
+    }
+}
+
+/*
+ * the silence window closed: with the refusal response in hand and no
+ * event recorded, the aborted mutation demonstrably delivered nothing
+ */
+static void silence_pass(int armedPhase)
+{
+    if (phase == armedPhase) {
+	if (!silentResp) {
+	    stop("EVENT-REFUSED-SILENT: no refusal response in the window");
+	    return;
+	}
+	pass("EVENT-REFUSED-SILENT");
+	advance();
+    }
 }

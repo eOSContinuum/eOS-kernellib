@@ -144,7 +144,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 3. Gate: parse the bearer token from the `Authorization` header and resolve it with `AUTHD->validate(token)` -- a principal string, or nil to refuse with 401. Pass the principal, not the token, into your domain daemons.
 4. For an admin-only route, gate in the daemon at the capability choke-point -- `CAPABILITYD->is_allowed(<capability>, principal)` -- and let the handler translate the refusal to 403 (the composite example's wipe route).
 
-**Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=48 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
+**Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=51 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
 
 **Owning doc**: `docs/composite-applications.md` Authenticating a wire request.
 

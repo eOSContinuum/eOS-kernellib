@@ -223,12 +223,15 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 48 sentinels with the
+multi-deploy profile form) and runs the driver: 51 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
 with examples/webauthn-app, the agent lifecycle -- mint, own-agents
 list, token ceremony, the ownership and delegability refusals, suspend
 and resume -- the event streams: open, observer-driven audit push,
-agent-state snapshot and change push, bad-token refusal -- and the
+agent-state snapshot and change push, bad-token refusal -- the
+identity mutation events: the suspend's event delivered to a
+subscribed observer with exact data, the resume's event paired with
+its wire response, a refused mutation delivering nothing -- and the
 recovery ceremony: self-provisioned codes, the bad-code and
 wrong-purpose and never-bare-re-bind refusals, atomic recover onto the
 same principal, login with the recovered passkey), 5 in the
