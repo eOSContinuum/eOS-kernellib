@@ -121,8 +121,13 @@ SAME identity, spending the code. Two scenarios it serves: a NEW
 DEVICE joining -- the old passkey keeps working, so two devices hold
 passkeys for one identity -- and a LOST device: bind here, then an
 operator revokes the old credential on the console (identity revoke);
-self-service revocation is not part of this demo's surface. Both are
-the human flow: 15 disables under an agent session, 16 always re-binds
+self-service revocation is not part of this demo's surface. The uuid
+is the demo's account handle: the platform keys identity by uuid (the
+demo@localhost label in the passkey sheet is decorative), and a real
+app would layer its own verified handle-to-identity directory on top,
+application-tier like the items store; this page remembers your last
+controller uuid in this browser and prefills the field. Both are the
+human flow: 15 disables under an agent session, 16 always re-binds
 the CONTROLLER uuid, and passkey login (2) is the way back.</p>
 <p>
   <button id="mintcodes">15. Mint recovery codes</button>
@@ -264,7 +269,11 @@ function closeAgentStream() {
 }
 function setSession(newToken, newPrincipal, kind) {
   token = newToken; principal = newPrincipal; sessionKind = kind;
-  if (kind === 'human') controllerUuid = uuidOf(newPrincipal);
+  if (kind === 'human') {
+    controllerUuid = uuidOf(newPrincipal);
+    try { localStorage.setItem('demo-controller-uuid', controllerUuid); }
+    catch (e) {}
+  }
   openAgentStream();
   updateUI();
 }
@@ -301,12 +310,20 @@ el('reg').onclick = async () => {
       attestationObject: b64u.enc(cred.response.attestationObject),
     });
     if (res.status === 201) {
+      const prev = controllerUuid;
       setSession(res.body.token, res.body.principal, 'human');
       log('REGISTER OK: ' + res.body.principal +
           ' -- you are the human controller', 'ok');
       log('the demo deploy granted this identity ' +
           'example:delegation-demo at registration; step 12 will use it',
           'hint');
+      if (prev && prev !== controllerUuid) {
+        log('note: this page previously remembered controller ' +
+            short(prev) + ' -- registering created a DIFFERENT identity ' +
+            '(the fork at the top of the session section). The old ' +
+            'identity still recovers with ITS uuid + code; the uuid ' +
+            'field now prefills the new one.', 'hint');
+      }
     } else {
       log('REGISTER refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
@@ -450,8 +467,9 @@ el('mintcodes').onclick = async () => {
   const res = await post('/auth/recovery-codes', { n: 2 }, true);
   if (res.status === 201) {
     el('rvuuid').value = controllerUuid || '';
-    log('RECOVERY CODES (this response is the only time the plaintext ' +
-        'exists -- store them with the uuid now):', 'ok');
+    log('RECOVERY KIT -- save the uuid and codes TOGETHER; the codes ' +
+        'exist only in this response, and recovery needs both:', 'ok');
+    log('  identity uuid: ' + (controllerUuid || '?'));
     res.body.codes.forEach((c, i) => log('  code ' + (i + 1) + ': ' + c));
     updateUI();
   } else {
@@ -470,6 +488,10 @@ el('recover').onclick = async () => {
           '); use the controller uuid step 15 filled in', 'err');
       return;
     }
+    log('recover: enrolling a REPLACEMENT passkey -- Safari will now ' +
+        'prompt to create one; the uuid names the identity, the code ' +
+        'proves the right, and the new key binds in the same atomic ' +
+        'step (recovery never logs in with an old passkey)', 'hint');
     const r = await fetch('/auth/recover-challenge');
     if (!r.ok) throw new Error('recover-challenge: HTTP ' + r.status);
     const ch = (await r.json()).challenge;
@@ -504,6 +526,7 @@ el('reset').onclick = () => {
   closeAgentStream();
   token = null; principal = null; sessionKind = null;
   controllerUuid = null; lastAgentUuid = null; credId = null;
+  try { localStorage.removeItem('demo-controller-uuid'); } catch (e) {}
   ['agentuuid', 'agenttoken', 'rvuuid', 'rvcode'].forEach(
     id => el(id).value = '');
   el('itemname').value = 'browser-widget';
@@ -514,6 +537,12 @@ el('reset').onclick = () => {
   updateUI();
 };
 
+try {
+  controllerUuid = localStorage.getItem('demo-controller-uuid') || null;
+} catch (e) {}
+if (controllerUuid && !el('rvuuid').value) {
+  el('rvuuid').value = controllerUuid;
+}
 openAuditStream();
 updateUI();
 </script>
