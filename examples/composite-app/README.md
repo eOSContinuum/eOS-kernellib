@@ -59,6 +59,8 @@ request becomes an authenticated principal -- is the companion doc
 | `POST /auth/recovery-codes` | bearer | provision own recovery codes (plaintext returned once) |
 | `GET /auth/passkeys` | bearer | the session identity's own passkeys (bookkeeping, no key material) |
 | `POST /auth/passkeys/<id>/revoke` | bearer | revoke one own passkey; the last one refuses |
+| `GET /auth/enroll-challenge` | bearer | enrollment-purpose challenge (the store tags purposes) |
+| `POST /auth/enroll` | bearer | bind an ADDITIONAL passkey to the session identity (the second-device path) |
 | `GET /auth/agents` | bearer | the controller's own-agents view |
 | `POST /auth/agents` | bearer | mint an agent; the response carries the token's only plaintext |
 | `POST /auth/agents/<uuid>/suspend` | bearer | suspend an own agent; revokes its live sessions |
@@ -242,9 +244,13 @@ redeems the code and binds the new passkey atomically to the SAME
 identity -- the identity string in the log matches the one you
 registered --
 and the code is spent: a second recover with it refuses. The old
-passkey keeps working until revoked -- which is now the walk's last
-step: list your passkeys (16, bookkeeping only, the current one
-marked) and revoke the lost device's (17). The facade refuses your
-last passkey, so a single-passkey identity answers 403 until 1c binds
-a second; the operator-plane `identity revoke` verb remains for
-records an operator manages.
+passkey keeps working until revoked -- which is now part of the
+walk's tail: list your passkeys (16, bookkeeping only, the current
+one marked), revoke the lost device's (17), and enroll a fresh one
+(18) -- add-passkey enrollment binds an ADDITIONAL passkey to the
+logged-in identity with no recovery code spent, which is how a
+second device joins routinely; recovery stays the loss path. The
+revoke facade refuses your last passkey, so a single-passkey
+identity answers 403 until enrollment (or a recovery) binds another;
+the operator-plane `identity revoke` verb remains for records an
+operator manages.

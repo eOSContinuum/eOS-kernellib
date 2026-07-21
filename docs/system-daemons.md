@@ -226,6 +226,10 @@ The recovery ceremony plus session mint: verifies the NEW passkey's registration
 
 Self-service recovery-code provisioning: a live identity session replaces its record's code set with `n` fresh codes and receives the plaintext -- the only time it exists. Without this entry a transport-registered identity would have no codes and no self-service recovery path.
 
+### `string enroll_passkey(string sessionToken, string challenge, string clientDataJSON, string attestationObject)`
+
+Add-passkey enrollment: a live session binds an ADDITIONAL passkey to its own record -- the second-device path, so routine device addition never rides the recovery ceremony. The registration payload is verified exactly as recovery's is (verify without a mint), then bound with the substrate's own rules doing the refusing (a globally-used credential id; a human row on an agent record). Returns the new credentialId; no session is minted -- enrollment adds a credential, not authentication.
+
 ### `mixed *query_passkeys(string sessionToken)` / `void revoke_passkey(string sessionToken, string credentialId)`
 
 Passkey self-service on the session's own record. The read returns one row per passkey credential, `({ credentialId, created, lastUsed })` -- bookkeeping, never key material. The revocation removes one of the record's own passkeys, refusing non-passkey rows (recovery codes rotate as a set above) and the record's last passkey, so a principal never revokes itself out of login; the substrate's never-zero guard backs it at the record level. Sessions are separate state and are untouched. The intended sequence for a lost device is recovery first (the replacement passkey binds via `recover_identity`), then revocation of the lost credential here.
