@@ -41,7 +41,7 @@ expect: identity: agents: 2
 
 # an agent cannot control agents, even from the operator face
 cmd: identity mint-agent %{agent} token
-expect: identity: an agent's controller must be a human identity
+expect: identity: an agent's principal must be a human identity
 
 cmd: identity mint-agent not-a-uuid token
 expect: identity: no such identity
@@ -95,4 +95,4 @@ cmd: identity grant %{stranger} platform.console
 expect: identity: granted platform.console
 
 cmd: identity delegate %{stranger} %{agent} platform.console
-expect: identity: no such agent of this controller
+expect: identity: no such agent of this principal

@@ -177,7 +177,7 @@ private void check_own_agent(string controllerUuid, string agentUuid)
 
     agent = IDENTITYD->find_identity(agentUuid);
     if (!agent || agent->query_controller() != controllerUuid) {
-	error("auth: no such agent of this controller");
+	error("auth: no such agent of this principal");
     }
 }
 

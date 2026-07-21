@@ -170,7 +170,7 @@ is authd's controller self-service, driven by the logged-in passkey
 session; the banner names who is acting, and principal-only steps
 disable under an agent session -- except mint (7), which stays
 enabled as the standing lesson: under an agent session it refuses
-("an agent's controller must be a human identity"), because
+("an agent's principal must be a human identity"), because
 delegation grants capabilities, never the principal's standing.
 Mint an agent (7): the response is the only time the token plaintext
 exists, and the page fills it into the agent-login field -- copy it
