@@ -288,6 +288,69 @@ string *rotate_recovery_codes(string sessionToken, int n)
 }
 
 /*
+ * the session identity's own passkeys, read-only: one row per passkey
+ * credential, ({ credentialId, created, lastUsed }). Derived from the
+ * live session, so a caller only ever sees its own; the rows carry
+ * bookkeeping, never key material.
+ */
+mixed *query_passkeys(string sessionToken)
+{
+    string *ids;
+    object identity;
+    mapping row;
+    mixed *rows;
+    int i;
+
+    identity = IDENTITYD->find_identity(session_identity(sessionToken));
+    ids = identity->query_credential_ids();
+    rows = ({ });
+    for (i = 0; i < sizeof(ids); i++) {
+	row = identity->query_credential(ids[i]);
+	if (row[CRED_TYPE] == CRED_TYPE_PASSKEY) {
+	    rows += ({ ({ ids[i], row[CRED_CREATED],
+			  row[CRED_LASTUSED] }) });
+	}
+    }
+    return rows;
+}
+
+/*
+ * self-service passkey revocation: a live session removes ONE of its
+ * own passkey credentials -- the lost or superseded device. Refuses
+ * non-passkey rows (recovery codes rotate as a set through
+ * rotate_recovery_codes) and the record's last passkey, so a
+ * principal never revokes itself out of login; the substrate's own
+ * never-zero guard backs this at the record level. Revocation removes
+ * the credential binding only -- live sessions are separate state and
+ * die by logout or expiry.
+ */
+void revoke_passkey(string sessionToken, string credentialId)
+{
+    string uuid, *ids;
+    object identity;
+    mapping row;
+    int i, passkeys;
+
+    uuid = session_identity(sessionToken);
+    identity = IDENTITYD->find_identity(uuid);
+    row = identity->query_credential(credentialId);
+    if (!row || row[CRED_TYPE] != CRED_TYPE_PASSKEY) {
+	error("auth: no such passkey on this identity");
+    }
+    ids = identity->query_credential_ids();
+    for (i = 0; i < sizeof(ids); i++) {
+	if (identity->query_credential(ids[i])[CRED_TYPE] ==
+						CRED_TYPE_PASSKEY) {
+	    passkeys++;
+	}
+    }
+    if (passkeys <= 1) {
+	error("auth: cannot revoke the last passkey");
+    }
+    IDENTITYD->unbind_credential(uuid, credentialId);
+}
+
+/*
  * the principal a live session token authenticates, or nil
  */
 string validate(string token)
