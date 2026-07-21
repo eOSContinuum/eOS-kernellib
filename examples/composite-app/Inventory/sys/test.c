@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (38 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (44 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -37,6 +37,8 @@
  *                                first's item
  *   ADMIN-REFUSED OK             platform-capability gate: wipe
  *                                refused without the operator grant
+ *   REPORT-REFUSED OK            the delegable-capability gate: the
+ *                                report refuses an unheld capability
  *   LOGOUT OK                    revoked session no longer validates
  *   AGENT-MINT OK                a live identity session mints an
  *                                agent; the response carries the
@@ -45,6 +47,9 @@
  *                                shows the new agent, active
  *   AGENT-LOGIN OK               the agent-token ceremony mints an
  *                                agent session
+ *   AGENT-STANDING-REFUSED OK    the agent's own session cannot mint
+ *                                agents: delegation grants
+ *                                capabilities, never standing
  *   AGENT-NOT-OWN-REFUSED OK     another identity cannot suspend it
  *   AGENT-DELEGATE-REFUSED OK    delegation refused when the atomic
  *                                substrate checks fail (capability
@@ -76,6 +81,16 @@
  *                                shot: atomic redeem-and-replace onto
  *                                the same principal, session minted
  *   LOGIN-AFTER-RECOVER OK       the recovered passkey asserts
+ *   PASSKEYS-LISTED OK           the session's own passkeys read back:
+ *                                both bound credentials, no key
+ *                                material
+ *   PASSKEY-UNKNOWN-REFUSED OK   revoking an unknown credential id
+ *                                refuses
+ *   PASSKEY-REVOKED OK           self-service revocation removes the
+ *                                original passkey; the list shows only
+ *                                the recovered one
+ *   LAST-PASSKEY-KEPT OK         the record's last passkey refuses
+ *                                revocation
  *   NEVER-BARE-REBIND OK         re-registering the bound credential
  *                                refuses (a fresh registration cannot
  *                                touch an existing record)
@@ -94,7 +109,7 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=38 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=44 for the full set.
  */
 
 # include <type.h>
@@ -128,33 +143,40 @@ private inherit hex "/lib/util/hex";
 # define P_SECOND_IDENTITY	12
 # define P_OWNER_ONLY		13
 # define P_ADMIN_REFUSED	14
-# define P_LOGOUT		15
-# define P_LOGOUT_PROBE		16
-# define P_AGENT_MINT		17
-# define P_AGENT_LIST		18
-# define P_AGENT_LOGIN		19
-# define P_AGENT_NOT_OWN	20
-# define P_AGENT_DELEGATE_REF	21
-# define P_AGENT_SUSPEND	22
-# define P_AGENT_SUSPENDED	23
-# define P_AGENT_RESUME		24
-# define P_AGENT_RELOGIN	25
-# define P_SSE_AUDIT_OPEN	26
-# define P_SSE_AUDIT_PUSH	27
-# define P_SSE_AGENTS_OPEN	28
-# define P_SSE_AGENTS_PUSH	29
-# define P_SSE_BAD_TOKEN	30
-# define P_RV_CODES		31
-# define P_RV_BAD_CODE		32
-# define P_RV_PURPOSE		33
-# define P_RV_RECOVER		34
-# define P_RV_NEW_LOGIN		35
-# define P_RV_REBIND		36
+# define P_REPORT_REFUSED	15
+# define P_LOGOUT		16
+# define P_LOGOUT_PROBE		17
+# define P_AGENT_MINT		18
+# define P_AGENT_LIST		19
+# define P_AGENT_LOGIN		20
+# define P_AGENT_STANDING	21
+# define P_AGENT_NOT_OWN	22
+# define P_AGENT_DELEGATE_REF	23
+# define P_AGENT_SUSPEND	24
+# define P_AGENT_SUSPENDED	25
+# define P_AGENT_RESUME		26
+# define P_AGENT_RELOGIN	27
+# define P_SSE_AUDIT_OPEN	28
+# define P_SSE_AUDIT_PUSH	29
+# define P_SSE_AGENTS_OPEN	30
+# define P_SSE_AGENTS_PUSH	31
+# define P_SSE_BAD_TOKEN	32
+# define P_RV_CODES		33
+# define P_RV_BAD_CODE		34
+# define P_RV_PURPOSE		35
+# define P_RV_RECOVER		36
+# define P_RV_NEW_LOGIN		37
+# define P_PK_LIST		38
+# define P_PK_UNKNOWN		39
+# define P_PK_REVOKE		40
+# define P_PK_LIST_AFTER	41
+# define P_PK_LAST		42
+# define P_RV_REBIND		43
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	37
-# define P_PERSIST_SESSION	38
-# define P_PERSIST_OBSERVER	39
-# define P_PERSIST_HTTP		40	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	44
+# define P_PERSIST_SESSION	45
+# define P_PERSIST_OBSERVER	46
+# define P_PERSIST_HTTP		47	/* no-crypto restore probe */
 
 # define STREAM_DEADLINE	8	/* seconds an awaited event may take */
 
@@ -171,6 +193,7 @@ private int itemId;		/* the created item */
 private int auditCount;		/* audit entries at dump time */
 private string agentUuid;	/* the minted agent */
 private string agentToken;	/* its mint-time token (plaintext) */
+private string agentSession;	/* the agent's own session (boot 1) */
 private object auditStream;	/* held-open audit event stream */
 private object agentStream;	/* held-open agent-state event stream */
 private string rvUuid;		/* first identity's bare uuid */
@@ -371,6 +394,13 @@ static void start_phase()
 	http("DELETE", "/inventory/items", bearer(token1), nil);
 	break;
 
+    case P_REPORT_REFUSED:
+	/* the delegable demo capability gates the report; nobody holds
+	 * it in a headless boot (grants are operator work, and the demo
+	 * provisioner is never part of a headless profile) */
+	http("GET", "/inventory/report", bearer(token1), nil);
+	break;
+
     case P_LOGOUT:
 	http("POST", "/auth/logout", bearer(token2), nil);
 	break;
@@ -393,6 +423,12 @@ static void start_phase()
     case P_AGENT_RELOGIN:
 	http("POST", "/auth/agent-login", nil,
 	     json::encode(([ "token" : agentToken ])));
+	break;
+
+    case P_AGENT_STANDING:
+	/* the agent's own session tries to mint an agent: delegation
+	 * grants capabilities, never the principal's standing */
+	http("POST", "/auth/agents", bearer(agentSession), nil);
 	break;
 
     case P_AGENT_NOT_OWN:
@@ -484,6 +520,29 @@ static void start_phase()
 	http("POST", "/auth/login", nil,
 	     login_body(WA_CH_A4, WA_ES2_CRED_ID_HEX, WA_A4_CDJ_HEX,
 			WA_A4_AD_HEX, WA_A4_SIG_HEX));
+	break;
+
+    case P_PK_LIST:
+    case P_PK_LIST_AFTER:
+	http("GET", "/auth/passkeys", bearer(token1), nil);
+	break;
+
+    case P_PK_UNKNOWN:
+	http("POST", "/auth/passkeys/no-such-id/revoke", bearer(token1),
+	     nil);
+	break;
+
+    case P_PK_REVOKE:
+	/* revoke the ORIGINAL passkey; the recovered one remains */
+	http("POST", "/auth/passkeys/" + wire(WA_ES_CRED_ID_HEX) +
+	     "/revoke", bearer(token1), nil);
+	break;
+
+    case P_PK_LAST:
+	/* the remaining passkey is the record's last: the facade
+	 * refuses to revoke a principal out of login */
+	http("POST", "/auth/passkeys/" + wire(WA_ES2_CRED_ID_HEX) +
+	     "/revoke", bearer(token1), nil);
 	break;
 
     case P_RV_REBIND:
@@ -739,6 +798,15 @@ void http_done(int code, string body)
 	advance();
 	break;
 
+    case P_REPORT_REFUSED:
+	if (code != 403) {
+	    stop("REPORT-REFUSED: expected 403, got " + code);
+	    return;
+	}
+	pass("REPORT-REFUSED");
+	advance();
+	break;
+
     case P_LOGOUT:
 	parsed = jbody(body);
 	if (code != 200 || parsed["revoked"] != 1) {
@@ -791,7 +859,17 @@ void http_done(int code, string body)
 	    stop("AGENT-LOGIN: " + code + " " + body);
 	    return;
 	}
+	agentSession = parsed["token"];
 	pass("AGENT-LOGIN");
+	advance();
+	break;
+
+    case P_AGENT_STANDING:
+	if (code != 403) {
+	    stop("AGENT-STANDING: expected 403, got " + code);
+	    return;
+	}
+	pass("AGENT-STANDING-REFUSED");
 	advance();
 	break;
 
@@ -929,6 +1007,59 @@ void http_done(int code, string body)
 	    return;
 	}
 	pass("LOGIN-AFTER-RECOVER");
+	advance();
+	break;
+
+    case P_PK_LIST:
+	parsed = jbody(body);
+	value = parsed["passkeys"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 2 ||
+	    (value[0]["id"] != wire(WA_ES_CRED_ID_HEX) &&
+	     value[1]["id"] != wire(WA_ES_CRED_ID_HEX))) {
+	    stop("PASSKEYS-LISTED: " + code + " " + body);
+	    return;
+	}
+	pass("PASSKEYS-LISTED");
+	advance();
+	break;
+
+    case P_PK_UNKNOWN:
+	if (code != 403) {
+	    stop("PASSKEY-UNKNOWN: expected 403, got " + code);
+	    return;
+	}
+	pass("PASSKEY-UNKNOWN-REFUSED");
+	advance();
+	break;
+
+    case P_PK_REVOKE:
+	if (code != 200) {
+	    stop("PASSKEY-REVOKED: revoke " + code + " " + body);
+	    return;
+	}
+	advance();	/* the sentinel lands after the list probe */
+	break;
+
+    case P_PK_LIST_AFTER:
+	parsed = jbody(body);
+	value = parsed["passkeys"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 1 ||
+	    value[0]["id"] != wire(WA_ES2_CRED_ID_HEX)) {
+	    stop("PASSKEY-REVOKED: list " + code + " " + body);
+	    return;
+	}
+	pass("PASSKEY-REVOKED");
+	advance();
+	break;
+
+    case P_PK_LAST:
+	if (code != 403) {
+	    stop("LAST-PASSKEY: expected 403, got " + code);
+	    return;
+	}
+	pass("LAST-PASSKEY-KEPT");
 	advance();
 	break;
 

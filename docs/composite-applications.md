@@ -219,7 +219,7 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 38 sentinels with the
+multi-deploy profile form) and runs the driver: 44 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
 with examples/webauthn-app, the agent lifecycle -- mint, own-agents
 list, token ceremony, the ownership and delegability refusals, suspend

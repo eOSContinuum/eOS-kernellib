@@ -92,17 +92,21 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=38 scripts/run-example.sh composite-app
+    EXPECTED_OK=44 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the thirty-six wire-level phases -- the agent lifecycle
-(mint, own-agents list, token ceremony, the not-own and not-delegable
-refusals, suspend-revokes-sessions, resume-restores-authentication),
-the event streams (open, observer-driven audit push, agent-state
-snapshot and change push, bad-token refusal), and the recovery
-ceremony (self-provisioned codes, the bad-code, wrong-purpose, and
+Boot 1 runs the forty-three wire-level phases -- the agent lifecycle
+(mint, own-agents list, token ceremony, the standing refusal on an
+agent session, the not-own and not-delegable refusals,
+suspend-revokes-sessions, resume-restores-authentication), the
+capability gates (the wipe's and the report's refusals), the event
+streams (open, observer-driven audit push, agent-state snapshot and
+change push, bad-token refusal), the recovery ceremony
+(self-provisioned codes, the bad-code, wrong-purpose, and
 never-bare-re-bind refusals, atomic recover, login with the recovered
-passkey) -- and dumps a snapshot; boot 2
+passkey), and passkey self-service (list, unknown-id refusal,
+revocation of the original passkey, the last-passkey guard) -- and
+dumps a snapshot; boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in
 `Inventory/sys/test.c` is the phase-by-phase map).
