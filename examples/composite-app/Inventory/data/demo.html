@@ -728,7 +728,7 @@ el('recover').onclick = async () => {
 
 el('reset').onclick = () => {
   closeAgentStream();
-  token = null; principal = null; sessionKind = null;
+  token = null; subject = null; sessionKind = null;
   principalUuid = null; lastAgentUuid = null; credId = null;
   expired = false;
   try {
