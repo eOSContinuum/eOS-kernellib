@@ -173,13 +173,17 @@ demonstrate the honest event shapes available today:
   space) inside the atomic property write, and the broker fans out as
   zero-delay call_outs -- so an aborted mutation rolls its pushes back
   and a stream never carries an event that did not commit.
-- `GET /auth/agents/stream?token=<session>` bridges a substrate
-  without notifications: the broker polls `authd->query_agents` per
-  subscriber at a short cadence and pushes a snapshot on change. If
-  the identity substrate ever grows mutation notifications, this poll
-  loop is the seam they replace. The token travels in the query string
-  because EventSource cannot set an Authorization header; the example
-  README states the tradeoff.
+- `GET /auth/agents/stream?token=<session>` is mutation-driven from
+  the identity substrate: the broker subscribes to identityd's
+  mutation events (`subscribe_events` / `identity_event`,
+  `docs/system-daemons.md`), and on any event that can change a
+  controller's own-agents view it recomputes each subscriber's
+  snapshot against `authd->query_agents` and pushes the ones that
+  changed. The events are armed inside the atomic mutators, so this
+  topic carries the same commit-or-nothing property as the audit
+  topic: an aborted mutation delivers nothing. The token travels in
+  the query string because EventSource cannot set an Authorization
+  header; the example README states the tradeoff.
 - `GET /inventory/events?heartbeat=1` opts the audit subscriber into
   the timer-driven shape: a tick every ten seconds from the broker's
   self-re-arming call_out, so a live page shows the runtime's
@@ -219,12 +223,15 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 38 sentinels with the
+multi-deploy profile form) and runs the driver: 51 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
 with examples/webauthn-app, the agent lifecycle -- mint, own-agents
 list, token ceremony, the ownership and delegability refusals, suspend
 and resume -- the event streams: open, observer-driven audit push,
-agent-state snapshot and change push, bad-token refusal -- and the
+agent-state snapshot and change push, bad-token refusal -- the
+identity mutation events: the suspend's event delivered to a
+subscribed observer with exact data, the resume's event paired with
+its wire response, a refused mutation delivering nothing -- and the
 recovery ceremony: self-provisioned codes, the bad-code and
 wrong-purpose and never-bare-re-bind refusals, atomic recover onto the
 same principal, login with the recovered passkey), 5 in the

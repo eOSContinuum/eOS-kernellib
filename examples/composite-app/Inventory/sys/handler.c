@@ -44,6 +44,12 @@
  *     /auth/passkeys/<id>/revoke (bearer) removes one -- the lost
  *     device's, after a recovery bound its replacement. The facade
  *     refuses the last passkey.
+ *   - /auth/enroll-challenge and /auth/enroll (both bearer) run
+ *     add-passkey enrollment: a live session plus a fresh
+ *     registration payload binds an ADDITIONAL passkey to the SAME
+ *     identity -- the second-device path, no recovery code spent.
+ *     Enroll challenges carry their own purpose tag in the
+ *     single-use store.
  *   - The event streams: GET /inventory/events (public, like the audit
  *     read) and GET /auth/agents/stream?token=<session> subscribe the
  *     connection with the SSE broker (sys/streamd) and return the
@@ -52,9 +58,9 @@
  *     tick events. The agent stream authenticates by token in the
  *     query string because EventSource cannot set an Authorization
  *     header; the token is validated here at subscribe time and
- *     re-validated by the broker's poll, and a production surface
- *     would prefer a cookie-bound session to keep tokens out of
- *     request logs.
+ *     re-validated at each of the broker's event-driven refreshes,
+ *     and a production surface would prefer a cookie-bound session to
+ *     keep tokens out of request logs.
  *
  * Wire format: JSON bodies; WebAuthn binary fields (clientDataJSON,
  * attestationObject, authenticatorData, signature) travel
@@ -396,6 +402,36 @@ private mixed *do_revoke_passkey(string credentialId, string authorization)
     return respond(200, "OK", ([ "revoked" : credentialId ]));
 }
 
+private mixed *do_enroll(string body, string authorization)
+{
+    mapping parsed;
+    mixed challenge;
+    string clientDataJSON, attestationObject, credentialId, err;
+
+    parsed = parse_body(body);
+    if (!parsed) {
+	return fail(400, "Bad Request", "malformed body");
+    }
+    challenge = parsed["challenge"];
+    clientDataJSON = raw_field(parsed, "clientDataJSON");
+    attestationObject = raw_field(parsed, "attestationObject");
+    if (typeof(challenge) != T_STRING || !clientDataJSON ||
+	!attestationObject) {
+	return fail(400, "Bad Request", "missing ceremony fields");
+    }
+    if (!consume_challenge(challenge, "enroll")) {
+	return fail(400, "Bad Request", "unknown or consumed challenge");
+    }
+    err = catch(credentialId = AUTHD->enroll_passkey(
+					bearer_token(authorization),
+					challenge, clientDataJSON,
+					attestationObject));
+    if (err != nil) {
+	return fail(403, "Forbidden", err);
+    }
+    return respond(201, "Created", ([ "enrolled" : credentialId ]));
+}
+
 /*
  * the event streams: subscribe the per-connection server clone (the
  * caller of handle()) with the broker, then hand the server the
@@ -679,6 +715,12 @@ mixed *handle(string method, string path, string body, string authorization)
     }
     if (method == "GET" && path == "/auth/passkeys") {
 	return do_list_passkeys(authorization);
+    }
+    if (method == "GET" && path == "/auth/enroll-challenge") {
+	return do_challenge("enroll");
+    }
+    if (method == "POST" && path == "/auth/enroll") {
+	return do_enroll(body, authorization);
     }
     if (method == "POST" &&
 	sscanf(path, "/auth/passkeys/%s/revoke", credentialId) != 0) {

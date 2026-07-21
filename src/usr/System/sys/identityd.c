@@ -33,6 +33,15 @@
  * The mutating and reading surface is System-tier (SYSTEM/KERNEL
  * callers); the operator face is the "identity" console verb,
  * dispatched by the kernel admin-console registry.
+ *
+ * Every committed mutation notifies subscribed observers: a sys-tier
+ * daemon registers via subscribe_events, and each atomic mutator arms
+ * one zero-delay call_out per observer delivering identity_event(event,
+ * data) -- armed inside the mutation, so an aborted mutation rolls its
+ * notifications back with everything else, and an observer failure
+ * never touches identity state. The event vocabulary is the IDEV_*
+ * set in identityd.h; per-login bookkeeping (update_sign_count,
+ * touch_credential) deliberately does not notify.
  */
 
 # include <kernel/kernel.h>
@@ -57,6 +66,7 @@ private mapping credentialIndex;	/* credential id : uuid */
 private mapping controllerIndex;	/* controller uuid : agent uuid set */
 private mapping grantSources;		/* uuid : capability : source set */
 private mapping delegations;		/* agent uuid : capability : grantor */
+private mapping observers;		/* event observer daemon : 1 */
 
 static void create()
 {
@@ -66,6 +76,7 @@ static void create()
     controllerIndex = ([ ]);
     grantSources = ([ ]);
     delegations = ([ ]);
+    observers = ([ ]);
     compile_object(OBJ_IDENTITY);
     sysLog("identity: registry up; crypto module " +
 # ifdef KF_SECURE_RANDOM
@@ -100,6 +111,59 @@ private object need_identity(string uuid)
 	error("identity: no such identity");
     }
     return identity;
+}
+
+
+/*
+ * the mutation-notification seam. Subscription is open to sys-tier
+ * daemons -- the WWW servers' push_event trust boundary, deliberately
+ * wider than the System-tier mutating surface: an observer receives
+ * uuid-tier bookkeeping, never credential material. A destructed
+ * observer drops from the object-keyed registry on its own; there is
+ * no explicit unsubscribe.
+ */
+void subscribe_events(object daemon)
+{
+    if (sscanf(previous_program(), "/usr/%*s/sys/%*s") == 0) {
+	error("Access denied");
+    }
+    if (!daemon) {
+	error("identity: subscription needs an observer");
+    }
+    if (!observers) {
+	observers = ([ ]);
+    }
+    observers[daemon] = 1;
+}
+
+/*
+ * arm one zero-delay call_out per observer, inside the running atomic
+ * mutation: an abort rolls the pending deliveries back with the state
+ */
+private void notify(string event, mapping data)
+{
+    object *daemons;
+    int i;
+
+    if (!observers) {
+	return;
+    }
+    daemons = map_indices(observers);
+    for (i = 0; i < sizeof(daemons); i++) {
+	call_out("deliver_event", 0, daemons[i], event, data);
+    }
+}
+
+/*
+ * one delivery, in its own execution round: catch-wrapped so a failing
+ * observer loses only its own event, and handed a copy so no observer
+ * sees another's mutations of the data
+ */
+static void deliver_event(object daemon, string event, mapping data)
+{
+    if (daemon) {
+	catch(daemon->identity_event(event, data + ([ ])));
+    }
 }
 
 
@@ -287,6 +351,7 @@ atomic string create_identity(string credentialId, mapping row)
     identity->configure(uuid);
     identities[uuid] = identity;
     bind_row(identity, uuid, credentialId, row);
+    notify(IDEV_CREATED, ([ "uuid" : uuid, "kind" : identity->query_kind() ]));
     return uuid;
 }
 
@@ -318,6 +383,7 @@ atomic mixed *mint_with_codes(int n)
 	bind_row(identity, uuid, code_id(hash), code_row(hash));
 	result[i + 1] = code;
     }
+    notify(IDEV_CREATED, ([ "uuid" : uuid, "kind" : identity->query_kind() ]));
     return result;
 }
 
@@ -329,6 +395,8 @@ atomic void bind_credential(string uuid, string credentialId, mapping row)
     check_system(previous_program());
     validate_row(credentialId, row);
     bind_row(need_identity(uuid), uuid, credentialId, row);
+    notify(IDEV_CRED_BOUND, ([ "uuid" : uuid, "credentialId" : credentialId,
+			       "type" : row[CRED_TYPE] ]));
 }
 
 /*
@@ -337,13 +405,18 @@ atomic void bind_credential(string uuid, string credentialId, mapping row)
 atomic void unbind_credential(string uuid, string credentialId)
 {
     object identity;
+    mapping row;
 
     check_system(previous_program());
     identity = need_identity(uuid);
     if (identity->query_credential_count() <= 1) {
 	error("identity: record cannot reach zero credentials");
     }
+    row = identity->query_credential(credentialId);
     unbind_row(identity, credentialId);
+    notify(IDEV_CRED_REMOVED, ([ "uuid" : uuid,
+				 "credentialId" : credentialId,
+				 "type" : row[CRED_TYPE] ]));
 }
 
 /*
@@ -355,12 +428,18 @@ atomic void rotate_credential(string uuid, string newId, mapping row,
 			      string oldId)
 {
     object identity;
+    mapping old;
 
     check_system(previous_program());
     validate_row(newId, row);
     identity = need_identity(uuid);
+    old = identity->query_credential(oldId);
     bind_row(identity, uuid, newId, row);
     unbind_row(identity, oldId);
+    notify(IDEV_CRED_BOUND, ([ "uuid" : uuid, "credentialId" : newId,
+			       "type" : row[CRED_TYPE] ]));
+    notify(IDEV_CRED_REMOVED, ([ "uuid" : uuid, "credentialId" : oldId,
+				 "type" : old[CRED_TYPE] ]));
 }
 
 /*
@@ -399,6 +478,7 @@ atomic string *rotate_recovery_codes(string uuid, int n)
     if (identity->query_credential_count() == 0) {
 	error("identity: record cannot reach zero credentials");
     }
+    notify(IDEV_CODES_ROTATED, ([ "uuid" : uuid, "count" : n ]));
     return codes;
 }
 
@@ -427,6 +507,8 @@ atomic int redeem_recovery_code(string uuid, string code)
 	      "pair redemption with a replacement");
     }
     unbind_row(identity, id);
+    notify(IDEV_CRED_REMOVED, ([ "uuid" : uuid, "credentialId" : id,
+				 "type" : CRED_TYPE_RECOVERY ]));
     return TRUE;
 }
 
@@ -453,6 +535,11 @@ atomic void redeem_and_replace(string uuid, string code, string newId,
     }
     bind_row(identity, uuid, newId, row);
     unbind_row(identity, id);
+    notify(IDEV_CRED_BOUND, ([ "uuid" : uuid, "credentialId" : newId,
+			       "type" : row[CRED_TYPE] ]));
+    notify(IDEV_CRED_REMOVED, ([ "uuid" : uuid, "credentialId" : id,
+				 "type" : CRED_TYPE_RECOVERY ]));
+    notify(IDEV_RECOVERED, ([ "uuid" : uuid ]));
 }
 
 /*
@@ -500,6 +587,8 @@ atomic string mint_agent(string controllerUuid, string credentialId,
     uuid = generate_uuid();
     identity = new_agent(controllerUuid, uuid);
     bind_row(identity, uuid, credentialId, row);
+    notify(IDEV_AGENT_MINTED, ([ "uuid" : uuid,
+				 "controller" : controllerUuid ]));
     return uuid;
 }
 
@@ -519,6 +608,8 @@ atomic string *mint_agent_with_token(string controllerUuid, varargs int ttl)
     hash = code_hash(token);
     bind_row(identity, uuid, token_id(hash),
 	     token_row(hash, token_expiry(ttl)));
+    notify(IDEV_AGENT_MINTED, ([ "uuid" : uuid,
+				 "controller" : controllerUuid ]));
     return ({ uuid, token });
 }
 
@@ -540,6 +631,9 @@ atomic string *bind_agent_token(string uuid, varargs int ttl)
     hash = code_hash(token);
     bind_row(identity, uuid, token_id(hash),
 	     token_row(hash, token_expiry(ttl)));
+    notify(IDEV_CRED_BOUND, ([ "uuid" : uuid,
+			       "credentialId" : token_id(hash),
+			       "type" : CRED_TYPE_AGENT_TOKEN ]));
     return ({ token_id(hash), token });
 }
 
@@ -555,7 +649,7 @@ atomic int suspend_agent(string uuid)
     object identity;
     mapping byAgent;
     string *held;
-    int i;
+    int i, sessions;
 
     check_system(previous_program());
     identity = need_identity(uuid);
@@ -567,20 +661,28 @@ atomic int suspend_agent(string uuid)
 		ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(held[i],
 							       identity->query_principal());
 	    }
+	    notify(IDEV_UNDELEGATED, ([ "agent" : uuid,
+					"controller" : byAgent[held[i]],
+					"capability" : held[i] ]));
 	}
 	delegations[uuid] = nil;
     }
-    return SESSIOND->revoke_principal(identity->query_principal());
+    sessions = SESSIOND->revoke_principal(identity->query_principal());
+    notify(IDEV_SUSPENDED, ([ "uuid" : uuid, "revoked" : sessions ]));
+    return sessions;
 }
 
 /*
  * resume restores the ability to authenticate only; anything revoked
- * at suspension is re-established deliberately, never automatically
+ * at suspension is re-established deliberately, never automatically.
+ * Atomic (unlike the plain flag write it wraps) so the resumed
+ * notification shares the mutation's commit like every other event.
  */
-void resume_agent(string uuid)
+atomic void resume_agent(string uuid)
 {
     check_system(previous_program());
     need_identity(uuid)->set_suspended(FALSE);
+    notify(IDEV_RESUMED, ([ "uuid" : uuid ]));
 }
 
 /*
@@ -742,6 +844,9 @@ private void revoke_delegations_from(string grantorUuid, string capability)
 		ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
 		    identities[agents[i]]->query_principal());
 	    }
+	    notify(IDEV_UNDELEGATED, ([ "agent" : agents[i],
+					"controller" : grantorUuid,
+					"capability" : capability ]));
 	}
     }
 }
@@ -758,6 +863,7 @@ atomic void grant_capability(string uuid, string capability)
     ADMIN_CONSOLE_REGISTRY->verb_grant_capability(capability,
 						  identity->query_principal());
     add_grant_source(uuid, capability, GRANT_SOURCE_OPERATOR);
+    notify(IDEV_GRANTED, ([ "uuid" : uuid, "capability" : capability ]));
 }
 
 /*
@@ -776,6 +882,7 @@ atomic void revoke_capability(string uuid, string capability)
 	ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
 						       identity->query_principal());
     }
+    notify(IDEV_REVOKED, ([ "uuid" : uuid, "capability" : capability ]));
 }
 
 /*
@@ -830,6 +937,9 @@ atomic void delegate_capability(string controllerUuid, string agentUuid,
     ADMIN_CONSOLE_REGISTRY->verb_grant_capability(capability,
 						  agent->query_principal());
     add_grant_source(agentUuid, capability, GRANT_SOURCE_DELEGATED);
+    notify(IDEV_DELEGATED, ([ "agent" : agentUuid,
+			      "controller" : controllerUuid,
+			      "capability" : capability ]));
 }
 
 /*
@@ -856,6 +966,9 @@ atomic void undelegate_capability(string controllerUuid, string agentUuid,
 	ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(capability,
 						       agent->query_principal());
     }
+    notify(IDEV_UNDELEGATED, ([ "agent" : agentUuid,
+				"controller" : controllerUuid,
+				"capability" : capability ]));
 }
 
 /*
@@ -881,6 +994,7 @@ atomic string *reconcile_delegations(string uuid)
     object identity, grantor;
     mapping byAgent;
     string *held, *revoked;
+    string grantorUuid;
     int i;
 
     check_system(previous_program());
@@ -891,7 +1005,8 @@ atomic string *reconcile_delegations(string uuid)
     }
     held = map_indices(byAgent);
     for (i = 0; i < sizeof(held); i++) {
-	grantor = identities[byAgent[held[i]]];
+	grantorUuid = byAgent[held[i]];
+	grantor = identities[grantorUuid];
 	if (!grantor ||
 	    !CAPABILITYD->is_allowed(held[i], grantor->query_principal())) {
 	    byAgent[held[i]] = nil;
@@ -899,6 +1014,9 @@ atomic string *reconcile_delegations(string uuid)
 		ADMIN_CONSOLE_REGISTRY->verb_revoke_capability(held[i],
 							       identity->query_principal());
 	    }
+	    notify(IDEV_UNDELEGATED, ([ "agent" : uuid,
+					"controller" : grantorUuid,
+					"capability" : held[i] ]));
 	    revoked += ({ held[i] });
 	}
     }
@@ -1047,6 +1165,8 @@ void cmd_identity(object user, string cmd, string str)
     if (sizeof(parts) == 0) {
 	_emit(user, "identity: identities: " +
 		    (string) map_sizeof(identities) + "\n" +
+		    "identity: observers: " +
+		    (string) (observers ? map_sizeof(observers) : 0) + "\n" +
 		    "identity: crypto module: " +
 # ifdef KF_SECURE_RANDOM
 		    "present"

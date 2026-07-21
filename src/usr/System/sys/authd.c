@@ -315,6 +315,31 @@ mixed *query_passkeys(string sessionToken)
 }
 
 /*
+ * add-passkey enrollment: a live session binds an ADDITIONAL passkey
+ * to its own record -- the second-device path, so routine device
+ * addition never rides the recovery ceremony. The registration
+ * payload is verified exactly as recovery's is (verify without a
+ * mint); the substrate's bind rules do the refusing (a
+ * globally-used credential id, or a human row on an agent record).
+ * No session is minted: enrollment adds a credential, not
+ * authentication.
+ */
+string enroll_passkey(string sessionToken, string challenge,
+		      string clientDataJSON, string attestationObject)
+{
+    string uuid, credentialId;
+    mapping row;
+
+    uuid = session_identity(sessionToken);
+    row = WEBAUTHND->verify_registration_payload(challenge, clientDataJSON,
+						 attestationObject);
+    credentialId = row["credentialId"];
+    row["credentialId"] = nil;
+    IDENTITYD->bind_credential(uuid, credentialId, row);
+    return credentialId;
+}
+
+/*
  * self-service passkey revocation: a live session removes ONE of its
  * own passkey credentials -- the lost or superseded device. Refuses
  * non-passkey rows (recovery codes rotate as a set through

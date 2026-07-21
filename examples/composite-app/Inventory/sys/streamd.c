@@ -11,15 +11,17 @@
  *     write rolls the call_out back with everything else, so a stream
  *     never carries an event for a mutation that did not commit.
  *
- *   - agents: poll-diff bridge. The identity substrate has no
- *     notification surface (no roadmap commitment names one), so this
- *     daemon polls authd->query_agents on each subscriber's session at
- *     a short cadence and pushes a snapshot event when the rows
- *     change. The first poll always differs from the empty state, so
- *     a fresh subscriber receives its snapshot within one interval. A
- *     session that stops validating closes the stream. If the
- *     substrate ever grows mutation notifications, this poll loop is
- *     the seam they replace.
+ *   - agents: seam-driven push. The identity substrate notifies its
+ *     subscribed observers from inside each atomic mutation
+ *     (identityd's subscribe_events; this daemon's identity_event),
+ *     with the same commit-or-nothing property as the audit topic:
+ *     an aborted mutation delivers nothing. On any event that can
+ *     change a controller's own-agents view, one coalesced zero-delay
+ *     sweep recomputes every subscriber's snapshot against authd and
+ *     pushes the ones that changed; the same sweep, armed at
+ *     subscribe time, delivers a fresh subscriber's first snapshot.
+ *     A session that stops validating closes the stream at the next
+ *     sweep.
  *
  *   - tick: server-pushed heartbeat. A call_out loop pushes a tick
  *     event (counter + server time) to every audit subscriber that
@@ -37,23 +39,24 @@
 
 # include <kernel/kernel.h>
 # include <type.h>
+# include <identityd.h>
 
 inherit "/usr/System/lib/auto";
 private inherit json "/lib/util/json";
 private inherit "/lib/util/lpc";	/* sysLog */
 
 private mixed *agent_rows(string sessionToken);
+private void arm_refresh();
 
 # define AUTHD		"/usr/System/sys/authd"
 # define MERRY_DAEMON	"/usr/Merry/sys/merry"
 
-# define POLL_INTERVAL	2	/* agent-topic poll cadence, seconds */
 # define TICK_INTERVAL	10	/* heartbeat cadence, seconds */
 
 private mapping auditStreams;	/* server clone : 1 */
 private mapping agentStreams;	/* server clone : ({ session, last }) */
 private mapping tickStreams;	/* server clone : 1 (heartbeat opt-ins) */
-private int pollArmed;		/* one poll call_out outstanding */
+private int refreshArmed;	/* one agent-refresh call_out outstanding */
 private int tickArmed;		/* one tick call_out outstanding */
 private int tickCount;		/* heartbeats pushed since boot */
 
@@ -66,6 +69,10 @@ static void create()
     /* Merry compiles after this domain (alphabetical initd order);
      * defer the script-space registration like the audit observer */
     call_out("register_space", 0);
+    /* the identity substrate (System tier) is up before any domain
+     * compiles: subscribe for the mutation events that drive the
+     * agents topic */
+    IDENTITYD->subscribe_events(this_object());
 }
 
 /*
@@ -175,24 +182,60 @@ void subscribe_agents(object server, string sessionToken)
 {
     check_domain();
     agentStreams[server] = ({ sessionToken, nil });
-    if (!pollArmed) {
-	pollArmed = TRUE;
-	call_out("poll_agents", POLL_INTERVAL);
+    arm_refresh();	/* the first snapshot rides the next sweep,
+			   after the streaming response headers go out */
+}
+
+/*
+ * the identity substrate's mutation events, delivered post-commit
+ * (identityd arms them inside the atomic mutators): on any event that
+ * can change a controller's own-agents view, refresh the agent
+ * subscribers. Everything else -- credential lifecycle, recovery,
+ * operator grants -- leaves the own-agents rows untouched and is
+ * ignored here.
+ */
+void identity_event(string event, mapping data)
+{
+    if (sscanf(previous_program(), "/usr/System/%*s") == 0) {
+	error("Access denied");
+    }
+    switch (event) {
+    case IDEV_AGENT_MINTED:
+    case IDEV_SUSPENDED:
+    case IDEV_RESUMED:
+    case IDEV_DELEGATED:
+    case IDEV_UNDELEGATED:
+	arm_refresh();
+	break;
     }
 }
 
 /*
- * one poll cycle: refresh every agent subscriber, push on change,
- * close streams whose session no longer validates
+ * coalesce refreshes: a compound mutation delivers several events in
+ * a burst, one sweep serves them all; per-subscriber diffing below
+ * keeps unaffected streams silent
  */
-static void poll_agents()
+private void arm_refresh()
+{
+    if (!refreshArmed && map_sizeof(agentStreams) != 0) {
+	refreshArmed = TRUE;
+	call_out("refresh_agents", 0);
+    }
+}
+
+/*
+ * one refresh sweep: recompute every agent subscriber's snapshot,
+ * push the changed ones, close streams whose session no longer
+ * validates
+ */
+static void refresh_agents()
 {
     object *servers;
     mixed *state, *rows;
     string snapshot, err;
     int i;
 
-    pollArmed = FALSE;
+    refreshArmed = FALSE;
     servers = map_indices(agentStreams);
     for (i = 0; i < sizeof(servers); i++) {
 	state = agentStreams[servers[i]];
@@ -210,15 +253,11 @@ static void poll_agents()
 	    catch(servers[i]->push_event("agents", snapshot));
 	}
     }
-    if (map_sizeof(agentStreams) != 0) {
-	pollArmed = TRUE;
-	call_out("poll_agents", POLL_INTERVAL);
-    }
 }
 
 /*
  * the subscriber's own-agents view, as JSON-shaped rows; errors out
- * of authd (dead session) propagate to the poll loop
+ * of authd (dead session) propagate to the sweep
  */
 private mixed *agent_rows(string sessionToken)
 {

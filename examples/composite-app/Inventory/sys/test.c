@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (38 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (51 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -37,6 +37,8 @@
  *                                first's item
  *   ADMIN-REFUSED OK             platform-capability gate: wipe
  *                                refused without the operator grant
+ *   REPORT-REFUSED OK            the delegable-capability gate: the
+ *                                report refuses an unheld capability
  *   LOGOUT OK                    revoked session no longer validates
  *   AGENT-MINT OK                a live identity session mints an
  *                                agent; the response carries the
@@ -45,6 +47,9 @@
  *                                shows the new agent, active
  *   AGENT-LOGIN OK               the agent-token ceremony mints an
  *                                agent session
+ *   AGENT-STANDING-REFUSED OK    the agent's own session cannot mint
+ *                                agents: delegation grants
+ *                                capabilities, never standing
  *   AGENT-NOT-OWN-REFUSED OK     another identity cannot suspend it
  *   AGENT-DELEGATE-REFUSED OK    delegation refused when the atomic
  *                                substrate checks fail (capability
@@ -56,17 +61,33 @@
  *   AGENT-RESUME OK              resume restores the ability to
  *                                authenticate: the ceremony works
  *                                again
+ *   ENROLL-AGENT-REFUSED OK      a live agent session presenting a
+ *                                valid enrollment payload refuses:
+ *                                human rows bind only to human
+ *                                records
  *   SSE-STREAM-OPEN OK           the audit event stream opens: 200,
  *                                chunked, held open past the response
  *   SSE-AUDIT-PUSH OK            a mutation's audit event reaches the
  *                                open stream, observer-driven
  *   SSE-AGENTS-SNAPSHOT OK       a fresh agent stream receives its
- *                                own-agents snapshot within one poll
+ *                                own-agents snapshot, pushed by the
+ *                                sweep armed at subscribe time
  *   SSE-AGENTS-PUSH OK           an agent-state change (suspend)
  *                                reaches the open stream as a new
- *                                snapshot
+ *                                snapshot, driven by the substrate's
+ *                                identity events
  *   SSE-AUTH-REFUSED OK          the agent stream refuses a bogus
  *                                session token
+ *   EVENT-SUSPENDED-DELIVERED OK the suspend delivered exactly its own
+ *                                event to a subscribed observer (this
+ *                                driver): suspended, the right agent,
+ *                                the one live session counted
+ *   EVENT-RESUMED-DELIVERED OK   the wire resume answered 200 AND its
+ *                                resumed event arrived, in either
+ *                                order
+ *   EVENT-REFUSED-SILENT OK      a refused delegation (aborted inside
+ *                                identityd) delivered nothing through
+ *                                the silence window
  *   RECOVERY-CODES OK            a live session provisions its own
  *                                recovery codes (plaintext once)
  *   RECOVER-BAD-CODE-REFUSED OK  a wrong code binds nothing
@@ -76,6 +97,23 @@
  *                                shot: atomic redeem-and-replace onto
  *                                the same principal, session minted
  *   LOGIN-AFTER-RECOVER OK       the recovered passkey asserts
+ *   PASSKEYS-LISTED OK           the session's own passkeys read back:
+ *                                both bound credentials, no key
+ *                                material
+ *   PASSKEY-UNKNOWN-REFUSED OK   revoking an unknown credential id
+ *                                refuses
+ *   PASSKEY-REVOKED OK           self-service revocation removes the
+ *                                original passkey; the list shows only
+ *                                the recovered one
+ *   LAST-PASSKEY-KEPT OK         the record's last passkey refuses
+ *                                revocation
+ *   ENROLL-PURPOSE-REFUSED OK    a webauthn-purpose challenge cannot
+ *                                be spent on enrollment
+ *   ENROLLED OK                  the principal's session binds an
+ *                                additional passkey (second-device
+ *                                path, no recovery code spent)
+ *   ENROLL-LISTED OK             the list shows both passkeys, the
+ *                                enrolled one present
  *   NEVER-BARE-REBIND OK         re-registering the bound credential
  *                                refuses (a fresh registration cannot
  *                                touch an existing record)
@@ -94,11 +132,12 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=38 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=51 for the full set.
  */
 
 # include <type.h>
 # include <kernel/kernel.h>
+# include <identityd.h>
 
 inherit "/usr/System/lib/auto";
 private inherit json "/lib/util/json";
@@ -128,35 +167,52 @@ private inherit hex "/lib/util/hex";
 # define P_SECOND_IDENTITY	12
 # define P_OWNER_ONLY		13
 # define P_ADMIN_REFUSED	14
-# define P_LOGOUT		15
-# define P_LOGOUT_PROBE		16
-# define P_AGENT_MINT		17
-# define P_AGENT_LIST		18
-# define P_AGENT_LOGIN		19
-# define P_AGENT_NOT_OWN	20
-# define P_AGENT_DELEGATE_REF	21
-# define P_AGENT_SUSPEND	22
-# define P_AGENT_SUSPENDED	23
-# define P_AGENT_RESUME		24
-# define P_AGENT_RELOGIN	25
-# define P_SSE_AUDIT_OPEN	26
-# define P_SSE_AUDIT_PUSH	27
-# define P_SSE_AGENTS_OPEN	28
-# define P_SSE_AGENTS_PUSH	29
-# define P_SSE_BAD_TOKEN	30
-# define P_RV_CODES		31
-# define P_RV_BAD_CODE		32
-# define P_RV_PURPOSE		33
-# define P_RV_RECOVER		34
-# define P_RV_NEW_LOGIN		35
-# define P_RV_REBIND		36
+# define P_REPORT_REFUSED	15
+# define P_LOGOUT		16
+# define P_LOGOUT_PROBE		17
+# define P_AGENT_MINT		18
+# define P_AGENT_LIST		19
+# define P_AGENT_LOGIN		20
+# define P_AGENT_STANDING	21
+# define P_AGENT_NOT_OWN	22
+# define P_AGENT_DELEGATE_REF	23
+# define P_AGENT_SUSPEND	24
+# define P_AGENT_SUSPENDED	25
+# define P_AGENT_RESUME		26
+# define P_AGENT_RELOGIN	27
+# define P_ENROLL_AGENT		28
+# define P_SSE_AUDIT_OPEN	29
+# define P_SSE_AUDIT_PUSH	30
+# define P_SSE_AGENTS_OPEN	31
+# define P_SSE_AGENTS_PUSH	32
+# define P_SSE_BAD_TOKEN	33
+# define P_EVT_SUSPENDED	34
+# define P_EVT_RESUME		35
+# define P_EVT_SILENT		36
+# define P_RV_CODES		37
+# define P_RV_BAD_CODE		38
+# define P_RV_PURPOSE		39
+# define P_RV_RECOVER		40
+# define P_RV_NEW_LOGIN		41
+# define P_PK_LIST		42
+# define P_PK_UNKNOWN		43
+# define P_PK_REVOKE		44
+# define P_PK_LIST_AFTER	45
+# define P_PK_LAST		46
+# define P_ENROLL_PURPOSE	47
+# define P_ENROLL		48
+# define P_ENROLL_LIST		49
+# define P_RV_REBIND		50
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	37
-# define P_PERSIST_SESSION	38
-# define P_PERSIST_OBSERVER	39
-# define P_PERSIST_HTTP		40	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	51
+# define P_PERSIST_SESSION	52
+# define P_PERSIST_OBSERVER	53
+# define P_PERSIST_HTTP		54	/* no-crypto restore probe */
 
 # define STREAM_DEADLINE	8	/* seconds an awaited event may take */
+# define SILENCE_WINDOW		2	/* seconds a refused mutation gets
+					   to leak an event before the
+					   silent verdict lands */
 
 private int phase;		/* current phase */
 private int cryptoMode;		/* ceremony surface available */
@@ -171,15 +227,23 @@ private int itemId;		/* the created item */
 private int auditCount;		/* audit entries at dump time */
 private string agentUuid;	/* the minted agent */
 private string agentToken;	/* its mint-time token (plaintext) */
+private string agentSession;	/* the agent's own session (boot 1) */
 private object auditStream;	/* held-open audit event stream */
 private object agentStream;	/* held-open agent-state event stream */
 private string rvUuid;		/* first identity's bare uuid */
 private string rvCode;		/* a provisioned recovery code */
+private mixed *seamEvents;	/* identity events recorded while the
+				   suspend window is open */
+private int evtResp;		/* the wire resume answered 200 */
+private int evtResumed;		/* the resumed event arrived */
+private int silentResp;		/* the refused delegation answered 403 */
 
 private void log_line(string msg);
 static void start_phase();
 private void arm_deadline();
 private void drop_streams();
+private void judge_suspend_events();
+private void finish_evt_resume();
 
 
 static void create()
@@ -371,6 +435,13 @@ static void start_phase()
 	http("DELETE", "/inventory/items", bearer(token1), nil);
 	break;
 
+    case P_REPORT_REFUSED:
+	/* the delegable demo capability gates the report; nobody holds
+	 * it in a headless boot (grants are operator work, and the demo
+	 * provisioner is never part of a headless profile) */
+	http("GET", "/inventory/report", bearer(token1), nil);
+	break;
+
     case P_LOGOUT:
 	http("POST", "/auth/logout", bearer(token2), nil);
 	break;
@@ -393,6 +464,12 @@ static void start_phase()
     case P_AGENT_RELOGIN:
 	http("POST", "/auth/agent-login", nil,
 	     json::encode(([ "token" : agentToken ])));
+	break;
+
+    case P_AGENT_STANDING:
+	/* the agent's own session tries to mint an agent: delegation
+	 * grants capabilities, never the principal's standing */
+	http("POST", "/auth/agents", bearer(agentSession), nil);
 	break;
 
     case P_AGENT_NOT_OWN:
@@ -419,6 +496,15 @@ static void start_phase()
 	     bearer(token1), nil);
 	break;
 
+    case P_ENROLL_AGENT:
+	/* a LIVE agent session presents a valid enrollment payload:
+	 * verification passes, the substrate's row-kind rule refuses
+	 * (human rows bind only to human records) */
+	HANDLER->arm_challenge(WA_CH_REG4, "enroll");
+	http("POST", "/auth/enroll", bearer(agentSession),
+	     register_body(WA_CH_REG4, WA_REG4_CDJ_HEX, WA_REG4_AO_HEX));
+	break;
+
     case P_SSE_AUDIT_OPEN:
 	auditStream = clone_object(STREAM_CLIENT);
 	auditStream->open(this_object(), "/inventory/events");
@@ -441,7 +527,14 @@ static void start_phase()
 	break;
 
     case P_SSE_AGENTS_PUSH:
-	/* a state change while the agent stream is open */
+	/* a state change while the agent stream is open. The driver
+	 * also subscribes itself to the substrate's events here (it is
+	 * a sys-tier daemon, so the subscription gate admits it): the
+	 * suspend's own event lands in identity_event below while the
+	 * pushed snapshot proves streamd's consumption of the same
+	 * mutation */
+	seamEvents = ({ });
+	IDENTITYD->subscribe_events(this_object());
 	http("POST", "/auth/agents/" + agentUuid + "/suspend",
 	     bearer(token1), nil);
 	arm_deadline();
@@ -449,6 +542,30 @@ static void start_phase()
 
     case P_SSE_BAD_TOKEN:
 	http("GET", "/auth/agents/stream?token=bogus", nil, nil);
+	break;
+
+    case P_EVT_SUSPENDED:
+	/* no wire action: judge the events the suspend delivered */
+	judge_suspend_events();
+	break;
+
+    case P_EVT_RESUME:
+	evtResp = evtResumed = FALSE;
+	http("POST", "/auth/agents/" + agentUuid + "/resume",
+	     bearer(token1), nil);
+	arm_deadline();
+	break;
+
+    case P_EVT_SILENT:
+	/* the delegation refusal aborts inside identityd (the session
+	 * identity does not hold the capability), so nothing may reach
+	 * a subscribed observer; the verdict lands when the silence
+	 * window closes */
+	silentResp = FALSE;
+	http("POST", "/auth/agents/" + agentUuid + "/delegate",
+	     bearer(token1),
+	     json::encode(([ "capability" : "example:inventory-admin" ])));
+	call_out("silence_pass", SILENCE_WINDOW, phase);
 	break;
 
     case P_RV_CODES:
@@ -484,6 +601,48 @@ static void start_phase()
 	http("POST", "/auth/login", nil,
 	     login_body(WA_CH_A4, WA_ES2_CRED_ID_HEX, WA_A4_CDJ_HEX,
 			WA_A4_AD_HEX, WA_A4_SIG_HEX));
+	break;
+
+    case P_PK_LIST:
+    case P_PK_LIST_AFTER:
+	http("GET", "/auth/passkeys", bearer(token1), nil);
+	break;
+
+    case P_PK_UNKNOWN:
+	http("POST", "/auth/passkeys/no-such-id/revoke", bearer(token1),
+	     nil);
+	break;
+
+    case P_PK_REVOKE:
+	/* revoke the ORIGINAL passkey; the recovered one remains */
+	http("POST", "/auth/passkeys/" + wire(WA_ES_CRED_ID_HEX) +
+	     "/revoke", bearer(token1), nil);
+	break;
+
+    case P_PK_LAST:
+	/* the remaining passkey is the record's last: the facade
+	 * refuses to revoke a principal out of login */
+	http("POST", "/auth/passkeys/" + wire(WA_ES2_CRED_ID_HEX) +
+	     "/revoke", bearer(token1), nil);
+	break;
+
+    case P_ENROLL_PURPOSE:
+	/* a webauthn-purpose challenge cannot be spent on enrollment */
+	HANDLER->arm_challenge(WA_CH_REG4, "webauthn");
+	http("POST", "/auth/enroll", bearer(token1),
+	     register_body(WA_CH_REG4, WA_REG4_CDJ_HEX, WA_REG4_AO_HEX));
+	break;
+
+    case P_ENROLL:
+	/* the principal's live session binds an ADDITIONAL passkey --
+	 * the second-device path, no recovery code spent */
+	HANDLER->arm_challenge(WA_CH_REG4, "enroll");
+	http("POST", "/auth/enroll", bearer(token1),
+	     register_body(WA_CH_REG4, WA_REG4_CDJ_HEX, WA_REG4_AO_HEX));
+	break;
+
+    case P_ENROLL_LIST:
+	http("GET", "/auth/passkeys", bearer(token1), nil);
 	break;
 
     case P_RV_REBIND:
@@ -739,6 +898,15 @@ void http_done(int code, string body)
 	advance();
 	break;
 
+    case P_REPORT_REFUSED:
+	if (code != 403) {
+	    stop("REPORT-REFUSED: expected 403, got " + code);
+	    return;
+	}
+	pass("REPORT-REFUSED");
+	advance();
+	break;
+
     case P_LOGOUT:
 	parsed = jbody(body);
 	if (code != 200 || parsed["revoked"] != 1) {
@@ -791,7 +959,17 @@ void http_done(int code, string body)
 	    stop("AGENT-LOGIN: " + code + " " + body);
 	    return;
 	}
+	agentSession = parsed["token"];
 	pass("AGENT-LOGIN");
+	advance();
+	break;
+
+    case P_AGENT_STANDING:
+	if (code != 403) {
+	    stop("AGENT-STANDING: expected 403, got " + code);
+	    return;
+	}
+	pass("AGENT-STANDING-REFUSED");
 	advance();
 	break;
 
@@ -847,7 +1025,19 @@ void http_done(int code, string body)
 	    stop("AGENT-RESUME: relogin " + code + " " + body);
 	    return;
 	}
+	agentSession = parsed["token"];
 	pass("AGENT-RESUME");
+	advance();
+	break;
+
+    case P_ENROLL_AGENT:
+	parsed = jbody(body);
+	if (code != 403 || parsed["error"] !=
+			   "identity: human credential on an agent record") {
+	    stop("ENROLL-AGENT: " + code + " " + body);
+	    return;
+	}
+	pass("ENROLL-AGENT-REFUSED");
 	advance();
 	break;
 
@@ -874,6 +1064,27 @@ void http_done(int code, string body)
 	}
 	pass("SSE-AUTH-REFUSED");
 	advance();
+	break;
+
+    case P_EVT_RESUME:
+	/* the wire half; the phase completes in finish_evt_resume once
+	 * the resumed event has also arrived, in either order */
+	if (code != 200) {
+	    stop("EVENT-RESUMED: resume " + code + " " + body);
+	    return;
+	}
+	evtResp = TRUE;
+	finish_evt_resume();
+	break;
+
+    case P_EVT_SILENT:
+	/* the refusal's own response; the verdict waits for the
+	 * silence window */
+	if (code != 403) {
+	    stop("EVENT-REFUSED-SILENT: expected 403, got " + code);
+	    return;
+	}
+	silentResp = TRUE;
 	break;
 
     case P_RV_CODES:
@@ -929,6 +1140,93 @@ void http_done(int code, string body)
 	    return;
 	}
 	pass("LOGIN-AFTER-RECOVER");
+	advance();
+	break;
+
+    case P_PK_LIST:
+	parsed = jbody(body);
+	value = parsed["passkeys"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 2 ||
+	    (value[0]["id"] != wire(WA_ES_CRED_ID_HEX) &&
+	     value[1]["id"] != wire(WA_ES_CRED_ID_HEX))) {
+	    stop("PASSKEYS-LISTED: " + code + " " + body);
+	    return;
+	}
+	pass("PASSKEYS-LISTED");
+	advance();
+	break;
+
+    case P_PK_UNKNOWN:
+	if (code != 403) {
+	    stop("PASSKEY-UNKNOWN: expected 403, got " + code);
+	    return;
+	}
+	pass("PASSKEY-UNKNOWN-REFUSED");
+	advance();
+	break;
+
+    case P_PK_REVOKE:
+	if (code != 200) {
+	    stop("PASSKEY-REVOKED: revoke " + code + " " + body);
+	    return;
+	}
+	advance();	/* the sentinel lands after the list probe */
+	break;
+
+    case P_PK_LIST_AFTER:
+	parsed = jbody(body);
+	value = parsed["passkeys"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 1 ||
+	    value[0]["id"] != wire(WA_ES2_CRED_ID_HEX)) {
+	    stop("PASSKEY-REVOKED: list " + code + " " + body);
+	    return;
+	}
+	pass("PASSKEY-REVOKED");
+	advance();
+	break;
+
+    case P_PK_LAST:
+	if (code != 403) {
+	    stop("LAST-PASSKEY: expected 403, got " + code);
+	    return;
+	}
+	pass("LAST-PASSKEY-KEPT");
+	advance();
+	break;
+
+    case P_ENROLL_PURPOSE:
+	if (code != 400) {
+	    stop("ENROLL-PURPOSE: expected 400, got " + code);
+	    return;
+	}
+	pass("ENROLL-PURPOSE-REFUSED");
+	advance();
+	break;
+
+    case P_ENROLL:
+	parsed = jbody(body);
+	if (code != 201 ||
+	    parsed["enrolled"] != wire(WA_ES3_CRED_ID_HEX)) {
+	    stop("ENROLLED: " + code + " " + body);
+	    return;
+	}
+	pass("ENROLLED");
+	advance();
+	break;
+
+    case P_ENROLL_LIST:
+	parsed = jbody(body);
+	value = parsed["passkeys"];
+	if (code != 200 || typeof(value) != T_ARRAY ||
+	    sizeof(value) != 2 ||
+	    (value[0]["id"] != wire(WA_ES3_CRED_ID_HEX) &&
+	     value[1]["id"] != wire(WA_ES3_CRED_ID_HEX))) {
+	    stop("ENROLL-LISTED: " + code + " " + body);
+	    return;
+	}
+	pass("ENROLL-LISTED");
 	advance();
 	break;
 
@@ -1062,4 +1360,89 @@ void stream_fail(int errorcode)
     }
     stop("stream connect failed in phase " + phase +
 	 " (error " + errorcode + ")");
+}
+
+/*
+ * the identity substrate's mutation events, delivered to the driver
+ * as a subscribed sys-tier observer. Armed inside the atomic
+ * mutators, so only committed mutations reach here; events outside
+ * the phases below (the recovery and passkey arcs also mutate
+ * identity state, and there is no unsubscribe) are ignored.
+ */
+void identity_event(string event, mapping data)
+{
+    if (sscanf(previous_program(), "/usr/System/%*s") == 0) {
+	error("Access denied");
+    }
+    switch (phase) {
+    case P_SSE_AGENTS_PUSH:
+	seamEvents += ({ ({ event, data }) });
+	break;
+
+    case P_EVT_RESUME:
+	if (event == IDEV_RESUMED && data["uuid"] == agentUuid) {
+	    evtResumed = TRUE;
+	    finish_evt_resume();
+	}
+	break;
+
+    case P_EVT_SILENT:
+	stop("EVENT-REFUSED-SILENT: " + event + " leaked past the abort");
+	break;
+    }
+}
+
+/*
+ * the suspend window's verdict: the mutation delivered exactly its
+ * own event -- suspended, the right agent, the one live agent session
+ * counted -- and nothing else (no delegation stood, so no undelegated
+ * events accompany it)
+ */
+private void judge_suspend_events()
+{
+    mapping data;
+
+    if (sizeof(seamEvents) != 1 || seamEvents[0][0] != IDEV_SUSPENDED) {
+	stop("EVENT-SUSPENDED: expected the one suspended event, got " +
+	     (string) sizeof(seamEvents) + " event(s)" +
+	     ((sizeof(seamEvents) != 0) ? ", first " + seamEvents[0][0]
+					: ""));
+	return;
+    }
+    data = seamEvents[0][1];
+    if (data["uuid"] != agentUuid || data["revoked"] != 1) {
+	stop("EVENT-SUSPENDED: wrong data for agent " + agentUuid);
+	return;
+    }
+    pass("EVENT-SUSPENDED-DELIVERED");
+    advance();
+}
+
+/*
+ * the resume phase completes on BOTH signals -- the wire 200 and the
+ * delivered resumed event -- in whichever order the response bytes
+ * and the local delivery call_out land
+ */
+private void finish_evt_resume()
+{
+    if (evtResp && evtResumed) {
+	pass("EVENT-RESUMED-DELIVERED");
+	advance();
+    }
+}
+
+/*
+ * the silence window closed: with the refusal response in hand and no
+ * event recorded, the aborted mutation demonstrably delivered nothing
+ */
+static void silence_pass(int armedPhase)
+{
+    if (phase == armedPhase) {
+	if (!silentResp) {
+	    stop("EVENT-REFUSED-SILENT: no refusal response in the window");
+	    return;
+	}
+	pass("EVENT-REFUSED-SILENT");
+	advance();
+    }
 }

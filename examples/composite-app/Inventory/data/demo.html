@@ -26,7 +26,7 @@
   <div class="who" id="who">Session: logged out</div>
   <div class="stream" id="stream">Streaming: connecting&hellip;</div>
   <div class="agentnote" id="agentnote" hidden>Agent session: steps
-  8-12 and 15-17 need the principal's session &mdash; passkey login
+  8-12 and 15-18 need the principal's session &mdash; passkey login
   (1b) switches back. Try mint (7) and the report (14) to see what an
   agent can and cannot do.</div>
 </div>
@@ -53,7 +53,9 @@
   &rarr; 14 report (200, delegated) &rarr; 3a create as the agent
   &rarr; 3b update the principal's item (403) &rarr; 1b back &rarr;
   9/10 suspend &amp; resume &rarr; 15 recovery kit &rarr; 1c recover
-  &rarr; 16 list passkeys &rarr; 17 revoke the old one.
+  &rarr; 16 list passkeys &rarr; 17 revoke the old one &rarr; 18
+  enroll a fresh one &rarr; 16 list again (two, no recovery code
+  spent).
   Streams are live the whole time; the heartbeat pinned under the log
   is the server pushing over SSE every 10 seconds.
 </div>
@@ -168,9 +170,12 @@ material; the one this browser holds is marked) and fills the field
 with the oldest OTHER one -- after a 1c recovery, that is the lost
 device's. 17 revokes the passkey in the field: the lost-device
 story's second half. The facade refuses to revoke your LAST passkey,
-so a fresh identity with a single passkey answers 403 until 1c binds
-a second. All three disable under an agent session; passkey login
-(1b) is the way back.</p>
+so a fresh identity with a single passkey answers 403 until another
+is bound. 18 binds that other one the routine way: ENROLLMENT -- a
+fresh passkey on your logged-in identity, no recovery code spent;
+this is how a second device joins, and recovery (1c) goes back to
+being the loss path only. All four disable under an agent session;
+passkey login (1b) is the way back.</p>
 <p>
   <button id="mintcodes">15. Mint recovery codes</button>
   <button id="passkeys">16. List my passkeys</button>
@@ -178,6 +183,7 @@ a second. All three disable under an agent session; passkey login
 <p>
   <input id="credid" placeholder="passkey credential id" size="38">
   <button id="revokekey">17. Revoke passkey</button>
+  <button id="enroll">18. Enroll another passkey</button>
 </p>
 <div id="log">ready.
 </div>
@@ -202,6 +208,7 @@ const b64u = {
 let token = null, credId = null, subject = null;
 let sessionKind = null;        // null | 'human' | 'agent'
 let principalUuid = null;      // uuid of the last principal session
+let expired = false;           // last session ended by TTL/revocation
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
@@ -217,7 +224,9 @@ const el = id => document.getElementById(id);
 function updateUI() {
   const who = el('who');
   if (!token) {
-    who.textContent = 'Session: logged out';
+    who.textContent = expired ?
+      'Session: EXPIRED -- passkey login (1b) to continue' :
+      'Session: logged out';
     who.className = 'who out';
   } else if (sessionKind === 'agent') {
     who.textContent = 'Session: AGENT ' + short(uuidOf(subject)) +
@@ -274,6 +283,7 @@ function updateUI() {
     'the kit is the principal\'s -- passkey login (1b) first' :
     'principal session required -- passkey login (1b)');
   need('passkeys', human, 'principal session required -- passkey login (1b)');
+  need('enroll', human, 'principal session required -- passkey login (1b)');
   need('revokekey', human && el('credid').value.trim() !== '', human ?
     'passkey credential id required (16 fills it)' :
     'principal session required -- passkey login (1b)');
@@ -321,8 +331,22 @@ function closeAgentStream() {
   if (liveAgents) liveAgents.close();
   liveAgents = null; agentsLive = false;
 }
+/*
+ * a bearer request answering 401 while the page still holds a token
+ * means the platform's session died underneath us (TTL expiry, or
+ * revocation by suspension) -- guide instead of walling
+ */
+function sessionLost() {
+  setSession(null, null, null);
+  expired = true;
+  updateUI();
+  log('session expired or revoked -- platform sessions carry a TTL; ' +
+      'passkey login (1b) resumes as the principal', 'err');
+}
+
 function setSession(newToken, newSubject, kind) {
   token = newToken; subject = newSubject; sessionKind = kind;
+  if (newToken) expired = false;
   if (kind === 'human') {
     principalUuid = uuidOf(newSubject);
     try { localStorage.setItem('demo-principal-uuid', principalUuid); }
@@ -339,9 +363,13 @@ async function challenge() {
 }
 async function post(path, body, bearer) {
   const headers = { 'Content-Type': 'application/json' };
-  if (bearer && token) headers['Authorization'] = 'Bearer ' + token;
+  const hadToken = bearer && token;
+  if (hadToken) headers['Authorization'] = 'Bearer ' + token;
   const r = await fetch(path, { method: 'POST', headers,
                                 body: JSON.stringify(body) });
+  if (r.status === 401 && hadToken && path !== '/auth/logout') {
+    sessionLost();
+  }
   return { status: r.status, body: await r.json().catch(() => ({})) };
 }
 
@@ -438,6 +466,7 @@ el('update').onclick = async () => {
   const r = await fetch('/inventory/items/' + id, { method: 'PUT',
     headers, body: JSON.stringify({ name: el('itemname').value,
                                     qty: 2 }) });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   log('update item ' + id + ' (as ' + (sessionKind || 'nobody') + '): ' +
       r.status + ' ' + JSON.stringify(body),
@@ -462,6 +491,7 @@ el('audit').onclick = async () => {
 el('wipe').onclick = async () => {
   const r = await fetch('/inventory/items', { method: 'DELETE',
     headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   log('wipe: ' + r.status + ' ' + JSON.stringify(body),
       r.status === 403 ? 'ok' : 'err');
@@ -498,6 +528,7 @@ el('mint').onclick = async () => {
 el('agents').onclick = async () => {
   const r = await fetch('/auth/agents', { headers: token ?
     { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
     log('agents (' + body.agents.length + '):');
@@ -551,6 +582,7 @@ el('agentlogin').onclick = async () => {
 el('report').onclick = async () => {
   const r = await fetch('/inventory/report', { headers: token ?
     { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   log('report (as ' + (sessionKind || 'nobody') + '): ' + r.status +
       ' ' + JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
@@ -565,6 +597,7 @@ el('report').onclick = async () => {
 el('passkeys').onclick = async () => {
   const r = await fetch('/auth/passkeys', { headers: token ?
     { 'Authorization': 'Bearer ' + token } : {} });
+  if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
     log('passkeys (' + body.passkeys.length + '):');
@@ -572,7 +605,7 @@ el('passkeys').onclick = async () => {
     body.passkeys.forEach(p => {
       const mine = p.id === credId;
       if (!mine && !firstOther) firstOther = p.id;
-      log('  ' + p.id.slice(0, 16) + '…' +
+      log('  ' + p.id +
           (mine ? '  (this browser\'s current)' : '') +
           '  created ' + new Date(p.created * 1000).toLocaleTimeString());
     });
@@ -593,6 +626,40 @@ el('revokekey').onclick = async () => {
         'remaining passkeys still can -- the lost-device story is ' +
         'complete', 'hint');
   }
+};
+
+el('enroll').onclick = async () => {
+  try {
+    const r = await fetch('/auth/enroll-challenge', { headers: token ?
+      { 'Authorization': 'Bearer ' + token } : {} });
+    if (r.status === 401 && token) { sessionLost(); return; }
+    if (!r.ok) throw new Error('enroll-challenge: HTTP ' + r.status);
+    const ch = (await r.json()).challenge;
+    const cred = await navigator.credentials.create({ publicKey: {
+      challenge: b64u.dec(ch),
+      rp: { name: 'composite-app', id: 'localhost' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)),
+              name: 'demo@localhost', displayName: 'demo (added device)' },
+      pubKeyCredParams: [ { type: 'public-key', alg: -7 },
+                          { type: 'public-key', alg: -8 } ],
+      attestation: 'none',
+    }});
+    const res = await post('/auth/enroll', {
+      challenge: ch,
+      clientDataJSON: b64u.enc(cred.response.clientDataJSON),
+      attestationObject: b64u.enc(cred.response.attestationObject),
+    }, true);
+    if (res.status === 201) {
+      log('ENROLLED: an additional passkey (' +
+          String(res.body.enrolled) + ') is bound to ' +
+          'your identity -- no recovery code spent; list (16) shows ' +
+          'both, and either logs in', 'ok');
+      updateUI();
+    } else {
+      log('enroll refused: ' + res.status + ' ' +
+          JSON.stringify(res.body), 'err');
+    }
+  } catch (e) { log('enroll: ' + e, 'err'); }
 };
 
 el('mintcodes').onclick = async () => {
@@ -658,6 +725,7 @@ el('reset').onclick = () => {
   closeAgentStream();
   token = null; principal = null; sessionKind = null;
   principalUuid = null; lastAgentUuid = null; credId = null;
+  expired = false;
   try {
     localStorage.removeItem('demo-principal-uuid');
     localStorage.removeItem('demo-controller-uuid');

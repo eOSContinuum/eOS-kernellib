@@ -26,7 +26,7 @@ Inventory/                the application domain
   sys/handler.c           routes, WebAuthn/session wire binding,
                           single-use challenge store
   sys/streamd.c           SSE broker: observer-driven audit topic,
-                          poll-bridged agent-state topic
+                          identity-event-driven agent-state topic
   obj/client.c            loopback HTTP/1 client (the client library's
                           first in-tree consumer)
   obj/stream_client.c     loopback SSE client (first through the
@@ -59,6 +59,8 @@ request becomes an authenticated principal -- is the companion doc
 | `POST /auth/recovery-codes` | bearer | provision own recovery codes (plaintext returned once) |
 | `GET /auth/passkeys` | bearer | the session identity's own passkeys (bookkeeping, no key material) |
 | `POST /auth/passkeys/<id>/revoke` | bearer | revoke one own passkey; the last one refuses |
+| `GET /auth/enroll-challenge` | bearer | enrollment-purpose challenge (the store tags purposes) |
+| `POST /auth/enroll` | bearer | bind an ADDITIONAL passkey to the session identity (the second-device path) |
 | `GET /auth/agents` | bearer | the controller's own-agents view |
 | `POST /auth/agents` | bearer | mint an agent; the response carries the token's only plaintext |
 | `POST /auth/agents/<uuid>/suspend` | bearer | suspend an own agent; revokes its live sessions |
@@ -92,17 +94,26 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=38 scripts/run-example.sh composite-app
+    EXPECTED_OK=51 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the thirty-six wire-level phases -- the agent lifecycle
-(mint, own-agents list, token ceremony, the not-own and not-delegable
-refusals, suspend-revokes-sessions, resume-restores-authentication),
-the event streams (open, observer-driven audit push, agent-state
-snapshot and change push, bad-token refusal), and the recovery
-ceremony (self-provisioned codes, the bad-code, wrong-purpose, and
+Boot 1 runs the fifty wire-level phases -- the agent lifecycle
+(mint, own-agents list, token ceremony, the standing refusal on an
+agent session, the not-own and not-delegable refusals,
+suspend-revokes-sessions, resume-restores-authentication), the
+capability gates (the wipe's and the report's refusals), the event
+streams (open, observer-driven audit push, agent-state snapshot and
+change push, bad-token refusal), the identity mutation events (the
+suspend's event delivered to a subscribed observer with exact data,
+the resume's event paired with its wire response, a refused mutation
+delivering nothing), the recovery ceremony
+(self-provisioned codes, the bad-code, wrong-purpose, and
 never-bare-re-bind refusals, atomic recover, login with the recovered
-passkey) -- and dumps a snapshot; boot 2
+passkey), and passkey self-service (list, unknown-id refusal,
+revocation of the original passkey, the last-passkey guard, and
+enrollment: the wrong-purpose and agent-session refusals, the bind,
+the list showing both) -- and
+dumps a snapshot; boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in
 `Inventory/sys/test.c` is the phase-by-phase map).
@@ -114,7 +125,7 @@ observer binding all survived (the sentinel comment block in
 -- register, login, authenticated create, audit read, capability-gate
 refusal, agent management and delegation, auto-established live
 streams with a server heartbeat, and recovery -- with a real
-authenticator, numbered steps, and a session-state banner that always
+authenticator, numbered steps, and a session-state banner that
 always names who is acting. The headless profile verifies the
 ceremonies against foreign-generated vectors instead; neither replaces
 the other. `scripts/demo-composite.sh` packages this whole recipe --
@@ -238,9 +249,13 @@ redeems the code and binds the new passkey atomically to the SAME
 identity -- the identity string in the log matches the one you
 registered --
 and the code is spent: a second recover with it refuses. The old
-passkey keeps working until revoked -- which is now the walk's last
-step: list your passkeys (16, bookkeeping only, the current one
-marked) and revoke the lost device's (17). The facade refuses your
-last passkey, so a single-passkey identity answers 403 until 1c binds
-a second; the operator-plane `identity revoke` verb remains for
-records an operator manages.
+passkey keeps working until revoked -- which is now part of the
+walk's tail: list your passkeys (16, bookkeeping only, the current
+one marked), revoke the lost device's (17), and enroll a fresh one
+(18) -- add-passkey enrollment binds an ADDITIONAL passkey to the
+logged-in identity with no recovery code spent, which is how a
+second device joins routinely; recovery stays the loss path. The
+revoke facade refuses your last passkey, so a single-passkey
+identity answers 403 until enrollment (or a recovery) binds another;
+the operator-plane `identity revoke` verb remains for records an
+operator manages.
