@@ -43,6 +43,8 @@ Two things bound that cost instead of letting it become a hang:
 - **The tick budget.** Every task runs under a per-owner resource ceiling. Exceeding it raises `Out of ticks` rather than blocking the platform indefinitely. This turns a runaway computation into an error, not a stall. The mechanics (what a tick charges, how the budget is set and read, atomic functions costing double) are in `docs/application-authoring.md` Writing tick-aware code. This document only needs the shape of the trade it makes.
 - **`call_out` chunking.** For work that legitimately needs more than one task's budget, the standard idiom is to process a bounded slice, save a cursor, and re-arm with `call_out` for the next slice. Each slice is its own task with a fresh budget, so long work proceeds without holding up the queue for its whole duration. Worked example: `docs/application-authoring.md` Spreading work across timeslices.
 
+One stall lives outside both bounds: the statedump pause. When the image writes -- every `dump_interval`, or on an explicit dump -- the runtime itself briefly blocks, and no tick budget meters it because it is not a task running. It recurs by design and scales with image size; its measurements and the sizing trade are priced in `docs/operations.md` Availability and data-loss model.
+
 ## Under sustained load
 
 What gives when offered load exceeds drain rate, stated from driver source, with the measured side in `docs/operations.md` Limits and capacity:

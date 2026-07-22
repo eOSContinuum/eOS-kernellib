@@ -158,6 +158,8 @@ The platform is a single process on a single machine. There is no replica to fai
 
 **Crash semantics.** A crash, such as a process killed before any dump runs, host power loss, or a `dump_state` failure mid-write (Common failure modes below), loses everything committed since the last completed dump. The platform does not partially apply an interrupted dump.
 
+**Recurring pause.** The availability cost that recurs by design: every `dump_interval` cycle the whole runtime briefly blocks while the image writes ("the runtime briefly blocks during the dump", `docs/persistence.md` The statedump cycle) -- the one head-of-line stall the tick budget does not bound, because it is the runtime writing, not a task running (`docs/execution-model.md` The price: head-of-line latency names it as the exception). Measured through a quarter-gigabyte image the client-observed pause stayed at or under 0.12 s (Snapshot-pause scaling, measured once, below); the pause scales with image size, and beyond that envelope it is unmeasured (Unmeasured today, below) -- a growing image re-measures with `scripts/measure-baseline.py` rather than extrapolating. Sizing `dump_interval` therefore trades on both axes at once: shorter narrows the recovery point above and pays the pause more often.
+
 **Downtime taxonomy.**
 
 | Mode | Trigger | Connections | State |
@@ -165,6 +167,8 @@ The platform is a single process on a single machine. There is no replica to fai
 | Hot boot | `shutdown(1)` + `execv`, with a `hotboot` tuple configured (Booting above) | Survive: inherited file descriptors | Survives: dump plus immediate reload |
 | Statedump restore | Cold start naming the snapshot on the command line (full, or the two-file incremental form) | Drop: clients reconnect | Survives, from the dump file(s) |
 | Cold boot | Cold start with no restore argument | Drop | Rebuilt from source: only what the initd cascade recreates, nothing carried over |
+
+**Recovery time.** The recovery point above bounds what is lost; recovery time -- how long until service returns -- has two parts with different shapes. The down-window is supervisor detection plus restore boot: the restore boot itself measured under 0.1 s to console-ready against a 237 MB snapshot (Snapshot-pause scaling, measured once, below), because readiness precedes the data -- state pages in on demand after it. Time to steady state is the longer tail: clients reconnect (connections never survive a restore, the taxonomy above), demand paging warms as state is first touched, and an aged snapshot's overdue `call_out` backlog fires immediately as a catch-up burst (Post-restore checklist above). An SLA or incident playbook budgets the down-window from the supervisor's detection interval plus the measured restore boot, and expects the warmup tail, not the boot, to dominate what users observe. The same envelope caveat applies: measured through a quarter-gigabyte image, unmeasured beyond (Unmeasured today, below).
 
 **Portability.** A snapshot restores only against a driver started with the same `auto_object` and `driver_object`, and with the same `modules` extensions loaded (Common failure modes below, the same conditions `docs/persistence.md` states for hot boot). It is a resume point for a specific configuration, not a portable backup format across incompatible driver configurations.
 
