@@ -53,6 +53,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `cp` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `create` | lfun | [kernel-reference.md](kernel-reference.md#create) |
 | `create_identity` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-create_identitystring-credentialid-mapping-row--atomic-mixed-mint_with_codesint-n) |
+| `declare_label` | daemon API | [system-daemons.md](system-daemons.md#void-declare_labelstring-label-string-type-int-index) |
 | `DelayedContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#delayedcontinuation) |
 | `delegate_capability` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-delegate_capabilitystring-controlleruuid-string-agentuuid-string-capability--atomic-void-undelegate_capabilitystring-controlleruuid-string-agentuuid-string-capability) |
 | `destruct` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
@@ -131,6 +132,8 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `query_inherits` | daemon API | [system-daemons.md](system-daemons.md#int-query_inheritsint-index) |
 | `query_intrinsic_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
 | `query_issues` | daemon API | [system-daemons.md](system-daemons.md#int-query_issuesstring-path) |
+| `query_label` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_labelstring-label--string-query_labels) |
+| `query_labels` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_labelstring-label--string-query_labels) |
 | `query_max_cascade_depth` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_max_cascade_depthint-n-and-query_max_cascade_depth) |
 | `query_name` | daemon API | [system-daemons.md](system-daemons.md#object-query_objectstring-name--string-query_nameobject-ob) |
 | `query_object` | daemon API | [system-daemons.md](system-daemons.md#object-query_objectstring-name--string-query_nameobject-ob) |
@@ -159,6 +162,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `register-observer` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `register_credential` | daemon API | [system-daemons.md](system-daemons.md#string-register_credentialstring-challenge-string-clientdatajson-string-attestationobject) |
 | `register_identity` | daemon API | [system-daemons.md](system-daemons.md#mixed-register_identitystring-challenge-string-clientdatajson-string-attestationobject-varargs-int-ttl) |
+| `register_manager` | daemon API | [system-daemons.md](system-daemons.md#void-register_managerstring-label-object-manager) |
 | `register_observer` | dispatcher LFUN | [dispatcher.md](dispatcher.md#register_observerobject-ob-mixed-path-string-timing-string-source) |
 | `remove_dir` | efun override | [kernel-reference.md](kernel-reference.md#remove_dir) |
 | `remove_observer` | dispatcher LFUN | [dispatcher.md](dispatcher.md#remove_observerobject-ob-string-path-string-timing-int-index) |

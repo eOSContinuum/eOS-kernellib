@@ -100,7 +100,7 @@ The kernel layer is application-neutral. Long-running stateful workflows, custom
 The boundaries are deliberate design decisions, stated up front:
 
 - **One process on one machine.** A single coherence domain by design: no horizontal scale-out, no multi-machine redundancy, no concurrent writers across machines (`docs/coming-from-contemporary-infrastructure.md` What does not translate).
-- **Stock-build ceilings.** 255 simultaneous users, 65535 objects, and a swap device capped at 65535 sectors -- about 64 MiB of pageable object storage at the demo config's 1 KiB sector size, scaling only through `sector_size` (`docs/operations.md` Limits and capacity states each ceiling and which rows have headroom).
+- **Stock-build ceilings.** 255 simultaneous users, 65535 objects, and a swap device capped at 65535 sectors -- about 64 MiB of pageable object storage at the demo config's 1 KiB sector size, scaling only through `sector_size`, whose own compiled cap of 65535 bytes puts total persistent state on a stock build just under 4 GiB (`docs/operations.md` Limits and capacity states each ceiling and which rows have headroom).
 - **LPC is the in-image language.** The runtime's guarantees hold for LPC (and Merry) code inside the image; other languages integrate at the transport boundary as clients.
 - **One task at a time.** Exactly one task runs in the image at any instant, to completion; concurrent connections queue whole tasks, so added concurrency buys queueing, not CPU parallelism (`docs/execution-model.md` Run to completion).
 - **No LSP, no step debugger.** LPC is edited as C files with `rg` for navigation; the console's introspection verbs stand in for a debugger (`docs/debugging-applications.md` The working environment, plainly).

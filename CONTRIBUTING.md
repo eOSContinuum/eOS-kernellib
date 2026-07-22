@@ -130,6 +130,10 @@ Shell scripts under `examples/` follow POSIX conventions and target a portable i
 5. Know that no automated checks run on a PR today -- there is no CI workflow, so nothing reruns the regression sweep for you. The PR's verification section is the reproducible evidence a reviewer reruns locally: include the exact commands and pass signals from the Full regression sweep (`scripts/README.md`) that your change touches.
 6. Maintainer review focuses on: does the change match an existing primitive or doc commitment; does it preserve capability-tier discipline; is the test evidence reproducible.
 
+## Maintenance
+
+Facts an adopter or contributor prices, stated plainly: the project has a single primary maintainer today. Review of external contributions is best-effort, with no committed turnaround; nothing reruns the regression sweep automatically (Pull request flow above), so review leans on the PR's reproducible verification evidence. If maintenance pauses, the continuity posture mirrors what the platform states for its own driver dependency: the BSD-2-Clause-Patent license permits carrying a fork without negotiation, and the regression harness (`scripts/README.md`) defines what a fork must keep passing.
+
 ## Code of Conduct
 
 This project follows the [Code of Conduct](CODE_OF_CONDUCT.md). Be excellent to each other; treat contributors as capable collaborators.
