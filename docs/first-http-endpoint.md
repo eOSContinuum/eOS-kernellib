@@ -198,6 +198,7 @@ Your domain lives at `src/usr/WWW`, and that mount name collides with the harnes
 
 ## Where to next
 
+- **[first-composition.md](first-composition.md)** continues this build directly: a second object kind with a registered name, a secondary index the store can never disagree with, an audit observer inside the atomic write, and a capability-gated admin route -- every mechanism the composite example composes, built at tutorial scale.
 - **[http-applications.md](http-applications.md)** is the reference behind every line you copied: the five platform contracts, the API signatures, routing multiple applications on one port, and the pieces this tutorial skipped (chunked transfer, WebSocket framing, TLS variants).
 - **[composite-applications.md](composite-applications.md)** is the assembly this tutorial points toward: `examples/composite-app/` composes the same seams you just built -- transport domain, cross-domain handlers, a persistent daemon -- with identity, an audit observer, and event streams. Read it with the composite example beside you.
 - **[vault-applications.md](vault-applications.md)** moves your store from image-only persistence to schema-registered on-disk XML, the durability layer a snapshot alone does not give you.
