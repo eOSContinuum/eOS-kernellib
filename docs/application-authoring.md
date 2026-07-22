@@ -124,6 +124,16 @@ Cross-domain reach for tier-E code is mediated at every relevant kfun call by th
 
 **What an application still builds.** The platform contributes the credential substrate, the ceremonies, the session primitive, and the capability discipline. An application still supplies: the transport binding (cookie, bearer, or its own scheme), its application-tier authorization policy (gate its verbs the way the chat example gates rooms, `docs/chat-applications.md`), and any per-user state beyond the shared record. Quotas remain per-owner, not per-identity.
 
+## Give your application an operator surface
+
+Every real application grows operations only an operator should perform -- wipe a store, rebuild an index, toggle a flag. Three shapes exist, and the instinct to reach for the most console-native one over-invests:
+
+1. **A capability-gated route on your own transport** -- the default. The operation lives in your daemon behind an `is_allowed(<capability>, principal)` check at the choke point; the operator grants the capability to an identity (`identity grant`, `docs/capability.md` Identity principals), and the authorized human or agent drives the route with an ordinary session. No platform change, revocable authority, and an audit point you control. `docs/first-composition.md` section 7 builds it at tutorial scale; the composite example's wipe route is the full-scale form.
+2. **A documented `code` call on your daemon** -- zero new surface. `code "/usr/MyApp/sys/myappd"->rebuild()` from the console is a legitimate operator interface when the operation is rare and the operator is already at the console; document it where your operators look.
+3. **A console verb** -- a platform contribution, not an application act. The console's verb table is hardcoded in the kernel registry (`src/kernel/sys/admin_console_registry.c`), so a new verb means patching the kernel layer (`docs/common-tasks.md` Add an operator verb for your application). Right when the operation belongs to the platform itself; wrong as the first reach for an application-local action.
+
+The fork to internalize: option 1 authenticates a *principal* and survives the operator not being you; options 2 and 3 authenticate *console access*. Start at option 1, fall back to 2 for the rare-and-manual, and treat 3 as the platform-maintainer's tool.
+
 ## Writing tick-aware code
 
 The platform has no threads and no preemption. What bounds a runaway computation is the **tick budget**: every entry into application code runs under per-owner resource limits, and exceeding them is a runtime error (`Out of ticks`), not a hung platform. The mechanics -- what a tick charges, where the 20,000,000-tick default ceiling comes from, what exhaustion does, atomic functions costing double, and the operator's consumption and quota surface -- live with the task model in [execution-model.md](execution-model.md) The tick budget, mechanically. What this page keeps is the author-facing idiom.

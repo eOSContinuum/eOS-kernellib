@@ -69,7 +69,7 @@ The repository contains LPC source under `src/`. DGD compiles LPC at runtime; th
 
 ## Boot it yourself: the configuration and the ports
 
-The proof above generated its own configuration and tore its boots down; running the platform interactively is where the configuration becomes yours. `example.dgd` is the starter DGD configuration: it mounts the kernel layer's source directory and binds the kernel's default ports.
+The proof above generated its own configuration and tore its boots down, but it left its example domain deployed: `src/usr/MerryApp` carries a boot-time test driver that snapshots and exits the platform the moment its assertions finish, so a manual boot with it still present halts within seconds. Remove it first (`rm -rf src/usr/MerryApp`; any later harness run would remove it for you in its clean-slate step). Running the platform interactively is where the configuration becomes yours. `example.dgd` is the starter DGD configuration: it mounts the kernel layer's source directory and binds the kernel's default ports.
 
 Edit `example.dgd` to set `directory` to the absolute path of `eOS-kernellib/src/`:
 
