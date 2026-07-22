@@ -10,6 +10,7 @@ The jobs this doc (and its task-shaped companions) cover, by name:
 
 | I need to... | Where |
 |---|---|
+| Stand up a fresh production deployment, in order | Day 0: standing up a production deployment |
 | Choose config values, raise a ceiling | The .dgd configuration file; Limits and capacity |
 | Size a workload's storage shape | Limits and capacity, Sizing a workload |
 | Boot cold, restore a snapshot, hot-boot | Booting |
@@ -23,6 +24,19 @@ The jobs this doc (and its task-shaped companions) cover, by name:
 | Diagnose a dead or misbehaving process | Common failure modes; Monitoring signals |
 | Ship a release; roll one back | `docs/changing-a-running-system.md` Shipping a release, Rolling back a release |
 | Provision, rotate, or offboard an operator credential | `docs/security-posture.md` Credential lifecycle |
+
+## Day 0: standing up a production deployment
+
+The constituent pieces each have their own section; what a first deployment needs is their order, because three orderings are load-bearing: **the admin credential is claimed by the first console connection**, so the telnet port stays loopback-only until the claim lands (an unclaimed admin behind a reachable port is a race anyone on that network can win); **transport security activates before any real client is pointed at the platform**; and **extensions are cold-boot facts** (an image cannot gain a module across a restore -- Loading host-driver extensions below), so the module set is decided before the boot that goes live. The sequence:
+
+1. **Build the pieces on the host.** The driver from the pinned commit (`docs/getting-started.md` Install DGD) and every extension the deployment needs beside it -- the crypto module if identity, sessions, or native TLS are in play. Create an unprivileged service user; the checkout and `state/` belong to it alone (State file locations and permissions below).
+2. **Write the production configuration.** Start from the production-shape starting point (Limits and capacity below): size the caps, set `dump_interval` against the availability model's recovery-point and recurring-pause trade (Availability and data-loss model below), keep `telnet_port` bound to loopback, and name the `modules`.
+3. **First boot, and claim admin immediately.** Boot, connect over loopback, and walk the first-claim password flow before anything else touches the host (`docs/security-posture.md` Credential lifecycle). The hash lands file-backed under `src/kernel/data/`, independent of the image.
+4. **Provision the operator surface.** The monitoring credential (`grant monitor access`, first-login password -- Monitoring signals below), each human operator's registered login, and the application's secret file where one is needed (`docs/common-tasks.md` Provision an application secret out of source).
+5. **Activate transport security.** Certificates at the configured paths, `tls-cert reload`, and the labeled `https` port answering -- before serving anything real (Network boundary and transport security below). A reverse proxy in front is the alternative where one host fronts several services.
+6. **Deploy the application domains and cold-boot.** Deploy-by-copy requires a cold boot -- the initd iteration runs only there (`docs/http-applications.md` Reference application) -- and this same boot fixes the image's extension set for every restore that follows. The domains' own sentinel drivers or health routes verify the deploy.
+7. **Verify the way the monitor will.** Drive the health route and read the counts against the alert thresholds (Monitoring signals below; `docs/common-tasks.md` Expose a health check for monitoring).
+8. **Hand off to the supervisor and schedule the drills.** The supervisor owns restarts from here (Running under a supervisor below); the backup sequence runs on its schedule with the restore rehearsal that makes it a recovery plan (Backing up and restoring state below). Day 2 -- shipping and rolling back releases -- is `docs/changing-a-running-system.md`.
 
 ## The .dgd configuration file
 
