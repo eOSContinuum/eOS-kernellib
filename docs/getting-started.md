@@ -10,6 +10,38 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`. For the administrative telnet port you also need a line-mode TCP client: `telnet` where available, or `nc` (netcat), which macOS ships (macOS has not shipped `telnet` since 10.13).
 
+## Zero to a passing proof
+
+The fastest signal, from nothing, in one block -- clone and build the driver, clone the kernel layer, and run an example through a real dump-and-restore cycle (the harness generates its own configuration; no config editing is involved):
+
+```sh
+git clone https://github.com/dworkin/dgd.git
+(cd dgd && git checkout 975e927f && cd src && make install)
+git clone https://github.com/eOSContinuum/eOS-kernellib.git
+cd eOS-kernellib
+DGD_BIN=$PWD/../dgd/bin/dgd scripts/run-example.sh merry-app
+```
+
+A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1.7.9 on macOS 26.5 arm64):
+
+```text
+== clean slate ==
+== deploy merry-app as the MerryApp domain ==
+== boot 1 (cold; driver dumps + self-exits) ==
+== boot 2 (restore from snapshot) ==
+== sentinels ==
+MerryApp:test: starting
+MerryApp:test: ANCESTRY OK
+MerryApp:test: SANDBOX OK
+[... 24 more sentinels ...]
+MerryApp:test: OBSERVER EVICT OK
+MerryApp:test: PERSIST VERIFY OK
+== 28 " OK" sentinels (expected 28) ==
+PASS
+```
+
+The two boots bracket a snapshot restore, so the PERSIST sentinels prove application state survived a real process exit. [`scripts/README.md`](../scripts/README.md) documents the harness; `examples/` holds the other runnable examples. The sections below unpack each step, then boot the platform interactively.
+
 ## Install DGD
 
 Clone the DGD source, build the driver, and install the binary:
@@ -35,9 +67,9 @@ cd eOS-kernellib
 
 The repository contains LPC source under `src/`. DGD compiles LPC at runtime; the kernel layer has no separate build step.
 
-## Run the example configuration
+## Boot it yourself: the configuration and the ports
 
-`example.dgd` is a starter DGD configuration that mounts the kernel layer's source directory and binds the kernel's default ports.
+The proof above generated its own configuration and tore its boots down; running the platform interactively is where the configuration becomes yours. `example.dgd` is the starter DGD configuration: it mounts the kernel layer's source directory and binds the kernel's default ports.
 
 Edit `example.dgd` to set `directory` to the absolute path of `eOS-kernellib/src/`:
 
@@ -67,34 +99,6 @@ telnet localhost 8023    # or: nc localhost 8023
 ```
 
 The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no application mounted on top there is nothing to answer them: the kernel's HTTP server clones an application server at `/usr/WWW/obj/server` per connection, and when that path is absent the connection is dropped without a response (a client like `curl` waits until its own timeout). Mounting an application there (`examples/http-app/README.md` is the walkthrough) is what makes 8080 respond.
-
-## Prove the platform in one command
-
-`scripts/run-example.sh` deploys an example application, boots the platform cold, snapshots, restarts from the snapshot, and counts the example's assertion sentinels -- the fastest way to see the runtime primitives pass on your machine:
-
-```sh
-DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
-```
-
-A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1.7.9 on macOS 26.5 arm64):
-
-```text
-== clean slate ==
-== deploy merry-app as the MerryApp domain ==
-== boot 1 (cold; driver dumps + self-exits) ==
-== boot 2 (restore from snapshot) ==
-== sentinels ==
-MerryApp:test: starting
-MerryApp:test: ANCESTRY OK
-MerryApp:test: SANDBOX OK
-[... 24 more sentinels ...]
-MerryApp:test: OBSERVER EVICT OK
-MerryApp:test: PERSIST VERIFY OK
-== 28 " OK" sentinels (expected 28) ==
-PASS
-```
-
-The two boots bracket a snapshot restore, so the PERSIST sentinels prove application state survived a real process exit. [`scripts/README.md`](../scripts/README.md) documents the harness; `examples/` holds the other runnable examples.
 
 ## Where to next
 
