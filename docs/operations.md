@@ -394,14 +394,16 @@ Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
 
 **Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (Limits and capacity above):
 
-| Signal | Alert condition | Reading |
-|---|---|---|
-| call_out count vs the `call_outs` cap | Approaching the cap | A backlog of deferred work: new `call_out`s begin to fail |
-| object count vs the `objects` cap | Approaching the cap | Allocation headroom is running out: clones and new objects begin to fail |
-| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (Limits and capacity above). The durable fix is a `sector_size` raise and a reboot from snapshot |
-| users count vs the `users` cap | Approaching the cap | At the cap, new connections complete their TCP connect and are never answered, with nothing logged -- the silent form of full. A climbing count under flat traffic is a connection leak (Common failure modes below) |
-| swap activity | Sustained churn | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot |
-| uptime, last reboot | Reset unexpectedly | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
+| Signal | Alert condition | Starting threshold | Reading |
+|---|---|---|---|
+| call_out count vs the `call_outs` cap | Approaching the cap | Warn at 70% of `call_outs`, page at 85% | A backlog of deferred work: new `call_out`s begin to fail |
+| object count vs the `objects` cap | Approaching the cap | Warn at 70% of `objects`, page at 85% | Allocation headroom is running out: clones and new objects begin to fail |
+| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | Warn at 50% of `swap_size`, page at 70% | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (Limits and capacity above). The durable fix is a `sector_size` raise and a reboot from snapshot |
+| users count vs the `users` cap | Approaching the cap | Warn at 70% of `users`, page at 85% | At the cap, new connections complete their TCP connect and are never answered, with nothing logged -- the silent form of full. A climbing count under flat traffic is a connection leak (Common failure modes below) |
+| swap activity | Sustained churn | Warn when the five-minute average is nonzero on two consecutive polls; page when it is still nonzero fifteen minutes later | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot |
+| uptime, last reboot | Reset unexpectedly | Page on any decrease | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
+
+The threshold column is a starting point, not a guarantee -- the same posture as the production-shape starting point under Limits and capacity above: numbers to write the first alert rule with, then tune against the occupancy your own workload measures. The gap between the swap-sector thresholds and the degrading rows is deliberate: the fatal ceiling gets the earlier warning.
 
 Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resource daemon, Resource limits above) reports each owner's tick usage against its budget. An owner far above its peers is running away. A tick-exhausted call rolls back rather than hanging the platform.
 
