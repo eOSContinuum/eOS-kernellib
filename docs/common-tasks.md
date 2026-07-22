@@ -186,6 +186,19 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/admin-console.md`; `docs/changing-a-running-system.md` rungs 1-3.
 
+## Run the browser demo
+
+**Goal**: the composite example's guided walk running in your browser over TLS the browser trusts, from one command.
+
+1. Prerequisites, once per machine: `mkcert` with its CA installed (`mkcert -install`), `python3`, `openssl`. The identity ceremonies need the host crypto module.
+2. `LPC_EXT_CRYPTO=/path/to/crypto.<ver> DGD_BIN=/path/to/dgd scripts/demo-composite.sh` deploys the interactive shape, generates the certificate, boots with native TLS on the labeled `https` port, drives the bring-up console verbs (two provision -- the provisioner compile and the capability's delegable flag -- the rest verify), and leaves the instance running -- `DEMO READY` (with the server pid) is the success signal. The script refuses to start while another dgd instance is running.
+3. Open `https://localhost:8443/demo` and follow the numbered walk: the register / login / recover entry triad, delegation with an observable effect, the intended refusals at all three authorization tiers, and passkey self-service including add-passkey enrollment.
+4. Teardown when done: the script's header lists the exact commands -- kill the printed pid, then remove the deployed mounts, the TLS material, the provisioner copy, the demo's state files, and the kernel access-grant residue (`src/kernel/data/access.data`).
+
+**Verify**: the script prints `DEMO READY` with the pid; the page loads without a certificate warning and registration completes against your authenticator.
+
+**Owning doc**: `examples/composite-app/README.md` The browser path; `docs/composite-applications.md` The demo page: the guided walk.
+
 ## Reset a development checkout to a clean slate
 
 **Goal**: a from-checkout boot with no residue from prior example runs or operator provisioning.
