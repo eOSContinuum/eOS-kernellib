@@ -12,14 +12,15 @@ A hands-on tutorial. In the next hour you will boot the platform, create a livin
 /path/to/dgd/bin/dgd example.dgd
 ```
 
-The boot log prints:
+The boot log prints, each line stamped with the host time (and the banner says 1.7.9 even on a newer `master` build -- `docs/getting-started.md` Install DGD):
 
 ```text
-** Initializing...
-** Initialization complete.
+Jul 21 18:59:39 ** DGD 1.7.9
+Jul 21 18:59:39 ** Initializing...
+Jul 21 18:59:39 ** Initialization complete.
 ```
 
-followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work: `DTD:: Registered ...` registrations and one `Schema:Daemon: cross-checked ...` line per bundled core-schema file. A `Warning:: Schema node ... not found!` or `import_state FAILED` line here is NOT normal. It means a schema file names an element the registry cannot resolve, or its import errored. The driver compiled the kernel and platform domains and is now listening. Leave it running. Open a second terminal for everything below.
+followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work. On this default build -- no crypto module loaded -- the burst begins with the identity stack standing down cleanly, and every one of these lines is normal and expected: `identity: registry up; crypto module absent (minting unavailable)`, `webauthn: ceremony daemon up`, the matching `session:` and `agentauth:` stand-downs, then `auth: transport authentication facade up`. The daemons boot, report, and refuse their crypto-dependent operations until the module is loaded (`docs/operations.md` Loading host-driver extensions). Then come the `DTD:: Registered ...` registrations, one `https: TLS stack not compiled ... standing down` line (normal for the same reason -- the TLS stack needs host-driver support this build lacks), and one `Schema:Daemon: cross-checked ...` line per bundled core-schema file. A `Warning:: Schema node ... not found!` or `import_state FAILED` line here is NOT normal. It means a schema file names an element the registry cannot resolve, or its import errored. The driver compiled the kernel and platform domains and is now listening. Leave it running. Open a second terminal for everything below.
 
 ## 2. Connect and claim the console
 
