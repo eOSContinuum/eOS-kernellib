@@ -140,9 +140,9 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 **Goal**: a route that answers only to an authenticated session, in your own transport-facing domain.
 
 1. Issue a challenge from an unauthenticated route: `AUTHD->issue_challenge()` returns the value the client's WebAuthn ceremony signs; consume it single-use at registration (`examples/composite-app/Inventory/sys/handler.c` is the worked form).
-2. Register: `AUTHD->register_identity(challenge, clientDataJSON, attestationObject)` verifies the ceremony and returns the principal and a session token.
-3. Gate: parse the bearer token from the `Authorization` header and resolve it with `AUTHD->validate(token)` -- a principal string, or nil to refuse with 401. Pass the principal, not the token, into your domain daemons.
-4. For an admin-only route, gate in the daemon at the capability choke-point -- `CAPABILITYD->is_allowed(<capability>, principal)` -- and let the handler translate the refusal to 403 (the composite example's wipe route).
+2. Register: `AUTHD->register_identity(challenge, clientDataJSON, attestationObject)` verifies the ceremony and returns the subject string and a session token.
+3. Gate: parse the bearer token from the `Authorization` header and resolve it with `AUTHD->validate(token)` -- the subject string (`identity:<uuid>`), or nil to refuse with 401. Pass the subject, not the token, into your domain daemons.
+4. For an admin-only route, gate in the daemon at the capability choke-point -- `CAPABILITYD->is_allowed(<capability>, subject)`, the subject string being exactly what the store records as a principal -- and let the handler translate the refusal to 403 (the composite example's wipe route).
 
 **Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=51 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
 
@@ -150,10 +150,10 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 ## Mint an agent identity and delegate a capability to it
 
-**Goal**: a human controller mints an agent principal, hands it a credential, and delegates a capability that dies with suspension.
+**Goal**: a human controller mints an agent identity, hands it a credential, and delegates a capability that dies with suspension.
 
 1. Mint from the controller's session: `AUTHD->mint_agent_with_token(controllerToken)` returns the agent's uuid and its token -- plaintext once, at mint, never again.
-2. The agent logs in with `AUTHD->authenticate_agent_token(agentToken)`, receiving its principal (`identity:<uuid>`) and its own session token.
+2. The agent logs in with `AUTHD->authenticate_agent_token(agentToken)`, receiving its subject string (`identity:<uuid>`) and its own session token.
 3. Delegate: `AUTHD->delegate_capability(controllerToken, uuid, capability)`; the reverse is `undelegate_capability`. The grant traces to the controller edge in the store.
 4. Suspend and resume with `AUTHD->suspend_agent` / `resume_agent`: suspension kills the delegated grant; resume restores nothing by itself.
 
@@ -165,8 +165,8 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: your service answers a route with a file-backed page instead of a string literal.
 
-1. Implement the handler contract's one-shot form and read the file per request: return `({ 200, "OK", "text/html; charset=utf-8", read_file("/usr/<App>/data/page.html") })`, with a 500 when the read returns nil and your 404 fallback for other paths -- `examples/composite-app/Inventory/sys/demo.c` is the whole pattern in thirty lines.
-2. What the platform gives you: `read_file` is access-checked against your domain's tree, and the per-request read means an edited file shows on the next reload, no cache to bust.
+1. Implement the handler contract's one-shot form and read the file per request: return `({ 200, "OK", "text/html; charset=utf-8", read_file("/usr/<App>/data/page.html"), ([ "Cache-Control" : "no-store" ]) })`, with a 500 when the read returns nil and your 404 fallback for other paths -- `examples/composite-app/Inventory/sys/demo.c` is the whole pattern.
+2. What the platform gives you: `read_file` is access-checked against your domain's tree, and the per-request read keeps the server current -- an edited file is what the next request reads. The browser is a second cache the server does not control: without a header saying otherwise, Safari heuristically caches the page and a returning visitor can sit on a stale copy until a hard refresh, which is why step 1's fifth element -- the handler contract's optional mapping of extra response headers (`docs/composite-applications.md`) -- sends `Cache-Control: no-store`.
 3. What it does not: no MIME table (state the Content-Type yourself), no caching, no directory serving -- one route, one file, which is exactly the admin-panel and demo-page shape.
 4. If the page drives WebAuthn, serve it over the labeled `https` port with an origin matching the relying-party configuration -- the browser requires a secure context (`examples/composite-app/README.md`).
 

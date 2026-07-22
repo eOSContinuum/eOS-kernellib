@@ -12,17 +12,17 @@
  * What it deliberately does NOT expose:
  *
  *   - sessiond->mint(principal): minting a session for an arbitrary
- *     principal string would let any caller forge authority. Here a
- *     session is minted only for the principal a ceremony just proved.
+ *     subject string would let any caller forge authority. Here a
+ *     session is minted only for the subject a ceremony just proved.
  *   - identityd credential mutation (bind/rotate/redeem) and the
  *     capability grant path: those remain operator- and System-tier
  *     concerns.
  *
  * The agent entry points extend the same rule rather than weaken it:
  * an agent ceremony (verified by agentauthd) mints a session only for
- * the proven agent principal, and the controller self-service entries
+ * the agent's proven subject, and the controller self-service entries
  * derive the controlling identity from a live session's proven
- * principal -- the new agent's controller edge, and the own-agents
+ * subject -- the new agent's controller edge, and the own-agents
  * constraint on suspend/resume, are never caller-supplied.
  *
  * Challenge ownership follows the webauthnd contract: the daemon holds
@@ -63,61 +63,62 @@ string issue_challenge()
 
 /*
  * TOFU registration plus session mint in one step. On success returns
- * ({ principal, token }): the new identity's principal string and a
- * live session token (plaintext, the only time it exists). Errors out
- * of webauthnd/identityd propagate to the caller.
+ * ({ subject, token }): the new identity's subject string
+ * ("identity:<uuid>", the form the capability store records as a
+ * principal) and a live session token (plaintext, the only time it
+ * exists). Errors out of webauthnd/identityd propagate to the caller.
  */
 mixed *register_identity(string challenge, string clientDataJSON,
 			 string attestationObject, varargs int ttl)
 {
-    string principal, token;
+    string subject, token;
 
-    principal = WEBAUTHND->register_credential(challenge, clientDataJSON,
-					       attestationObject);
-    token = SESSIOND->mint(principal, ttl);
-    return ({ principal, token });
+    subject = WEBAUTHND->register_credential(challenge, clientDataJSON,
+					     attestationObject);
+    token = SESSIOND->mint(subject, ttl);
+    return ({ subject, token });
 }
 
 /*
  * assertion verification plus session mint in one step. On success
- * returns ({ principal, token }) for the asserted identity.
+ * returns ({ subject, token }) for the asserted identity.
  */
 mixed *authenticate(string challenge, string credentialId,
 		    string clientDataJSON, string authenticatorData,
 		    string signature, varargs int ttl)
 {
-    string principal, token;
+    string subject, token;
 
-    principal = WEBAUTHND->verify_assertion(challenge, credentialId,
-					    clientDataJSON,
-					    authenticatorData, signature);
-    token = SESSIOND->mint(principal, ttl);
-    return ({ principal, token });
+    subject = WEBAUTHND->verify_assertion(challenge, credentialId,
+					  clientDataJSON,
+					  authenticatorData, signature);
+    token = SESSIOND->mint(subject, ttl);
+    return ({ subject, token });
 }
 
 /*
  * agent ceremonies: the same ceremony-plus-mint composition for agent
- * principals. agentauthd checks the record's kind and suspended state
- * at ceremony time; a session is minted only for the proven principal.
+ * identities. agentauthd checks the record's kind and suspended state
+ * at ceremony time; a session is minted only for the proven subject.
  */
 mixed *authenticate_agent_key(string challenge, string credentialId,
 			      string signature, varargs int ttl)
 {
-    string principal, token;
+    string subject, token;
 
-    principal = AGENTAUTHD->verify_key_assertion(challenge, credentialId,
-						 signature);
-    token = SESSIOND->mint(principal, ttl);
-    return ({ principal, token });
+    subject = AGENTAUTHD->verify_key_assertion(challenge, credentialId,
+					       signature);
+    token = SESSIOND->mint(subject, ttl);
+    return ({ subject, token });
 }
 
 mixed *authenticate_agent_token(string agentToken, varargs int ttl)
 {
-    string principal, token;
+    string subject, token;
 
-    principal = AGENTAUTHD->verify_token(agentToken);
-    token = SESSIOND->mint(principal, ttl);
-    return ({ principal, token });
+    subject = AGENTAUTHD->verify_token(agentToken);
+    token = SESSIOND->mint(subject, ttl);
+    return ({ subject, token });
 }
 
 /*
@@ -125,7 +126,7 @@ mixed *authenticate_agent_token(string agentToken, varargs int ttl)
  * payload for the NEW passkey is verified without a mint, then the
  * substrate redeems the recovery code and binds the verified
  * credential as one atomic operation (valid even on the record's last
- * credential), then a session is minted for the recovered principal.
+ * credential), then a session is minted for the recovered identity.
  * A wrong code binds nothing, a bad attestation redeems nothing, and
  * there is no intermediate recovery state to hijack. Never-bare-
  * re-bind holds: the only path onto an existing record still requires
@@ -136,16 +137,16 @@ mixed *recover_identity(string uuid, string code, string challenge,
 			varargs int ttl)
 {
     mapping row;
-    string credentialId, principal, token;
+    string credentialId, subject, token;
 
     row = WEBAUTHND->verify_registration_payload(challenge, clientDataJSON,
 						 attestationObject);
     credentialId = row["credentialId"];
     row["credentialId"] = nil;
     IDENTITYD->redeem_and_replace(uuid, code, credentialId, row);
-    principal = "identity:" + uuid;
-    token = SESSIOND->mint(principal, ttl);
-    return ({ principal, token });
+    subject = "identity:" + uuid;
+    token = SESSIOND->mint(subject, ttl);
+    return ({ subject, token });
 }
 
 
@@ -153,19 +154,19 @@ mixed *recover_identity(string uuid, string code, string challenge,
  * controller self-service: a live session proves the controlling
  * identity. The new agent's controller edge -- and the own-agents
  * constraint on suspend/resume -- is derived from that proven
- * principal, never caller-supplied. identityd enforces that only a
+ * subject, never caller-supplied. identityd enforces that only a
  * human record controls agents, so an agent session cannot pass these
  * entries.
  */
 private string session_identity(string sessionToken)
 {
-    string principal, uuid;
+    string subject, uuid;
 
-    principal = SESSIOND->validate(sessionToken);
-    if (!principal) {
+    subject = SESSIOND->validate(sessionToken);
+    if (!subject) {
 	error("auth: no live session");
     }
-    if (sscanf(principal, "identity:%s", uuid) == 0) {
+    if (sscanf(subject, "identity:%s", uuid) == 0) {
 	error("auth: not an identity session");
     }
     return uuid;
@@ -376,7 +377,7 @@ void revoke_passkey(string sessionToken, string credentialId)
 }
 
 /*
- * the principal a live session token authenticates, or nil
+ * the subject a live session token authenticates, or nil
  */
 string validate(string token)
 {

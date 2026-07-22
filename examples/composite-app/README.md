@@ -41,7 +41,7 @@ This directory grounds the "Multiple applications on one port" pattern
 in docs/http-applications.md: `WWW/sys/router.c` and the registering
 initd are the files that section sketches. The seam walkthrough --
 how a connection object reaches a persistent daemon, and how a wire
-request becomes an authenticated principal -- is the companion doc
+request becomes an authenticated subject -- is the companion doc
 (docs/composite-applications.md).
 
 ## Routes
@@ -231,7 +231,7 @@ Recovery is one of the page's three ways in: the entry triad -- 1a
 Register, 1b Login, 1c Recover -- is picked by what you hold
 (nothing, a passkey on this device, or a recovery kit), so a
 returning user on a new device is never funneled into Register
-forking a fresh identity. The stored uuid plus one code bind the new
+forking a fresh platform identity. The stored uuid plus one code bind the new
 device's passkey to the SAME identity; the old passkey keeps working
 (two devices, one identity), and after a lost device, revocation is
 the operator plane's half. Recovery is also the human flow, and the

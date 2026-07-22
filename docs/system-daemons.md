@@ -192,7 +192,7 @@ The token ceremony: hash lookup, full-hash match, expiry and record checks; retu
 
 ## authd -- `src/usr/System/sys/authd.c`
 
-The transport authentication facade. The identity substrate's daemons gate every entry to System/kernel callers, so a tier-E transport surface -- an HTTP application binding a login flow, a non-HTTP protocol doing the same -- consumes ceremonies and sessions through this facade instead. It composes webauthnd and sessiond and exposes exactly the ceremony-plus-session flow; it deliberately does NOT expose `sessiond->mint` (minting a session for an arbitrary principal string would forge authority -- here a session is minted only for the principal a ceremony just proved), identityd mutation, or the capability grant path. The facade holds no state: challenge ownership stays with the caller per the webauthnd contract, and the reference single-use challenge store is `examples/composite-app`'s handler (`docs/composite-applications.md`). Unlike the rest of this page, the surface is deliberately callable from every tier.
+The transport authentication facade. The identity substrate's daemons gate every entry to System/kernel callers, so a tier-E transport surface -- an HTTP application binding a login flow, a non-HTTP protocol doing the same -- consumes ceremonies and sessions through this facade instead. It composes webauthnd and sessiond and exposes exactly the ceremony-plus-session flow; its entries return the acting identity's **subject** string (`identity:<uuid>`, the form the capability store records as a principal when authorizing). It deliberately does NOT expose `sessiond->mint` (minting a session for an arbitrary subject string would forge authority -- here a session is minted only for the subject a ceremony just proved), identityd mutation, or the capability grant path. The facade holds no state: challenge ownership stays with the caller per the webauthnd contract, and the reference single-use challenge store is `examples/composite-app`'s handler (`docs/composite-applications.md`). Unlike the rest of this page, the surface is deliberately callable from every tier.
 
 ### `string issue_challenge()`
 
@@ -200,23 +200,23 @@ A fresh single-use challenge via webauthnd; the caller stores it and accepts it 
 
 ### `mixed *register_identity(string challenge, string clientDataJSON, string attestationObject, varargs int ttl)`
 
-The TOFU registration ceremony plus session mint in one step; returns `({ principal, token })`. Ceremony errors propagate.
+The TOFU registration ceremony plus session mint in one step; returns `({ subject, token })`. Ceremony errors propagate.
 
 ### `mixed *authenticate(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature, varargs int ttl)`
 
-The assertion ceremony plus session mint in one step; returns `({ principal, token })`.
+The assertion ceremony plus session mint in one step; returns `({ subject, token })`.
 
 ### `string validate(string token)` / `int logout(string token)`
 
-sessiond's validate and revoke, passed through: the principal a live token authenticates (or nil), and single-session revocation (TRUE iff a live one was removed).
+sessiond's validate and revoke, passed through: the subject a live token authenticates (or nil), and single-session revocation (TRUE iff a live one was removed).
 
 ### `mixed *authenticate_agent_key(string challenge, string credentialId, string signature, varargs int ttl)` / `mixed *authenticate_agent_token(string agentToken, varargs int ttl)`
 
-The agent ceremonies (verified by agentauthd) plus session mint in one step; returns `({ principal, token })` exactly like the human flow -- a session is minted only for a ceremony-proven principal.
+The agent ceremonies (verified by agentauthd) plus session mint in one step; returns `({ subject, token })` exactly like the human flow -- a session is minted only for a ceremony-proven subject.
 
 ### `string mint_agent(string sessionToken, string credentialId, mapping row)` / `string *mint_agent_with_token(string sessionToken, varargs int ttl)` / `int suspend_agent(string sessionToken, string agentUuid)` / `void resume_agent(string sessionToken, string agentUuid)` / `void delegate_capability(string sessionToken, string agentUuid, string capability)` / `void undelegate_capability(string sessionToken, string agentUuid, string capability)`
 
-Controller self-service: a live session proves the controlling identity, and every operation derives the controller from that proven principal, never from a caller-supplied argument -- the new agent's controller edge on the mint paths, and the own-agents constraint on suspend/resume/delegate/undelegate. The substrate enforces that only a human record controls agents, so an agent session cannot mint or manage agents (`docs/identity.md` Agent identities).
+Controller self-service: a live session proves the controlling identity, and every operation derives the controller from that proven subject, never from a caller-supplied argument -- the new agent's controller edge on the mint paths, and the own-agents constraint on suspend/resume/delegate/undelegate. The substrate enforces that only a human record controls agents, so an agent session cannot mint or manage agents (`docs/identity.md` Agent identities).
 
 ### `mixed *query_agents(string sessionToken)`
 
@@ -224,7 +224,7 @@ The session identity's own agents, read-only: one row per agent, `({ uuid, suspe
 
 ### `mixed *recover_identity(string uuid, string code, string challenge, string clientDataJSON, string attestationObject, varargs int ttl)`
 
-The recovery ceremony plus session mint: verifies the NEW passkey's registration payload without a mint, then redeems the recovery code and binds the verified credential in identityd's one atomic step (valid even on the record's last credential), then mints the session for the recovered principal. Both proofs travel in one call -- a wrong code binds nothing, a bad attestation redeems nothing, and there is no intermediate recovery state to hijack (`docs/identity.md` Rotation and recovery).
+The recovery ceremony plus session mint: verifies the NEW passkey's registration payload without a mint, then redeems the recovery code and binds the verified credential in identityd's one atomic step (valid even on the record's last credential), then mints the session for the recovered identity. Both proofs travel in one call -- a wrong code binds nothing, a bad attestation redeems nothing, and there is no intermediate recovery state to hijack (`docs/identity.md` Rotation and recovery).
 
 ### `string *rotate_recovery_codes(string sessionToken, int n)`
 

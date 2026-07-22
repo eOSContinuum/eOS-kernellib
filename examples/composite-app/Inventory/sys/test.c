@@ -31,7 +31,7 @@
  *   LOGIN OK                     assertion ceremony mints a session
  *   ASSERT-REPLAY-REFUSED OK     replayed signature counter refused
  *   SECOND-IDENTITY OK           second registration (Ed25519 vector)
- *                                mints a distinct principal
+ *                                mints a distinct subject
  *   OWNER-ONLY OK                application-tier authorization: the
  *                                second identity may not edit the
  *                                first's item
@@ -95,7 +95,7 @@
  *                                be spent on the recovery route
  *   RECOVER OK                   code + new-passkey attestation in one
  *                                shot: atomic redeem-and-replace onto
- *                                the same principal, session minted
+ *                                the same identity, session minted
  *   LOGIN-AFTER-RECOVER OK       the recovered passkey asserts
  *   PASSKEYS-LISTED OK           the session's own passkeys read back:
  *                                both bound credentials, no key
@@ -221,8 +221,8 @@ private int cryptoMode;		/* ceremony surface available */
 private string token1;		/* first identity's session */
 private string token2;		/* login-minted session (revoked) */
 private string tokenEd;		/* second identity's session */
-private string principal1;	/* first identity */
-private string principalEd;	/* second identity */
+private string subject1;	/* first identity */
+private string subjectEd;	/* second identity */
 private int itemId;		/* the created item */
 private int auditCount;		/* audit entries at dump time */
 private string agentUuid;	/* the minted agent */
@@ -775,13 +775,13 @@ void http_done(int code, string body)
     case P_REGISTER:
 	parsed = jbody(body);
 	if (code != 201 ||
-	    typeof(parsed["principal"]) != T_STRING ||
-	    sscanf(parsed["principal"], "identity:%*s") == 0 ||
+	    typeof(parsed["subject"]) != T_STRING ||
+	    sscanf(parsed["subject"], "identity:%*s") == 0 ||
 	    typeof(parsed["token"]) != T_STRING) {
 	    stop("REGISTER: " + code + " " + body);
 	    return;
 	}
-	principal1 = parsed["principal"];
+	subject1 = parsed["subject"];
 	token1 = parsed["token"];
 	pass("REGISTER");
 	advance();
@@ -848,7 +848,7 @@ void http_done(int code, string body)
     case P_LOGIN:
 	parsed = jbody(body);
 	if (code != 200 || typeof(parsed["token"]) != T_STRING ||
-	    parsed["principal"] != principal1) {
+	    parsed["subject"] != subject1) {
 	    stop("LOGIN: " + code + " " + body);
 	    return;
 	}
@@ -868,13 +868,13 @@ void http_done(int code, string body)
 
     case P_SECOND_IDENTITY:
 	parsed = jbody(body);
-	if (code != 201 || typeof(parsed["principal"]) != T_STRING ||
-	    parsed["principal"] == principal1 ||
+	if (code != 201 || typeof(parsed["subject"]) != T_STRING ||
+	    parsed["subject"] == subject1 ||
 	    typeof(parsed["token"]) != T_STRING) {
 	    stop("SECOND-IDENTITY: " + code + " " + body);
 	    return;
 	}
-	principalEd = parsed["principal"];
+	subjectEd = parsed["subject"];
 	tokenEd = parsed["token"];
 	pass("SECOND-IDENTITY");
 	advance();
@@ -954,7 +954,7 @@ void http_done(int code, string body)
     case P_AGENT_LOGIN:
 	parsed = jbody(body);
 	if (code != 200 ||
-	    parsed["principal"] != "identity:" + agentUuid ||
+	    parsed["subject"] != "identity:" + agentUuid ||
 	    typeof(parsed["token"]) != T_STRING) {
 	    stop("AGENT-LOGIN: " + code + " " + body);
 	    return;
@@ -1021,7 +1021,7 @@ void http_done(int code, string body)
     case P_AGENT_RELOGIN:
 	parsed = jbody(body);
 	if (code != 200 ||
-	    parsed["principal"] != "identity:" + agentUuid) {
+	    parsed["subject"] != "identity:" + agentUuid) {
 	    stop("AGENT-RESUME: relogin " + code + " " + body);
 	    return;
 	}
@@ -1096,8 +1096,8 @@ void http_done(int code, string body)
 	    return;
 	}
 	rvCode = value[0];
-	if (sscanf(principal1, "identity:%s", rvUuid) == 0) {
-	    stop("RECOVERY-CODES: unparsable principal " + principal1);
+	if (sscanf(subject1, "identity:%s", rvUuid) == 0) {
+	    stop("RECOVERY-CODES: unparsable subject " + subject1);
 	    return;
 	}
 	pass("RECOVERY-CODES");
@@ -1124,7 +1124,7 @@ void http_done(int code, string body)
 
     case P_RV_RECOVER:
 	parsed = jbody(body);
-	if (code != 200 || parsed["principal"] != principal1 ||
+	if (code != 200 || parsed["subject"] != subject1 ||
 	    typeof(parsed["token"]) != T_STRING) {
 	    stop("RECOVER: " + code + " " + body);
 	    return;
@@ -1135,7 +1135,7 @@ void http_done(int code, string body)
 
     case P_RV_NEW_LOGIN:
 	parsed = jbody(body);
-	if (code != 200 || parsed["principal"] != principal1) {
+	if (code != 200 || parsed["subject"] != subject1) {
 	    stop("LOGIN-AFTER-RECOVER: " + code + " " + body);
 	    return;
 	}

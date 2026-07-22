@@ -2,12 +2,21 @@
 <meta charset="utf-8">
 <title>composite-app WebAuthn demo</title>
 <style>
-  body { font: 15px/1.5 system-ui, sans-serif; max-width: 46rem; margin: 0 auto 2rem; padding: 0 1rem; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 82rem; margin: 0 auto 2rem; padding: 0 1rem; }
+  #page { display: grid; grid-template-columns: minmax(0, 46rem) minmax(22rem, 1fr); gap: 0 2rem; }
+  #left { min-width: 0; }
+  #right { min-width: 0; position: sticky; top: 1rem; align-self: start; }
+  @media (max-width: 64rem) {
+    #page { grid-template-columns: 1fr; }
+    #right { position: static; }
+    #banner { margin-top: 1rem; }
+    #log { max-height: 22rem; }
+  }
   button { font: inherit; padding: .4rem .9rem; margin: 0 .4rem .4rem 0; }
   button:disabled { opacity: .45; }
   input { font: inherit; padding: .3rem; }
-  #banner { position: sticky; top: 0; background: #fff; border-bottom: 2px solid #ccc;
-            padding: .6rem 0; margin-bottom: 1rem; z-index: 1; }
+  #banner { background: #fff; border-bottom: 2px solid #ccc;
+            padding: .6rem 0; margin: 0 0 .4rem; }
   #banner .who { font-weight: 600; }
   #banner .out { color: #666; } #banner .human { color: #06600e; } #banner .agent { color: #6a1fa0; }
   #banner .stream { font-size: 13px; color: #666; }
@@ -16,30 +25,29 @@
   .legend { background: #f8f6ee; border: 1px solid #ddd; padding: .6rem .8rem; font-size: 14px; }
   h2 { font-size: 16px; margin: 1.2rem 0 .3rem; }
   .note { font-size: 13px; color: #555; margin: 0 0 .4rem; }
-  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; max-height: 22rem; overflow-y: auto; }
+  #log { background: #f4f4f4; border: 1px solid #ccc; padding: .8rem; white-space: pre-wrap; font: 13px/1.45 ui-monospace, monospace; min-height: 8rem; max-height: calc(100vh - 16rem); overflow-y: auto; }
   #tickfoot { background: #f4f4f4; border: 1px solid #ccc; border-top: 0; padding: .3rem .8rem; font: 13px/1.45 ui-monospace, monospace; color: #06600e; font-style: italic; }
   .ok { color: #06600e; } .err { color: #a11; } .hint { color: #555; font-style: italic; }
 </style>
 <h1>composite-app: browser-real WebAuthn</h1>
-<div id="banner">
-  <button id="reset" title="forget this page's session and log, keep the server's state">Reset demo</button>
-  <div class="who" id="who">Session: logged out</div>
-  <div class="stream" id="stream">Streaming: connecting&hellip;</div>
-  <div class="agentnote" id="agentnote" hidden>Agent session: steps
-  8-12 and 15-18 need the principal's session &mdash; passkey login
-  (1b) switches back. Try mint (7) and the report (14) to see what an
-  agent can and cannot do.</div>
-</div>
+<div id="page">
+<div id="left">
 <div class="legend">
-  <b>Principal and agents.</b> Your passkey identity is the
-  <b>principal</b> -- the party on whose behalf everything here runs;
-  step 7 mints <b>agents</b> it controls (the API's routes and console
-  verbs call the principal the agent's "controller"). The page holds
-  one session at a time; the banner above always says who is acting,
-  and buttons that need a different session disable themselves and say
-  why. One wire note: API responses name the ACTING identity's subject
-  string in a field called <code>principal</code> -- even for an
-  agent's actions; this page keeps "principal" for you, the party
+  <b>Principal and agents.</b> YOU are the <b>principal</b> -- the
+  party on whose behalf everything here runs. Your passkeys
+  AUTHENTICATE you (several can prove the same platform identity,
+  and recovery codes are the fallback -- losing one authenticator
+  never loses the identity). What you may DO is authorized separately: an operator
+  grants capabilities to your identity, and step 7 mints <b>agents</b>
+  to which you can delegate a subset of what you hold (the API's
+  routes and console verbs call the principal the agent's
+  "controller"). The page holds
+  one session at a time; the banner above the log always says who is
+  acting, and buttons that need a different session disable themselves
+  and say why. One wire note: API responses name the ACTING identity's subject
+  string in a field called <code>subject</code>; the capability store
+  records exactly that string as a principal when deciding what it
+  may do -- while this page keeps "principal" for you, the party
   agents act for.<br>
   <b>Two planes.</b> This page is the application plane; grants and
   delegable flags belong to the <b>operator console</b>. The demo deploy
@@ -62,9 +70,9 @@
 
 <h2>1. Ways in (unauthenticated -- pick by what you hold)</h2>
 <p class="note">Every path starts logged out; the three entries differ
-only in what you hold. Nothing yet: <b>1a</b> creates a NEW identity
-bound to this device's passkey (the demo grants it
-example:delegation-demo at registration). A passkey on this device:
+only in what you hold. Nothing yet: <b>1a</b> creates a NEW platform
+identity whose first credential is this device's passkey (the demo
+grants it example:delegation-demo at registration). A passkey on this device:
 <b>1b</b> logs in -- also the way back from an agent session. A
 recovery kit (uuid + one code, provisioned at 15): <b>1c</b> enrolls a
 fresh passkey on THIS device and atomically binds it to your EXISTING
@@ -72,7 +80,7 @@ identity, spending the code -- recovery never logs in with an old
 passkey. 1c serves the new-device case (the old passkey keeps working:
 two devices, one identity) and the lost-device case: recover here,
 then list (16) and revoke (17) the lost device's passkey. The uuid
-is the demo's account handle -- the platform keys identity by uuid,
+is the demo's account handle -- the platform keys identities by uuid,
 the passkey sheet's demo@localhost label is decorative, and a real app
 would layer a verified handle-to-identity directory on top; this page
 remembers your principal uuid in this browser and prefills the
@@ -185,9 +193,22 @@ passkey login (1b) is the way back.</p>
   <button id="revokekey">17. Revoke passkey</button>
   <button id="enroll">18. Enroll another passkey</button>
 </p>
+</div>
+<div id="right">
+<div id="banner">
+  <button id="reset" title="forget this page's session and log, keep the server's state">Reset demo</button>
+  <div class="who" id="who">Session: logged out</div>
+  <div class="stream" id="stream">Streaming: connecting&hellip;</div>
+  <div class="agentnote" id="agentnote" hidden>Agent session: steps
+  8-12 and 15-18 need the principal's session &mdash; passkey login
+  (1b) switches back. Try mint (7) and the report (14) to see what an
+  agent can and cannot do.</div>
+</div>
 <div id="log">ready.
 </div>
 <div id="tickfoot">server heartbeat: waiting for the first tick&hellip;</div>
+</div>
+</div>
 <script>
 const log = (m, cls) => {
   const d = document.getElementById('log');
@@ -212,9 +233,13 @@ let expired = false;           // last session ended by TTL/revocation
 let lastAgentUuid = null;      // uuid of the last minted/logged-in agent
 let liveAudit = null, liveAgents = null;
 let auditLive = false, agentsLive = false;
+let regHintShown = false, auditHintShown = false, createHintShown = false;
+let suspendHintShown = false, delegateHintShown = false;
 
 const short = u => u ? u.slice(0, 8) + '…' : '?';
 const uuidOf = p => (p || '').replace('identity:', '');
+const actor = () => sessionKind === 'agent' ? 'the agent' :
+  sessionKind === 'human' ? 'the principal' : 'nobody';
 const el = id => document.getElementById(id);
 
 /*
@@ -303,7 +328,15 @@ function openAuditStream() {
   auditLive = false;
   liveAudit = new EventSource('/inventory/events?heartbeat=1');
   liveAudit.onopen = () => { auditLive = true; updateUI(); };
-  liveAudit.addEventListener('audit', e => log('live audit: ' + e.data, 'ok'));
+  liveAudit.addEventListener('audit', e => {
+    log('live audit: ' + e.data, 'ok');
+    if (!auditHintShown) {
+      auditHintShown = true;
+      log('live audit lines are a Merry property observer on ' +
+          'inventoryd, relayed over SSE: mutations dispatch observers, ' +
+          'nothing polls', 'hint');
+    }
+  });
   liveAudit.addEventListener('tick', e => {
     const t = JSON.parse(e.data);
     el('tickfoot').textContent = 'server heartbeat #' + t.n + ' at ' +
@@ -351,6 +384,7 @@ function setSession(newToken, newSubject, kind) {
     principalUuid = uuidOf(newSubject);
     try { localStorage.setItem('demo-principal-uuid', principalUuid); }
     catch (e) {}
+    el('rvuuid').value = principalUuid;
   }
   openAgentStream();
   updateUI();
@@ -393,24 +427,32 @@ el('reg').onclick = async () => {
     });
     if (res.status === 201) {
       const prev = principalUuid;
-      setSession(res.body.token, res.body.principal, 'human');
-      log('REGISTER OK: ' + res.body.principal +
+      setSession(res.body.token, res.body.subject, 'human');
+      log('[1a] REGISTER OK: ' + res.body.subject +
           ' -- you are the principal', 'ok');
       log('the demo deploy granted this identity ' +
           'example:delegation-demo at registration; step 11 will use it',
           'hint');
+      if (!regHintShown) {
+        regHintShown = true;
+        log('behind 1a: webauthnd verified the WebAuthn ceremony and ' +
+            'sessiond minted the bearer session in one authd step; the ' +
+            'token is stored hashed, so the plaintext never reaches a ' +
+            'statedump', 'hint');
+      }
       if (prev && prev !== principalUuid) {
         log('note: this page previously remembered principal ' +
-            short(prev) + ' -- registering created a DIFFERENT identity ' +
-            '(the 1a-vs-1c fork). The old identity still recovers with ' +
+            short(prev) + ' -- registering created a DIFFERENT ' +
+            'platform identity (the 1a-vs-1c fork). The old identity ' +
+            'still recovers with ' +
             'ITS uuid + code; the uuid field now prefills the new one.',
             'hint');
       }
     } else {
-      log('REGISTER refused: ' + res.status + ' ' +
+      log('[1a] REGISTER refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('register: ' + e, 'err'); }
+  } catch (e) { log('[1a] register: ' + e, 'err'); }
 };
 
 el('login').onclick = async () => {
@@ -431,36 +473,43 @@ el('login').onclick = async () => {
     });
     if (res.status === 200) {
       credId = b64u.enc(cred.rawId);
-      setSession(res.body.token, res.body.principal, 'human');
-      log('LOGIN OK: ' + res.body.principal +
+      setSession(res.body.token, res.body.subject, 'human');
+      log('[1b] LOGIN OK: ' + res.body.subject +
           ' -- principal session (back from any agent session)', 'ok');
     } else {
-      log('LOGIN refused: ' + res.status + ' ' +
+      log('[1b] LOGIN refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('login: ' + e, 'err'); }
+  } catch (e) { log('[1b] login: ' + e, 'err'); }
 };
 
 el('logout').onclick = async () => {
   const res = await post('/auth/logout', {}, true);
   setSession(null, null, null);
-  log('logout: ' + res.status + ' ' + JSON.stringify(res.body));
+  log('[2] logout: ' + res.status + ' ' + JSON.stringify(res.body));
 };
 
 el('create').onclick = async () => {
+  log('[3a] create "' + el('itemname').value + '" as ' + actor() + ' ->');
   const res = await post('/inventory/items',
     { name: el('itemname').value, qty: 1 }, true);
-  log('create item (as ' + (sessionKind || 'nobody') + '): ' +
-      res.status + ' ' + JSON.stringify(res.body),
+  log('[3a] create item: ' + res.status + ' ' + JSON.stringify(res.body),
       res.status === 201 ? 'ok' : 'err');
   if (res.status === 201 && res.body.id) {
     el('itemid').value = res.body.id;
+    if (!createHintShown) {
+      createHintShown = true;
+      log('the item and its audit entry committed in one atomic ' +
+          'function -- all or nothing; a failure would roll back both',
+          'hint');
+    }
     updateUI();
   }
 };
 
 el('update').onclick = async () => {
   const id = el('itemid').value.trim();
+  log('[3b] update item ' + id + ' as ' + actor() + ' ->');
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   const r = await fetch('/inventory/items/' + id, { method: 'PUT',
@@ -468,9 +517,8 @@ el('update').onclick = async () => {
                                     qty: 2 }) });
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
-  log('update item ' + id + ' (as ' + (sessionKind || 'nobody') + '): ' +
-      r.status + ' ' + JSON.stringify(body),
-      r.status === 200 ? 'ok' : 'err');
+  log('[3b] update item ' + id + ': ' + r.status + ' ' +
+      JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
   if (r.status === 403) {
     log('application-tier authorization: the item\'s CREATOR decides, ' +
         'and delegation does not transfer ownership -- the third ' +
@@ -480,12 +528,12 @@ el('update').onclick = async () => {
 
 el('list').onclick = async () => {
   const r = await fetch('/inventory/items');
-  log('items: ' + JSON.stringify(await r.json()));
+  log('[4] items: ' + JSON.stringify(await r.json()));
 };
 
 el('audit').onclick = async () => {
   const r = await fetch('/inventory/audit');
-  log('audit: ' + JSON.stringify(await r.json()));
+  log('[5] audit: ' + JSON.stringify(await r.json()));
 };
 
 el('wipe').onclick = async () => {
@@ -493,7 +541,7 @@ el('wipe').onclick = async () => {
     headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
-  log('wipe: ' + r.status + ' ' + JSON.stringify(body),
+  log('[6] wipe: ' + r.status + ' ' + JSON.stringify(body),
       r.status === 403 ? 'ok' : 'err');
   if (r.status === 403) {
     log('403 is the lesson: example:inventory-admin is a platform ' +
@@ -503,17 +551,18 @@ el('wipe').onclick = async () => {
 };
 
 el('mint').onclick = async () => {
+  log('[7] mint agent as ' + actor() + ' ->');
   const res = await post('/auth/agents', {}, true);
   if (res.status === 201) {
     el('agentuuid').value = res.body.uuid;
     el('agenttoken').value = res.body.token;
     lastAgentUuid = res.body.uuid;
-    log('AGENT MINTED: ' + res.body.uuid, 'ok');
+    log('[7] AGENT MINTED: ' + res.body.uuid, 'ok');
     log('agent token (this response is the only time the plaintext ' +
         'exists): ' + res.body.token);
     updateUI();
   } else {
-    log('mint (as ' + (sessionKind || 'nobody') + '): ' + res.status +
+    log('[7] mint (as ' + actor() + '): ' + res.status +
         ' ' + JSON.stringify(res.body),
         sessionKind === 'agent' && res.status === 403 ? 'ok' : 'err');
     if (sessionKind === 'agent' && res.status === 403) {
@@ -531,27 +580,46 @@ el('agents').onclick = async () => {
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
-    log('agents (' + body.agents.length + '):');
+    log('[8] agents (' + body.agents.length + '):');
     body.agents.forEach(a => log('  ' + a.uuid +
       (a.suspended ? ' [suspended]' : ' [active]') +
       (a.capabilities.length ?
         '  caps: ' + a.capabilities.join(', ') : '')));
   } else {
-    log('agents: ' + r.status + ' ' + JSON.stringify(body), 'err');
+    log('[8] agents: ' + r.status + ' ' + JSON.stringify(body), 'err');
   }
 };
 
-const agentOp = async (op, extra) => {
+const agentOp = async (op, step, extra) => {
   const uuid = el('agentuuid').value.trim();
+  log('[' + step + '] ' + op + ' ' + short(uuid) + ' ->');
   const res = await post('/auth/agents/' + uuid + '/' + op, extra || {}, true);
-  log(op + ': ' + res.status + ' ' + JSON.stringify(res.body),
-      res.status === 200 ? 'ok' : 'err');
+  log('[' + step + '] ' + op + ': ' + res.status + ' ' +
+      JSON.stringify(res.body), res.status === 200 ? 'ok' : 'err');
+  return res;
 };
-el('suspend').onclick = () => agentOp('suspend');
-el('resume').onclick = () => agentOp('resume');
+el('suspend').onclick = async () => {
+  const res = await agentOp('suspend', 9);
+  if (res.status === 200 && !suspendHintShown) {
+    suspendHintShown = true;
+    log('suspension is one atomic operation: ceremonies now refuse, ' +
+        'live sessions are revoked (revoked: ' + res.body.revoked +
+        (res.body.revoked ? '' : ' -- none was live') + '), and ' +
+        'delegated grants die with them; resume (10) restores ' +
+        'authentication only', 'hint');
+  }
+};
+el('resume').onclick = () => agentOp('resume', 10);
 el('delegate').onclick = async () => {
   const cap = el('cap').value.trim();
-  await agentOp('delegate', { capability: cap });
+  const res = await agentOp('delegate', 11, { capability: cap });
+  if (res.status === 200 && !delegateHintShown) {
+    delegateHintShown = true;
+    log('the grant is a source-tracked store entry: this delegation ' +
+        'is one source, an operator grant of the same capability ' +
+        'would be another, and the entry dies only with its last ' +
+        'source', 'hint');
+  }
   if (cap !== 'example:delegation-demo') {
     log('example:delegation-demo is the capability the demo deploy ' +
         'pre-provisioned (granted + delegable); other capabilities ' +
@@ -559,22 +627,22 @@ el('delegate').onclick = async () => {
   }
 };
 el('undelegate').onclick = () =>
-  agentOp('undelegate', { capability: el('cap').value.trim() });
+  agentOp('undelegate', 12, { capability: el('cap').value.trim() });
 
 el('agentlogin').onclick = async () => {
   const t = el('agenttoken').value.trim();
   const res = await post('/auth/agent-login', { token: t });
   if (res.status === 200) {
-    setSession(res.body.token, res.body.principal, 'agent');
-    lastAgentUuid = uuidOf(res.body.principal);
-    log('AGENT LOGIN OK: ' + res.body.principal, 'ok');
+    setSession(res.body.token, res.body.subject, 'agent');
+    lastAgentUuid = uuidOf(res.body.subject);
+    log('[13] AGENT LOGIN OK: ' + res.body.subject, 'ok');
     log('the page session is now the agent\'s: item create (3a) runs ' +
         'as the agent, principal-only steps 8-12 and 15-17 disable, ' +
         'and passkey login (1b) switches back -- try the report (14), ' +
         'mint (7), and updating the principal\'s item (3b) to see ' +
         'what the agent can and cannot do', 'hint');
   } else {
-    log('agent login refused: ' + res.status + ' ' +
+    log('[13] agent login refused: ' + res.status + ' ' +
         JSON.stringify(res.body), 'err');
   }
 };
@@ -584,7 +652,7 @@ el('report').onclick = async () => {
     { 'Authorization': 'Bearer ' + token } : {} });
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
-  log('report (as ' + (sessionKind || 'nobody') + '): ' + r.status +
+  log('[14] report (as ' + actor() + '): ' + r.status +
       ' ' + JSON.stringify(body), r.status === 200 ? 'ok' : 'err');
   if (r.status === 403 && sessionKind === 'agent') {
     log('the agent holds example:delegation-demo only while a ' +
@@ -600,7 +668,7 @@ el('passkeys').onclick = async () => {
   if (r.status === 401 && token) sessionLost();
   const body = await r.json().catch(() => ({}));
   if (r.status === 200) {
-    log('passkeys (' + body.passkeys.length + '):');
+    log('[16] passkeys (' + body.passkeys.length + '):');
     let firstOther = '';
     body.passkeys.forEach(p => {
       const mine = p.id === credId;
@@ -612,15 +680,15 @@ el('passkeys').onclick = async () => {
     if (firstOther) el('credid').value = firstOther;
     updateUI();
   } else {
-    log('passkeys: ' + r.status + ' ' + JSON.stringify(body), 'err');
+    log('[16] passkeys: ' + r.status + ' ' + JSON.stringify(body), 'err');
   }
 };
 
 el('revokekey').onclick = async () => {
   const id = el('credid').value.trim();
   const res = await post('/auth/passkeys/' + id + '/revoke', {}, true);
-  log('revoke passkey: ' + res.status + ' ' + JSON.stringify(res.body),
-      res.status === 200 ? 'ok' : 'err');
+  log('[17] revoke passkey: ' + res.status + ' ' +
+      JSON.stringify(res.body), res.status === 200 ? 'ok' : 'err');
   if (res.status === 200) {
     log('the revoked passkey can no longer log in; the identity\'s ' +
         'remaining passkeys still can -- the lost-device story is ' +
@@ -650,29 +718,30 @@ el('enroll').onclick = async () => {
       attestationObject: b64u.enc(cred.response.attestationObject),
     }, true);
     if (res.status === 201) {
-      log('ENROLLED: an additional passkey (' +
+      log('[18] ENROLLED: an additional passkey (' +
           String(res.body.enrolled) + ') is bound to ' +
           'your identity -- no recovery code spent; list (16) shows ' +
           'both, and either logs in', 'ok');
       updateUI();
     } else {
-      log('enroll refused: ' + res.status + ' ' +
+      log('[18] enroll refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('enroll: ' + e, 'err'); }
+  } catch (e) { log('[18] enroll: ' + e, 'err'); }
 };
 
 el('mintcodes').onclick = async () => {
   const res = await post('/auth/recovery-codes', { n: 2 }, true);
   if (res.status === 201) {
     el('rvuuid').value = principalUuid || '';
-    log('RECOVERY KIT -- save the uuid and codes TOGETHER; the codes ' +
-        'exist only in this response, and recovery needs both:', 'ok');
+    log('[15] RECOVERY KIT -- save the uuid and codes TOGETHER; the ' +
+        'codes exist only in this response, and recovery needs both:',
+        'ok');
     log('  principal uuid: ' + (principalUuid || '?'));
     res.body.codes.forEach((c, i) => log('  code ' + (i + 1) + ': ' + c));
     updateUI();
   } else {
-    log('recovery codes: ' + res.status + ' ' +
+    log('[15] recovery codes: ' + res.status + ' ' +
         JSON.stringify(res.body), 'err');
   }
 };
@@ -682,12 +751,12 @@ el('recover').onclick = async () => {
     const uuid = el('rvuuid').value.trim();
     const code = el('rvcode').value.trim();
     if (lastAgentUuid && uuid === lastAgentUuid) {
-      log('recover: that is the AGENT uuid -- recovery re-binds your ' +
+      log('[1c] recover: that is the AGENT uuid -- recovery re-binds your ' +
           'PRINCIPAL identity (' + (principalUuid || 'register first') +
           '); use the principal uuid step 15 filled in', 'err');
       return;
     }
-    log('recover: enrolling a REPLACEMENT passkey -- Safari will now ' +
+    log('[1c] recover: enrolling a REPLACEMENT passkey -- Safari will now ' +
         'prompt to create one; the uuid names the identity, the code ' +
         'proves the right, and the new key binds in the same atomic ' +
         'step (recovery never logs in with an old passkey)', 'hint');
@@ -710,22 +779,24 @@ el('recover').onclick = async () => {
     });
     if (res.status === 200) {
       credId = b64u.enc(cred.rawId);
-      setSession(res.body.token, res.body.principal, 'human');
-      log('RECOVER OK: ' + res.body.principal + ' -- the new passkey ' +
+      setSession(res.body.token, res.body.subject, 'human');
+      log('[1c] RECOVER OK: ' + res.body.subject + ' -- the new passkey ' +
           'is bound to the SAME identity, the code is spent, and this ' +
           'session is live', 'ok');
     } else {
-      log('recover refused: ' + res.status + ' ' +
+      log('[1c] recover refused: ' + res.status + ' ' +
           JSON.stringify(res.body), 'err');
     }
-  } catch (e) { log('recover: ' + e, 'err'); }
+  } catch (e) { log('[1c] recover: ' + e, 'err'); }
 };
 
 el('reset').onclick = () => {
   closeAgentStream();
-  token = null; principal = null; sessionKind = null;
+  token = null; subject = null; sessionKind = null;
   principalUuid = null; lastAgentUuid = null; credId = null;
   expired = false;
+  regHintShown = auditHintShown = createHintShown = false;
+  suspendHintShown = delegateHintShown = false;
   try {
     localStorage.removeItem('demo-principal-uuid');
     localStorage.removeItem('demo-controller-uuid');
