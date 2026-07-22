@@ -1,6 +1,6 @@
 # System-daemon application surface
 
-The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), the agent ceremony daemon (agentauthd), the transport authentication facade (authd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
+The signature reference for the daemons an author is told to consume elsewhere in this doc set: the compile-graph recorder (objectd), the upgrade coordinator (upgraded), the error manager (errord), the logger (logd), the port-label registry (portd), the capability store (capabilityd), the identity registry (identityd), the WebAuthn ceremony daemon (webauthnd), the session daemon (sessiond), the agent ceremony daemon (agentauthd), the transport authentication facade (authd), and the logical-name registry (the Index daemon). Format follows `docs/dispatcher.md`'s Application surface: per-function signature, gating, semantics. The source files are authoritative.
 
 **Audience**: a System-tier or application author about to call one of these daemons directly and needing the exact contract, after the owning concept doc (`docs/code-lifecycle.md`, `docs/operations.md`, `docs/capability.md`, `docs/schema.md`) has explained when to.
 
@@ -63,6 +63,22 @@ Gated to SYSTEM() or KERNEL() callers; errord's persistence path. Appends a pre-
 ### `void set_threshold(int level)` / `int query_threshold()`
 
 The write is KERNEL()-gated (an ungated caller gets an error, not a silent nil) and errors on a level outside the valid range; the read is public. Default threshold is INFO. Operators reach these through the `log-level` verb.
+
+## portd -- `src/usr/System/sys/portd.c`
+
+The port-label registry: the label layer over the kernel's numeric port-to-manager registration, letting System-tier boot code name a configured port slot by role and connection managers register by label rather than by position in the `.dgd` port list. Where the kernel surface is silent about mistakes (a port with no registered manager falls back to the kernel's default user object), the registry refuses loudly. The daemon declares the canonical labels at boot: `admin` (telnet 0), `http` (binary 0), and `https` (binary 1) when the matching slot is configured. `PORTD` is the object-path constant from `<portd.h>`; `docs/common-tasks.md` Bind an additional port is the worked recipe.
+
+### `void declare_label(string label, string type, int index)`
+
+SYSTEM()-gated. Declares `label` for the port at position `index` of the configured `type` list (`"telnet"`, `"binary"`, or `"datagram"`). Errors on an empty label, an unknown type, an index with no configured port of that type, or a label already declared.
+
+### `void register_manager(string label, object manager)`
+
+SYSTEM()-gated. Registers `manager` as the connection manager for a declared label, forwarding to the kernel userd's numeric registration underneath (first registration wins there). Errors on a nil manager, an undeclared label, or a label that already has a registered manager. A registration made directly against the kernel userd bypasses the registry and is invisible to it: the manager a query reports is the one registered through the label path.
+
+### `mixed *query_label(string label)` / `string *query_labels()`
+
+Public -- the query surface is open to every tier. `query_label` resolves a declared label to `({ type, index, port, manager })`, where `port` is the live port number from driver status and `manager` is nil until one registers; an undeclared label answers nil. `query_labels` returns the declared label names.
 
 ## capabilityd -- `src/kernel/sys/capabilityd.c`
 
