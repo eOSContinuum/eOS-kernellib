@@ -16,6 +16,23 @@ It is the wrong platform, by design and not by immaturity, when any of these hol
 - The workload needs **declarative cross-entity queries**. There is no query planner over the image; enumeration and indexing are application structures.
 - The workload needs **multi-core CPU parallelism inside the state domain**. Exactly one task runs in the image at any instant, to completion; more cores do not parallelize in-image work, and added concurrency buys queueing, not parallelism (`execution-model.md` Run to completion; measured in `operations.md` Limits and capacity).
 
+## From your system to the nearest example
+
+Start from the example nearest the system you are picturing. Each runs in one command (`scripts/run-example.sh <name>`), except `http-app` and `https-app`, which verify with live curl probes per their own READMEs:
+
+| You are picturing | Start from |
+|---|---|
+| An HTTP service with a health endpoint | `examples/http-app` (its TLS twin: `examples/https-app`) |
+| A full authenticated service: users, sessions, agents, live event streams | `examples/composite-app` (`composite-applications.md` walks it in stages) |
+| Passkey/WebAuthn ceremony mechanics alone | `examples/webauthn-app` |
+| Agents acting on a person's behalf | `examples/agent-app` |
+| Rooms, users, and capability-gated admin actions | `examples/chat-app` |
+| Reactions that commit or roll back with the state change | `examples/signal-app` |
+| Sandboxed scripting over platform state | `examples/merry-app` |
+| Typed records persisted to exportable on-disk XML | `examples/vault-app` |
+| Live code upgrade on a running system | `examples/hot-reload-demo`, `examples/hot-reload-master`, `examples/upgrade-cascade` |
+| The atomic rollback guarantee in its smallest form | `examples/atomic-demo` |
+
 ## What is proven today
 
 `runtime-primitives.md` states per-primitive status honestly rather than claiming the set wholesale: of the eight primitives, three are **Validated** (atomicity, persistent state, hot reload) and five are **Partial** (capability separation, sandboxed code load, asynchronous events, multi-agent coherence, state introspection) -- foundation present, demonstration incomplete. Its At-a-glance table carries a one-command proof per primitive; the fastest single check is:

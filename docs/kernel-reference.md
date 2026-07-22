@@ -20,8 +20,11 @@ The sections on this page are one of several signature homes. From "I need the s
 | Console verb | `code`, `upgrade`, `log` | [`admin-console.md`](admin-console.md), the alphabetical verb appendix |
 | System daemon API | `objectd`, `upgraded`, `errord`, `logd` | [`system-daemons.md`](system-daemons.md) |
 | HTTP API class | `HttpRequest`, `Http1Server`, `Http1Client` | [`http-applications.md`](http-applications.md), API signatures |
+| Vault-layout subsystem (Vault / Marshal / Schema / XML / Index) | `lib/app.c` participation, `dtd_daemon` type registration | No rows here or in the function index, by design: an application consumes these through the participating-domain contract -- [`vault-applications.md`](vault-applications.md), with [`schema.md`](schema.md) and [`xml.md`](xml.md) carrying the file-by-file references |
 
 `See also` references naming a DGD kfun point at DGD's own kfun documentation, maintained in [`dworkin/lpc-doc`](https://github.com/dworkin/lpc-doc); those pages are not part of this repository.
+
+**The application author's short list.** The routers above cover every callable surface; a tier-E application author's daily set is much smaller, and each entry in it is taught by a recipe or tutorial: the lifecycle overrides (`clone_object`, `destruct_object`, `find_object`), deferral and health (`call_out`, `status`), the property surface (`set_property` and the rest of the `/lib/util/properties.c` block), observers (`register_observer`), asynchronous chains (`Continuation`'s `chain` / `runNext`), the collection classes (`KVstore`, `Array`, `String` / `StringBuffer`), the JSON codec ([`common-tasks.md`](common-tasks.md) Encode or decode JSON), the file kfuns under the kernel's access checks (`read_file`, `write_file`), and the HTTP handler surface (`Http1Server`; the `handle()` contract itself is stated in [`composite-applications.md`](composite-applications.md)). [`common-tasks.md`](common-tasks.md) teaches these in task shape; the rest of the index is reference depth for when a task outgrows the recipes.
 
 ## Where the platform calls you
 

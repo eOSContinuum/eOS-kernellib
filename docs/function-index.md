@@ -4,6 +4,8 @@ An alphabetical index of the platform's callable surfaces: each name, its kind, 
 
 The link resolves to the exact signature where the owning home titles each callable (efun overrides, daemon APIs, dispatcher LFUNs, library classes, HTTP classes); for the table-based homes (merryfuns, console verbs) it resolves to the table's section.
 
+One boundary is deliberate rather than an omission: the Vault layout's five subsystems (Vault / Marshal / Schema / XML / Index) have no rows here. An application consumes them through the participating-domain contract ([vault-applications.md](vault-applications.md) The participating-domain contract), not through a flat callable surface, and their file-by-file references live on their own pages ([vault-applications.md](vault-applications.md), [schema.md](schema.md), [xml.md](xml.md)).
+
 | Name | Kind | Signature home |
 |---|---|---|
 | `/lib/util/named.c` | utility module | [kernel-libraries.md](kernel-libraries.md#libutilnamedc) |
@@ -61,6 +63,7 @@ The link resolves to the exact signature where the owning home titles each calla
 | `driver` | driver/userd hook | [kernel-reference.md](kernel-reference.md#driver) |
 | `Duplicate` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `ed` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
+| `enroll_passkey` | daemon API | [system-daemons.md](system-daemons.md#string-enroll_passkeystring-sessiontoken-string-challenge-string-clientdatajson-string-attestationobject) |
 | `Every` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `file_info` | efun override | [kernel-reference.md](kernel-reference.md#file_info) |
 | `find_by_credential` | daemon API | [system-daemons.md](system-daemons.md#object-find_identitystring-uuid--string-find_by_credentialstring-credentialid--int-query_identity_count) |
@@ -134,6 +137,7 @@ The link resolves to the exact signature where the owning home titles each calla
 | `query_objects` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_tree--string-query_subdirsvarargs-string-path--string-query_objectsvarargs-string-path) |
 | `query_origin` | daemon API | [system-daemons.md](system-daemons.md#void-configurestring-rpid-string-origin--string-query_rp_id--string-query_origin) |
 | `query_owner` | lfun | [kernel-reference.md](kernel-reference.md#query_owner) |
+| `query_passkeys` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_passkeysstring-sessiontoken--void-revoke_passkeystring-sessiontoken-string-credentialid) |
 | `query_path` | daemon API | [system-daemons.md](system-daemons.md#string-query_pathint-index) |
 | `query_prefixed_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
 | `query_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
@@ -158,10 +162,11 @@ The link resolves to the exact signature where the owning home titles each calla
 | `register_observer` | dispatcher LFUN | [dispatcher.md](dispatcher.md#register_observerobject-ob-mixed-path-string-timing-string-source) |
 | `remove_dir` | efun override | [kernel-reference.md](kernel-reference.md#remove_dir) |
 | `remove_observer` | dispatcher LFUN | [dispatcher.md](dispatcher.md#remove_observerobject-ob-string-path-string-timing-int-index) |
-| `resume_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-suspend_agentstring-uuid--void-resume_agentstring-uuid) |
+| `resume_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-suspend_agentstring-uuid--atomic-void-resume_agentstring-uuid) |
 | `retrieve_atomic_messages` | efun override | [kernel-reference.md](kernel-reference.md#retrieve_atomic_messages) |
 | `revoke` | daemon API | [system-daemons.md](system-daemons.md#int-revokestring-token--int-revoke_principalstring-principal--int-query_session_count) |
 | `revoke_capability` | daemon API | [system-daemons.md](system-daemons.md#void-grant_capabilitystring-uuid-string-capability--void-revoke_capabilitystring-uuid-string-capability--string-query_grantsstring-uuid) |
+| `revoke_passkey` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_passkeysstring-sessiontoken--void-revoke_passkeystring-sessiontoken-string-credentialid) |
 | `revoke_principal` | daemon API | [system-daemons.md](system-daemons.md#int-revokestring-token--int-revoke_principalstring-principal--int-query_session_count) |
 | `rm` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `rmdir` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
@@ -203,7 +208,8 @@ The link resolves to the exact signature where the owning home titles each calla
 | `Stop` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `String` | library class | [kernel-libraries.md](kernel-libraries.md#string) |
 | `StringBuffer` | library class | [kernel-libraries.md](kernel-libraries.md#stringbuffer) |
-| `suspend_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-suspend_agentstring-uuid--void-resume_agentstring-uuid) |
+| `subscribe_events` | daemon API | [system-daemons.md](system-daemons.md#void-subscribe_eventsobject-daemon) |
+| `suspend_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-suspend_agentstring-uuid--atomic-void-resume_agentstring-uuid) |
 | `swapout` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `Time` | library class | [kernel-libraries.md](kernel-libraries.md#time) |
 | `tls_get` | efun override | [kernel-reference.md](kernel-reference.md#tls_get) |

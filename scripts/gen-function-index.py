@@ -233,6 +233,17 @@ def render(entries):
         "LFUNs, library classes, HTTP classes); for the table-based homes "
         "(merryfuns, console verbs) it resolves to the table's section.")
     out.append("")
+    out.append(
+        "One boundary is deliberate rather than an omission: the Vault "
+        "layout's five subsystems (Vault / Marshal / Schema / XML / Index) "
+        "have no rows here. An application consumes them through the "
+        "participating-domain contract "
+        "([vault-applications.md](vault-applications.md) The "
+        "participating-domain contract), not through a flat callable "
+        "surface, and their file-by-file references live on their own "
+        "pages ([vault-applications.md](vault-applications.md), "
+        "[schema.md](schema.md), [xml.md](xml.md)).")
+    out.append("")
     out.append("| Name | Kind | Signature home |")
     out.append("|---|---|---|")
     for name, kind, docfile, anchor in rows:
