@@ -2,14 +2,14 @@
 
 A hands-on tutorial. In the next hour you will boot the platform, create a living object from the operator console, give it state, watch the platform react to a state change, then kill the process and watch everything come back. No theory beyond one sentence per step. The reading-path docs carry the depth. This is the part where you see it.
 
-**Audience**: a newcomer who has completed [getting-started.md](getting-started.md) (DGD built, `example.dgd` pointing at this repository's `src/`, and the `state/` directory shipping with the checkout) and has not yet written any LPC. Every command is shown with its expected output.
+**Audience**: a newcomer who has completed [getting-started.md](getting-started.md) (DGD built, a configuration localized to point at this repository's `src/` -- the `state/local.dgd` copy that doc has you make, or an `example.dgd` edited in place -- and the `state/` directory shipping with the checkout) and has not yet written any LPC. Every command is shown with its expected output.
 
 **What you'll have at the end**: a domain you created, a singleton and a clone you compiled, properties you set, an observer that fired the instant a property changed, and (the point of the whole platform) all of it alive after the process was stopped and restarted.
 
 ## 1. Boot
 
 ```sh
-/path/to/dgd/bin/dgd example.dgd
+/path/to/dgd/bin/dgd example.dgd    # or state/local.dgd, wherever your localized config lives
 ```
 
 The boot log prints, each line stamped with the host time (and the banner says 1.7.9 even on a newer `master` build -- `docs/getting-started.md` Install DGD):
@@ -20,7 +20,7 @@ Jul 21 18:59:39 ** Initializing...
 Jul 21 18:59:39 ** Initialization complete.
 ```
 
-followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work. On this default build -- no crypto module loaded -- the burst begins with the identity stack standing down cleanly, and every one of these lines is normal and expected: `identity: registry up; crypto module absent (minting unavailable)`, `webauthn: ceremony daemon up`, the matching `session:` and `agentauth:` stand-downs, then `auth: transport authentication facade up`. The daemons boot, report, and refuse their crypto-dependent operations until the module is loaded (`docs/operations.md` Loading host-driver extensions). Then come the `DTD:: Registered ...` registrations, one `https: TLS stack not compiled ... standing down` line (normal for the same reason -- the TLS stack needs host-driver support this build lacks), and one `Schema:Daemon: cross-checked ...` line per bundled core-schema file. A `Warning:: Schema node ... not found!` or `import_state FAILED` line here is NOT normal. It means a schema file names an element the registry cannot resolve, or its import errored. The driver compiled the kernel and platform domains and is now listening. Leave it running. Open a second terminal for everything below.
+followed by a short burst of `NOTICE` lines as the platform domains finish deferred startup work. On this default build -- no crypto module loaded -- the burst begins with the identity stack standing down cleanly, and every one of these lines is normal and expected: `identity: registry up; crypto module absent (minting unavailable)`, `webauthn: ceremony daemon up`, the matching `session:` and `agentauth:` stand-downs, then `auth: transport authentication facade up`. The daemons boot, report, and refuse their crypto-dependent operations until the module is loaded (`docs/operations.md` Loading host-driver extensions). Then come the `DTD:: Registered ...` registrations, one `https: TLS stack not compiled ... standing down` line (normal for the same reason -- the TLS stack needs host-driver support this build lacks), and one `Schema:Daemon: cross-checked ...` line per bundled core-schema file. A `Warning:: Schema node ... not found!` or `import_state FAILED` line here is NOT normal. It means a schema file names an element the registry cannot resolve, or its import errored. (One shape note: the burst's messages are not newline-terminated -- `docs/operations.md` Logging and diagnostics -- so they run together on the terminal, and in a captured boot log the whole burst lands as one physical line. When checking a captured log, grep for the substrings above rather than counting `NOTICE` lines.) The driver compiled the kernel and platform domains and is now listening. Leave it running. Open a second terminal for everything below.
 
 ## 2. Connect and claim the console
 

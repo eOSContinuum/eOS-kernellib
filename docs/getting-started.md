@@ -71,19 +71,27 @@ The repository contains LPC source under `src/`. DGD compiles LPC at runtime; th
 
 The proof above generated its own configuration and tore its boots down, but it left its example domain deployed: `src/usr/MerryApp` carries a boot-time test driver that snapshots and exits the platform the moment its assertions finish, so a manual boot with it still present halts within seconds. Remove it first (`rm -rf src/usr/MerryApp`; any later harness run would remove it for you in its clean-slate step). Running the platform interactively is where the configuration becomes yours. `example.dgd` is the starter DGD configuration: it mounts the kernel layer's source directory and binds the kernel's default ports.
 
-Edit `example.dgd` to set `directory` to the absolute path of `eOS-kernellib/src/`:
+Copy the configuration into `state/` and localize the copy -- the same generated-copy pattern the harness itself boots from (`scripts/run-example.sh` writes one), and it keeps the tree diff-clean, which every later Verify that reads `git status` assumes:
+
+```sh
+cp example.dgd state/local.dgd
+```
+
+Edit `state/local.dgd` to set `directory` to the absolute path of `eOS-kernellib/src/`:
 
 ```text
 directory       = "/absolute/path/to/eOS-kernellib/src";
 ```
 
-The `state/` directory referenced by the `swap_file` and `dump_file` settings ships with the checkout (it holds a tracked `.gitignore`); if you relocated those paths in the config, create the directory they point at.
+(Editing `example.dgd` in place works too -- the config's relative state paths resolve against `directory`, not against the config file's own location -- but the localization then shows as a tracked modification in `git status` for as long as you keep it.) (One self-reference rides along in any copy: the `hotboot` tuple's config-file entry names `../example.dgd`, resolved against `directory` like the state paths. Nothing in the tutorials uses hot boot, but if you later enable that flow -- the `hotboot` row in `docs/operations.md` The .dgd configuration file -- point the tuple's entries at your localized copy.) The `state/` directory referenced by the `swap_file` and `dump_file` settings ships with the checkout (it holds a tracked `.gitignore`, which is also what keeps your localized copy out of `git status`); if you relocated those paths in the config, create the directory they point at.
 
 Run the driver against the configuration:
 
 ```sh
-/path/to/dgd/bin/dgd example.dgd
+/path/to/dgd/bin/dgd state/local.dgd
 ```
+
+Boot commands elsewhere in this doc set write `example.dgd` the same way they write `/path/to/dgd/bin/dgd` -- a placeholder to substitute: pass your localized configuration's path (`state/local.dgd` here) wherever one appears.
 
 The driver compiles the kernel objects and binds two ports:
 
