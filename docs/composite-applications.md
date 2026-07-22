@@ -31,6 +31,10 @@ The example is large because it composes everything; your first real service sho
 
 `sys/test.c` follows the same split: its transport phases exercise stage 1 alone, and the crypto-gated phases add stages 2 and 3 (`examples/composite-app/README.md` maps phases to sentinel counts).
 
+## The demo page: the guided walk
+
+The example has a browser front door: `scripts/demo-composite.sh` is the one-command bring-up (deploy, a locally-trusted certificate, native TLS boot, the two operator verbs), and the page it leaves running at `https://localhost:8443/demo` walks the full identity surface as a numbered sequence -- the unauthenticated entry triad (register / login / recover), a delegable capability whose effect is observable (the capability-gated report), all three authorization tiers refused on purpose along the way, passkey self-service (list, revoke, and add-passkey enrollment, the second-device path), and session-expiry guidance when a bearer call returns 401. The walk is the fastest way to *see* the substrate behave before reading the code; the step-by-step and route table live in `examples/composite-app/README.md` (The browser path), and `docs/common-tasks.md` carries the run recipe.
+
 ## The shape
 
 ```text
@@ -182,7 +186,13 @@ demonstrate the honest event shapes available today:
   snapshot against `authd->query_agents` and pushes the ones that
   changed. The events are armed inside the atomic mutators, so this
   topic carries the same commit-or-nothing property as the audit
-  topic: an aborted mutation delivers nothing. The token travels in
+  topic: an aborted mutation delivers nothing. Session validity is
+  re-checked at each sweep, never on a timer -- so a stream whose
+  session expires with no subsequent identity mutation stays open
+  until the next event drives a sweep, and closes then; the
+  connection-drop path is unchanged. That is the honest price of
+  event-driven delivery: no idle work between mutations, and no
+  bounded staleness either. The token travels in
   the query string because EventSource cannot set an Authorization
   header; the example README states the tradeoff.
 - `GET /inventory/events?heartbeat=1` opts the audit subscriber into
