@@ -76,7 +76,7 @@ A behavior change updates the document that owns it. At subsystem grain, `docs/s
 | `call_touch`, `patch()`, the upgrade cascade | `docs/code-lifecycle.md` |
 | The atomic envelope (what rolls back, where it sits in a task) | `docs/execution-model.md` |
 | The statedump cycle (dump, restore, hot boot) | `docs/persistence.md` |
-| The tick budget and execution-cost model | `docs/application-authoring.md` (What a tick is) |
+| The tick budget and execution-cost model | `docs/execution-model.md` (The tick budget, mechanically) |
 | Observer dispatch timing (pre/main/post, batching, cascade bounds) | `docs/dispatcher.md` |
 | Task serialization and run-to-completion | `docs/execution-model.md` |
 

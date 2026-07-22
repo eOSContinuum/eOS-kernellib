@@ -93,12 +93,12 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: your code calls another service over HTTP or HTTPS.
 
-1. Inherit `Http1Client` (TLS variant `Http1TlsClient`) composed with `/usr/HTTP/api/lib/BufferedConnection1`, keeping the driver-level connection raw -- the shape `examples/composite-app`'s loopback client (`Inventory/obj/client.c`) uses. That client is the surface's first in-tree consumer; its header documents two of the plain-client path's three latent defects the buffered composition avoids, and the third (a double connect) sits in `obj/client1.c` itself (`docs/application-authoring.md` Outbound connections names all three).
-2. The constructor signatures live in `docs/http-applications.md` API signatures; the surface's proven-versus-shipped boundary is stated plainly in `docs/application-authoring.md` Outbound connections.
+1. Inherit `Http1Client` (TLS variant `Http1TlsClient`) composed with `/usr/HTTP/api/lib/BufferedConnection1`, keeping the driver-level connection raw -- the shape `examples/composite-app`'s loopback client (`Inventory/obj/client.c`) uses. That client is the surface's first in-tree consumer; its header documents two of the plain-client path's three latent defects the buffered composition avoids, and the third (a double connect) sits in `obj/client1.c` itself (`docs/http-applications.md` Outbound connections names all three).
+2. The constructor signatures live in `docs/http-applications.md` API signatures; the surface's proven-versus-shipped boundary is stated plainly in `docs/http-applications.md` Outbound connections.
 
 **Verify**: `scripts/run-example.sh composite-app` drives the client end-to-end over real TCP among its phases.
 
-**Owning doc**: `docs/application-authoring.md` Outbound connections; `docs/http-applications.md` API signatures.
+**Owning doc**: `docs/http-applications.md` Outbound connections; `docs/http-applications.md` API signatures.
 
 ## Encode or decode JSON
 

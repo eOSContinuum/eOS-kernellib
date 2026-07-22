@@ -214,7 +214,7 @@ errored. Fixed by renaming the internal function
 
 The example's test driver reaches every phase over real TCP through
 `Inventory/obj/client.c` -- the first in-tree consumer of the HTTP/1
-client library ([application-authoring.md](application-authoring.md)
+client library ([http-applications.md](http-applications.md)
 Outbound connections). Being first, it surfaced three latent defects
 in the plain-client path, all documented in the client's header:
 `obj/client1.c` double-connects; its driver-level `MODE_BLOCK` is
