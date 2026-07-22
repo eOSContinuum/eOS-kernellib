@@ -28,6 +28,10 @@ eOS-kernellib is the kernel layer that exposes these as runtime primitives — c
 
 Treating these eight as runtime primitives is the architectural commitment of eOS-kernellib: each one is a runtime guarantee the application inherits rather than a pattern the application reimplements. An orthogonally-persistent server cannot fake them at the application layer — atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. Asking the application to provide them is asking it to reproduce the runtime in user space.
 
+## Project status
+
+Stated per primitive rather than claimed wholesale: three of the eight are **Validated** today (atomicity, persistent state, hot reload) and five are **Partial** — foundation present, demonstration incomplete (`docs/runtime-primitives.md` is the per-primitive statement). The measured envelope is one machine and one workload shape — a rig and a datum, not a guarantee (`docs/evaluating.md`) — and the roadmap commits forward surfaces on named activation triggers, not dates (`docs/runtime-platform-roadmap.md`).
+
 ## Two primitives, in code
 
 The counter master from `examples/atomic-demo/`, with only its header comment trimmed:

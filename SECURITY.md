@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-eOS-kernellib is under active development. The [`main`](https://github.com/eOSContinuum/eOS-kernellib/tree/main) branch is the supported reporting target. The [README's Tested-against line](README.md#status) names the runtime configuration the doc set and the example application are validated against; reports targeting that configuration will be triaged first.
+eOS-kernellib is under active development. The [`main`](https://github.com/eOSContinuum/eOS-kernellib/tree/main) branch is the supported reporting target. The [README's Tested-against line](README.md#quickstart) names the runtime configuration the doc set and the example application are validated against; reports targeting that configuration will be triaged first.
 
 Tagged releases will land as the platform stabilizes; this section will name the supported version range at that point.
 
@@ -36,7 +36,7 @@ In scope for this repository:
 - System-layer code under `src/usr/System/`.
 - The eight runtime primitives' behavior as documented in [`docs/runtime-primitives.md`](docs/runtime-primitives.md). A vulnerability is anything that breaks one of these guarantees: atomicity bypass, capability bypass, persistence corruption, hot-reload escape, code-load sandbox escape, event misdelivery, multi-agent coherence violation, or state-introspection unauthorized exposure. Capability bypass here means a breach of the tier model's enforced boundaries; the capability model's documented non-goals (ambient authority, bypassable pure-LPC caretaker patterns -- `docs/security-posture.md` Non-goals and known limits) are limitations, not vulnerabilities.
 - Daemon contracts (initd, userd, errord, objectd, accessd, resource_daemon, and related kernel/system daemons).
-- The HTTP/1 application surface bound by `mva.dgd`-style configurations of the example application.
+- The HTTP/1 application surface bound by `example.dgd`-style configurations of the example application.
 - The admin-console exposure shaped by the kernel layer's `admin_console.c`.
 - Documentation that misleads readers into insecure configurations.
 
@@ -53,7 +53,7 @@ We will close the following as out of scope:
 
 - Issues affecting only abandoned forks or third-party derivatives.
 - Theoretical issues without a demonstrated path to impact.
-- Vulnerability reports against an unsupported runtime configuration (e.g., DGD versions older than the [README's Tested-against baseline](README.md#status)) where the fix would be a configuration change in the reporter's deployment.
+- Vulnerability reports against an unsupported runtime configuration (e.g., DGD versions older than the [README's Tested-against baseline](README.md#quickstart)) where the fix would be a configuration change in the reporter's deployment.
 
 ## Acknowledgement
 
