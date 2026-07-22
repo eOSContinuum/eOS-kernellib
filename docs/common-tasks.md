@@ -186,6 +186,18 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/admin-console.md`; `docs/changing-a-running-system.md` rungs 1-3.
 
+## Provision an application secret out of source
+
+**Goal**: an API key or comparable secret your application needs, surviving a cold boot, absent from the source tree, and leaving nothing in the statedump beyond its use.
+
+1. Put the secret in a host file under your domain's data directory -- deploy state, not source: `src/usr/<App>/data/api-key.secret`, mode 0600, owned by the service user. Add the path to your repository's ignore file. This is the platform's own precedent: the kernel's credentials and access bits are file-backed under `src/kernel/data/` for exactly these properties (`docs/security-posture.md`).
+2. Read it at use time with `read_file` (access-checked to your own tree) rather than loading it into a long-lived global at boot: a value read, used, and dropped in one task leaves nothing for the statedump to retain. If the daemon must hold it, clear the variable the moment its use ends -- the transient-secret discipline (`docs/security-posture.md`).
+3. Rotation is a file replacement (plus a re-read if held). A cold boot needs no step: the file survives it -- the property a console-set, image-only secret lacks: a cold boot rebuilds from source, and nothing else is carried over (the cold-boot row of `docs/operations.md` Availability and data-loss model).
+
+**Verify**: cold-boot and confirm the consumer works with no console provisioning step; `git status --short` shows no secret file; if the secret is ever held in a long-lived variable, scan a fresh statedump for its bytes (the TLS key-scan in `scripts/https-smoke.sh` is the model).
+
+**Owning doc**: `docs/security-posture.md` (the secrets discipline); `docs/operations.md` Day 0: standing up a production deployment.
+
 ## Run the browser demo
 
 **Goal**: the composite example's guided walk running in your browser over TLS the browser trusts, from one command.
