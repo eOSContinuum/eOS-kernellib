@@ -85,7 +85,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 2. The route rides your existing `binary_port` mount, cleartext or TLS (`docs/operations.md` Network boundary and transport security); no new port and no operator credential is involved.
 3. Point the monitor at the route on an interval and alert on the thresholds in `docs/operations.md` Monitoring signals -- the swap-sector line earliest, because its ceiling is fatal rather than degrading.
 
-**Verify**: `curl http://localhost:8080/status` against the deployed example returns the five `key=value` lines; cross-check a value against the console `status` block.
+**Verify**: `curl http://localhost:8080/status` against the deployed example returns the five `key=value` lines; cross-check the capacity caps and the `users` count against the console `status` block. The used counts (objects, callouts, sectors) legitimately drift a few units between the two probes -- the probe connection and the console login are themselves objects -- so matching caps and `users` is the check, not equal object counts.
 
 **Owning doc**: `docs/operations.md` Monitoring signals; `examples/http-app/` for the worked route.
 
@@ -107,7 +107,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 1. The in-tree idiom is inheritance: `inherit "/lib/util/json";` then `json::encode(value)` / `json::decode(str)` (`src/lib/util/json.c`; every shipped consumer uses this form). The registered singletons `src/sys/jsonencode.c` / `src/sys/jsondecode.c` expose the same pair callable directly, which is what the console probe below uses.
 2. The per-class block in `docs/kernel-libraries.md` (Utilities) states the supported value shapes and bounds.
 
-**Verify**: from the console, `code "/sys/jsonencode"->encode((["a": ({1, 2})]))`.
+**Verify**: from the console, `code "/sys/jsonencode"->encode((["a": ({1, 2})]))` answers `$N = "{\"a\":[1,2]}"` -- the console renders the returned string as an LPC literal, so the escaped quotes are the success shape, not double encoding.
 
 **Owning doc**: `docs/kernel-libraries.md` Utilities.
 
@@ -219,7 +219,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 2. For a full reset, also delete the admin credential (`src/kernel/data/admin.pwd`): the next console login re-claims it, and the smoke scripts expect the default password `drive-verbs` there, not one you picked in the tutorials (`scripts/README.md`).
 3. Or let the harness do it: every `scripts/drive-verbs-smoke.sh` run performs the mount-and-state reset first; `scripts/run-example.sh` resets the mounts and state files but leaves the operator-provisioning residue (`src/usr/testop/`, `access.data`) in place. Both remove `src/usr/WWW` -- it is in the example-mount list, and a tutorial-authored WWW domain goes with it -- but neither touches `admin.pwd`, `src/usr/Pet`, or `src/usr/KV` (`scripts/README.md`).
 
-**Verify**: `git status --short` shows no untracked deploy artifacts; the next cold boot registers no leftover domains.
+**Verify**: `git status --short` shows no untracked deploy artifacts (an `example.dgd` you localized in place shows as ` M` -- that is your configuration, not residue; the generated-copy path in `docs/getting-started.md` Boot it yourself leaves even that clean); the next cold boot registers no leftover domains.
 
 **Owning doc**: `scripts/README.md` (the clean-slate steps and the Adding a new example checklist).
 

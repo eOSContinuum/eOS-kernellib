@@ -196,6 +196,8 @@ ctime(time())[4..18] + " ** " + str
 
 `message` is called by the driver during initialization, snapshot restore, and on interrupt. It is callable by kernel-tier and System-tier code. The underlying `send_message` kfun routes the output to the connection that triggered the current call (typically the operator at admin_console). Application-tier code does not invoke `message` directly.
 
+`message` emits exactly the string it is given -- no newline is appended (`src/kernel/sys/driver.c` `message`), and whether a line ends is the caller's choice. The boot banner's messages carry their own `\n`; the deferred-startup `NOTICE` burst's do not, so in a captured driver log (a supervisor's capture, `dgd ... > boot.log`, CI) the whole burst lands as one physical line. Grep captured boot logs for substrings (`Warning::`, `import_state FAILED`); a line-oriented check (`grep -c NOTICE`, line counts) undercounts.
+
 The platform's general diagnostic facility is `logd`, a System-tier daemon at `/usr/System/sys/logd`. It owns a single persistent sink (`/usr/System/log/system.log`), the emission threshold, and the operator surface. The three diagnostic calls platform and application code already carry, `debugLog` / `info` / `sysLog` (defined in `/lib/util/lpc.c`), forward to `logd`, each mapped to a fixed severity:
 
 | Call | Level | Intended use |

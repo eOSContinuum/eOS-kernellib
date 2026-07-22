@@ -129,6 +129,8 @@ $9 = 0
 
 The counter is still `0`. The `counter++` ran, then unhappened. That is the `atomic` modifier: a function declared `atomic` commits all of its state changes or none of them, and an error inside it rolls everything back. You wrote no rollback code. The runtime enforced it. Notice that the failed call consumed no `$N` slot. It produced no value, only an error.
 
+Meanwhile the boot terminal has more to say: the driver reports this same error up to three times there -- first as a multi-frame trace with an `[atomic]` suffix as the rollback fires (its top frames name your `kv_daemon` and `increment_and_fail`), then again under `[caught]` suffixes as the console's own error handling intercepts it, with frames walking kernel objects like `/kernel/obj/telnet` and `/kernel/lib/admin_console`. That wall of frames is the platform's error-trace surface working as designed -- evidence, not damage. [debugging-applications.md](debugging-applications.md) (Reading an error trace) teaches you to read it, including exactly what those two suffixes mean.
+
 This is the platform's transactional guarantee at the smallest scale. A real multi-step write (moving a value from one key to another, say) wrapped in one `atomic` function either lands wholly or not at all, even if it fails partway. See [runtime-primitives.md](runtime-primitives.md) (Atomicity) for the foundation, and `examples/atomic-demo/` for the same guarantee exercised over HTTP. Note from [execution-model.md](execution-model.md) (The tick budget, mechanically) that an `atomic` function runs on half the tick budget.
 
 ## 5. A hot-fix without a restart
