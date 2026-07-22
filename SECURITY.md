@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-eOS-kernellib is under active development. The [`main`](https://github.com/eOSContinuum/eOS-kernellib/tree/main) branch is the supported reporting target. The [README's Tested-against line](README.md#status) names the runtime configuration the doc set and the example application are validated against; reports targeting that configuration will be triaged first.
+eOS-kernellib is under active development. The [`main`](https://github.com/eOSContinuum/eOS-kernellib/tree/main) branch is the supported reporting target. The [README's Tested-against line](README.md#quickstart) names the runtime configuration the doc set and the example application are validated against; reports targeting that configuration will be triaged first.
 
 Tagged releases will land as the platform stabilizes; this section will name the supported version range at that point.
 
@@ -53,7 +53,7 @@ We will close the following as out of scope:
 
 - Issues affecting only abandoned forks or third-party derivatives.
 - Theoretical issues without a demonstrated path to impact.
-- Vulnerability reports against an unsupported runtime configuration (e.g., DGD versions older than the [README's Tested-against baseline](README.md#status)) where the fix would be a configuration change in the reporter's deployment.
+- Vulnerability reports against an unsupported runtime configuration (e.g., DGD versions older than the [README's Tested-against baseline](README.md#quickstart)) where the fix would be a configuration change in the reporter's deployment.
 
 ## Acknowledgement
 
