@@ -6,7 +6,7 @@
  * calling the handler directly.
  *
  * This is the first in-tree consumer of the HTTP/1 client library
- * (docs/application-authoring.md Outbound connections notes that no
+ * (docs/http-applications.md Outbound connections notes that no
  * shipped example exercised it before), and its shape follows the TLS
  * pair (Http1TlsClient / obj/tls_client1.c), not obj/client1.c. The
  * plain clonable's driver-line-mode design has two failure modes this

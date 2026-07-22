@@ -129,7 +129,7 @@ $9 = 0
 
 The counter is still `0`. The `counter++` ran, then unhappened. That is the `atomic` modifier: a function declared `atomic` commits all of its state changes or none of them, and an error inside it rolls everything back. You wrote no rollback code. The runtime enforced it. Notice that the failed call consumed no `$N` slot. It produced no value, only an error.
 
-This is the platform's transactional guarantee at the smallest scale. A real multi-step write (moving a value from one key to another, say) wrapped in one `atomic` function either lands wholly or not at all, even if it fails partway. See [runtime-primitives.md](runtime-primitives.md) (Atomicity) for the foundation, and `examples/atomic-demo/` for the same guarantee exercised over HTTP. Note from [application-authoring.md](application-authoring.md) (Writing tick-aware code) that an `atomic` function runs on half the tick budget.
+This is the platform's transactional guarantee at the smallest scale. A real multi-step write (moving a value from one key to another, say) wrapped in one `atomic` function either lands wholly or not at all, even if it fails partway. See [runtime-primitives.md](runtime-primitives.md) (Atomicity) for the foundation, and `examples/atomic-demo/` for the same guarantee exercised over HTTP. Note from [execution-model.md](execution-model.md) (The tick budget, mechanically) that an `atomic` function runs on half the tick budget.
 
 ## 5. A hot-fix without a restart
 

@@ -264,7 +264,7 @@ The inheritable per-connection server library; the mount-point object inherits i
 
 ### `Http1Client` (`src/usr/HTTP/api/lib/Client1.c`)
 
-The inheritable HTTP/1 client library. The first in-tree consumer is `examples/composite-app/Inventory/obj/client.c`, which composes it with `/usr/HTTP/api/lib/BufferedConnection1` (driver-level connection kept raw, framing internal) -- start there rather than from `obj/client1.c`, whose plain driver-line-mode shape has documented latent defects (`docs/application-authoring.md` Outbound connections).
+The inheritable HTTP/1 client library. The first in-tree consumer is `examples/composite-app/Inventory/obj/client.c`, which composes it with `/usr/HTTP/api/lib/BufferedConnection1` (driver-level connection kept raw, framing internal) -- start there rather than from `obj/client1.c`, whose plain driver-line-mode shape has documented latent defects (Outbound connections below).
 
 - `create(object client, string host, int port, string responsePath, string headersPath)` -- bind the relay, name the wire-parsing classes, and connect
 - the application overrides: `void receiveResponse(HttpResponse response)` -- REQUIRED, the parsed response; as with the server's `receiveRequest`, the override must not chain to the inherited implementation (the same relay dispatch would recurse); `void connected()` / `void connectFailed(int errorcode)` -- connection outcome callbacks; `int inactivityTimeout()` -- default 120
@@ -288,6 +288,22 @@ The HTTP/1.x protocol base both server and client inherit. Beyond the functions 
 - `void sendWsChunk(int opcode, int flags, varargs int mask, StringBuffer chunk)` -- emit a WebSocket frame
 - `void terminate()` -- break the connection
 - `int persistent()` / `int webSocket()` -- negotiated-state accessors
+
+## Outbound connections
+
+The platform can initiate connections outward, and the surface is smaller and less proven than the inbound one. Stated plainly:
+
+**What ships.** `Http1Client` (and its TLS variant `Http1TlsClient`) compiles at boot: an inheritable client library whose `create(object client, string host, int port, string responsePath, string headersPath)` initiates the connection, with the signatures in API signatures above. The first in-tree consumer is `examples/composite-app`'s loopback test client (`Inventory/obj/client.c`), and being first it surfaced three latent defects in the plain-client path (a double connect in `obj/client1.c`, a driver-level `MODE_BLOCK` nothing lifts, and a line-framing race on single-segment responses -- all documented in that client's header). Adopt the shape that works: compose `Http1Client` with `/usr/HTTP/api/lib/BufferedConnection1` and keep the driver-level connection raw, as that client and the TLS variants do.
+
+**The call chain and its gate.** An application cannot open a socket directly: the kernel auto's `connect()` is gated to the kernel's connection machinery, and the socket opens through a kernel connection object bound to a user object -- the same user-library pattern as inbound (`docs/application-authoring.md` Non-HTTP transports). Inheriting `Http1Client` beside `/usr/System/lib/user` is the packaged form of that route.
+
+**The callback lifecycle.** `connect` is fire-and-forget; no call blocks. The outcome arrives as callbacks: `connected()` on success, `connectFailed(int errorcode)` on failure, with the error codes in `src/include/connect.h` (`CONNECT_REFUSED`, `CONNECT_HOST_UNREACH`, `CONNECT_NET_UNREACH`, `CONNECT_TIMEOUT`, and the unspecified `CONNECT_FAILURE`). Response data then arrives through the flow contract as new tasks -- every received chunk is its own task under run-to-completion (`docs/execution-model.md`), so a pending response never holds a task open. Because each callback is its own task, state read before `connect()` may be stale by the time `connected()` or the response callback fires -- re-validate there, not from the pre-connect read (`docs/execution-model.md` What serialization does not give you).
+
+**Timeouts.** Two exist, one is yours: the established-connection inactivity timeout is the client class's `inactivityTimeout()` override (default 120 seconds), while the pending-connect timeout is the operating system's TCP timeout, which the host driver detects and surfaces as `connectFailed(CONNECT_TIMEOUT)` -- there is no LPC-side knob for it. The idiom for a request deadline is a `call_out` armed when the request is sent, cancelled in `receiveResponse`; if it fires first, `terminate()` the connection and treat the exchange as failed.
+
+**The atomic envelope.** How an in-flight outbound connect interacts with an enclosing atomic function is undocumented and untested today: no doc states whether the initiation is deferred, refused, or performed immediately, and no shipped code initiates one from atomic context. Treat it in the same register as the platform's other unproven interactions (`docs/operations.md` Open empirical questions): do not initiate outbound work inside an atomic function until someone has proven the behavior.
+
+The roadmap's transport posture carries the activation status for the outbound clients (`docs/runtime-platform-roadmap.md` Transport posture).
 
 ## Where to next
 

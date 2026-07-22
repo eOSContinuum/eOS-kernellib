@@ -47,7 +47,7 @@ Habits that produce redundant or wrong code on this platform:
 In the interest of honesty about the other direction, here are the needs the service stack serves that this platform deliberately does not meet:
 
 - **Horizontal scale-out and multi-machine redundancy.** Single coherence domain, one process. If the workload needs concurrent writers across machines, this is the wrong platform. The single-coherence-domain commitment is named in [runtime-primitives.md](runtime-primitives.md) §7.
-- **Polyglot services.** The runtime's guarantees hold for LPC (and Merry) code inside the image. External services integrate at the transport boundary like any other client -- and for the outbound direction (your code calling them), read `application-authoring.md` Outbound connections first: the client surface ships but is unproven today.
+- **Polyglot services.** The runtime's guarantees hold for LPC (and Merry) code inside the image. External services integrate at the transport boundary like any other client -- and for the outbound direction (your code calling them), read `http-applications.md` Outbound connections first: the client surface ships but is unproven today.
 - **Declarative cross-entity queries.** There is no query planner over the image. Enumeration and indexing are application structures (see the Index and Vault subsystems for what ships).
 
 ## Where to next

@@ -69,7 +69,7 @@ The fastest path into this doc set is often the error string itself. This table 
 
 | Message or symptom | Meaning | First action | Where it is documented |
 |---|---|---|---|
-| `Out of ticks` | The calling owner's tick budget for this execution ran out. | Check `quota <owner>` for the ticks ceiling. | `docs/application-authoring.md` Writing tick-aware code |
+| `Out of ticks` | The calling owner's tick budget for this execution ran out. | Check `quota <owner>` for the ticks ceiling. | `docs/execution-model.md` The tick budget, mechanically |
 | `merry: cascade depth N exceeded at <object>:<path>` | A recursive observer chain hit the dispatcher's cascade-depth bound (default 32) inside one batch. | Read the batch-status entry, then find the observer that re-triggers itself. | `docs/dispatcher.md` `set_max_cascade_depth` |
 | `merry: observer cycle detected at <object>:<path>` | The dispatcher's cycle chain saw the same object-and-path pair twice in one execution. | Read the batch-status log for the cycle chain. | `docs/dispatcher.md` `dispatch_set` |
 | `MERRY: target <object> does not carry the property API (inherit /lib/util/properties)` | `register_observer` refused a target that does not inherit the property library. | Add `inherit "/lib/util/properties"` to the target. | This document, The observer did not fire, step 6 |
