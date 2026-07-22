@@ -198,6 +198,18 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/security-posture.md` (the secrets discipline); `docs/operations.md` Day 0: standing up a production deployment.
 
+## Make one write durable at acknowledge time
+
+**Goal**: a write your application has acknowledged to its client survives an unclean stop -- not just until the next scheduled snapshot.
+
+1. Price the three options first (`docs/evaluating.md` Adoption risks, priced -- the durability bullet): a snapshot on the critical path (step 2), an edge-file copy of the one record (step 3), or an external system of record (not a platform recipe). This recipe is the mechanics of the two in-platform options.
+2. **Snapshot on the critical path.** In the function that commits the write: mutate, request the snapshot, and defer the acknowledgment to a `call_out` -- never send it from the same task. The timing is the entire correctness story. `dump_state` only registers the request; the driver writes the image when the task ends (statedumps run between timeslices, `docs/persistence.md` The statedump cycle), and at that boundary it flushes queued network output BEFORE it writes the snapshot (the driver's task-end sequence in `dgd.cpp` `endTask`: the flush precedes the deferred dump). An acknowledgment sent from the mutating task can therefore reach the client moments before the image lands, and an unclean stop in that window loses an acknowledged write. A `call_out` runs as a later task, strictly after the dump completes: acknowledge from there. Two gates ride along: `dump_state` is System-creator-gated (`/kernel/lib/auto.c`), so a tier-E domain routes the request through a System-tier overlay daemon (`docs/application-repository.md` covers carrying one in your application repo), and the cost is the measured dump pause per acknowledged batch (`docs/operations.md` Availability and data-loss model).
+3. **Edge-file the one record.** Persist the record itself to a host file under your domain tree at write time, and let the statedump lag: the platform's own idiom for its credentials and access bits (`src/kernel/sys/access_daemon.c` persists via `save_object`; `docs/security-posture.md`). Use `save_object` for a record-holding object or `write_file` for an append shape -- the driver refuses both inside an `atomic` function ("save_object() within atomic function"), so the write sits in plain non-atomic code, or defers by one tick with the coalesced-`call_out(0)` pattern `logd` uses (`docs/operations.md` Logging and diagnostics). A cold boot re-reads the file at use time, the same read-at-use discipline as the secret recipe above.
+
+**Verify**: against a live boot, drive the critical-path write, wait for the acknowledgment to arrive, `kill -9` the driver, restore from the snapshot pair, and read the record back: it is present. (An acknowledgment sent from the mutating task instead is the documented wrong order -- the driver's task-end sequence, not a race you must win, is the evidence.)
+
+**Owning doc**: `docs/persistence.md` The statedump cycle; `docs/evaluating.md` Adoption risks, priced (the three options).
+
 ## Run the browser demo
 
 **Goal**: the composite example's guided walk running in your browser over TLS the browser trusts, from one command.
