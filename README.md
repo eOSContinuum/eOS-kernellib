@@ -28,6 +28,18 @@ eOS-kernellib is the kernel layer that exposes these as runtime primitives — c
 
 Treating these eight as runtime primitives is the architectural commitment of eOS-kernellib: each one is a runtime guarantee the application inherits rather than a pattern the application reimplements. An orthogonally-persistent server cannot fake them at the application layer — atomicity requires runtime cooperation with the transaction manager; persistence requires runtime cooperation with the storage manager; capability separation requires runtime cooperation with the access checks; hot reload requires runtime cooperation with the dispatcher. Asking the application to provide them is asking it to reproduce the runtime in user space.
 
+## What ships on top
+
+The primitives are the foundation. The kernel layer also ships the platform services an application would otherwise have to build first:
+
+- **An identity and agent substrate** — WebAuthn passkey registration and login, hashed single-use recovery codes with atomic rotation, short-lived hashed-token sessions, and first-class agent identities: every agent carries an immutable edge to the human who controls it, capabilities are delegated from that controller, and suspension is a kill switch that revokes live sessions in the same operation (`docs/identity.md`).
+- **Merry, a sandboxed scripting layer** — user-authored behavior compiled and run inside the image under a 51-entry kfun deny list, bound to properties and fired by state changes: untrusted code as content, not as a deployment (`docs/merry-language.md`, `docs/observers.md`).
+- **Activated transport** — an HTTP/1 server convention, native TLS 1.3 termination on a labeled port (the host's ACME client feeds the certificate paths; reload without a restart), and server-sent-event streaming with observer- and identity-event topics (`docs/http-applications.md`; `docs/operations.md` Network boundary and transport security).
+- **A reactive property dispatcher** — property writes dispatch to registered observers atomically with the write that produced them, with batching, cascade bounds, and cycle detection (`docs/dispatcher.md`).
+- **A crypto toolkit** — SHA-256 digests, ES256/Ed25519 signature verification, a CSPRNG, and CBOR/COSE codecs: the pieces the identity stack itself is built from, callable by applications (`src/lib/util/`, `docs/identity.md`).
+
+Each of these is exercised by a runnable example under `examples/`; the multi-user chat and the composite application compose most of them into one service. The identity, TLS, and crypto rows ride the optional crypto host-driver extension (`docs/operations.md` Loading host-driver extensions); the platform boots without it and stands them down cleanly.
+
 ## Project status
 
 Stated per primitive rather than claimed wholesale: three of the eight are **Validated** today (atomicity, persistent state, hot reload) and five are **Partial** — foundation present, demonstration incomplete (`docs/runtime-primitives.md` is the per-primitive statement). The measured envelope is one machine and one workload shape — a rig and a datum, not a guarantee (`docs/evaluating.md`) — and the roadmap commits forward surfaces on named activation triggers, not dates (`docs/runtime-platform-roadmap.md`).
