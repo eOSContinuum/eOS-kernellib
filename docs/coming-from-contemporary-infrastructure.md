@@ -8,7 +8,7 @@ A translation guide for developers arriving from the contemporary service stack:
 
 | You reach for | The platform provides | Where it's covered |
 |---|---|---|
-| Database / cache | The persistent image: objects are durable by default, and the "cache" and the "database" are the same in-memory state | [persistence.md](persistence.md) |
+| Database / cache | The persistent image: objects are durable by default -- to the last completed statedump, not per-write -- and the "cache" and the "database" are the same in-memory state | [persistence.md](persistence.md) |
 | ORM / serialization layer | Nothing: there is no second representation to map to | [persistence.md](persistence.md) Compared with common alternatives |
 | Queue / webhook / pub-sub | Property-change observers firing inside the same atomic envelope as the write | [dispatcher.md](dispatcher.md), [signal-applications.md](signal-applications.md) |
 | Deploy pipeline | Hot reload: `compile_object` replaces a master's program in the running system | [code-lifecycle.md](code-lifecycle.md) Hot reload |
@@ -20,7 +20,7 @@ A translation guide for developers arriving from the contemporary service stack:
 
 ## What each translation actually means
 
-**The database and the cache collapse into the image.** State lives in objects. Objects are durable because the runtime snapshots the whole image. There is no read path that hydrates from storage and no write path that flushes to it: reads and writes are variable access. The mental model shift: stop asking "where is this stored?" and start asking "which object owns this state?" Consistency between "the cache" and "the store" is not a problem you manage. There is one copy.
+**The database and the cache collapse into the image.** State lives in objects. Objects are durable because the runtime snapshots the whole image. There is no read path that hydrates from storage and no write path that flushes to it: reads and writes are variable access. The mental model shift: stop asking "where is this stored?" and start asking "which object owns this state?" Consistency between "the cache" and "the store" is not a problem you manage. There is one copy. One instinct must not carry over with the word "durable": this is not durable-on-acknowledge. The database instinct expects COMMIT to return only once the write is safely on disk (what a database's durable-by-default configuration promises); here an acknowledged write is in-memory state whose durability arrives with the next completed statedump, so an unclean stop loses every write acknowledged since the last one. The recovery point and the deliberate ways to close the gap for writes that cannot tolerate it are priced in [evaluating.md](evaluating.md) Adoption risks, priced; the model is [operations.md](operations.md) Availability and data-loss model.
 
 **Events are not a queue.** On the service stack, reacting to a state change means publishing to a queue and processing it later, with delivery semantics (at-least-once? exactly-once?) as a contract you defend in application code. Here, observers registered on a property fire *inside the same atomic envelope as the write*: when the write commits, the reactions have already run. When the write rolls back, the reactions un-happened with it. There is no delivery window, no retry policy, no dead-letter queue, and also no cross-machine fan-out. This is a single-coherence-domain runtime by design. Work that should *not* share the write's envelope is scheduled explicitly with `call_out` or a `$delay()` continuation, which is the platform's version of "enqueue for later."
 
@@ -35,6 +35,7 @@ A translation guide for developers arriving from the contemporary service stack:
 Habits that produce redundant or wrong code on this platform:
 
 - **No serialization API.** Writing `to_json`/`from_json` pairs for durability re-implements what the image already does. (Serialization at the *transport* boundary, talking to external clients, is real and lives at the edge, e.g. [xml.md](xml.md) and the HTTP surface.)
+- **No per-transaction commit.** An acknowledged write is durable at the next completed statedump, not at acknowledge time -- the COMMIT-implies-fsync instinct does not transfer. A path that must not lose acknowledged writes (an order, a payment) takes a deliberate durability step, chosen from the priced options in [evaluating.md](evaluating.md) Adoption risks, priced.
 - **No message queue.** Registering an observer is the reaction mechanism. `call_out` is the deferral mechanism. Building a polling loop over a "pending work" table re-implements `call_out` badly.
 - **No deploy step.** If your change process ends with "restart the server," you have re-imported the habit the platform removed. Restarts are for host-binary upgrades (hot boot), not code changes.
 - **No external identity service.** Capability checks are structural. An "auth middleware" layer guarding internal calls duplicates what the tier boundary already enforces. Put authorization logic at the transport edge where external principals enter, not between internal objects.

@@ -158,6 +158,8 @@ The platform is a single process on a single machine. There is no replica to fai
 
 **Crash semantics.** A crash, such as a process killed before any dump runs, host power loss, or a `dump_state` failure mid-write (Common failure modes below), loses everything committed since the last completed dump. The platform does not partially apply an interrupted dump.
 
+**Recurring pause.** The availability cost that recurs by design: every `dump_interval` cycle the whole runtime briefly blocks while the image writes ("the runtime briefly blocks during the dump", `docs/persistence.md` The statedump cycle) -- the one head-of-line stall the tick budget does not bound, because it is the runtime writing, not a task running (`docs/execution-model.md` The price: head-of-line latency names it as the exception). Measured through a quarter-gigabyte image the client-observed pause stayed at or under 0.12 s (Snapshot-pause scaling, measured once, below); the pause scales with image size, and beyond that envelope it is unmeasured (Unmeasured today, below) -- a growing image re-measures with `scripts/measure-baseline.py` rather than extrapolating. Sizing `dump_interval` therefore trades on both axes at once: shorter narrows the recovery point above and pays the pause more often.
+
 **Downtime taxonomy.**
 
 | Mode | Trigger | Connections | State |
@@ -165,6 +167,8 @@ The platform is a single process on a single machine. There is no replica to fai
 | Hot boot | `shutdown(1)` + `execv`, with a `hotboot` tuple configured (Booting above) | Survive: inherited file descriptors | Survives: dump plus immediate reload |
 | Statedump restore | Cold start naming the snapshot on the command line (full, or the two-file incremental form) | Drop: clients reconnect | Survives, from the dump file(s) |
 | Cold boot | Cold start with no restore argument | Drop | Rebuilt from source: only what the initd cascade recreates, nothing carried over |
+
+**Recovery time.** The recovery point above bounds what is lost; recovery time -- how long until service returns -- has two parts with different shapes. The down-window is supervisor detection plus restore boot: the restore boot itself measured under 0.1 s to console-ready against a 237 MB snapshot (Snapshot-pause scaling, measured once, below), because readiness precedes the data -- state pages in on demand after it. Time to steady state is the longer tail: clients reconnect (connections never survive a restore, the taxonomy above), demand paging warms as state is first touched, and an aged snapshot's overdue `call_out` backlog fires immediately as a catch-up burst (Post-restore checklist above). An SLA or incident playbook budgets the down-window from the supervisor's detection interval plus the measured restore boot, and expects the warmup tail, not the boot, to dominate what users observe. The same envelope caveat applies: measured through a quarter-gigabyte image, unmeasured beyond (Unmeasured today, below).
 
 **Portability.** A snapshot restores only against a driver started with the same `auto_object` and `driver_object`, and with the same `modules` extensions loaded (Common failure modes below, the same conditions `docs/persistence.md` states for hot boot). It is a resume point for a specific configuration, not a portable backup format across incompatible driver configurations.
 
@@ -390,14 +394,16 @@ Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
 
 **Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (Limits and capacity above):
 
-| Signal | Alert condition | Reading |
-|---|---|---|
-| call_out count vs the `call_outs` cap | Approaching the cap | A backlog of deferred work: new `call_out`s begin to fail |
-| object count vs the `objects` cap | Approaching the cap | Allocation headroom is running out: clones and new objects begin to fail |
-| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (Limits and capacity above). The durable fix is a `sector_size` raise and a reboot from snapshot |
-| users count vs the `users` cap | Approaching the cap | At the cap, new connections complete their TCP connect and are never answered, with nothing logged -- the silent form of full. A climbing count under flat traffic is a connection leak (Common failure modes below) |
-| swap activity | Sustained churn | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot |
-| uptime, last reboot | Reset unexpectedly | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
+| Signal | Alert condition | Starting threshold | Reading |
+|---|---|---|---|
+| call_out count vs the `call_outs` cap | Approaching the cap | Warn at 70% of `call_outs`, page at 85% | A backlog of deferred work: new `call_out`s begin to fail |
+| object count vs the `objects` cap | Approaching the cap | Warn at 70% of `objects`, page at 85% | Allocation headroom is running out: clones and new objects begin to fail |
+| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | Warn at 50% of `swap_size`, page at 70% | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (Limits and capacity above). The durable fix is a `sector_size` raise and a reboot from snapshot |
+| users count vs the `users` cap | Approaching the cap | Warn at 70% of `users`, page at 85% | At the cap, new connections complete their TCP connect and are never answered, with nothing logged -- the silent form of full. A climbing count under flat traffic is a connection leak (Common failure modes below) |
+| swap activity | Sustained churn | Warn when the five-minute average is nonzero on two consecutive polls; page when it is still nonzero fifteen minutes later | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot |
+| uptime, last reboot | Reset unexpectedly | Page on any decrease | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
+
+The threshold column is a starting point, not a guarantee -- the same posture as the production-shape starting point under Limits and capacity above: numbers to write the first alert rule with, then tune against the occupancy your own workload measures. The gap between the swap-sector thresholds and the degrading rows is deliberate: the fatal ceiling gets the earlier warning.
 
 Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resource daemon, Resource limits above) reports each owner's tick usage against its budget. An owner far above its peers is running away. A tick-exhausted call rolls back rather than hanging the platform.
 
