@@ -81,7 +81,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: a monitoring system reads the platform's capacity counts over HTTP, with no console login.
 
-1. Add a status route to your application's HTTP server object: call the no-argument `status()` and emit the capacity-headroom counts (`objects`, callouts, swap sectors, `users`) as stable `key=used/cap` lines. `examples/http-app/obj/server.c`'s `GET /status` route is the worked form -- copy its report block.
+1. Add a status route to your application's HTTP server object: call the no-argument `status()` and emit the four capacity-headroom counts (`objects`, callouts, swap sectors, `users`) as stable `key=used/cap` lines, plus an `uptime` line (a bare seconds value -- the fifth line the Verify below counts). `examples/http-app/obj/server.c`'s `GET /status` route is the worked form -- copy its report block.
 2. The route rides your existing `binary_port` mount, cleartext or TLS (`docs/operations.md` Network boundary and transport security); no new port and no operator credential is involved.
 3. Point the monitor at the route on an interval and alert on the thresholds in `docs/operations.md` Monitoring signals -- the swap-sector line earliest, because its ceiling is fatal rather than degrading.
 
