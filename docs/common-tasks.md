@@ -47,7 +47,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 1. Operationally, from the admin console: `grant Foo /usr/Bar/lib read` (`write` is the default when the mode keyword is omitted; `full` also exists). `ungrant` reverses it, and `access <user>` / `access <directory>` audit the current bits.
 2. `grant global <directory>` instead adds a `/usr/`-subdirectory to the global-read set -- the right shape when every domain should read a shared library.
-3. At boot time, grants are System-tier acts: the access API (`set_access`) is reachable from System code, not from a tier-E domain's own initd -- a domain cannot grant itself access to anything. Route boot-time grant needs through your platform overlay's System-tier initialization, or provision them once from the console (grants persist in the kernel's saved access data).
+3. At boot time, grants are System-tier acts: the access API (`set_access`) is reachable from System code, not from a tier-E domain's own initd -- a domain cannot grant itself access to anything. Provision them once from the console (grants persist in the kernel's saved access data), or route them through a System-tier overlay file your own repository carries -- `docs/application-repository.md` System-tier overlay files covers that file and the explicit compile step it needs.
 
 **Verify**: `access Foo` lists the grant; a `read_file` from Foo's code stops erroring.
 
@@ -190,7 +190,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: an API key or comparable secret your application needs, surviving a cold boot, absent from the source tree, and leaving nothing in the statedump beyond its use.
 
-1. Put the secret in a host file under your domain's data directory -- deploy state, not source: `src/usr/<App>/data/api-key.secret`, mode 0600, owned by the service user. Add the path to your repository's ignore file. This is the platform's own precedent: the kernel's credentials and access bits are file-backed under `src/kernel/data/` for exactly these properties (`docs/security-posture.md`).
+1. Put the secret in a host file under your domain's data directory -- deploy state, not source: `src/usr/<App>/data/api-key.secret`, mode 0600, owned by the service user. Add the path to your application repository's ignore file (`docs/application-repository.md` The split). This is the platform's own precedent: the kernel's credentials and access bits are file-backed under `src/kernel/data/` for exactly these properties (`docs/security-posture.md`).
 2. Read it at use time with `read_file` (access-checked to your own tree) rather than loading it into a long-lived global at boot: a value read, used, and dropped in one task leaves nothing for the statedump to retain. If the daemon must hold it, clear the variable the moment its use ends -- the transient-secret discipline (`docs/security-posture.md`).
 3. Rotation is a file replacement (plus a re-read if held). A cold boot needs no step: the file survives it -- the property a console-set, image-only secret lacks: a cold boot rebuilds from source, and nothing else is carried over (the cold-boot row of `docs/operations.md` Availability and data-loss model).
 
