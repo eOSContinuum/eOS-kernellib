@@ -195,6 +195,7 @@ The process died and came back, and the store is intact. No database, no seriali
 
 - **[first-http-endpoint.md](first-http-endpoint.md)** continues this build directly: an HTTP face on the service you just wrote, driven with `curl`, ending at the reference and assembly docs.
 - **[application-authoring.md](application-authoring.md)** covers the patterns behind this tutorial at reference depth: domain layout, owner and access, tick-aware code, object tracking, and when the four-file example shape stops fitting.
+- **[application-repository.md](application-repository.md)** is the graduation step from building inside the platform clone, the way this tutorial did: your domains in a repository of their own, with the deploy, CI, and platform-update flows around them.
 - **[kernel-libraries.md](kernel-libraries.md)** documents the inheritable libraries you call from application code, including a `KVstore` library. This tutorial hand-rolled a mapping to keep the moving parts visible.
 - **[persistence.md](persistence.md)** is section 6 in full: what the snapshot carries, the persistence boundaries, and the backup and restore mechanics.
 - **[dispatcher.md](dispatcher.md)** and **[signal-applications.md](signal-applications.md)** give your service reactions: run a script the instant a property changes, atomic with the write, the way [first-hour.md](first-hour.md) section 7 did.

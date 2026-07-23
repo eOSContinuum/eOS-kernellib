@@ -298,5 +298,6 @@ A driver that asserts survival across a restart follows the two-boot recipe `mer
 - [`docs/kernel-libraries.md`](kernel-libraries.md) documents inheritable libraries shipped under [`src/lib/`](../src/lib/): String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
 - [`docs/http-applications.md`](http-applications.md) covers the HTTP/1-specific application pattern with [`examples/http-app/`](../examples/http-app/) as the runnable reference.
 - [`docs/operations.md`](operations.md) gives the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
+- [`docs/application-repository.md`](application-repository.md) covers the repository posture around these patterns: what your repo owns, the deploy-by-copy flow, System-tier overlay files, your own harness runner, and platform pin updates.
 
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md
