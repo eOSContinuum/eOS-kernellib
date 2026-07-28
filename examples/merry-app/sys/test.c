@@ -1075,6 +1075,81 @@ static void run_tests()
 
     log_line("MerryApp:test: OBSERVER CLEAR OK");
 
+    /* phase 15g: coercion merryfuns (Str/Int/Flt/Arr/Obj), exercised
+     * from Merry source against the phase 1 parent as binding host.
+     * The script also uses an uninitialized local declaration, the
+     * declare-then-assign shape the language doc prescribes. A zero
+     * return means every check passed; nonzero names the first
+     * failing check. */
+
+    catch {
+	object coerce_script;
+
+	coerce_script = new_object(MERRY_DATA,
+	    "string s;\n" +
+	    "s = Str(42);\n" +
+	    "if (s != \"42\") return 1;\n" +
+	    "if (Str(nil) != \"\") return 2;\n" +
+	    "if (Str(\"x\") != \"x\") return 3;\n" +
+	    "if (Int(\"17\") != 17) return 4;\n" +
+	    "if (Int(nil) != 0 || Int(\"\") != 0) return 5;\n" +
+	    "if (Int(3.9) != 4 || Int(3.4) != 3) return 6;\n" +
+	    "if (Flt(\"2.5\") != 2.5) return 7;\n" +
+	    "if (Flt(4) != 4.0) return 8;\n" +
+	    "if (sizeof(Arr(nil)) != 0) return 9;\n" +
+	    "if (sizeof(Arr(\"a\")) != 1) return 10;\n" +
+	    "if (Arr(({ 1, 2 }))[1] != 2) return 11;\n" +
+	    "if (Obj(\"MerryApp:no:such:name\")) return 12;\n" +
+	    "if (Obj($this) != $this) return 13;\n" +
+	    "return 0;");
+	parent->set_property("merry:lib:coerce", coerce_script);
+	result = run_merry(parent, "coerce", "lib", ([ ]));
+	if (result != 0) {
+	    log_line("MerryApp:test: FAIL: COERCION check " +
+		     (string) result + " failed");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: COERCION phase threw");
+	return;
+    }
+
+    log_line("MerryApp:test: COERCION OK");
+
+    /* phase 15h: canonical codec merryfuns (Encode/Decode/Dump).
+     * Checks the round-trip on a nested structure, the canonical
+     * fixpoint (Encode of Decode of e equals e), the by-name object
+     * round-trip against the phase 1 parent's logical name, and that
+     * Dump produces a nonempty string. */
+
+    catch {
+	object codec_script;
+
+	codec_script = new_object(MERRY_DATA,
+	    "string e;\n" +
+	    "mixed d;\n" +
+	    "e = Encode(([ \"k\": ({ 1, 2.5, \"x\", nil }) ]));\n" +
+	    "d = Decode(e);\n" +
+	    "if (d[\"k\"][0] != 1 || d[\"k\"][1] != 2.5) return 1;\n" +
+	    "if (d[\"k\"][2] != \"x\" || d[\"k\"][3] != nil) return 2;\n" +
+	    "if (Encode(d) != e) return 3;\n" +
+	    "if (Decode(Encode($this)) != $this) return 4;\n" +
+	    "if (strlen(Dump(([ \"a\": ({ nil }) ]))) == 0) return 5;\n" +
+	    "return 0;");
+	parent->set_property("merry:lib:codec", codec_script);
+	result = run_merry(parent, "codec", "lib", ([ ]));
+	if (result != 0) {
+	    log_line("MerryApp:test: FAIL: CODEC check " +
+		     (string) result + " failed");
+	    return;
+	}
+    } : {
+	log_line("MerryApp:test: FAIL: CODEC phase threw");
+	return;
+    }
+
+    log_line("MerryApp:test: CODEC OK");
+
     /* phase 16: PERSIST SETUP -- register a persistent observer on a
      * fresh binding host, save the host so phase17_verify can find it
      * after restore, schedule the verify call_out, then trigger a

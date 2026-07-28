@@ -154,6 +154,8 @@ The example's boot driver (`examples/merry-app/sys/test.c`) proves the invocatio
 | `Spawn` merryfun clones the binding host's clonable via the `::clone_object` escape | 3 | `SPAWN OK` |
 | `$delay()` and the 5-arg mcontext dispatch -- a deferred continuation resumes and completes the write | 4 | `DELAY OK` |
 | `LabelCall` and the script-space handler protocol -- a registered handler dispatches a named method | 5 | `LABELCALL OK` |
+| Type-coercion merryfuns -- `Str`/`Int`/`Flt`/`Arr`/`Obj` semantics checked from Merry source, including a declare-then-assign local | 15g | `COERCION OK` |
+| Canonical codec merryfuns -- `Encode`/`Decode` round-trip, canonical fixpoint, by-name object reference, `Dump` output | 15h | `CODEC OK` |
 
 ## What this example does NOT exercise
 

@@ -16,6 +16,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `access` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `add_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
 | `approve-registrar` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
+| `Arr` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `Array` | library class | [kernel-libraries.md](kernel-libraries.md#array) |
 | `authenticate` | daemon API | [system-daemons.md](system-daemons.md#mixed-authenticatestring-challenge-string-credentialid-string-clientdatajson-string-authenticatordata-string-signature-varargs-int-ttl) |
 | `authenticate_agent_key` | daemon API | [system-daemons.md](system-daemons.md#mixed-authenticate_agent_keystring-challenge-string-credentialid-string-signature-varargs-int-ttl--mixed-authenticate_agent_tokenstring-agenttoken-varargs-int-ttl) |
@@ -54,6 +55,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `create` | lfun | [kernel-reference.md](kernel-reference.md#create) |
 | `create_identity` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-create_identitystring-credentialid-mapping-row--atomic-mixed-mint_with_codesint-n) |
 | `declare_label` | daemon API | [system-daemons.md](system-daemons.md#void-declare_labelstring-label-string-type-int-index) |
+| `Decode` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `DelayedContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#delayedcontinuation) |
 | `delegate_capability` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-delegate_capabilitystring-controlleruuid-string-agentuuid-string-capability--atomic-void-undelegate_capabilitystring-controlleruuid-string-agentuuid-string-capability) |
 | `destruct` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
@@ -62,8 +64,10 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `dispatch_set` | dispatcher LFUN | [dispatcher.md](dispatcher.md#dispatch_setobject-obj-string-path-mixed-val-varargs-string-caller_program) |
 | `DistContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#distcontinuation) |
 | `driver` | driver/userd hook | [kernel-reference.md](kernel-reference.md#driver) |
+| `Dump` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `Duplicate` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `ed` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
+| `Encode` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `enroll_passkey` | daemon API | [system-daemons.md](system-daemons.md#string-enroll_passkeystring-sessiontoken-string-challenge-string-clientdatajson-string-attestationobject) |
 | `Every` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `file_info` | efun override | [kernel-reference.md](kernel-reference.md#file_info) |
@@ -71,6 +75,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `find_identity` | daemon API | [system-daemons.md](system-daemons.md#object-find_identitystring-uuid--string-find_by_credentialstring-credentialid--int-query_identity_count) |
 | `find_object` | efun override | [kernel-reference.md](kernel-reference.md#find_object) |
 | `FindMerry` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
+| `Flt` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `Get` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `get_dir` | efun override | [kernel-reference.md](kernel-reference.md#get_dir) |
 | `GetVar` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
@@ -89,6 +94,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `HttpRequest` | HTTP class | [http-applications.md](http-applications.md#httprequest-srcusrhttpapilibrequestc-and-httpresponse-srcusrhttpapilibresponsec) |
 | `HttpResponse` | HTTP class | [http-applications.md](http-applications.md#httprequest-srcusrhttpapilibrequestc-and-httpresponse-srcusrhttpapilibresponsec) |
 | `In` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
+| `Int` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `IntIterator` | library class | [kernel-libraries.md](kernel-libraries.md#intiterator) |
 | `issue_challenge` | daemon API | [system-daemons.md](system-daemons.md#string-issue_challenge) |
 | `issues` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
@@ -112,6 +118,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `mv` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `new` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `new_object` | efun override | [kernel-reference.md](kernel-reference.md#new_object) |
+| `Obj` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `observers` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `password` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `patch` | lfun | [kernel-reference.md](kernel-reference.md#patch) |
@@ -210,6 +217,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `status` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `status` | efun override | [kernel-reference.md](kernel-reference.md#status) |
 | `Stop` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
+| `Str` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `String` | library class | [kernel-libraries.md](kernel-libraries.md#string) |
 | `StringBuffer` | library class | [kernel-libraries.md](kernel-libraries.md#stringbuffer) |
 | `subscribe_events` | daemon API | [system-daemons.md](system-daemons.md#void-subscribe_eventsobject-daemon) |

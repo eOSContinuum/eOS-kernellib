@@ -53,7 +53,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [merry-applications.md](merry-applications.md), Merry-specific patterns: script-bearing object contract, the `merry:<mode>:<signal>` storage convention, the ancestry walk via `find_merry`, the static invocation surface, what the sandbox forbids.
 - [chat-applications.md](chat-applications.md), multi-user chat patterns: room and user clonables, capability-token LWO, capability-gated admin verbs, and the shipped demonstrations spanning capability separation, persistence, sandboxed reactions, async events, and multi-agent coherence.
 - [composite-applications.md](composite-applications.md), the composite application walkthrough: the multi-domain route registry, the connection-object-to-daemon seam, binding WebAuthn/session authentication to the wire through the authd facade, and the outbound HTTP client's working shape.
-- [merry-language.md](merry-language.md), Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the fifteen merryfuns with full signatures. Read this when writing Merry source, not just binding it.
+- [merry-language.md](merry-language.md), Merry-the-language reference: dialect restrictions over LPC, the four extensions (`$arg`, `${obj}`, `$delay()`, `space::method()`), the compile pipeline, AST node types, the 51-entry sandbox surface, the twenty-three merryfuns with full signatures. Read this when writing Merry source, not just binding it.
 
 ### Operations
 

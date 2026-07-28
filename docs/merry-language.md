@@ -101,7 +101,7 @@ The merrynode's own merryfuns escape sandbox shadowing using LPC's `::` operator
 
 This section is the signature home for the merryfuns; for other callable kinds, the router is `docs/kernel-reference.md` Where signatures live.
 
-Fifteen merryfuns are available to Merry source. Signatures below are the declarations in `merrynode.c`. The leading type is the return type.
+Twenty-three merryfuns are available to Merry source. Signatures below are the declarations in `merrynode.c`. The leading type is the return type.
 
 | Merryfun | Signature | Behavior |
 |---|---|---|
@@ -120,10 +120,18 @@ Fifteen merryfuns are available to Merry source. Signatures below are the declar
 | `In` | `string In(string signal, int seconds)` | Schedules a single re-fire of `signal` on `this` at `t+seconds` via `schedule_entry`. Returns the schedule-entry id |
 | `Every` | `string Every(string signal, int seconds)` | Schedules a recurring re-fire of `signal` every `seconds`. Returns the schedule-entry id |
 | `Stop` | `string Stop(string id)` | Cancels a scheduled `In` or `Every` entry by id via `unschedule_entry` |
+| `Str` | `string Str(mixed val)` | Coerce to string: nil is `""`, int/float convert, a string passes through, an object answers its logical name (`name()`). Arrays and mappings error -- use `Encode` or `Dump` for structures |
+| `Int` | `int Int(mixed val)` | Coerce to integer: nil and `""` are 0, a float rounds to nearest (DGD's own float-to-int conversion: `Int(3.9)` is 4), a string parses via `sscanf %d`. Errors on an unparseable string, array, mapping, or object |
+| `Flt` | `float Flt(mixed val)` | Coerce to float: nil and `""` are 0.0, an int converts, a string parses via `sscanf %f`. Errors on an unparseable string, array, mapping, or object |
+| `Arr` | `mixed *Arr(mixed val)` | Coerce to array: nil is `({ })`, an array passes through, any other value wraps as a one-element array |
+| `Obj` | `object Obj(mixed val)` | Coerce to object: nil and objects pass through; a string resolves via `find_object` with the Index-daemon logical-name fallback, answering nil when nothing matches (the existence-tolerant lookup; `FindMerry`/`Call` throw instead). Errors on int, float, array, mapping |
+| `Encode` | `string Encode(mixed val)` | Canonical serialization of a sandbox-legal value (nil/int/float/string/array/mapping, object references by logical name) via the `/lib/util/coercion` codec: strict canonical writer, full-precision floats, aliased or cyclic structures and LWOs refused with an error |
+| `Decode` | `mixed Decode(string str)` | The round-trip inverse of `Encode`: tolerant of whitespace variation, loud on anything outside the grammar. Object references resolve via `find_object` with the Index fallback and error when unresolvable |
+| `Dump` | `string Dump(mixed val)` | Human-facing debug printer (`dumpValue`): same literal shape as the admin console's value dumps, cycles print as backreferences, floats at display precision. NOT a round-trip form -- serialize with `Encode` |
 
 For raising errors from inside Merry source, use the allowed kfun `error("message")` directly: there is no `Error` merryfun. (The `categorize_merry_word` syntax-categorizer in `merryapi.c` lists `Error` as a merryfun token, but the merrynode implementation carries no `Error` LFUN. The entry is vestigial categorization tooling.)
 
-All fifteen merryfuns are marked `nomask`: subclasses cannot redefine them. `Spawn` and `Duplicate` are also `atomic`.
+All twenty-three merryfuns are marked `nomask`: subclasses cannot redefine them. `Spawn` and `Duplicate` are also `atomic`.
 
 The `Set(obj, "*", mapping)` and `Get(obj, "*")` forms are bulk: the wildcard `"*"` replaces or returns the entire property map atomically (`merrynode.c::set_all` clears then re-sets under one atomic block).
 
