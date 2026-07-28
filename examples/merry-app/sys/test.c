@@ -207,9 +207,9 @@ static void run_tests()
      * clonable path. */
 
     catch {
-	/* Merry source has no LPC-style variable declarations; it is
-	 * an expression / statement language closer to TCL than C.
-	 * Compose the call inline and let LPC's return propagate. */
+	/* Merry declarations take no initializers, so a one-shot
+	 * value composes inline rather than declare-assign-return.
+	 * Let LPC's return propagate. */
 	spawn_script = new_object(MERRY_DATA,
 				  "return object_name(Spawn($this));");
     } : {

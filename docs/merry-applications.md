@@ -88,7 +88,7 @@ target->set_property("merry:lib:greet", script);
 
 `set_property` downcases the key (`set_downcased_property` is the underlying mutator). Inheritors that want the case-preserving variant can call `set_downcased_property` directly.
 
-Merry source has no LPC-style variable declarations -- `object o = Spawn(...)` is a parse error. Compose merryfun calls inline instead.
+Merry declarations take no initializers -- `object o = Spawn(...)` is a parse error, while `object o; o = Spawn(...);` compiles. Declare then assign, keeping declarations before statements, or compose merryfun calls inline.
 
 ## What the sandbox forbids
 
