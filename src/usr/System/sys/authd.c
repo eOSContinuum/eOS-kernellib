@@ -41,10 +41,17 @@
  */
 
 # include <kernel/kernel.h>
+# include <kernel/capability.h>
 # include <identityd.h>
 
 inherit "/usr/System/lib/auto";
+inherit "/kernel/lib/capability";
 private inherit "/lib/util/lpc";	/* sysLog */
+
+/* the capability the session-administration entries require of the
+ * caller's own proven subject, granted through the operator path
+ * (identity grant <uuid> session.admin) */
+# define SESSION_ADMIN_CAP	"session.admin"
 
 static void create()
 {
@@ -374,6 +381,73 @@ void revoke_passkey(string sessionToken, string credentialId)
 	error("auth: cannot revoke the last passkey");
     }
     IDENTITYD->unbind_credential(uuid, credentialId);
+}
+
+/*
+ * Session administration: bookkeeping and revocation for subjects
+ * OTHER than the caller -- the moderation shape (boot a member,
+ * logout-everywhere) an application cannot otherwise build without
+ * holding another identity's plaintext token against the platform's
+ * no-plaintext-at-rest posture. Every entry derives the acting
+ * subject from its own live session, then requires the session.admin
+ * capability for that subject AT CALL TIME -- the check hits the live
+ * capability store on every call, nothing cached, the same
+ * revocation-honest posture the two-stage credential doctrine
+ * demands. This deliberately generalizes the suspend_agent shape (an
+ * entry that ends another record's sessions) past the controller
+ * edge: where suspend_agent's authority is the immutable controller
+ * relationship, this authority is an explicit, operator-granted,
+ * operator-revocable capability.
+ *
+ * Rows carry the bookkeeping id (the stored token hash: it can
+ * revoke, never authenticate -- validation hashes a presented
+ * plaintext), mint time, and expiry. A plaintext token never crosses
+ * this surface in either direction.
+ */
+private string admin_subject(string sessionToken)
+{
+    string subject;
+
+    subject = SESSIOND->validate(sessionToken);
+    if (!subject) {
+	error("auth: no live session");
+    }
+    require_member(SESSION_ADMIN_CAP, subject);
+    return subject;
+}
+
+/*
+ * a subject's live sessions, read-only: one row per session,
+ * ({ sessionId, created, expires })
+ */
+mixed *query_subject_sessions(string sessionToken, string subject)
+{
+    admin_subject(sessionToken);
+    return SESSIOND->query_principal_sessions(subject);
+}
+
+/*
+ * revoke ONE of a subject's live sessions by its bookkeeping id;
+ * TRUE iff a live session with that id belonged to the subject and
+ * was removed (the id-to-subject binding is checked in sessiond, so
+ * an id learned from one listing cannot revoke another subject's
+ * session)
+ */
+int revoke_subject_session(string sessionToken, string subject,
+			   string sessionId)
+{
+    admin_subject(sessionToken);
+    return SESSIOND->revoke_session_id(subject, sessionId);
+}
+
+/*
+ * revoke ALL of a subject's live sessions (the boot / logout-
+ * everywhere primitive); returns the count removed
+ */
+int revoke_subject_sessions(string sessionToken, string subject)
+{
+    admin_subject(sessionToken);
+    return SESSIOND->revoke_principal(subject);
 }
 
 /*

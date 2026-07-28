@@ -143,6 +143,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `query_passkeys` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_passkeysstring-sessiontoken--void-revoke_passkeystring-sessiontoken-string-credentialid) |
 | `query_path` | daemon API | [system-daemons.md](system-daemons.md#string-query_pathint-index) |
 | `query_prefixed_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
+| `query_principal_sessions` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_principal_sessionsstring-principal--int-revoke_session_idstring-principal-string-id) |
 | `query_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
 | `query_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
 | `query_property_indices` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
@@ -150,6 +151,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `query_rp_id` | daemon API | [system-daemons.md](system-daemons.md#void-configurestring-rpid-string-origin--string-query_rp_id--string-query_origin) |
 | `query_session_count` | daemon API | [system-daemons.md](system-daemons.md#int-revokestring-token--int-revoke_principalstring-principal--int-query_session_count) |
 | `query_subdirs` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_tree--string-query_subdirsvarargs-string-path--string-query_objectsvarargs-string-path) |
+| `query_subject_sessions` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_subject_sessionsstring-sessiontoken-string-subject--int-revoke_subject_sessionstring-sessiontoken-string-subject-string-sessionid--int-revoke_subject_sessionsstring-sessiontoken-string-subject) |
 | `query_threshold` | daemon API | [system-daemons.md](system-daemons.md#void-set_thresholdint-level--int-query_threshold) |
 | `query_tree` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_tree--string-query_subdirsvarargs-string-path--string-query_objectsvarargs-string-path) |
 | `queryStateRoot` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
@@ -172,6 +174,9 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `revoke_capability` | daemon API | [system-daemons.md](system-daemons.md#void-grant_capabilitystring-uuid-string-capability--void-revoke_capabilitystring-uuid-string-capability--string-query_grantsstring-uuid) |
 | `revoke_passkey` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_passkeysstring-sessiontoken--void-revoke_passkeystring-sessiontoken-string-credentialid) |
 | `revoke_principal` | daemon API | [system-daemons.md](system-daemons.md#int-revokestring-token--int-revoke_principalstring-principal--int-query_session_count) |
+| `revoke_session_id` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_principal_sessionsstring-principal--int-revoke_session_idstring-principal-string-id) |
+| `revoke_subject_session` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_subject_sessionsstring-sessiontoken-string-subject--int-revoke_subject_sessionstring-sessiontoken-string-subject-string-sessionid--int-revoke_subject_sessionsstring-sessiontoken-string-subject) |
+| `revoke_subject_sessions` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_subject_sessionsstring-sessiontoken-string-subject--int-revoke_subject_sessionstring-sessiontoken-string-subject-string-sessionid--int-revoke_subject_sessionsstring-sessiontoken-string-subject) |
 | `rm` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `rmdir` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `rotate_credential` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-rotate_credentialstring-uuid-string-newid-mapping-row-string-oldid) |

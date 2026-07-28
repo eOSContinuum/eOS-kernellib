@@ -239,6 +239,79 @@ else
     rc=1
 fi
 
+echo "== phase 6: authd session administration (capability-gated) =="
+# Provision an admin identity, grant session.admin through the operator
+# path, and drive the tier-E authd entries via the console code verb
+# (console code objects compile outside the System tier, so a passing
+# call proves tier-E reachability; the per-call capability check is the
+# only gate). The negative comes first: the same entry under a session
+# NOT holding session.admin reports the uniform capability denial.
+cat > state/session-admin.verbset <<VERBSET
+cmd: identity mint 1
+expect: minted identity
+capture: adminuuid minted identity:([0-9a-f-]+) with
+
+cmd: identity grant %{adminuuid} session.admin
+expect: identity: granted session.admin
+
+cmd: session mint identity:%{adminuuid}
+expect: session: token
+capture: admintok session: token (\S+)
+
+cmd: identity mint 1
+expect: minted identity
+capture: plainuuid minted identity:([0-9a-f-]+) with
+
+cmd: session mint identity:%{plainuuid}
+expect: session: token
+capture: plaintok session: token (\S+)
+
+cmd: session mint $PRINCIPAL
+expect: session: token
+
+cmd: session mint $PRINCIPAL
+expect: session: token
+
+# no capability -> the uniform denial, and nothing is listed
+cmd: code "/usr/System/sys/authd"->query_subject_sessions("%{plaintok}", "$PRINCIPAL")
+expect: Error: capability denied: principal identity:%{plainuuid} lacks session.admin
+
+# a dead admin token is a refused session, not an empty listing
+cmd: code "/usr/System/sys/authd"->query_subject_sessions("not-a-token", "$PRINCIPAL")
+expect: Error: auth: no live session
+
+# the admin lists the subject's sessions: bookkeeping ids, never a token
+cmd: code "/usr/System/sys/authd"->query_subject_sessions("%{admintok}", "$PRINCIPAL")
+expect: "[0-9a-f]{64}"
+capture: sessid "([0-9a-f]{64})"
+
+# revoke the listed session by id; the second one still stands
+cmd: code "/usr/System/sys/authd"->revoke_subject_session("%{admintok}", "$PRINCIPAL", "%{sessid}")
+expect: [$]\d+ = 1\b
+
+# a spent id revokes nothing
+cmd: code "/usr/System/sys/authd"->revoke_subject_session("%{admintok}", "$PRINCIPAL", "%{sessid}")
+expect: [$]\d+ = 0\b
+
+# logout-everywhere drops the remainder
+cmd: code "/usr/System/sys/authd"->revoke_subject_sessions("%{admintok}", "$PRINCIPAL")
+expect: [$]\d+ = 1\b
+
+cmd: code "/usr/System/sys/authd"->query_subject_sessions("%{admintok}", "$PRINCIPAL")
+expect: [$]\d+ = \(\{\s*\}\)
+
+# the operator face agrees
+cmd: session list $PRINCIPAL
+expect: session: 0 live session\(s\) for $PRINCIPAL
+VERBSET
+if python3 scripts/drive-verbs.py state/session-admin.verbset \
+        --host "$HOST" --port 8023; then
+    echo "PASS: capability-gated session administration end to end"
+else
+    echo "FAIL: session-administration phase failed" >&2
+    rc=1
+fi
+
 drive 'cmd: halt' >/dev/null 2>&1 || true
 sleep 1
 

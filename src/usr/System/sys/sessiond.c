@@ -191,6 +191,49 @@ int query_session_count()
     return map_sizeof(sessions);
 }
 
+/*
+ * per-principal bookkeeping rows for the administration surface:
+ * ({ id, created, expires }) per live session, where id is the stored
+ * token hash (hex). The id can revoke but never authenticate --
+ * validation hashes a presented plaintext, so possession of an id
+ * grants no login.
+ */
+mixed *query_principal_sessions(string principal)
+{
+    string *hashes;
+    mixed *rows;
+    int i;
+
+    check_system(previous_program());
+    reap(time());
+    hashes = map_indices(sessions);
+    rows = ({ });
+    for (i = 0; i < sizeof(hashes); i++) {
+	if (sessions[hashes[i]][SESS_PRINCIPAL] == principal) {
+	    rows += ({ ({ hashes[i],
+			  sessions[hashes[i]][SESS_CREATED],
+			  sessions[hashes[i]][SESS_EXPIRES] }) });
+	}
+    }
+    return rows;
+}
+
+/*
+ * revoke one live session by its bookkeeping id, bound to the
+ * principal it must belong to; TRUE iff a matching live session was
+ * removed. The principal binding keeps an id learned from one
+ * subject's listing from revoking another subject's session.
+ */
+int revoke_session_id(string principal, string id)
+{
+    check_system(previous_program());
+    if (id && sessions[id] && sessions[id][SESS_PRINCIPAL] == principal) {
+	sessions[id] = nil;
+	return TRUE;
+    }
+    return FALSE;
+}
+
 
 /*
  * NAME:	_emit()
@@ -212,6 +255,8 @@ private void _emit(object user, string msg)
  *		  session validate <token>      -- the principal, or none
  *		  session revoke <token>        -- drop one session
  *		  session revoke-principal <p>  -- drop all of a principal's
+ *		  session list <principal>     -- bookkeeping rows (id,
+ *		                                  created, expires)
  */
 void cmd_session(object user, string cmd, string str)
 {
@@ -295,10 +340,34 @@ void cmd_session(object user, string cmd, string str)
 		    " session(s)\n");
 	return;
 
+    case "list":
+	if (sizeof(parts) != 2) {
+	    _emit(user, "usage: " + cmd + " list <principal>\n");
+	    return;
+	}
+	{
+	    mixed *rows;
+	    int i;
+
+	    err = catch(rows = query_principal_sessions(parts[1]));
+	    if (err) {
+		_emit(user, err + "\n");
+		return;
+	    }
+	    _emit(user, "session: " + (string) sizeof(rows) +
+			" live session(s) for " + parts[1] + "\n");
+	    for (i = 0; i < sizeof(rows); i++) {
+		_emit(user, "session: id " + rows[i][0] +
+			    " created " + (string) rows[i][1] +
+			    " expires " + (string) rows[i][2] + "\n");
+	    }
+	}
+	return;
+
     default:
 	_emit(user, "usage: " + cmd + " [mint <principal> [ttl] | " +
 		    "validate <token> | revoke <token> | " +
-		    "revoke-principal <principal>]\n");
+		    "revoke-principal <principal> | list <principal>]\n");
 	return;
     }
 }
