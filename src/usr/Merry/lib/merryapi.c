@@ -274,22 +274,30 @@ string categorize_merry_word(string word) {
    case "varargs":
    case "while":
       return "keyword";
+   case "Arr":
    case "BatchedSet":
    case "Call":
+   case "Decode":
+   case "Dump":
    case "Duplicate":
+   case "Encode":
    case "Error":
    case "Every":
    case "FindMerry":
+   case "Flt":
    case "Get":
    case "GetVar":
    case "In":
+   case "Int":
    case "LabelCall":
    case "LabelRef":
+   case "Obj":
    case "Set":
    case "SetVar":
    case "Slay":
    case "Spawn":
    case "Stop":
+   case "Str":
       return "merryfun";
    case "acos":
    case "allocate":

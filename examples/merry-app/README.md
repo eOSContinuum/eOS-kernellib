@@ -81,6 +81,8 @@ kill %1
 #   MerryApp:test: OBSERVER SUGAR OK
 #   MerryApp:test: OBSERVER REMOVE OK
 #   MerryApp:test: OBSERVER CLEAR OK
+#   MerryApp:test: COERCION OK
+#   MerryApp:test: CODEC OK
 #   MerryApp:test: PERSIST SETUP OK
 #   --- (driver exits; restart against snapshot) ---
 #   MerryApp:test: SUICIDE OK
@@ -183,6 +185,10 @@ result = run_merry(child, "label_test", "lib", ([ ]));
 ```
 
 The grammar maps `testspace::greet($who: "world")` to `LabelCall("testspace", "greet", ({ "who", "world" }))`. `merrynode.c::LabelCall` queries `MERRY->query_script_space("testspace")`, then calls `Call(handler, "greet", local)`. `Call` walks the handler's `query_method` -- a non-zero return routes through `obj->call_method(name, args)`, where `args` is the merry-source `args` mapping with the inline locals overlaid. The handler reads `args["who"]` and returns `"Hello world"`.
+
+### Phases 15g and 15h -- coercion and canonical-codec merryfuns
+
+Two Merry scripts bound to the phase 1 parent exercise the type layer from Merry source. Phase 15g checks the coercion merryfuns: `Str` (nil to `""`, int to decimal string, string identity, object to its logical name), `Int` (string parse, nil and `""` to 0, float rounding to nearest -- DGD's own conversion), `Flt` (string parse, int widening), `Arr` (nil to `({ })`, wrap-scalar, array identity), and `Obj` (unknown name answers nil, object identity, logical-name resolution through the Index fallback) -- plus the errors-loudly posture: `Int("abc")` and `Str` of a mapping must throw, asserted with Merry's own `catch`. The script opens with an uninitialized local declaration (`string s;` then `s = Str(42);`), the declare-then-assign shape `docs/merry-language.md` prescribes. Phase 15h checks the canonical codec: an `Encode`/`Decode` round-trip over a nested mapping/array structure holding int, float, string, and nil; the canonical fixpoint (`Encode(Decode(e)) == e`); a by-name object reference round-trip against the parent's logical name; that `Dump` produces a nonempty printout; and the codec's refusals -- `Encode` of a cyclic structure and `Decode` of malformed input both throw. Each script returns 0 on success or the number of the first failing check, which the failure sentinel carries.
 
 ## Files
 

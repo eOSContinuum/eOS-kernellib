@@ -6,7 +6,9 @@
  *     restrictions; '->' and 'rlimits' additionally grammar-forbidden);
  *   - the merryfun API surface callable from Merry source: property bridge
  *     (Set/Get/SetVar/GetVar), invocation (Call/LabelCall/LabelRef/FindMerry),
- *     lifecycle (Spawn/Slay/Duplicate), scheduling (In/Every/Stop);
+ *     lifecycle (Spawn/Slay/Duplicate), scheduling (In/Every/Stop),
+ *     type coercion (Str/Int/Flt/Arr/Obj), canonical serialization
+ *     (Encode/Decode) and the debug printer (Dump);
  *   - the args + this TLS-shape state set up at evaluate() entry;
  *   - the obref() runtime lookup that resolves AST `${objref-name}` tokens
  *     to actual objects via the per-script object array.
@@ -16,6 +18,7 @@
 # include <type.h>
 
 # define MERRY		"/usr/Merry/sys/merry"
+# define INDEX		"/usr/Index/sys/index_daemon"
 
 /* string/util surface available to Merry source */
 inherit "/lib/util/ascii";
@@ -28,6 +31,9 @@ private inherit "/usr/Merry/lib/merryapi";
 
 /* state export/import for Duplicate */
 private inherit "/usr/Marshal/XmlBinding/lib/stateimpex";
+
+/* canonical value codec for Encode/Decode */
+private inherit "/lib/util/coercion";
 
 private int mru_stamp;
 private object *obarr;
@@ -378,6 +384,137 @@ object Duplicate(object ob) {
       return clone;
    }
    error("object is not a clone");
+}
+
+/*
+ * Type coercions. Semantics follow the SkotOS precedent: nil coerces
+ * to the type's empty value, scalars convert, anything unconvertible
+ * errors loudly (no silent placeholder returns). Obj() answers nil
+ * for an unknown name -- it is the existence-tolerant lookup; error
+ * paths that need a hit use FindMerry/Call, which throw.
+ */
+
+nomask static
+string Str(mixed val) {
+   switch (typeof(val)) {
+   case T_NIL:
+      return "";
+   case T_INT:
+   case T_FLOAT:
+      return (string) val;
+   case T_STRING:
+      return val;
+   case T_OBJECT:
+      return name(val);
+   }
+   error("Str(): cannot convert value to string");
+}
+
+nomask static
+int Int(mixed val) {
+   int i;
+
+   switch (typeof(val)) {
+   case T_NIL:
+      return 0;
+   case T_INT:
+      return val;
+   case T_FLOAT:
+      return (int) val;
+   case T_STRING:
+      if (!strlen(val)) {
+	 return 0;
+      }
+      if (sscanf(val, "%d", i)) {
+	 return i;
+      }
+      break;
+   }
+   error("Int(): cannot convert value to integer");
+}
+
+nomask static
+float Flt(mixed val) {
+   float f;
+
+   switch (typeof(val)) {
+   case T_NIL:
+      return 0.0;
+   case T_INT:
+      return (float) val;
+   case T_FLOAT:
+      return val;
+   case T_STRING:
+      if (!strlen(val)) {
+	 return 0.0;
+      }
+      if (sscanf(val, "%f", f)) {
+	 return f;
+      }
+      break;
+   }
+   error("Flt(): cannot convert value to float");
+}
+
+nomask static
+mixed *Arr(mixed val) {
+   switch (typeof(val)) {
+   case T_NIL:
+      return ({ });
+   case T_ARRAY:
+      return val;
+   }
+   return ({ val });
+}
+
+nomask static
+object Obj(mixed val) {
+   object ob;
+
+   switch (typeof(val)) {
+   case T_NIL:
+      return nil;
+   case T_OBJECT:
+      return val;
+   case T_STRING:
+      ob = find_object(val);
+      if (!ob) {
+	 /* the Index-daemon fallback the coercion codec's object
+	  * decode uses; -> reaches the kfun directly, so the local
+	  * call_other shadow does not fire (same as LabelCall's
+	  * MERRY-> lookups). */
+	 ob = INDEX->query_object(val);
+      }
+      return ob;
+   }
+   error("Obj(): cannot convert value to object");
+}
+
+/*
+ * Canonical serialization round-trip over sandbox-legal values
+ * (nil/int/float/string/array/mapping, object references by name):
+ * the /lib/util/coercion codec -- strict canonical writer, tolerant
+ * reader, aliased/cyclic structures and LWOs refused. Dump is the
+ * human-facing debug printer (dumpValue), NOT a round-trip form:
+ * floats lose precision and cycles print as backreferences.
+ */
+
+nomask static
+string Encode(mixed val) {
+   return encodeValue(val);
+}
+
+nomask static
+mixed Decode(string str) {
+   if (typeof(str) != T_STRING) {
+      error("Decode(): argument is not a string");
+   }
+   return decodeValue(str);
+}
+
+nomask static
+string Dump(mixed val) {
+   return dumpValue(val);
 }
 
 static

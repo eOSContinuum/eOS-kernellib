@@ -59,7 +59,7 @@ example_profile() {
                            # module: LPC_EXT_CRYPTO=... EXPECTED_OK=51
         hot-reload-demo)   echo "WWW 1 timed 2" ;;
         hot-reload-master) echo "Reload 1 timed 3" ;;
-        merry-app)         echo "MerryApp 2 selfexit 28" ;;
+        merry-app)         echo "MerryApp 2 selfexit 30" ;;
         signal-app)        echo "SignalApp 1 timed 1" ;;
         upgrade-cascade)   echo "Cascade 1 timed 7" ;;
         vault-app)         echo "MyApp 1 timed 10" ;;
