@@ -285,6 +285,12 @@ cmd: code "/usr/System/sys/authd"->query_subject_sessions("%{admintok}", "$PRINC
 expect: "[0-9a-f]{64}"
 capture: sessid "([0-9a-f]{64})"
 
+# id-to-subject binding: the id belongs to the target principal, so
+# naming a different subject revokes nothing -- and the mis-aimed call
+# leaves the session alive for the correctly-aimed revoke below
+cmd: code "/usr/System/sys/authd"->revoke_subject_session("%{admintok}", "identity:%{plainuuid}", "%{sessid}")
+expect: [$]\d+ = 0\b
+
 # revoke the listed session by id; the second one still stands
 cmd: code "/usr/System/sys/authd"->revoke_subject_session("%{admintok}", "$PRINCIPAL", "%{sessid}")
 expect: [$]\d+ = 1\b
@@ -303,6 +309,15 @@ expect: [$]\d+ = \(\{\s*\}\)
 # the operator face agrees
 cmd: session list $PRINCIPAL
 expect: session: 0 live session\(s\) for $PRINCIPAL
+
+# revocation immediacy: the capability check hits the live store on
+# every call, so an ungrant denies the very next call -- same admin,
+# same live session token
+cmd: identity ungrant %{adminuuid} session.admin
+expect: identity: ungranted session.admin
+
+cmd: code "/usr/System/sys/authd"->query_subject_sessions("%{admintok}", "$PRINCIPAL")
+expect: Error: capability denied: principal identity:%{adminuuid} lacks session.admin
 VERBSET
 if python3 scripts/drive-verbs.py state/session-admin.verbset \
         --host "$HOST" --port 8023; then
