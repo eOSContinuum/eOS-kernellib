@@ -190,6 +190,10 @@ The principal a live token authenticates, or nil for an unknown or expired token
 
 Drop one session (TRUE iff a live one was removed); drop every session for a principal (a logout-everywhere primitive; returns the count); the live-session count (expired records reaped first).
 
+### `mixed *query_principal_sessions(string principal)` / `int revoke_session_id(string principal, string id)`
+
+The administration bookkeeping pair. `query_principal_sessions` returns one row per live session of the principal, `({ id, created, expires })`, where `id` is the stored token hash (hex) -- an id can revoke but never authenticate, since validation hashes a presented plaintext. `revoke_session_id` drops one live session by that id, bound to the principal it must belong to (TRUE iff a matching live session was removed); the binding keeps an id learned from one subject's listing from revoking another subject's session. The tier-E face of both is authd's capability-gated session administration below; the operator face is `session list <principal>` on the console verb.
+
 ## agentauthd -- `src/usr/System/sys/agentauthd.c`
 
 The agent ceremony daemon: verifies the two agent authentication ceremonies against live substrate state (the record's kind and suspended flag are checked at ceremony time) and returns the proven principal. It never mints sessions -- authd composes ceremony plus mint -- and never mutates records beyond last-use bookkeeping. The key assertion verifies a signature over a domain-separated message (a fixed tag plus the challenge, so an agent-auth signature cannot be replayed into another protocol) with the bound row's verify scheme and raw public key; replay protection is the caller-owned single-use challenge, with no signature counter. The token ceremony hashes the presented token, requires a matching stored hash and an unexpired row, and stamps last use. Challenge ownership follows the webauthnd contract: the daemon holds no challenge state. Ceremonies need the crypto module; the verifying surface is System/kernel-tier (`docs/identity.md` Agent identities; `scripts/agent-smoke.sh` is the live proof).
@@ -221,6 +225,10 @@ The TOFU registration ceremony plus session mint in one step; returns `({ subjec
 ### `mixed *authenticate(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature, varargs int ttl)`
 
 The assertion ceremony plus session mint in one step; returns `({ subject, token })`.
+
+### `mixed *query_subject_sessions(string sessionToken, string subject)` / `int revoke_subject_session(string sessionToken, string subject, string sessionId)` / `int revoke_subject_sessions(string sessionToken, string subject)`
+
+Session administration: bookkeeping and revocation for subjects OTHER than the caller -- the moderation shape (boot a member, logout-everywhere) an application cannot otherwise build without holding another identity's plaintext token against the platform's no-plaintext-at-rest posture. Every entry derives the acting subject from `sessionToken`'s live session, then requires the **`session.admin`** capability for that subject at call time -- the check hits the live capability store on every call, nothing cached, so an operator revocation of the capability takes effect on the next call. Grant it through the operator path (`identity grant <uuid> session.admin`, `docs/capability.md` Identity principals). This deliberately generalizes the `suspend_agent` shape (an entry that ends another record's sessions) past the controller edge: where `suspend_agent`'s authority is the immutable controller relationship, this authority is an explicit, operator-granted, operator-revocable capability. `query_subject_sessions` returns `({ sessionId, created, expires })` rows; `revoke_subject_session` drops one by id (TRUE iff that id belonged to the subject and was live -- the binding is checked in sessiond); `revoke_subject_sessions` drops all and returns the count. A plaintext token never crosses this surface in either direction. Live proof: `scripts/session-smoke.sh` phase 6, including the uniform capability denial for a subject without the grant.
 
 ### `string validate(string token)` / `int logout(string token)`
 
