@@ -1101,6 +1101,10 @@ static void run_tests()
 	    "if (Arr(({ 1, 2 }))[1] != 2) return 11;\n" +
 	    "if (Obj(\"MerryApp:no:such:name\")) return 12;\n" +
 	    "if (Obj($this) != $this) return 13;\n" +
+	    "if (Str($this) != \"MerryApp:demo:parent\") return 14;\n" +
+	    "if (Obj(\"MerryApp:demo:parent\") != $this) return 15;\n" +
+	    "if (!catch(Int(\"abc\"))) return 16;\n" +
+	    "if (!catch(Str(([ \"a\": 1 ])))) return 17;\n" +
 	    "return 0;");
 	parent->set_property("merry:lib:coerce", coerce_script);
 	result = run_merry(parent, "coerce", "lib", ([ ]));
@@ -1128,6 +1132,7 @@ static void run_tests()
 	codec_script = new_object(MERRY_DATA,
 	    "string e;\n" +
 	    "mixed d;\n" +
+	    "mixed *cyc;\n" +
 	    "e = Encode(([ \"k\": ({ 1, 2.5, \"x\", nil }) ]));\n" +
 	    "d = Decode(e);\n" +
 	    "if (d[\"k\"][0] != 1 || d[\"k\"][1] != 2.5) return 1;\n" +
@@ -1135,6 +1140,10 @@ static void run_tests()
 	    "if (Encode(d) != e) return 3;\n" +
 	    "if (Decode(Encode($this)) != $this) return 4;\n" +
 	    "if (strlen(Dump(([ \"a\": ({ nil }) ]))) == 0) return 5;\n" +
+	    "cyc = ({ 1 });\n" +
+	    "cyc[0] = cyc;\n" +
+	    "if (!catch(Encode(cyc))) return 6;\n" +
+	    "if (!catch(Decode(\"({ bogus\"))) return 7;\n" +
 	    "return 0;");
 	parent->set_property("merry:lib:codec", codec_script);
 	result = run_merry(parent, "codec", "lib", ([ ]));
