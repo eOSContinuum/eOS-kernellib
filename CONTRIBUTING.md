@@ -35,7 +35,7 @@ For trivial work (typos, small documentation fixes, broken cross-references): op
 Commits in this repository are atomic, signed, and content-attributed to humans only.
 
 - **Atomic**: one logical change per commit. Renames precede content edits; automated changes are separate from manual content.
-- **Signed**: `git commit -S -s` (GPG-signed and DCO-style sign-off). Configured via `~/.gitconfig` once; subsequent commits inherit.
+- **Signed**: `git commit -S -s`. The two flags gate differently and both are required on every commit, from maintainers and outside contributors alike: the DCO-style sign-off (`-s`) asserts you have the right to submit the work under the project license, and the cryptographic signature (`-S`) attests authorship of the commit itself. A PR containing unsigned commits is not mergeable as-is. GPG and SSH signature formats are both accepted; [GitHub's commit-signing documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification) covers key setup for either. Configured via `~/.gitconfig` once; subsequent commits inherit. (Imported upstream history predates this requirement; it governs contributions, not archaeology.)
 - **Message format**: imperative-mood title of 72 characters or fewer; body wraps at 72 columns; ASCII only (no em-dashes, curly quotes, or ellipsis characters).
 - **No AI attribution**: commit history names the human author. AI assistance is a tool, not a co-author.
 - **Body content**: lead with outcomes (what is different now), then supporting detail. For multi-file commits, the body is required and enumerates what changed per file or area.
@@ -68,6 +68,8 @@ Two documentation surfaces:
 - **Procedural docs** outside `docs/` -- README, CONTRIBUTING, SECURITY, this file. Follow the standard OSS-repo convention.
 
 New docs added to `docs/` use lowercase-hyphenated filenames matching the existing pattern. The `docs/README.md` folder index is updated to include any new doc in the appropriate audience group.
+
+The platform sits at the junction of several traditions (DGD driver, kernellib, SkotOS, WebAuthn, contemporary infrastructure), and their vocabularies collide. The doc set resolves collisions by register separation, not renaming: each plane keeps its home tradition's term, with a one-sentence bridge at each seam where planes meet (the glossary's "principal" and "subject" entries are worked examples). A rename is right only when a plane's own term misleads at its interface.
 
 A behavior change updates the document that owns it. At subsystem grain, `docs/source-map.md` maps each subsystem to its doc; the most-restated mechanisms cross subsystems, so their owners are named here directly -- update the owner first, and let other docs reference rather than restate:
 
@@ -118,6 +120,17 @@ LPC code follows the conventions visible across `src/`:
 - Capability-tier discipline: code at tier N does not bypass tier N-1's contract. When in doubt, [`docs/architecture.md`](docs/architecture.md) names what each tier may call.
 - Inherit-chain conventions: kernel-auto for `src/kernel/`, system-auto for `src/usr/System/`, application-auto chain for other tier-E domains.
 - ASCII directory trees in docs use indent-based shape; Unicode box-drawing is not used.
+
+At line level, the operative rule is **match the file you are editing** -- a few SkotOS-heritage subsystems carry their own older style, and a patch that restyles its surroundings is noise. For a **new file**, the conventions are the kernel lineage's, visible throughout the recent `src/usr/System` and `src/lib/util` work:
+
+- **Indentation**: logical levels of 4 columns rendered against 8-column tab stops -- level 1 is four spaces, level 2 one tab, level 3 tab plus four spaces (the classic DGD editor profile: `tab-width 8`, `c-basic-offset 4`, tabs enabled). Tabs also align trailing comments and `# define` values to 8-column stops.
+- **Braces**: a function's opening brace on its own line at column 0; control-flow braces (`if`/`for`/`while`/`switch`) on the same line, `} else if (...) {` cuddled. Brace even single-statement `if` bodies. `case` labels sit at the `switch`'s own indent, bodies one level deeper.
+- **Naming**: `snake_case` functions in daemon and kernel code, with `query_`/`set_` accessor prefixes, `cmd_` for console verbs, and a leading underscore for call_out targets and private emitters; `ALL_CAPS` for `# define` constants; `snake_case` (or single-word lowercase) variables everywhere. `/lib/util` carries both lineages' function conventions: net-new libraries use `camelCase` public functions (`webauthn.c`; `coercion.c`'s `encodeValue` / `decodeValue`), while SkotOS-lifted utilities keep their `snake_case` surfaces (`properties.c`, `named.c`, `ur.c`) -- extend a library in its own style, and give a new library the camelCase shape.
+- **Preprocessor**: a space after the hash -- `# include`, `# define`, `# ifdef` -- and conditionals at column 0 even inside function bodies. Include order: `<kernel/...>` headers first, then other bracket headers, then domain headers; then the `inherit` block (auto first, then labeled `private inherit` of `/lib/util` libraries); then `# define`s; then globals; then `create()` as the first function.
+- **Comments**: `/* ... */` only (`//` appears nowhere in the tree). New code carries a file-level rationale block stating tier, invariants, and what the surface deliberately does not expose, and free-form prose blocks per function; the operator-verb section at a daemon's end (`_emit` plus `cmd_*`) keeps the kernel's `NAME:`/`DESCRIPTION:` template.
+- **Idioms**: `atomic` goes between visibility and return type (`private atomic string *recompile(...)`); tier gates use a private `check_*` helper taking the caller's program as an argument, each public entry passing `previous_program()`; errors read `error("<surface>: <lowercase message>")`, with bare `error("Access denied")` reserved for tier gates; `nil` (not 0) for absent objects and strings.
+
+Three exemplar files, one per placement shape -- when in doubt, match these rather than reverse-engineering the tree: [`src/lib/util/webauthn.c`](src/lib/util/webauthn.c) for a `/lib/util` pure-function library, [`src/usr/System/sys/sessiond.c`](src/usr/System/sys/sessiond.c) for a System-tier daemon (includes the gate-helper pattern and the operator-verb tail), and [`src/usr/System/obj/identity.c`](src/usr/System/obj/identity.c) for a clonable per-instance record.
 
 Shell scripts under `examples/` follow POSIX conventions and target a portable invocation environment.
 
