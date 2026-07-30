@@ -42,7 +42,7 @@ Each of these is exercised by a runnable example under `examples/`; the multi-us
 
 ## Project status
 
-Stated per primitive rather than claimed wholesale: three of the eight are **Validated** today (atomicity, persistent state, hot reload) and five are **Partial** — foundation present, demonstration incomplete (`docs/runtime-primitives.md` is the per-primitive statement). The measured envelope is one machine and one workload shape — a rig and a datum, not a guarantee (`docs/evaluating.md`) — and the roadmap commits forward surfaces on named activation triggers, not dates (`docs/runtime-platform-roadmap.md`).
+Stated per primitive rather than claimed wholesale: each of the eight primitives carries a status of **Validated** or **Partial** — foundation present, demonstration incomplete — and `docs/runtime-primitives.md` is the per-primitive statement, its At-a-glance table the authoritative current split (deliberately restated nowhere else, so a status change cannot drift). The measured envelope is one machine and one workload shape — a rig and a datum, not a guarantee (`docs/evaluating.md`) — and the roadmap commits forward surfaces on named activation triggers, not dates (`docs/runtime-platform-roadmap.md`).
 
 ## Two primitives, in code
 
