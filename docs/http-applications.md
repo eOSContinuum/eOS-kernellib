@@ -204,6 +204,18 @@ The platform mount point is a single path: `/usr/WWW/obj/server`. To run more th
 
 This pattern ships runnable: `examples/composite-app/` carries exactly these files (the WWW part deploys the registry and routing servers, the Inventory part a registering application domain), and [composite-applications.md](composite-applications.md) walks the seams. The kernel layer is indifferent to which pattern an application chooses; the single-application reference and the router pattern rely on the same platform contracts.
 
+### The routed-handler contract
+
+Every handler behind the route registry implements one narrow contract, and this section is its reference home:
+
+```c
+mixed *handle(string method, string path, string body,
+              string authorization)
+    -> ({ code, phrase, contentType, body })
+```
+
+A handler may append an optional fifth element -- a mapping of extra response header name : value pairs -- when a resource needs a header beyond the defaults. The routing server stays the only object that touches `HttpRequest` / `HttpResponse` wire objects: handlers see strings and return strings. A handler error becomes a 500 without breaking the connection contract. The worked walkthrough of the seam, on both of its sides, is [composite-applications.md](composite-applications.md) Reading the example in stages.
+
 ## Cross-domain initialization order
 
 The System initd compiles `/usr/[A-Z]*/initd.c` alphabetically, after a fixed `TLS`, `HTTP`, `LPC` prefix. An application initd that needs to call into another user-layer domain at compile time may run before that domain's initd has compiled. To defer registration until the System initd has finished iterating all domains, use a `call_out` of duration 0:

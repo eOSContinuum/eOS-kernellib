@@ -59,6 +59,8 @@ Atomicity is what makes this cheap where it was hard elsewhere: the store write 
 
 **When the mapping outgrows.** The collection fork (`/lib/Array`, `KVstore`, `BTree`) trades dataspace-granularity paging against `objects`-table slots; take it before the first real domain model outgrows the demo shapes (`docs/kernel-libraries.md` Choosing a collection).
 
+**The delete side.** Removing an entity is the same one-atomic-function discipline run in reverse -- rows and indexes out, then `destruct_object` -- plus the residue the runtime does not clean for you (Vault on-disk XML, dangling stored references). The worked sequence, with what cleans itself and what does not, is `docs/common-tasks.md` Remove an entity and everything that points at it.
+
 ## The initd's role
 
 Every tier-E domain must have an `initd.c` at its root. The System initd compiles each domain's `initd.c` during cold boot. The domain's `initd::create()` runs inside the System initd's create envelope.

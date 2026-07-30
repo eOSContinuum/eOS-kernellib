@@ -123,6 +123,19 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/application-authoring.md` Modeling domain data.
 
+## Remove an entity and everything that points at it
+
+**Goal**: destruct a live entity so no lookup, index, or on-disk residue resurrects it -- the delete side of the find-and-index recipe above.
+
+1. In one `atomic` function on the owning daemon, remove the store row and any secondary-index entries, then `destruct_object(entity)` -- the mirror of the create side, so the rows and the destruct commit or roll back together. The rollback is total (verified live): an error after the destruct restores the object, its rows, and even its logical-name registration.
+2. What cleans itself: the logical-name registration -- the kernel destruct hook clears the Index entry, so `find_named` answers nil with no explicit `set_object_name(nil)` (`docs/kernel-libraries.md` /lib/util/named.c) -- and the entity's own observer registrations, which live in its property table and die with it (`docs/observers.md` Persistence and end-of-life). In-image references other objects still hold resolve to nil after the destruct (`docs/code-lifecycle.md` Destruct: removal).
+3. What does not clean itself: Vault on-disk XML. The Vault daemon has no delete API, a stored file survives destruct, and any later respawn silently resurrects the entity from it, state intact (verified live). Removal is deliberately outside the owning domain's reach -- tier-E `remove_file` against the Vault storage root is refused -- so it is an operator act: the console `rm` verb against the store path (the `store` call returned it; the shape is `/usr/Vault/data/vault/<name-with-colons-as-slashes>.xml`), or host-side removal, or System-tier code a deployment deliberately provisions.
+4. If other Vault-stored entities hold `lpc_obj` references to the removed one, their stored XML now dangles, and a dangling reference costs the referrer its whole import at the next respawn (`docs/vault-applications.md` Cross-object references). Remove leaf entities before their referrers, and re-`store` any referrer you edited to drop the reference.
+
+**Verify**: from the console, `find_named("<name>")` returns nil and the daemon's field-index probe comes back empty; for a Vault-participating entity, also confirm the store path is gone -- a `spawn_one_by_name` attempt then errors with `no such file` instead of resurrecting.
+
+**Owning doc**: `docs/application-authoring.md` Modeling domain data for the entity lifecycle; `docs/vault-applications.md` for the on-disk store.
+
 ## Serve HTTPS on the labeled port
 
 **Goal**: the platform terminates TLS 1.3 natively for your application.
