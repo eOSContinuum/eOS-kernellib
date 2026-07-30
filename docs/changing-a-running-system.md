@@ -87,6 +87,8 @@ The ladder above is written for application-tier change. Kernel- and System-tier
 
 The contributor's edit loop follows from the matrix: day-to-day kernel work is edit, `compile`, exercise from the console; a change to either auto or to widely-included headers is verified with a cold boot plus the regression sweep (`CONTRIBUTING.md`), because that is the only path that proves the whole tree rebuilds against the change.
 
+**What the kernel-auto row costs a stateful deployment.** For a development checkout, "treat it as a cold-boot change" means a rebuild; for a production image it is the downtime taxonomy's most expensive row -- a cold boot carries over "only what the initd cascade recreates" (`docs/operations.md` Availability and data-loss model) -- so an upstream fix to `/kernel/lib/auto.c` currently prices at the entire non-exported object graph. What survives is exactly the file-backed state: the kernel's own data files and whatever each domain deliberately persisted through the Vault, recovered by the same ladder operations.md documents for a lost dump pair -- cold boot from the tree, per-domain respawn sweep, then grep `system.log` for the two failure lines (`docs/operations.md` What the Vault XML backup can recover). The contingency plan is that drill, rehearsed: apply the change on a rehearsal host, cold boot, run the respawn sweep, and read the logs before scheduling the production window. The design-time implication runs the other way: Vault-export coverage is the insurance policy against this class of forced cold boot, so when an application author weighs what to schema-export (`docs/persistence.md` Getting data out), the kernel-auto row belongs on the scale.
+
 ## The safety net
 
 Two properties hold under every rung above:

@@ -35,7 +35,7 @@ Start from the example nearest the system you are picturing. Each runs in one co
 
 ## What is proven today
 
-`runtime-primitives.md` states per-primitive status honestly rather than claiming the set wholesale: of the eight primitives, three are **Validated** (atomicity, persistent state, hot reload) and five are **Partial** (capability separation, sandboxed code load, asynchronous events, multi-agent coherence, state introspection) -- foundation present, demonstration incomplete. Its At-a-glance table carries a one-command proof per primitive; the fastest single check is:
+`runtime-primitives.md` states per-primitive status honestly rather than claiming the set wholesale: each of the eight primitives is either **Validated** or **Partial** (foundation present, demonstration incomplete), and its At-a-glance table is the authoritative split -- the counts are deliberately not restated here, so they cannot drift. The same table carries a one-command proof per primitive; the fastest single check is:
 
 ```sh
 DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
