@@ -33,7 +33,7 @@ Where the data inside those objects belongs -- the property table versus plain t
 
 The platform's pitch -- the object graph IS the storage layer -- leaves the author the half a database schema used to do: choosing entity shapes, finding things again, and enumerating safely. The patterns:
 
-**Entity shape: rows in a daemon, or clones.** Small and uniform domain data lives as mappings in the owning `sys/` daemon (the composite example's inventory: one `items` mapping, ids to rows). Entities with real identity -- per-instance behavior, cross-references, independent lifecycle -- are clones, each its own persistent dataspace. The fork is sizing as much as style: one mapping caps at the driver's pair ceiling and swaps as one unit, while clones spend `objects`-table slots (`docs/kernel-libraries.md` Choosing a collection; `docs/operations.md` Sizing a workload).
+**Entity shape: rows in a daemon, or clones.** Small and uniform domain data lives as mappings in the owning `sys/` daemon (the composite example's inventory: one `items` mapping, ids to rows). Entities with real identity -- per-instance behavior, cross-references, independent lifecycle -- are clones, each its own persistent dataspace. The fork is sizing as much as style: one mapping caps at the driver's pair ceiling and swaps as one unit, while clones spend `objects`-table slots (`docs/kernel-libraries.md` Choosing a collection; `docs/configuration.md` Sizing a workload).
 
 **Identity lookup: logical names.** An entity that other domains find by name registers one: `set_object_name("App:things:name")` at create, `find_named(name)` from anywhere -- global and O(1) through the Index daemon, and the same registry the Vault and `OBJ(...)` references resolve through (`docs/kernel-libraries.md` /lib/util/named.c).
 
@@ -212,7 +212,7 @@ src/usr/KV/
         kv_daemon.c    — singleton holding the mapping
 ```
 
-The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, value)` assigns, `get(key)` reads, and `remove(key)` deletes. (A single mapping caps at 32,767 entries on a stock build; when a real store approaches that, `docs/kernel-libraries.md` Choosing a collection and `docs/operations.md` Sizing a workload carry the decision rule.) The platform guarantees:
+The `kv_daemon.c` carries a single `private mapping store` variable. `put(key, value)` assigns, `get(key)` reads, and `remove(key)` deletes. (A single mapping caps at 32,767 entries on a stock build; when a real store approaches that, `docs/kernel-libraries.md` Choosing a collection and `docs/configuration.md` Sizing a workload carry the decision rule.) The platform guarantees:
 
 - **Persistence**: the `store` mapping survives restart without explicit serialization.
 - **Atomicity**: a multi-step write (e.g., transactional rename of a key) is atomic if wrapped in a single function call. A partial failure rolls back.
@@ -299,7 +299,7 @@ A driver that asserts survival across a restart follows the two-boot recipe `mer
 - [`docs/lpc-essentials.md`](lpc-essentials.md) gives LPC language orientation: types, type modifiers, inheritance, atomicity, `call_out`, error handling. The bridge to the formal spec at [LPC.md].
 - [`docs/kernel-libraries.md`](kernel-libraries.md) documents inheritable libraries shipped under [`src/lib/`](../src/lib/): String / StringBuffer, KVstore, Iterator family, Continuation family, Time, and the small `/lib/util/` set.
 - [`docs/http-applications.md`](http-applications.md) covers the HTTP/1-specific application pattern with [`examples/http-app/`](../examples/http-app/) as the runnable reference.
-- [`docs/operations.md`](operations.md) gives the operator's view (admin_console use, statedump cadence, rlimits, JIT deployment posture).
+- [`docs/operations.md`](operations.md) gives the operator's view (admin_console use, statedump cadence, JIT deployment posture); [`docs/configuration.md`](configuration.md) covers rlimits.
 - [`docs/application-repository.md`](application-repository.md) covers the repository posture around these patterns: what your repo owns, the deploy-by-copy flow, System-tier overlay files, your own harness runner, and platform pin updates.
 
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md

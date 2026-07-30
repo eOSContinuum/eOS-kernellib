@@ -54,7 +54,7 @@ rolls back wholly.
 - src/usr/System/sys/resource_daemon.c: quota check added before
   the allocation handoff.
 - src/lib/api/resource.c: API path exercises the new check.
-- docs/operations.md: Resource limits section updated to name the
+- docs/configuration.md: Resource limits section updated to name the
   per-owner check.
 ```
 

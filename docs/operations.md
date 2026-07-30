@@ -1,8 +1,8 @@
 # Operations
 
-This document covers running an eOS-kernellib instance: configuring it via the `.dgd` file, booting and re-booting it, snapshotting, backing up, and restoring its persistent state, its availability and data-loss model, monitoring its output, diagnosing failures, sizing it within the platform's limits, and loading optional host-driver extensions. The architecture document (`docs/architecture.md`) covers the platform's structural model. This document covers the operator's surface for keeping it running.
+This document covers running an eOS-kernellib instance: booting and re-booting it, snapshotting, backing up, and restoring its persistent state, its availability and data-loss model, monitoring its output, diagnosing failures, and loading optional host-driver extensions. `.dgd` configuration fields and the platform's capacity ceilings are covered in `docs/configuration.md`. The architecture document (`docs/architecture.md`) covers the platform's structural model. This document covers the operator's surface for keeping it running.
 
-**Audience**: someone running the platform, responsible for choosing config values, watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Application authoring is covered in `docs/application-authoring.md` and `docs/http-applications.md`.
+**Audience**: someone running the platform, responsible for watching the running process, taking snapshots, restoring after a crash, and deciding whether to load extensions. Choosing config values and sizing a workload is covered in `docs/configuration.md`. Application authoring is covered in `docs/application-authoring.md` and `docs/http-applications.md`.
 
 ## The operator's task index
 
@@ -11,8 +11,8 @@ The jobs this doc (and its task-shaped companions) cover, by name:
 | I need to... | Where |
 |---|---|
 | Stand up a fresh production deployment, in order | Day 0: standing up a production deployment |
-| Choose config values, raise a ceiling | The .dgd configuration file; Limits and capacity |
-| Size a workload's storage shape | Limits and capacity, Sizing a workload |
+| Choose config values, raise a ceiling | `docs/configuration.md` The .dgd configuration file; Limits and capacity |
+| Size a workload's storage shape | `docs/configuration.md` Limits and capacity, Sizing a workload |
 | Boot cold, restore a snapshot, hot-boot | Booting |
 | Take a backup now; restore one (same host or off-host) | Backing up and restoring state |
 | Schedule unattended off-host backups | Backing up and restoring state, Scheduled off-host backup, end to end |
@@ -30,38 +30,13 @@ The jobs this doc (and its task-shaped companions) cover, by name:
 The constituent pieces each have their own section; what a first deployment needs is their order, because three orderings are load-bearing: **the admin credential is claimed by the first console connection**, so the telnet port stays loopback-only until the claim lands (an unclaimed admin behind a reachable port is a race anyone on that network can win); **transport security activates before any real client is pointed at the platform**; and **extensions are cold-boot facts** (a module added at a restore boot reaches the kfun table but not the platform daemons, whose cold-boot stand-down is image state -- Loading host-driver extensions below), so the module set is decided before the boot that goes live. The sequence:
 
 1. **Build the pieces on the host.** The driver from the pinned commit (`docs/getting-started.md` Install DGD) and every extension the deployment needs beside it -- the crypto module if identity, sessions, or native TLS are in play. Create an unprivileged service user; the checkout and `state/` belong to it alone (State file locations and permissions below).
-2. **Write the production configuration.** Start from the production-shape starting point (Limits and capacity below): size the caps, set `dump_interval` against the availability model's recovery-point and recurring-pause trade (Availability and data-loss model below), keep `telnet_port` bound to loopback, and name the `modules`.
+2. **Write the production configuration.** Start from the production-shape starting point (`docs/configuration.md` Limits and capacity): size the caps, set `dump_interval` against the availability model's recovery-point and recurring-pause trade (Availability and data-loss model below), keep `telnet_port` bound to loopback, and name the `modules`.
 3. **First boot, and claim admin immediately.** Boot, connect over loopback, and walk the first-claim password flow before anything else touches the host (`docs/security-posture.md` Credential lifecycle). The hash lands file-backed under `src/kernel/data/`, independent of the image.
 4. **Provision the operator surface.** The monitoring credential (`grant monitor access`, first-login password -- Monitoring signals below), each human operator's registered login, and the application's secret file where one is needed (`docs/common-tasks.md` Provision an application secret out of source; the file lives inside the domain tree, so stage it whenever step 6's copy puts that tree on the host).
 5. **Activate transport security.** Certificates at the configured paths, `tls-cert reload`, and the labeled `https` port answering -- before serving anything real (Network boundary and transport security below). A reverse proxy in front is the alternative where one host fronts several services.
 6. **Deploy the application domains and cold-boot.** Deploy-by-copy requires a cold boot -- the initd iteration runs only there (`docs/http-applications.md` Reference application) -- and this same boot fixes the image's extension set for every restore that follows. The domains' own sentinel drivers or health routes verify the deploy. (The application team's side of this step -- the repository the copy comes from -- is `docs/application-repository.md`.)
 7. **Verify the way the monitor will.** Drive the health route and read the counts against the alert thresholds (Monitoring signals below; `docs/common-tasks.md` Expose a health check for monitoring).
 8. **Hand off to the supervisor and schedule the drills.** The supervisor owns restarts from here (Running under a supervisor below); the backup sequence runs on its schedule with the restore rehearsal that makes it a recovery plan (Backing up and restoring state below). Day 2 -- shipping and rolling back releases -- is `docs/changing-a-running-system.md`.
-
-## The .dgd configuration file
-
-The host driver reads its configuration from a `.dgd` file passed on the command line at boot. The fields below cover the operator-facing decisions. See the upstream DGD reference at <https://github.com/dworkin/dgd> for the full set.
-
-| Field | Role |
-|---|---|
-| `directory` | The platform's source root. The driver compiles LPC files relative to this directory and chroots its filesystem-style operations to it |
-| `auto_object` | Path of the auto-inherited object. eOS-kernellib uses `/kernel/lib/auto` |
-| `driver_object` | Path of the driver object. eOS-kernellib uses `/kernel/sys/driver` |
-| `create` | Name of the driver-side create dispatcher. eOS-kernellib uses `_F_create` |
-| `include_file` | Path of the standard include file. eOS-kernellib uses `/include/std.h` |
-| `include_dirs` | Search path for `#include` directives |
-| `telnet_port` | Address-and-port mapping for the telnet listener (admin_console binds here) |
-| `binary_port` | Address-and-port mapping for binary listeners (HTTP and other application transports bind here) |
-| `swap_file`, `swap_size`, `swap_fragment`, `sector_size` | Swap parameters governing how the platform pages objects to disk |
-| `static_chunk`, `dynamic_chunk` | Memory allocator chunk sizes |
-| `dump_file` | Path the platform writes snapshots to |
-| `dump_interval` | Seconds between automatic snapshots. 3600 (one hour) is a reasonable default |
-| `hotboot` | Tuple of `({ binary, config, snapshot, snapshot.old })` enabling hot boot via `execv` (see `docs/architecture.md` boot sequence) |
-| `typechecking` | Strictness of compile-time type checks. Production deployments should set `2` (full) |
-| `users`, `editors`, `objects`, `call_outs`, `array_size` | Hard caps on platform-wide resource counts |
-| `modules` | Optional mapping of host-driver extensions to load at boot (see Loading host-driver extensions below) |
-
-A minimal example is included at `example.dgd` in the repository root.
 
 ## Booting
 
@@ -153,7 +128,7 @@ A complete backup covers more than the dump file:
 **Restore.** Two forms, both invoked as `dgd config_file [restore files]`:
 
 - **Full restore**: `dgd config_file dump_file`. Works when `dump_file` holds a full snapshot: the `snapshot` verb (`dump_state(FALSE)`, `src/kernel/lib/admin_console.c` `cmd_snapshot`) and the console dump-and-exit path (`dump_state(FALSE)`, `src/usr/System/sys/persist_helper.c:54`) both leave one.
-- **Two-file (incremental) restore**: `dgd config_file dump_file dump_file.old`. Required when `dump_file` holds an incremental snapshot written by `dump_state(1)`/`dump_state(TRUE)`. The argument order (the current dump file first, its full base second) is verified from the DGD driver's own usage line, `Usage: dgd config_file [[partial_snapshot] snapshot]`, and from `Config::restore(fd, fd2)`: the header read from the first file is checked for the partial flag, and the second file is opened only to back it. This is the same order already documented for the `.dgd` file's `hotboot` tuple (`{ binary, config, snapshot, snapshot.old }`, The .dgd configuration file above). An unset second argument on a partial primary fails at boot with "Missing secondary snapshot".
+- **Two-file (incremental) restore**: `dgd config_file dump_file dump_file.old`. Required when `dump_file` holds an incremental snapshot written by `dump_state(1)`/`dump_state(TRUE)`. The argument order (the current dump file first, its full base second) is verified from the DGD driver's own usage line, `Usage: dgd config_file [[partial_snapshot] snapshot]`, and from `Config::restore(fd, fd2)`: the header read from the first file is checked for the partial flag, and the second file is opened only to back it. This is the same order already documented for the `.dgd` file's `hotboot` tuple (`{ binary, config, snapshot, snapshot.old }`, `docs/configuration.md` The .dgd configuration file). An unset second argument on a partial primary fails at boot with "Missing secondary snapshot".
 
 This two-file form is a different recovery than the corrupt-snapshot fallback in Common failure modes below, which discards the newer `dump_file` outright and restores from `<dump_file>.old` alone as a self-contained snapshot. The two-file form instead restores using both files together, applying the incremental on top of its base.
 
@@ -200,11 +175,11 @@ Respawn is application code, not an operator verb: each domain respawns its own 
 
 The platform is a single process on a single machine. There is no replica to fail over to and no distributed consensus to reason about (`docs/persistence.md`: "this platform is deliberately single-coherence-domain"). Availability and data loss are properties of one process's dump-and-restore cycle, not of a cluster.
 
-**Recovery point.** The RPO is `dump_interval` (The .dgd configuration file above), a sizing decision the operator makes, not a platform-supplied guarantee. Work committed after the last completed dump and lost on an unclean stop is bounded by that interval. The prior snapshot is untouched by a failed or interrupted dump attempt and remains a valid restore point (Backing up and restoring state above).
+**Recovery point.** The RPO is `dump_interval` (`docs/configuration.md` The .dgd configuration file), a sizing decision the operator makes, not a platform-supplied guarantee. Work committed after the last completed dump and lost on an unclean stop is bounded by that interval. The prior snapshot is untouched by a failed or interrupted dump attempt and remains a valid restore point (Backing up and restoring state above).
 
 **Crash semantics.** A crash, such as a process killed before any dump runs, host power loss, or a `dump_state` failure mid-write (Common failure modes below), loses everything committed since the last completed dump. The platform does not partially apply an interrupted dump.
 
-**Recurring pause.** The availability cost that recurs by design: every `dump_interval` cycle the whole runtime briefly blocks while the image writes ("the runtime briefly blocks during the dump", `docs/persistence.md` The statedump cycle) -- the one head-of-line stall the tick budget does not bound, because it is the runtime writing, not a task running (`docs/execution-model.md` The price: head-of-line latency names it as the exception). Measured through a quarter-gigabyte image the client-observed pause stayed at or under 0.12 s (Snapshot-pause scaling, measured once, below); the pause scales with image size, and beyond that envelope it is unmeasured (Unmeasured today, below) -- a growing image re-measures with `scripts/measure-baseline.py` rather than extrapolating. Sizing `dump_interval` therefore trades on both axes at once: shorter narrows the recovery point above and pays the pause more often.
+**Recurring pause.** The availability cost that recurs by design: every `dump_interval` cycle the whole runtime briefly blocks while the image writes ("the runtime briefly blocks during the dump", `docs/persistence.md` The statedump cycle) -- the one head-of-line stall the tick budget does not bound, because it is the runtime writing, not a task running (`docs/execution-model.md` The price: head-of-line latency names it as the exception). Measured through a quarter-gigabyte image the client-observed pause stayed at or under 0.12 s (`docs/configuration.md` Snapshot-pause scaling, measured once); the pause scales with image size, and beyond that envelope it is unmeasured (`docs/configuration.md` Unmeasured today) -- a growing image re-measures with `scripts/measure-baseline.py` rather than extrapolating. Sizing `dump_interval` therefore trades on both axes at once: shorter narrows the recovery point above and pays the pause more often.
 
 **Downtime taxonomy.**
 
@@ -214,7 +189,7 @@ The platform is a single process on a single machine. There is no replica to fai
 | Statedump restore | Cold start naming the snapshot on the command line (full, or the two-file incremental form) | Drop: clients reconnect | Survives, from the dump file(s) |
 | Cold boot | Cold start with no restore argument | Drop | Rebuilt from source: only what the initd cascade recreates, nothing carried over |
 
-**Recovery time.** The recovery point above bounds what is lost; recovery time -- how long until service returns -- has two parts with different shapes. The down-window is supervisor detection plus restore boot: the restore boot itself measured under 0.1 s to console-ready against a 237 MB snapshot (Snapshot-pause scaling, measured once, below), because readiness precedes the data -- state pages in on demand after it. Time to steady state is the longer tail: clients reconnect (connections never survive a restore, the taxonomy above), demand paging warms as state is first touched, and an aged snapshot's overdue `call_out` backlog fires immediately as a catch-up burst (Post-restore checklist above). An SLA or incident playbook budgets the down-window from the supervisor's detection interval plus the measured restore boot, and expects the warmup tail, not the boot, to dominate what users observe. The same envelope caveat applies: measured through a quarter-gigabyte image, unmeasured beyond (Unmeasured today, below).
+**Recovery time.** The recovery point above bounds what is lost; recovery time -- how long until service returns -- has two parts with different shapes. The down-window is supervisor detection plus restore boot: the restore boot itself measured under 0.1 s to console-ready against a 237 MB snapshot (`docs/configuration.md` Snapshot-pause scaling, measured once), because readiness precedes the data -- state pages in on demand after it. Time to steady state is the longer tail: clients reconnect (connections never survive a restore, the taxonomy above), demand paging warms as state is first touched, and an aged snapshot's overdue `call_out` backlog fires immediately as a catch-up burst (Post-restore checklist above). An SLA or incident playbook budgets the down-window from the supervisor's detection interval plus the measured restore boot, and expects the warmup tail, not the boot, to dominate what users observe. The same envelope caveat applies: measured through a quarter-gigabyte image, unmeasured beyond (`docs/configuration.md` Unmeasured today).
 
 **Portability.** A snapshot restores only against a driver started with the same `auto_object` and `driver_object`, and with the same `modules` extensions loaded (Common failure modes below, the same conditions `docs/persistence.md` states for hot boot). It is a resume point for a specific configuration, not a portable backup format across incompatible driver configurations.
 
@@ -263,83 +238,13 @@ The property-change dispatcher writes a per-failure audit line to `/usr/Merry/lo
 
 Optional verbose-trace lines are general diagnostics rather than audit, so they route to `logd` at DEBUG level (not to `dispatch.log`) when the `dispatch_trace` flag is on. Toggle via the admin verb `dispatch-trace on|off|status` (see `docs/admin-console.md` Dispatcher operator surface) or via `MERRY->set_dispatch_trace(int flag)` (KERNEL-gated, public read via `MERRY->query_dispatch_trace()`). Default is off. Trace lines elide their I/O entirely when the flag is unset. Two gates apply when on: the flag enables emission, and `logd`'s threshold must admit DEBUG lines. Under the default INFO threshold the lines are dropped, so pair `dispatch-trace on` with `log-level debug` (the verb prints a hint when the current threshold would suppress trace). Read the result with the `log` verb. Routing through `logd`'s deferred flush also means trace lines survive atomic-mode dispatch, where a direct file write would be refused. When on, the current scope emits one trace line per `dispatch_set` entry (object name + path). Additional trace sites are future-work. Leaving trace on during steady-state operation increases log volume. The flag is intended for operator-driven troubleshooting sessions.
 
-## Resource limits
-
-Platform-wide caps live in the `.dgd` file: `users`, `editors`, `objects`, `call_outs`, `array_size`. These are hard ceilings. The platform refuses operations that would exceed them.
-
-Per-owner limits are managed by the resource daemon at `/kernel/sys/resource_daemon` (registered as `resource_daemon` in the driver). Each owner has a quota covering object count, call_out count, ticks consumed per call, and stack depth. The admin_console `quota` and `rsrc` verbs read and write these. Per-owner ticks are charged on the owner's account when their code runs. An owner that exhausts ticks gets a runtime error and rollback rather than a hung platform.
-
-The property-change dispatcher (`docs/dispatcher.md`) exposes a runtime-configurable cascade-depth bound via `MERRY->set_max_cascade_depth(int n)` (KERNEL-gated) and `MERRY->query_max_cascade_depth()` (public read-only). Default is `32`. The bound counts depth, not breadth: a flat batched write with many keys does not increment the counter. An observer-triggered chain of further writes does. Hitting the bound throws `merry: cascade depth N exceeded ...` and records `cascade-aborted` in the dispatcher's batch-status log.
-
-The admin verb `cascade-depth [N]` (see `docs/admin-console.md` Dispatcher operator surface) is the operator-facing read/write surface. The no-arg form reports the current value, the integer-arg form sets it via the registry's KERNEL-elevation helper. The dispatcher exposes nine operator verbs from the admin console in total. `cascade-depth` and `dispatch-trace` are covered above, and the remaining seven cover runtime inspection and mutation of dispatcher state (observers, batch-status, observer-registration, approved-registrar set). `docs/admin-console.md` enumerates the full set and the worked-example operator session.
-
-## Limits and capacity
-
-`example.dgd`'s numbers are demo-scale, not sizing guidance. Read against the driver's own compiled bounds (`dworkin/dgd` `src/config.cpp`'s config-field range table and `src/config.h`'s index-type defaults):
-
-| `.dgd` field | `example.dgd` | Driver's compiled range (stock build) | Reading |
-|---|---|---|---|
-| `array_size` | 32767 | 1-32767 (`USHRT_MAX / 2`) | Already at the driver's ceiling: raising it needs a driver built with a wider array-size type, not a config edit |
-| `users` | 255 | 0-255 (`EINDEX_MAX`, a one-byte count) | Already at the stock build's ceiling, for the same reason |
-| `editors` | 10 | 0-255 (`EINDEX_MAX`) | Demo-scale: real deployments have headroom to 255 with no rebuild |
-| `objects` | 10000 | 2-65535 (`UINDEX_MAX`) | Demo-scale: headroom to 65535 with no rebuild |
-| `call_outs` | 10000 | 0-65534 (`CINDEX_MAX - 1`) | Demo-scale: headroom to 65534 with no rebuild |
-| `swap_size` × `sector_size` | 65535 × 1024 bytes | `swap_size` 1024-65535 (the sector-index cap); `sector_size` 512-65535 | About 64 MiB of pageable object storage, sized to the example's tiny working set rather than a production footprint |
-
-The stock driver build's index widths (matching the driver's own header comment: "default: 64K objects, 64K swap sectors, 255 users, max string length 64K") set the ceilings above. A driver rebuilt with wider `uindex`/`eindex` types raises them, at the cost of a larger per-object memory footprint. eOS-kernellib runs against a stock build, so the table above is the practical ceiling until that changes.
-
-The two ranges in the `swap_size` × `sector_size` row compound into the platform's absolute state ceiling: 65535 sectors times the 65535-byte maximum `sector_size` is just under 4.0 GiB of total persistent object storage on a stock build -- the most state the platform can hold at any configuration, however much RAM the host has (RAM sizes the resident set; the swap device bounds total state). Beyond that, the fix is a driver rebuilt with a wider sector index, not a config edit.
-
-Ceilings that are not `.dgd` fields:
-
-| Ceiling | Value | Source |
-|---|---|---|
-| Host driver's core kfun set | Capped at 256, by the 1-byte kfun numbering | `docs/architecture.md` Host-driver extensions |
-| Per-execution tick budget | 20,000,000 ticks, default | Set at boot in `src/kernel/sys/driver.c`. Raised or lowered per owner via `quota <owner> ticks <limit>` (Resource limits above) |
-| LPC `int` width | 32-bit signed | `docs/lpc-essentials.md` Types and values |
-
-**Sizing a workload.** Which storage shape holds N records, and which ceiling binds first. One constant the tables above do not carry: **a single mapping caps at 32,767 key-value pairs** on a stock build -- the `array_size` knob governs mappings as well as arrays, and exceeding it raises `"Mapping too large"` at construction or `"Mapping too large to grow"` on assignment past the cap (verified against the driver source; the same knob is already at its driver ceiling, so there is no config headroom). The planned two-level mapping is the roadmap's answer for one logical mapping beyond that bound (`docs/runtime-platform-roadmap.md` Wave 3).
-
-| Shape | First-binding ceiling | 10^5 records, stock build | 10^6 records |
-|---|---|---|---|
-| One clone per record | The `objects` table (65535, shared with every platform and application object) | No | No |
-| One `mapping` | 32,767 key-value pairs per mapping | No | No |
-| `/lib/Array` (integer-indexed) | Structurally 32767^2 elements; in practice the holder's single dataspace -- the swap device must hold it and the snapshot writes it every cycle | Yes | Yes, with the swap sized for the dataspace |
-| `/lib/KVstore` (string keys) | The `objects` table again, through node clones: roughly N/(fan-out/2) leaves plus a thin interior layer; per-node arrays bound fan-out by `array_size` | Yes (fan-out 100: ~1,000-2,000 nodes) | Yes (fan-out 100: ~10,000-20,000 nodes; fan-out 1,000: ~1,000-2,000) |
-
-The residency profiles differ more than the counts: a mapping or an `Array` lives in one dataspace that pages in and out as a unit and contributes its full size to every snapshot, while a `KVstore` pages at node granularity (an access faults in the touched nodes, not the whole set) at the price of `objects`-table slots. `docs/kernel-libraries.md` Choosing a collection carries the author-facing decision rule; the wider-index driver rebuild that would raise the object ceiling is observed to segfault naively (`docs/building.md`), so treat 65535 objects as the practical bound.
-
-**A production-shape starting point.** The sizing-relevant fields of a non-demo `.dgd`, each set against the tables above -- splice into a copy of `example.dgd` (these lines alone are not a bootable config), and treat it as a starting point, not a guarantee:
-
-```text
-users           = 255;      /* stock ceiling (one-byte count) */
-editors         = 255;      /* headroom to the same cap; demo ships 10 */
-array_size      = 32767;    /* driver ceiling; also caps each mapping at 32767 pairs */
-objects         = 65535;    /* demo ships 10000; stock ceiling */
-call_outs       = 65534;    /* demo ships 10000; stock ceiling */
-swap_size       = 65535;    /* the sector-count cap: capacity scales through sector_size */
-sector_size     = 16384;    /* 65535 x 16 KiB = ~1 GiB pageable object storage */
-dump_file       = "../state/snapshot";   /* rotation writes <dump_file>.old beside it */
-dump_interval   = 3600;     /* the data-loss window on snapshot restore */
-```
-
-Raising `sector_size` takes effect at the next boot (the swap file is per-boot scratch, rebuilt empty each start), and a restore boot accepts the new value. `users` and `array_size` are already at stock ceilings; the rest have the headroom shown in the field table above.
-
-**Snapshot-pause scaling, measured once.** The dump-time pause scales with in-memory image size, not with the config caps above ("a multi-gigabyte image can take seconds to write; the runtime briefly blocks during the dump", `docs/persistence.md` The statedump cycle). Measured 2026-07-12 on an Apple M5 Max (macOS 26.5, arm64, local NVMe) with `scripts/measure-baseline.py`: the client-observed pause -- the window a connected console waits after `snapshot` -- stayed at or under 0.12 s from a 2 MB base image through a 237 MB image, and was not monotonic across steps (filesystem caching and swap-file growth dominate at these sizes). The same runs measured cold boot to console-ready at roughly 0.1 s, a restore boot against the 237 MB snapshot reaching console-ready in under 0.1 s (state pages in on demand after readiness), and the bundled http-app answering about 1,600 sequential one-connection-per-request `GET /health` requests per second. A companion `--tls` run of the same script over the native TLS 1.3 stack -- the reference HTTPS application, a self-signed certificate activated through the `tls-cert` reload verb -- measured the same one-connection-per-request `GET /health` shape at about 470 requests per second with a median TLS handshake of roughly 1.5 ms, on that run about a third of the cleartext rate: the expected cost of terminating TLS in interpreted LPC, with a cheap handshake. One machine, one workload shape, two consistent runs: a rig and a datum, not a guarantee. Two capacity facts the rig surfaced: the stock build caps `swap_size` at 65535 sectors, so swap capacity scales through `sector_size`; and an image that outgrows the swap device dies with a fatal `out of sectors` error.
-
-**Concurrency, measured once.** Same rig (`--concurrent`, `--headline` in `scripts/measure-baseline.py`), same machine, 2026-07-19: with parallel closed-loop clients driving `GET /health`, aggregate throughput saturates around 2,400 requests per second at 2, 8, and 32 connections alike (2,346 / 2,386 / 2,391), while median per-request latency grows with client count (0.8 / 3.2 / 12.9 ms) -- the signature of one serialization point servicing sub-millisecond requests: added concurrency buys queueing, not parallelism. The head-of-line worst case, measured directly: with the driver saturated by back-to-back near-budget busy tasks (about 88 ms each on this hardware; a full default 20,000,000-tick budget is roughly 90-120 ms of driver wall), a probing client's median `/health` latency rose from about 2 ms to about 260 ms (maximum 292 ms) and recovered immediately after the burst -- the tick budget bounds any single task's hold on the queue. `docs/execution-model.md` Under sustained load states the semantics behind these numbers. The connection-slot recycling evidence rode along: the health route's `users` line read 1/255 after each concurrent run and 2/255 after the head-of-line run.
-
-**A state-touching workload, measured once.** Every throughput figure above drives `GET /health`, a route that answers from the connection object and touches no persistent state. Same rig (`--state-workload` in `scripts/measure-baseline.py`), same machine, 2026-07-29: a clean-slate boot with the composite example deployed (crypto module loaded), a principal provisioned operator-side on the console (`identity mint`, `session mint`), and 200 sequential authenticated `POST /inventory/items` writes -- each request paying bearer-token validation at the handler, the persistent daemon mutation, and the synchronous audit observer in one task -- measured about 970 requests per second (latency median 1.0 ms, p95 1.2 ms). The same boot answered the zero-work comparison, `GET /inventory/health` through the identical transport and routing machinery, at about 2,100 requests per second (median 0.5 ms): on this run the full authenticated, audited write path cost roughly half a millisecond over the empty route. The slot-recycling evidence rode along (a console `status()` probe read users=1/255 before and after each phase). The growth run above now also samples driver resident memory beside each snapshot-pause step: 7 MB RSS over the 2.4 MB base snapshot, then 112 MB, 462 MB, and 1,402 MB as the snapshot file grew to 36 MB, 103 MB, and 237 MB -- resident memory runs several times the on-disk image because the dynamic allocator arena grows in chunks ahead of use (the final step's own status line showed a 1.19 GB arena at 21% used). One machine, one workload shape, one measured run each: a rig and a datum, not a guarantee.
-
-**Unmeasured today.** Dump-pause behavior beyond a quarter-gigabyte image, sustained throughput near the `objects` / `call_outs` / `array_size` ceilings (the concurrency figures above stop at 32 connections, far from any table cap), and the memory cost of a driver rebuilt with wider index types are not measured against this codebase. Treat the tables above as compiled-in ceilings and documented defaults, not throughput guarantees.
-
 ## Running under a supervisor
 
 The platform is one process. A process supervisor (systemd, a container runtime, runit) owns its lifecycle: start it, restart it on exit, stop it on demand. Two facts shape that configuration.
 
 **A graceful stop takes a final snapshot.** The driver catches `SIGTERM`, the default stop signal for `systemctl stop`, `docker stop`, and a bare `kill`. On receipt it runs `prepare_reboot()`, writes an incremental snapshot with `dump_state(1)`, and shuts down cold (`src/kernel/sys/driver.c:757-766`, reached through the `SIGTERM` handler in `dworkin/dgd` `src/host/unix/local.cpp`). A supervisor's ordinary stop therefore leaves a current restore point with no operator action. This is the same incremental form the `reboot` verb writes (Backing up and restoring state above), so recovery needs both `dump_file` and `<dump_file>.old`.
 
-Give the stop timeout room for the dump. Dump time scales with the in-memory image size (Limits and capacity above), so a large image needs a stop timeout longer than a supervisor's default. A supervisor that escalates to `SIGKILL` before the dump finishes loses that snapshot.
+Give the stop timeout room for the dump. Dump time scales with the in-memory image size (`docs/configuration.md` Limits and capacity), so a large image needs a stop timeout longer than a supervisor's default. A supervisor that escalates to `SIGKILL` before the dump finishes loses that snapshot.
 
 `SIGINT`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` are not caught: their default disposition applies, so a stop sent as `SIGINT` terminates the process without the snapshot. Only `SIGTERM` runs the snapshot-and-shutdown path. `SIGINT`, `SIGKILL`, and a host crash bypass it and lose the work committed since the last automatic dump (Availability and data-loss model above).
 
@@ -372,7 +277,7 @@ ExecStart=/srv/eos/run-dgd.sh
 Restart=on-failure
 KillSignal=SIGTERM
 # SIGTERM triggers the snapshot-then-exit path; give the dump room.
-# Scale with image size (Limits and capacity above).
+# Scale with image size (docs/configuration.md Limits and capacity).
 TimeoutStopSec=300
 
 [Install]
@@ -434,7 +339,7 @@ Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
 
 **Reading the block, field by field.** Every line is a slot of the no-argument `status()` vector (the `ST_*` indices a health probe reads directly):
 
-- `sectors: used / total (%)` -- swap-device occupancy against the `.dgd` `swap_size` cap, with `sector size` echoing `sector_size`. This is the one fatal ceiling: an image that outgrows the swap device dies with a fatal `out of sectors` error (Limits and capacity above), so this percentage belongs in the alert set, with an earlier threshold than the degrading signals (table below).
+- `sectors: used / total (%)` -- swap-device occupancy against the `.dgd` `swap_size` cap, with `sector size` echoing `sector_size`. This is the one fatal ceiling: an image that outgrows the swap device dies with a fatal `out of sectors` error (`docs/configuration.md` Limits and capacity), so this percentage belongs in the alert set, with an earlier threshold than the degrading signals (table below).
 - `swap average: a, b` -- objects swapped out per second, averaged over the last minute and the last five minutes (the driver counts swapouts per window; the console divides by 60 and 300). Near zero when the resident set fits memory; sustained non-zero values are the "sustained churn" the alert table names -- every access is paging.
 - `static:` / `dynamic:` -- bytes in use versus bytes allocated from the host, for the two allocators: static holds the boot-time infrastructure tables (sized to the `.dgd` caps) and long-lived driver buffers, dynamic holds compiled programs and object data; the third row is their sum. The runtime grows both by chunks (`static_chunk` / `dynamic_chunk`), so the percentage reads utilization of the current allocation, not distance to a configured ceiling -- for capacity planning watch the absolute totals and the process RSS, not the percentage.
 - `short:` / `other:` -- queued callouts, split by the driver's scheduling horizon: whole-second callouts due soon (within roughly the next two minutes) versus longer-dated and millisecond-delay ones; then their sum against the `call_outs` table cap -- the alert-table row.
@@ -444,23 +349,23 @@ Objects:        215 /     10000 (  2%)    Users:         1 /      255 (  0%)
 
 **What an alertable line looks like.** A runtime error persists into `system.log` as a multi-line block: one timestamped `ERROR` header line carrying the message, then the indented trace frames beneath it (observed by tailing the log after a forced fault). Match alerting rules on the header (` ERROR `), not on frame lines; one fault produces one header and many frames.
 
-**Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (Limits and capacity above):
+**Capacity headroom, from `status()`.** The no-argument `status()` health vector (the `status` verb, `docs/admin-console.md`) carries the counts to watch against the `.dgd` caps (`docs/configuration.md` Limits and capacity):
 
 | Signal | Alert condition | Starting threshold | Reading |
 |---|---|---|---|
 | call_out count vs the `call_outs` cap | Approaching the cap | Warn at 70% of `call_outs`, page at 85% | A backlog of deferred work: new `call_out`s begin to fail |
 | object count vs the `objects` cap | Approaching the cap | Warn at 70% of `objects`, page at 85% | Allocation headroom is running out: clones and new objects begin to fail |
-| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | Warn at 50% of `swap_size`, page at 70% | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (Limits and capacity above). The durable fix is a `sector_size` raise and a reboot from snapshot |
+| swap sectors vs the `swap_size` cap | Rising occupancy, alerted earlier than the rows above | Warn at 50% of `swap_size`, page at 70% | The one ceiling that is fatal rather than degrading: at the cap the platform dies with `out of sectors` (`docs/configuration.md` Limits and capacity). The durable fix is a `sector_size` raise and a reboot from snapshot |
 | users count vs the `users` cap | Approaching the cap | Warn at 70% of `users`, page at 85% | At the cap, new connections complete their TCP connect and are never answered, with nothing logged -- the silent form of full. A climbing count under flat traffic is a connection leak (Common failure modes below) |
 | swap activity | Sustained churn | Warn when the five-minute average is nonzero on two consecutive polls; page when it is still nonzero fifteen minutes later | The resident set exceeds memory and every access pages. A `swapout` relieves pressure; the durable fix is a config raise and reboot (Config changes across a restore, above, is what a restore boot accepts) |
 | uptime, last reboot | Reset unexpectedly | Page on any decrease | The platform restarted: check it against the supervisor's restart log and the snapshot cadence |
-| health-route response time | Sustained elevation over the deployment's measured baseline | Probe the health route on the existing polling interval; warn when the median holds at several times your measured baseline across two consecutive polls, page when it is still elevated fifteen minutes later | The signature degradation the count rows cannot see: queueing. The platform's own measurement served a ~260 ms median under saturation while `users` -- the one capacity count that run reported -- sat at 2/255, nowhere near alertable (Limits and capacity above). Attribution is the paragraph below |
+| health-route response time | Sustained elevation over the deployment's measured baseline | Probe the health route on the existing polling interval; warn when the median holds at several times your measured baseline across two consecutive polls, page when it is still elevated fifteen minutes later | The signature degradation the count rows cannot see: queueing. The platform's own measurement served a ~260 ms median under saturation while `users` -- the one capacity count that run reported -- sat at 2/255, nowhere near alertable (`docs/configuration.md` Limits and capacity). Attribution is the paragraph below |
 
-The threshold column is a starting point, not a guarantee -- the same posture as the production-shape starting point under Limits and capacity above: numbers to write the first alert rule with, then tune against the occupancy your own workload measures. The gap between the swap-sector thresholds and the degrading rows is deliberate: the fatal ceiling gets the earlier warning.
+The threshold column is a starting point, not a guarantee -- the same posture as the production-shape starting point under `docs/configuration.md` Limits and capacity: numbers to write the first alert rule with, then tune against the occupancy your own workload measures. The gap between the swap-sector thresholds and the degrading rows is deliberate: the fatal ceiling gets the earlier warning.
 
-**When the latency row fires and every count row is green**, the cause is one of three, each with its own signature. A burst of near-budget tasks: elevated medians that recover between bursts; attribute with `rsrc ticks` (Resource limits above), which names the owner far above its peers. The recurring dump pause: elevation at the `dump_interval` cadence, bounded by the measured pause and expected (Availability and data-loss model above). Sustained saturation of the one serialization point: elevation that tracks offered load and recovers only when load drops (`docs/execution-model.md` Under sustained load). The measured worst case makes the blind spot concrete: a saturated driver held the health route's median latency around 260 ms while `users` -- the capacity count that measurement reported -- read 2/255 (Limits and capacity above).
+**When the latency row fires and every count row is green**, the cause is one of three, each with its own signature. A burst of near-budget tasks: elevated medians that recover between bursts; attribute with `rsrc ticks` (`docs/configuration.md` Resource limits), which names the owner far above its peers. The recurring dump pause: elevation at the `dump_interval` cadence, bounded by the measured pause and expected (Availability and data-loss model above). Sustained saturation of the one serialization point: elevation that tracks offered load and recovers only when load drops (`docs/execution-model.md` Under sustained load). The measured worst case makes the blind spot concrete: a saturated driver held the health route's median latency around 260 ms while `users` -- the capacity count that measurement reported -- read 2/255 (`docs/configuration.md` Limits and capacity).
 
-Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resource daemon, Resource limits above) reports each owner's tick usage against its budget. An owner far above its peers is running away. A tick-exhausted call rolls back rather than hanging the platform.
+Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resource daemon, `docs/configuration.md` Resource limits) reports each owner's tick usage against its budget. An owner far above its peers is running away. A tick-exhausted call rolls back rather than hanging the platform.
 
 **Alertable log lines.** `logd` writes `system.log` and tees `errord`'s reports there at ERROR level (Logging and diagnostics above):
 
@@ -473,7 +378,7 @@ Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resou
 
 ## Network boundary and transport security
 
-The platform listens on two kinds of port (The .dgd configuration file above): `telnet_port` for the operator console, and `binary_port` for application transports (HTTP and others). Their exposure and transport security are separate decisions.
+The platform listens on two kinds of port (`docs/configuration.md` The .dgd configuration file): `telnet_port` for the operator console, and `binary_port` for application transports (HTTP and others). Their exposure and transport security are separate decisions.
 
 **The operator console is unencrypted.** `admin_console` speaks plain telnet: the wire carries the operator's password and every command in clear text. Bind `telnet_port` to a loopback interface or a dedicated maintenance network, never a public one, and reach it through an SSH tunnel or a host-terminated TLS tunnel. Console access is equivalent to host shell access on the platform's process (`docs/admin-console.md` Console security posture), so the tunnel endpoint and its credentials carry that weight.
 
@@ -499,7 +404,7 @@ The platform's persistent state lives in host files whose contents range from th
 
 Run the platform as a dedicated unprivileged user and keep each of these readable and writable only by that user: a restrictive `umask` on the process, files not group- or world-readable, containing directories not traversable by other users. The runtime user needs write access to the `dump_file` and `swap_file` directories. A permissions problem on the `dump_file` directory is a common cause of a failed dump (Common failure modes below). Back up the `dump_file` pair and `src/kernel/data/` to off-host storage for disaster recovery (Backing up and restoring state above). That backup carries the same credentials and state, so protect it the same way.
 
-**Sizing the state volume.** Three consumers share it: the dump rotation holds two full images at once (`dump_file` plus `<dump_file>.old`, about twice the in-memory image -- and the image grows with the workload); the swap file grows toward `swap_size` × `sector_size` (about 64 MiB at the demo config, about 1 GiB at the production-shape starting point above); and the scheduled backup's copy step stages a third image cut while it runs (Backing up and restoring state above). Provision the volume as a multiple of the expected image size with room for all three, and alert on host-disk occupancy beside the stalled-snapshot signal (Monitoring signals above): a full disk otherwise first surfaces as `dump_state` erroring out (Common failure modes below).
+**Sizing the state volume.** Three consumers share it: the dump rotation holds two full images at once (`dump_file` plus `<dump_file>.old`, about twice the in-memory image -- and the image grows with the workload); the swap file grows toward `swap_size` × `sector_size` (about 64 MiB at the demo config, about 1 GiB at the `docs/configuration.md` production-shape starting point); and the scheduled backup's copy step stages a third image cut while it runs (Backing up and restoring state above). Provision the volume as a multiple of the expected image size with room for all three, and alert on host-disk occupancy beside the stalled-snapshot signal (Monitoring signals above): a full disk otherwise first surfaces as `dump_state` erroring out (Common failure modes below).
 
 ## Loading host-driver extensions
 
@@ -531,16 +436,17 @@ Both questions are open. Empirical verification requires running the platform un
 | Cold boot fails with compile error in initd cascade | Missing or broken `/usr/<Domain>/initd.c` | Check the message path. The driver names the file and line |
 | Snapshot restore fails | Snapshot corrupt or `.dgd` config changed incompatibly (different `auto_object`, different `driver_object`, missing `modules` extension) | Restore from `<dump_file>.old`. If same failure, cold-boot from clean state |
 | `dump_state` errors out | Disk full, permissions on `dump_file` directory, or snapshot exceeds available memory | Check disk space and permissions. Consider `swapout()` first |
-| Platform dies with a fatal `out of sectors` error | The in-memory image outgrew the swap device: `swap_size` (capped at 65535 sectors in the stock build) times `sector_size` (Limits and capacity above) | Raise `sector_size` in the `.dgd` config and reboot from the latest snapshot. Alert on the `status` swap-sector percentage before it gets here (Monitoring signals above) |
+| Platform dies with a fatal `out of sectors` error | The in-memory image outgrew the swap device: `swap_size` (capped at 65535 sectors in the stock build) times `sector_size` (`docs/configuration.md` Limits and capacity) | Raise `sector_size` in the `.dgd` config and reboot from the latest snapshot. Alert on the `status` swap-sector percentage before it gets here (Monitoring signals above) |
 | New connections open but nothing answers; existing service goes quiet | The `users` table is full: genuine concurrent load at the cap, or a leak outpacing reclaim -- a server that never releases completed requests holds each slot until the flow layer's 60-second inactivity timeout | At the cap both count surfaces (the `status` verb, the health route's `users=` line) need a connection the driver will no longer grant, so confirm from a console session already open -- or from outside: TCP connects that nothing ever answers, on every port at once, are this row. Recovery: a standing session's `reboot`, or SIGTERM from the host (the graceful stop writes the snapshot) and a supervisor restart; either clears the table but not the cause. Then find the leak (each HTTP example releases via `doneRequest()` when its response completes) or the abuser (Exposure to abuse above) |
 | `system.log` grows without bound, repeating the same block | Error-manager feedback storm: an error caught inside an `atomic` function re-entering the error manager and looping a file write | Read the repeating block's trace for the atomic call site. `logd`'s deferred writes exist to prevent the class (Logging and diagnostics above); `scripts/base-boot-guard.sh` is its regression guard |
 | Application kfun call returns "unknown function" or "extension not loaded" | A required `modules` entry is missing | Check `.dgd modules` mapping. Load the missing extension or remove the application code that depends on it |
 | Per-owner ticks exhausted | Owner code is consuming ticks faster than `rsrc` allows | Use admin_console `quota` to inspect. Either raise the owner's quota or fix the looping code |
-| `shutdown(1)` raises "Hotbooting is disabled" | The `.dgd` config has no `hotboot` tuple | Add the tuple to the `.dgd` config (see The .dgd configuration file above) and reboot, or use cold reboot via `shutdown()` instead |
+| `shutdown(1)` raises "Hotbooting is disabled" | The `.dgd` config has no `hotboot` tuple | Add the tuple to the `.dgd` config (see `docs/configuration.md` The .dgd configuration file) and reboot, or use cold reboot via `shutdown()` instead |
 | Hot boot fails after `execv` (platform exits without restore) | `hotboot` tuple's paths point at a different binary or config than the running one, or `execv` fails | Check the tuple's paths against the running process. Fall back to cold reboot via `shutdown()` |
 
 ## Where to next
 
+- **[`docs/configuration.md`](configuration.md)** covers the `.dgd` configuration fields, resource limits, and capacity ceilings referenced throughout this document.
 - **[`docs/architecture.md`](architecture.md)** covers the platform tier model, daemons, and boot sequence in detail.
 - **[`docs/runtime-primitives.md`](runtime-primitives.md)** covers the platform's eight runtime primitives, including the atomicity (§1) and hot-reload (§4) guarantees referenced above.
 - **[`docs/application-authoring.md`](application-authoring.md)** covers writing a tier-E application on top of this platform.

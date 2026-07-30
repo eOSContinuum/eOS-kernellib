@@ -14,7 +14,7 @@ It is the wrong platform, by design and not by immaturity, when any of these hol
 - The workload needs **more than 255 concurrent connections** on a stock driver build, or a working set beyond the stock ceilings below.
 - The team needs **polyglot code inside the state domain**. LPC (and the Merry dialect) is the in-image language; everything else integrates at the transport boundary as a client.
 - The workload needs **declarative cross-entity queries**. There is no query planner over the image; enumeration and indexing are application structures.
-- The workload needs **multi-core CPU parallelism inside the state domain**. Exactly one task runs in the image at any instant, to completion; more cores do not parallelize in-image work, and added concurrency buys queueing, not parallelism (`execution-model.md` Run to completion; measured in `operations.md` Limits and capacity).
+- The workload needs **multi-core CPU parallelism inside the state domain**. Exactly one task runs in the image at any instant, to completion; more cores do not parallelize in-image work, and added concurrency buys queueing, not parallelism (`execution-model.md` Run to completion; measured in `configuration.md` Limits and capacity).
 
 ## From your system to the nearest example
 
@@ -45,16 +45,16 @@ which exercises persistence across a real dump-and-restart cycle among its asser
 
 ## The measured envelope
 
-One machine, one workload shape, a rig and a datum rather than a guarantee (`operations.md` Limits and capacity, which names the hardware and the rig):
+One machine, one workload shape, a rig and a datum rather than a guarantee (`configuration.md` Limits and capacity, which names the hardware and the rig):
 
 - Snapshot pause stayed at or under 0.12 s from a 2 MB through a 237 MB image; cold boot and a 237 MB restore both reach console-ready in about 0.1 s.
 - The bundled HTTP example answered about 1,600 sequential one-connection-per-request requests per second cleartext, and about 470 over native TLS 1.3 (median handshake roughly 1.5 ms).
-- Concurrency has been measured once at moderate scale: aggregate throughput saturates at the same level across the measured client counts -- added concurrency buys queueing, not parallelism -- and the head-of-line worst case under a saturated queue is bounded by the tick budget, clearing immediately after the burst (`operations.md` Limits and capacity carries the numbers). Sustained behavior near the ceilings remains unmeasured.
-- A state-touching workload has been measured once: sequential authenticated inventory writes through the composite example -- bearer-token validation, a persistent daemon mutation, and the synchronous audit observer per request -- ran at about 970 requests per second (median 1.0 ms), against about 2,100 for the same boot's zero-work health route; and driver resident memory at the snapshot-pause steps ran several times the on-disk image, 7 MB to 1.4 GB over 2 MB to 237 MB snapshots (`operations.md` Limits and capacity carries both).
+- Concurrency has been measured once at moderate scale: aggregate throughput saturates at the same level across the measured client counts -- added concurrency buys queueing, not parallelism -- and the head-of-line worst case under a saturated queue is bounded by the tick budget, clearing immediately after the burst (`configuration.md` Limits and capacity carries the numbers). Sustained behavior near the ceilings remains unmeasured.
+- A state-touching workload has been measured once: sequential authenticated inventory writes through the composite example -- bearer-token validation, a persistent daemon mutation, and the synchronous audit observer per request -- ran at about 970 requests per second (median 1.0 ms), against about 2,100 for the same boot's zero-work health route; and driver resident memory at the snapshot-pause steps ran several times the on-disk image, 7 MB to 1.4 GB over 2 MB to 237 MB snapshots (`configuration.md` Limits and capacity carries both).
 
 ## The ceilings
 
-Stock-build compiled bounds, not tuning knobs (`operations.md` Limits and capacity for the full table and which rows have config headroom): 255 users and 32767 `array_size` are already at the stock ceiling; `objects` has headroom to 65535 and `call_outs` to 65534; the swap device caps at 65535 sectors, about 64 MiB of pageable object storage at the demo config's 1 KiB `sector_size`, scaling only through `sector_size` -- whose own compiled range tops out at 65535 bytes, so total persistent state on a stock build tops out just under 4 GiB; LPC `int` is 32-bit signed; the per-execution tick budget defaults to 20,000,000. A driver rebuilt with wider index types raises the index ceilings; the platform runs against a stock build.
+Stock-build compiled bounds, not tuning knobs (`configuration.md` Limits and capacity for the full table and which rows have config headroom): 255 users and 32767 `array_size` are already at the stock ceiling; `objects` has headroom to 65535 and `call_outs` to 65534; the swap device caps at 65535 sectors, about 64 MiB of pageable object storage at the demo config's 1 KiB `sector_size`, scaling only through `sector_size` -- whose own compiled range tops out at 65535 bytes, so total persistent state on a stock build tops out just under 4 GiB; LPC `int` is 32-bit signed; the per-execution tick budget defaults to 20,000,000. A driver rebuilt with wider index types raises the index ceilings; the platform runs against a stock build.
 
 ## Adoption risks, priced
 
@@ -69,4 +69,4 @@ Stock-build compiled bounds, not tuning knobs (`operations.md` Limits and capaci
 
 ## Spending the rest of the budget
 
-In order, as budget allows: `runtime-primitives.md` At a glance (run a proof beside it), `operations.md` Limits and capacity, `security-posture.md`, `runtime-platform-roadmap.md` for the ships-today-versus-next boundary, `coming-from-contemporary-infrastructure.md` for what the platform replaces, and `debugging-applications.md` The working environment, plainly for the team's day-to-day.
+In order, as budget allows: `runtime-primitives.md` At a glance (run a proof beside it), `configuration.md` Limits and capacity, `security-posture.md`, `runtime-platform-roadmap.md` for the ships-today-versus-next boundary, `coming-from-contemporary-infrastructure.md` for what the platform replaces, and `debugging-applications.md` The working environment, plainly for the team's day-to-day.

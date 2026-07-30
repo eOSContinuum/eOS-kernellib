@@ -85,5 +85,6 @@ The tier boundary is packaging convention, not enforcement (`docs/runtime-primit
 - **[`docs/runtime-primitives.md`](runtime-primitives.md)**: the authoritative shipped-status statement per primitive: foundation, demonstration, extensions, open work.
 - **[`docs/dispatcher.md`](dispatcher.md)**: the shipped property-change dispatcher: registration, timings, batching, cycle detection, persistence.
 - **[`docs/architecture.md`](architecture.md)**: capability tiers, daemons, boot sequence, the structural model under all of the above.
-- **[`docs/operations.md`](operations.md)**: the deployment surface: `.dgd` configuration, boot modes, the operator console, extensions.
+- **[`docs/configuration.md`](configuration.md)**: `.dgd` configuration fields and capacity ceilings.
+- **[`docs/operations.md`](operations.md)**: the deployment surface: boot modes, the operator console, extensions.
 - **[`CONTRIBUTING.md`](../CONTRIBUTING.md)**: conventions for contributing roadmap work.

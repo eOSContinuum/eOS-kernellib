@@ -72,7 +72,7 @@ Each runtime surface, the code that implements it, and the document that explain
 | HTTP and transport | `src/usr/HTTP/`, `src/usr/System/sys/http_server.c` | `docs/http-applications.md` |
 | TLS | `src/usr/TLS/` | `docs/operations.md` |
 | Connections, sessions, users | `src/kernel/sys/userd.c`, `src/usr/System/sys/userd.c`, `src/usr/System/sys/portd.c`, `src/kernel/lib/connection.c` | `docs/architecture.md`, `docs/admin-console.md` |
-| Resources and limits | `src/kernel/sys/resource_daemon.c` | `docs/operations.md` |
+| Resources and limits | `src/kernel/sys/resource_daemon.c` | `docs/configuration.md` |
 | Code lifecycle and upgrade | `src/kernel/sys/driver.c`, `src/usr/System/sys/upgraded.c`, `src/usr/System/sys/objectd.c` | `docs/code-lifecycle.md`, `docs/changing-a-running-system.md` |
 | Logging and diagnostics | `src/usr/System/sys/logd.c`, `src/usr/System/sys/errord.c` | `docs/operations.md`, `docs/debugging-applications.md` |
 | Platform identity substrate | `src/usr/System/sys/identityd.c`, `src/usr/System/obj/identity.c`, `src/include/identityd.h` | `docs/system-daemons.md` |

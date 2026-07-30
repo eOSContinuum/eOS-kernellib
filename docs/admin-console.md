@@ -1,6 +1,6 @@
 # Admin console
 
-The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `docs/operations.md` is the deployment surface (configuration, boot modes, statedump cadence, extension loading).
+The operator's console: a verb-based REPL that binds to the kernel's telnet port and exposes the platform's introspection, code-lifecycle, persistence, permissions, and resource surfaces. This document is the operator's reference; `docs/operations.md` is the deployment surface (boot modes, statedump cadence, extension loading) and `docs/configuration.md` covers the `.dgd` configuration fields and capacity ceilings.
 
 **Audience**: an operator with admin-console access to a running platform; needs to introspect state, hot-fix code, manage permissions, snapshot, or shut down.
 
@@ -297,7 +297,7 @@ The investigative moves from the task sections above, consolidated into one walk
 
 **Something an operator did, or a stray connection, is interfering.** `people` lists live login sessions with addresses and idle time -- login sessions only: application transport connections (HTTP included) do not appear there. Compare against the expected operator population. Combine with `status` for the who-is-on plus what-is-going-on snapshot. The console's own sessions appear here too: `people` marks who is in the editor, and editor sessions come from a small fixed pool (the `editors` field in the `.dgd` configuration). What the console cannot do is end a connection -- there is no disconnect verb, and connection objects are kernel-owned, beyond `destruct`'s reach; interference from a wedged or hostile connection resolves at the application layer or by platform restart (`docs/operations.md` Network boundary and transport security).
 
-**The platform is degrading slowly across days.** Capacity creep: `rsrc objects` and `rsrc callouts` against the `.dgd` caps show whether the platform is drifting toward a hard ceiling; `status` swap numbers show whether the image has outgrown memory. A `swapout` relieves memory pressure immediately (objects page back in on access); a config raise needs a reboot and belongs to `docs/operations.md`.
+**The platform is degrading slowly across days.** Capacity creep: `rsrc objects` and `rsrc callouts` against the `.dgd` caps show whether the platform is drifting toward a hard ceiling; `status` swap numbers show whether the image has outgrown memory. A `swapout` relieves memory pressure immediately (objects page back in on access); a config raise (`docs/configuration.md` Limits and capacity) needs a reboot (`docs/operations.md` Config changes across a restore).
 
 **None of the above explains it.** `snapshot`, then experiment freely: `code` reaches everything the platform exposes, and the snapshot plus `<dump_file>.old` are the way back. For failures at boot rather than at runtime (compile errors in the initd cascade, restore failures, missing extensions), see the Common failure modes table in `docs/operations.md`.
 
@@ -373,7 +373,8 @@ The appendix above is the kernel console's verb set, reached by the `admin` logi
 
 ## Where to next
 
-- [`docs/operations.md`](operations.md): the deployment surface, covering `.dgd` configuration fields, boot modes, statedump cadence, logging, resource caps, host-driver extension loading.
+- [`docs/configuration.md`](configuration.md): `.dgd` configuration fields and resource caps.
+- [`docs/operations.md`](operations.md): the deployment surface, covering boot modes, statedump cadence, logging, host-driver extension loading.
 - [`docs/architecture.md`](architecture.md): the platform's tier model, daemons, and inheritance chain that the console verbs operate against.
 - [`docs/runtime-primitives.md`](runtime-primitives.md): the runtime primitives the console exposes (atomicity §1, capability separation §2, persistence §3, hot reload §4, state introspection §8).
 - [`src/kernel/lib/admin_console.c`](../src/kernel/lib/admin_console.c): the authoritative LPC source for every verb's exact dispatch.

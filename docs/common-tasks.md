@@ -75,7 +75,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Verify**: `code "/usr/System/sys/portd"->query_label("myapp")` on the admin console answers `({ type, index, port, manager })`; then connect a client to the new port -- your manager's `select()` runs (log from it while developing).
 
-**Owning doc**: `docs/system-daemons.md` portd (the registry contract); `docs/kernel-reference.md` userd (the manager hooks); `docs/operations.md` for the `.dgd` port configuration fields.
+**Owning doc**: `docs/system-daemons.md` portd (the registry contract); `docs/kernel-reference.md` userd (the manager hooks); `docs/configuration.md` for the `.dgd` port configuration fields.
 
 ## Expose a health check for monitoring
 
