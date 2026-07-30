@@ -18,10 +18,10 @@ the labeled https port. That stack runs in interpreted LPC, so the number
 is the honest cost of native termination on this machine -- the figure the
 retired-reverse-proxy posture stands or falls on.
 
-Two standalone shapes measure the platform under parallel clients instead
-of the sequential loop. Each boots clean-slate instances with the
-http-app deployed and skips the growth/snapshot phases; giving either
-flag runs only the requested shapes:
+Three standalone shapes skip the growth/snapshot phases; giving any of
+their flags runs only the requested shapes. Two measure the platform
+under parallel clients instead of the sequential loop, booting
+clean-slate instances with the http-app deployed:
 
     --concurrent  for each client count, that many parallel clients each
                   drive a serial loop of GET /health requests; reports
@@ -34,6 +34,23 @@ flag runs only the requested shapes:
                   the latency the probing client observes before, during,
                   and after the burst -- the serialization price
                   docs/execution-model.md describes.
+
+The third standalone shape measures a workload that touches persistent
+state, because GET /health exercises none -- it answers from the
+connection object without reaching a daemon:
+
+    --state-workload  boots a clean slate with the composite-app
+                  deployed (WWW + Inventory, the self-exiting test
+                  driver stripped; needs LPC_EXT_CRYPTO for the
+                  identity substrate), provisions a principal on the
+                  admin console (identity mint + session mint), then
+                  drives N sequential authenticated POST
+                  /inventory/items writes -- each request paying
+                  bearer-token validation, the persistent daemon
+                  mutation, and the synchronous Merry audit observer
+                  in one task -- and reports throughput and latency
+                  beside a same-boot GET /inventory/health figure
+                  (the same machinery under the zero-work shape).
 
 Both parallel shapes budget their TOTAL request count per boot, and
 --concurrent boots a fresh instance per client count. The budget is a
@@ -60,6 +77,8 @@ Usage:
     DGD_BIN=/path/to/dgd scripts/measure-baseline.py --concurrent 2,8,32
                                             [--concurrent-requests 100]
     DGD_BIN=/path/to/dgd scripts/measure-baseline.py --headline
+    LPC_EXT_CRYPTO=/path/to/crypto DGD_BIN=/path/to/dgd \
+        scripts/measure-baseline.py --state-workload 200
 
   --sizes     cumulative `code` growth calls per step (each call parks
               about 8 MB of integer arrays in the scratch object; the
@@ -81,12 +100,26 @@ Usage:
                          default 0 = auto, splitting the per-boot user
                          slot budget across the clients
   --headline      run the head-of-line probe
+  --state-workload  sequential authenticated POST /inventory/items
+                    writes for the state-touching figure (needs
+                    LPC_EXT_CRYPTO, like --tls)
+
+The growth run also samples the driver process RSS (ps -o rss=) at the
+base image and each growth step, printed beside the snapshot-pause line:
+the resident-memory cost of the image the snapshot file sizes on disk.
+
+The ports default to example.dgd's 8023/8080 (8443 for --tls) and can
+be shifted -- MEASURE_TELNET_PORT, MEASURE_HTTP_PORT,
+MEASURE_HTTPS_PORT -- when another instance holds the defaults; the
+generated configs follow the shifted values.
 
 Writes the report to stdout and the raw transcript beside the boot logs
 under state/. Run from the repository root, like the other scripts here.
 """
 
 import argparse
+import json
+import re
 import ssl
 import sys
 
@@ -102,9 +135,9 @@ import time
 import urllib.request
 
 HOST = "127.0.0.1"
-TELNET_PORT = 8023
-HTTP_PORT = 8080
-HTTPS_PORT = 8443
+TELNET_PORT = int(os.environ.get("MEASURE_TELNET_PORT", "8023"))
+HTTP_PORT = int(os.environ.get("MEASURE_HTTP_PORT", "8080"))
+HTTPS_PORT = int(os.environ.get("MEASURE_HTTPS_PORT", "8443"))
 TLS_DATA_DIR = "src/usr/System/data/tls"
 TLS_CERT = "/usr/System/data/tls/cert.pem"
 PARK = "/usr/admin/park"
@@ -116,6 +149,8 @@ BURN = "/usr/admin/burn"
 BURN_SRC = "int burn(int n) { int i; for (i = 0; i < n; i++) { } return i; }"
 HEALTH_URL = "http://%s:%d/health" % (HOST, HTTP_PORT)
 STATUS_URL = "http://%s:%d/status" % (HOST, HTTP_PORT)
+INV_HEALTH_URL = "http://%s:%d/inventory/health" % (HOST, HTTP_PORT)
+ITEMS_URL = "http://%s:%d/inventory/items" % (HOST, HTTP_PORT)
 PROBE_INTERVAL = 0.08		# head-of-line probe pacing between samples
 HEADLINE_QUIET = 3.0		# quiet sampling before and after the burst
 HEADLINE_WINDOW = 2.0		# target injection-burst duration
@@ -134,14 +169,15 @@ _dv_spec.loader.exec_module(drive_verbs)
 
 
 def clean_slate(root):
-    for mount in ("Cascade", "Chat", "MerryApp", "MyApp", "Reload",
-                  "SignalApp", "WWW", "testop"):
+    for mount in ("Cascade", "Chat", "Inventory", "MerryApp", "MyApp",
+                  "Reload", "SignalApp", "WWW", "testop"):
         shutil.rmtree(os.path.join(root, "src/usr", mount),
                       ignore_errors=True)
     for f in ("snapshot", "snapshot.old", "swap", "measure-boot1.log",
               "measure-boot2.log", "measure.dgd", "measure-transcript.log",
               "measure-concurrent-boot.log", "measure-headline-boot.log",
-              "measure-headline-transcript.log"):
+              "measure-headline-transcript.log", "measure-state.dgd",
+              "measure-state-boot.log", "measure-state-transcript.log"):
         try:
             os.remove(os.path.join(root, "state", f))
         except FileNotFoundError:
@@ -156,19 +192,39 @@ def clean_slate(root):
                     os.path.join(root, "src/usr/WWW"))
 
 
-def write_config(root):
+def write_config(root, dst_name="measure.dgd", module=None):
+    """example.dgd localized for a measurement boot: base directory,
+    ports (which follow the MEASURE_* overrides), a raised sector size,
+    and optionally a loadable module appended (the checked-in
+    example.dgd stays module-less)."""
     src = os.path.join(root, "example.dgd")
-    dst = os.path.join(root, "state", "measure.dgd")
+    dst = os.path.join(root, "state", dst_name)
     with open(src) as f, open(dst, "w") as out:
         for line in f:
             if line.startswith("directory"):
                 line = 'directory\t= "%s";\n' % os.path.join(root, "src")
+            elif line.startswith("telnet_port"):
+                line = 'telnet_port\t= ([ "localhost" : %d ]);\n' \
+                       % TELNET_PORT
+            elif line.startswith("binary_port"):
+                line = "binary_port\t= %d;\n" % HTTP_PORT
             elif line.startswith("sector_size"):
                 line = "sector_size\t= 8192;\t/* raised for measurement" \
                        " runs: the stock build caps swap_size at 65535" \
                        " sectors, so capacity scales via sector size */\n"
             out.write(line)
+        if module:
+            out.write('modules\t\t= ([ "%s" : "" ]);\n' % module)
     return dst
+
+
+def require_crypto(flag):
+    module = os.environ.get("LPC_EXT_CRYPTO")
+    if not module or not os.path.isfile(module):
+        raise SystemExit("%s needs LPC_EXT_CRYPTO=/path/to/crypto module"
+                         " (build with `make crypto` in the lpc-ext"
+                         " worktree)" % flag)
+    return module
 
 
 def wait_port(port, proc, deadline=30.0):
@@ -238,8 +294,17 @@ def latency_stats(times):
     return (s[len(s) // 2], s[min(len(s) - 1, (len(s) * 95) // 100)], s[-1])
 
 
-def warm_http(proc, deadline=30.0):
-    """Wait until the deployed http-app answers GET /health (the binary
+def rss_mb(pid):
+    """The driver process's resident set size in MB, sampled from
+    outside via ps (which reports 1024-byte units on macOS and Linux
+    alike)."""
+    out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)],
+                         capture_output=True, text=True).stdout.strip()
+    return int(out) * 1024 / 1e6
+
+
+def warm_http(proc, url=HEALTH_URL, deadline=30.0):
+    """Wait until the deployed app answers its health route (the binary
     port accepts before the WWW domain finishes compiling on a cold boot),
     then run a short sequential warm-up so the measured window never pays
     first-request compilation."""
@@ -249,16 +314,17 @@ def warm_http(proc, deadline=30.0):
             raise SystemExit("driver exited during warm-up; read the"
                              " boot log")
         try:
-            with urllib.request.urlopen(HEALTH_URL, timeout=2) as r:
+            with urllib.request.urlopen(url, timeout=2) as r:
                 if r.status == 200:
                     break
         except OSError:
             pass
         if time.monotonic() - start > deadline:
-            raise SystemExit("http-app not answering within %ds" % deadline)
+            raise SystemExit("health route not answering within %ds"
+                             % deadline)
         time.sleep(0.1)
     for _ in range(WARM_REQUESTS - 1):
-        urllib.request.urlopen(HEALTH_URL, timeout=5).close()
+        urllib.request.urlopen(url, timeout=5).close()
 
 
 def users_line():
@@ -270,6 +336,175 @@ def users_line():
         if ln.startswith("users="):
             return ln
     return "users=?"
+
+
+def console_users_line(sess):
+    """users=used/cap via the admin console's code verb (the composite
+    deploy has no /status route; status() through the console is the
+    same live evidence that connection slots recycle). Refuses to let
+    the run continue if slots are visibly not being reclaimed -- the
+    loud form of the failure the per-phase budget exists for."""
+    sess.send_line("code ({ status()[ST_NUSERS], status()[ST_UTABSIZE] })")
+    text = sess.read_until([r"\$\d+ = \(\{ \d+, \d+ \}\)"], timeout=15.0)
+    m = re.search(r"\(\{ (\d+), (\d+) \}\)", text)
+    if not m:
+        raise SystemExit("console status() probe failed: "
+                         + text.strip()[-200:])
+    used, cap = int(m.group(1)), int(m.group(2))
+    if used > 20:
+        raise SystemExit("connection slots not recycling (users=%d/%d);"
+                         " refusing to drive the next phase into the"
+                         " users cap" % (used, cap))
+    return "users=%d/%d" % (used, cap)
+
+
+def deploy_composite(root):
+    """Deploy the composite example's two domains as WWW + Inventory in
+    the interactive shape demo-composite.sh uses: the self-exiting
+    boot-time test driver stripped, so the instance stays up for the
+    measured window."""
+    for mount in ("WWW", "Inventory"):
+        shutil.rmtree(os.path.join(root, "src/usr", mount),
+                      ignore_errors=True)
+        shutil.copytree(os.path.join(root, "examples/composite-app", mount),
+                        os.path.join(root, "src/usr", mount))
+    os.remove(os.path.join(root, "src/usr/Inventory/sys/test.c"))
+    initd = os.path.join(root, "src/usr/Inventory/initd.c")
+    with open(initd) as f:
+        lines = [ln for ln in f
+                 if 'compile_object("sys/test")' not in ln]
+    with open(initd, "w") as f:
+        f.writelines(lines)
+
+
+def mint_principal(sess):
+    """Provision a measurement principal operator-side: a synthetic
+    identity and a console-minted bearer session for it
+    (docs/identity.md's operator plane; no WebAuthn ceremony -- the
+    workload measures the request path, not registration). Returns
+    (uuid, session token)."""
+    sess.send_line("identity mint 1")
+    text = sess.read_until([r"minted identity:[0-9a-f-]+"], timeout=15.0)
+    m = re.search(r"minted identity:([0-9a-f-]+)", text)
+    if not m:
+        raise SystemExit("identity mint failed: " + text.strip()[-200:])
+    uuid = m.group(1)
+    sess.send_line("session mint identity:%s" % uuid)
+    text = sess.read_until([r"session: token [A-Za-z0-9_-]+"], timeout=15.0)
+    m = re.search(r"session: token ([A-Za-z0-9_-]+)", text)
+    if not m:
+        raise SystemExit("session mint failed: " + text.strip()[-200:])
+    return uuid, m.group(1)
+
+
+def timed_requests(n, make_request):
+    """n sequential one-connection requests via make_request (which
+    returns True on the expected status), returning (ok, wall seconds,
+    per-request latency list)."""
+    lat = []
+    ok = 0
+    t0 = time.monotonic()
+    for _ in range(n):
+        t1 = time.monotonic()
+        if make_request():
+            ok += 1
+            lat.append(time.monotonic() - t1)
+    return ok, time.monotonic() - t0, lat
+
+
+def inventory_write(token, name, qty):
+    req = urllib.request.Request(
+        ITEMS_URL,
+        data=json.dumps({"name": name, "qty": qty}).encode("ascii"),
+        headers={"Authorization": "Bearer " + token,
+                 "Content-Type": "application/json"},
+        method="POST")
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return r.status == 201
+
+
+def measure_state_workload(dgd, root, n):
+    """Boot a clean slate with the composite-app deployed, provision a
+    principal on the admin console, and drive n sequential authenticated
+    inventory writes over HTTP -- each request paying bearer-token
+    validation at the handler, the persistent inventoryd mutation, and
+    the synchronous Merry audit observer in one task -- then the
+    same-boot GET /inventory/health figure for the zero-work comparison.
+    Each phase is bounded by USER_BUDGET separately, with the console
+    users= probe between phases as the live evidence that slots recycled
+    before the next bounded phase begins."""
+    if n + WARM_REQUESTS + 1 > USER_BUDGET:
+        raise SystemExit("--state-workload %d exceeds the per-phase"
+                         " request budget of %d (see the docstring)"
+                         % (n, USER_BUDGET - WARM_REQUESTS - 1))
+    module = require_crypto("--state-workload")
+    print("== state workload: clean slate, composite-app deployed as"
+          " WWW+Inventory ==")
+    clean_slate(root)
+    deploy_composite(root)
+    config = write_config(root, "measure-state.dgd", module=module)
+
+    boot_log = open(os.path.join(root, "state/measure-state-boot.log"), "w")
+    proc = subprocess.Popen([dgd, config], stdout=boot_log, stderr=boot_log,
+                            cwd=root)
+    try:
+        t_boot = wait_port(TELNET_PORT, proc)
+        print("cold boot to console-ready (crypto build): %.2fs" % t_boot)
+        warm_http(proc, INV_HEALTH_URL)
+
+        sess = drive_verbs.Session(
+            HOST, TELNET_PORT,
+            os.path.join(root, "state/measure-state-transcript.log"))
+        drive_verbs.login(sess, "admin", "drive-verbs")
+        uuid, token = mint_principal(sess)
+        print("principal identity:%s, bearer session minted on the"
+              " console" % uuid)
+
+        # one warm write, so the measured window never pays the POST
+        # path's first-request compilation
+        if not inventory_write(token, "warm-up", 1):
+            raise SystemExit("warm-up write refused; read the transcript")
+        print("  pre-write %s" % console_users_line(sess))
+
+        ok, wall, times = timed_requests(
+            n, lambda: inventory_write(token, "measured item", 1))
+        if not times:
+            raise SystemExit("no successful writes; read the transcript")
+        med, p95, worst = latency_stats(times)
+        print("composite-app POST /inventory/items (authenticated write,"
+              " audited): %d/%d ok in %.2fs (%.0f req/s, sequential"
+              " one-connection-per-request; latency median %.1f ms,"
+              " p95 %.1f ms, max %.1f ms)"
+              % (ok, n, wall, ok / wall, med * 1e3, p95 * 1e3, worst * 1e3))
+        print("  post-write %s" % console_users_line(sess))
+
+        def health():
+            with urllib.request.urlopen(INV_HEALTH_URL, timeout=5) as r:
+                return r.status == 200
+
+        ok, wall, times = timed_requests(n, health)
+        if not times:
+            raise SystemExit("no successful health reads; read the"
+                             " transcript")
+        med, p95, worst = latency_stats(times)
+        print("composite-app GET /inventory/health (same boot, zero-work"
+              " comparison): %d/%d ok in %.2fs (%.0f req/s, sequential"
+              " one-connection-per-request; latency median %.1f ms,"
+              " p95 %.1f ms, max %.1f ms)"
+              % (ok, n, wall, ok / wall, med * 1e3, p95 * 1e3, worst * 1e3))
+        print("  post-health %s" % console_users_line(sess))
+
+        sess.send_line("shutdown")
+        time.sleep(1.0)
+        sess.close()
+    finally:
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        boot_log.close()
 
 
 def concurrent_load(n, per_client):
@@ -512,16 +747,16 @@ def write_tls_config(root):
     """example.dgd localized for a TLS boot: a second binary port for the
     https label and the crypto module loaded (the checked-in example.dgd
     stays module-less; the module path comes from LPC_EXT_CRYPTO)."""
-    module = os.environ.get("LPC_EXT_CRYPTO")
-    if not module or not os.path.isfile(module):
-        raise SystemExit("--tls needs LPC_EXT_CRYPTO=/path/to/crypto module"
-                         " (build with `make crypto` in the lpc-ext worktree)")
+    module = require_crypto("--tls")
     src = os.path.join(root, "example.dgd")
     dst = os.path.join(root, "state", "measure-tls.dgd")
     with open(src) as f, open(dst, "w") as out:
         for line in f:
             if line.startswith("directory"):
                 line = 'directory\t= "%s";\n' % os.path.join(root, "src")
+            elif line.startswith("telnet_port"):
+                line = 'telnet_port\t= ([ "localhost" : %d ]);\n' \
+                       % TELNET_PORT
             elif line.startswith("binary_port"):
                 line = ('binary_port\t= ([ "*" : %d, "*" : %d ]);\n'
                         % (HTTP_PORT, HTTPS_PORT))
@@ -657,6 +892,11 @@ def main():
                          " per-boot user slot budget across the clients)")
     ap.add_argument("--headline", action="store_true",
                     help="run the head-of-line probe only")
+    ap.add_argument("--state-workload", type=int, default=0,
+                    metavar="N",
+                    help="drive N sequential authenticated inventory"
+                         " writes against the composite-app (needs"
+                         " LPC_EXT_CRYPTO); runs this shape only")
     args = ap.parse_args()
     steps = [int(x) for x in args.sizes.split(",")]
 
@@ -665,12 +905,14 @@ def main():
         raise SystemExit("set DGD_BIN=/path/to/dgd")
     root = os.getcwd()
 
-    if args.concurrent or args.headline:
+    if args.concurrent or args.headline or args.state_workload:
         if args.concurrent:
             counts = [int(x) for x in args.concurrent.split(",")]
             measure_concurrent(dgd, root, counts, args.concurrent_requests)
         if args.headline:
             measure_headline(dgd, root)
+        if args.state_workload:
+            measure_state_workload(dgd, root, args.state_workload)
         print("== done; transcript and boot logs under state/ ==")
         return
 
@@ -693,8 +935,8 @@ def main():
 
     status_line(sess, "base image")
     pause, size = snapshot_pause(sess, root)
-    print("snapshot pause, base image: %.3fs (snapshot file %.1f MB)"
-          % (pause, size / 1e6))
+    print("snapshot pause, base image: %.3fs (snapshot file %.1f MB,"
+          " dgd RSS %.0f MB)" % (pause, size / 1e6, rss_mb(proc.pid)))
 
     done = 0
     for cum in steps:
@@ -702,8 +944,9 @@ def main():
         done = cum
         status_line(sess, "+%d chunks (~%d MB parked)" % (cum, cum * 8))
         pause, size = snapshot_pause(sess, root)
-        print("snapshot pause at +%d chunks: %.3fs (snapshot file %.1f MB)"
-              % (cum, pause, size / 1e6))
+        print("snapshot pause at +%d chunks: %.3fs (snapshot file %.1f MB,"
+              " dgd RSS %.0f MB)" % (cum, pause, size / 1e6,
+                                     rss_mb(proc.pid)))
 
     sess.send_line("shutdown")
     time.sleep(1.0)

@@ -38,3 +38,4 @@ src/usr/Merry/log/
 # Operator account directory created live by the console `grant testop
 # access` in scripts/verbsets/operator-provision.verbset.
 src/usr/testop/
+__pycache__/
