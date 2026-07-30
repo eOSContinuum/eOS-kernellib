@@ -50,6 +50,7 @@ One machine, one workload shape, a rig and a datum rather than a guarantee (`ope
 - Snapshot pause stayed at or under 0.12 s from a 2 MB through a 237 MB image; cold boot and a 237 MB restore both reach console-ready in about 0.1 s.
 - The bundled HTTP example answered about 1,600 sequential one-connection-per-request requests per second cleartext, and about 470 over native TLS 1.3 (median handshake roughly 1.5 ms).
 - Concurrency has been measured once at moderate scale: aggregate throughput saturates at the same level across the measured client counts -- added concurrency buys queueing, not parallelism -- and the head-of-line worst case under a saturated queue is bounded by the tick budget, clearing immediately after the burst (`operations.md` Limits and capacity carries the numbers). Sustained behavior near the ceilings remains unmeasured.
+- A state-touching workload has been measured once: sequential authenticated inventory writes through the composite example -- bearer-token validation, a persistent daemon mutation, and the synchronous audit observer per request -- ran at about 970 requests per second (median 1.0 ms), against about 2,100 for the same boot's zero-work health route; and driver resident memory at the snapshot-pause steps ran several times the on-disk image, 7 MB to 1.4 GB over 2 MB to 237 MB snapshots (`operations.md` Limits and capacity carries both).
 
 ## The ceilings
 
