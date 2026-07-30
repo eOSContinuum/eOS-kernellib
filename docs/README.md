@@ -63,6 +63,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 ### Contributing
 
 - `../CONTRIBUTING.md`: the contribution workflow -- how to propose a change, commit conventions, testing, Anatomy of a mergeable change, and code style.
+- [first-contribution.md](first-contribution.md): the contributor loop executed for real on the smallest starter change CONTRIBUTING.md names -- gap reproduced on a live console, regression written first and watched fail, the edit live-compiled, the harness green, the owed docs found, the commit drafted. The hands-on companion to Anatomy of a mergeable change.
 - [kernel-heritage-model.md](kernel-heritage-model.md): the kernel library's conceptual overview inherited from the upstream `dworkin/cloud-server` documentation -- motivation, directory structure, resource control, file security, and user management, for the contributor mapping the kernel tier to its origins.
 - [source-map.md](source-map.md): where each subsystem lives in the tree and which doc explains it (also under Reference below).
 - `../scripts/README.md`: the regression harness a change must keep green.
