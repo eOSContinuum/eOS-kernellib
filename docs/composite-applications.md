@@ -201,6 +201,51 @@ invokes, so in a single-object composition every chunked receive
 errored. Fixed by renaming the internal function
 (`src/usr/HTTP/lib/Connection1.c`).
 
+### Bounding a lagging subscriber
+
+The exposure a stream author owns is stated in
+`docs/execution-model.md` Under sustained load: the connection
+library's per-connection output buffer is uncapped, a subscriber that
+drains slower than the broker emits grows it in image memory for as
+long as the connection lives, and no shipped policy caps or sheds
+it. The countermeasure is application code, in three pieces:
+
+- **Measure by high-water mark, not by query.** The backlog lives in
+  private fields with no accessor (the HTTP library's `outbuf`, the
+  kernel connection's pending message), so the server clone tracks
+  its own: count bytes at each `sendChunk`, subtract on the
+  `doneChunk` relay callback the connection library fires when the
+  output buffer empties. No in-tree code implements `doneChunk` yet;
+  implementing it is part of the pattern. The high-water mark between
+  drains is the lagging-subscriber signal.
+- **Shed by tearing the subscription down.** The example's lever is
+  the server clone's `end_stream` -- streamd invokes it when a
+  subscriber's session stops validating: it marks the stream closed,
+  queues the terminal chunk, and destructs the clone through a
+  zero-delay logout, taking the broker's registry entry and every
+  application-side resource with it. Verified against a live stalled
+  client: the shed subscriber's `closed` event was queued, the
+  subscription ended, and no further pushes reached it.
+- **Know the graceful path's limit.** For a client that has genuinely
+  stopped reading, the graceful teardown cannot deliver: TCP
+  backpressure holds the terminal chunk off the wire, and the kernel
+  connection object reaps the socket lazily -- observed as a
+  `CLOSE_WAIT` that clears on the client's next socket event.
+  Application resources are freed either way; only the socket
+  lingers. A deployment that must sever the connection eagerly uses
+  the flow layer's active close instead: `terminate()`
+  (`docs/http-applications.md` Outbound connections documents the
+  call; the flow layer verifies the caller is the relay, so the
+  server object self-invokes it via `this_object()->terminate()`),
+  which reaches `disconnect()` and closes the socket at once -- the
+  same active-close path the protocol-error responses use, measured
+  delivering an immediate server-side FIN.
+
+Verify a shed end to end: subscribe from a client that deliberately
+stops reading, drive events, trigger the shed, and
+confirm from the console that the broker's subscription is gone and
+`status` Users returns to baseline once the socket reap completes.
+
 ## The outbound client seam
 
 The example's test driver reaches every phase over real TCP through
