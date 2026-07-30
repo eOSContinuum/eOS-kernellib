@@ -67,22 +67,13 @@ path is:
 1. The kernel clones the mount-point server for the connection
    (`docs/http-applications.md` The mount point).
 2. The clone parses the request (inherited `Http1Server`), resolves
-   the path through the registry, and relays on the narrow handler
-   contract:
-
-   ```c
-   mixed *handle(string method, string path, string body,
-                 string authorization)
-       -> ({ code, phrase, contentType, body })
-   ```
-
-   A handler may append an optional fifth element -- a mapping of
-   extra response header name : value pairs -- when a resource needs
-   a header beyond the defaults (the demo page sends `Cache-Control:
-   no-store` this way). The server stays the only object that touches
-   HttpRequest/HttpResponse wire objects; handlers see strings and
-   return strings. A handler error becomes a 500 without breaking the
-   connection contract.
+   the path through the registry, and relays on the narrow
+   routed-handler contract -- `handle(method, path, body,
+   authorization)` returning `({ code, phrase, contentType, body })`,
+   stated in full at its reference home, `docs/http-applications.md`
+   The routed-handler contract. The example uses the contract's
+   optional fifth element once: the demo page sends `Cache-Control:
+   no-store` as an extra response header this way.
 3. The handler calls into the domain daemon
    (`Inventory/sys/inventoryd.c`), which owns the durable state. The
    connection clone dies with the connection; the daemon's items

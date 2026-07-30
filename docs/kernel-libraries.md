@@ -270,7 +270,7 @@ The `src/lib/util/` subdirectory holds small utility libraries that wrap kfun-le
 | `src/lib/util/asn.c` | host kfuns `asn_*` | Big-integer (arbitrary-precision) arithmetic |
 | `src/lib/util/base64.c` | character encoding | Base64 encode and decode |
 | `src/lib/util/cbor.c` | binary parsing | CBOR (RFC 8949) decoder for the deterministic subset WebAuthn/CTAP2 payloads use |
-| `src/lib/util/coercion.c` | LPC-literal grammar | Round-trip codec for simple LPC values (ints, floats, strings, object references, nil, arrays, mappings); the marshaling path behind `properties.c`'s `query_ascii_property` / `set_ascii_property` |
+| `src/lib/util/coercion.c` | LPC-literal grammar | Round-trip codec for simple LPC values (ints, floats, strings, object references, nil, arrays, mappings); the marshaling path behind `properties.c`'s `query_ascii_property` / `set_ascii_property`, and the engine behind the Merry `Encode` / `Decode` merryfuns |
 | `src/lib/util/cose.c` | key extraction | COSE_Key (RFC 9052/9053) public-key extraction to the crypto kfuns' verify shapes (ES256, Ed25519) |
 | `src/lib/util/hex.c` | character encoding | Hexadecimal encode and decode |
 | `src/lib/util/json.c` | `/sys/jsonencode`, `/sys/jsondecode` | JSON encode and decode |
@@ -313,6 +313,8 @@ Strict decoder for the deterministic CBOR subset WebAuthn and CTAP2 payloads use
 - `mixed *decodePrefix(string data, int offset)` -- decode the item starting at `offset`; returns `({ value, next })` with `next` the offset past the item, for values embedded mid-stream (a COSE key inside authenticator data)
 
 ### `src/lib/util/coercion.c`
+
+Two consumers ride this codec: the property layer's ascii-property accessors (the `Core:Entries` marshaling path, `docs/schema.md` Property-table marshaling) and the Merry `Encode` / `Decode` merryfuns, which expose the same canonical round-trip to sandboxed script authors (`docs/merry-language.md` Merryfun call surface).
 
 - `string encodeValue(mixed value)` -- encode a simple LPC value (int, float, string, object reference, nil, array, mapping) to its literal form
 - `mixed decodeValue(string str)` -- decode such a literal back to the LPC value

@@ -38,7 +38,7 @@ The console's resolution of Index logical names in object-taking verb arguments:
 
 ## coercion codec
 
-The `/lib/util/coercion` round-trip codec (`encodeValue` / `decodeValue`) for simple LPC values, over the literal grammar `dumpValue` prints: ints, full-precision floats, escaped strings, `<logical-name>` object references, nil, and nested arrays/mappings. Aliased or cyclic structures and LWOs are refused loudly: shared-identity reconstruction is the Wave 2 generalized serializer's concern. Consumed by the property layer's ascii-property accessors, which give bare property-bearing objects the `Core:Entries` marshaling path with no per-app schema. Load-bearing in [schema.md](schema.md) Property-table marshaling and [vault-applications.md](vault-applications.md) the participating-domain contract.
+The `/lib/util/coercion` round-trip codec (`encodeValue` / `decodeValue`) for simple LPC values, over the literal grammar `dumpValue` prints: ints, full-precision floats, escaped strings, `<logical-name>` object references, nil, and nested arrays/mappings. Aliased or cyclic structures and LWOs are refused loudly: shared-identity reconstruction is the Wave 2 generalized serializer's concern. Consumed by the property layer's ascii-property accessors, which give bare property-bearing objects the `Core:Entries` marshaling path with no per-app schema, and by the Merry `Encode` / `Decode` merryfuns, which hand sandboxed script authors the same canonical round-trip ([merry-language.md](merry-language.md) Merryfun call surface). Load-bearing in [schema.md](schema.md) Property-table marshaling and [vault-applications.md](vault-applications.md) the participating-domain contract.
 
 ## compile_object
 
