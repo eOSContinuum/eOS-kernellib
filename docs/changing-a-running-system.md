@@ -44,7 +44,7 @@ Reference: `docs/merry-applications.md`, `docs/merry-language.md`, and `docs/run
 
 ### 6. Replace the host binary
 
-The largest change (a new build of the host runtime itself) also takes effect without losing the system. Hotboot (the `.dgd` configuration's `hotboot` tuple) re-executes the new binary against a freshly written snapshot. Connections survive, and state restores from the snapshot.
+The largest change (a new build of the host runtime itself) also takes effect without losing the system. Hotboot (the `.dgd` configuration's `hotboot` tuple) re-executes the new binary against a freshly written snapshot. Connections survive, and state restores from the snapshot. The operator sequence -- pre-flight, staging at the tuple path, verification by process inspection, and the failure mode's recovery -- is `docs/operations.md` Replace the host binary, end to end.
 
 Reference: `docs/operations.md` boot modes and `docs/admin-console.md` Snapshot, restore, and shutdown.
 

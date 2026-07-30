@@ -14,7 +14,7 @@ The finale of this tutorial gates an admin route on a platform capability, and p
 modules		= ([ "/absolute/path/to/lpc-ext/crypto.1.6" : "" ]);
 ```
 
-One fact decides what happens next, and it is worth learning on purpose: **an extension is a cold-boot fact.** The kfun table is part of the image, fixed when the driver initializes -- a snapshot taken without the module restores fine under a module-loaded driver, but the module's kfuns are not reachable in the restored image (`session mint` answers `session: crypto module not loaded`). The reverse is also a restore precondition: a snapshot taken *with* the module needs it present to restore at all (`docs/operations.md` Backing up and restoring state). So: stop the platform and boot **cold** -- no snapshot argument:
+One fact decides what happens next, and it is worth learning on purpose: **an extension is a cold-boot fact.** A snapshot taken without the module restores fine under a module-loaded driver, and the module's raw kfuns even work in the restored image -- but the platform daemons probed for the module when THEY cold-booted, and that stand-down is image state the snapshot carries, so the capabilities you actually consume still refuse (`session mint` answers `session: crypto module not loaded`) until a cold boot re-runs the probes (`docs/operations.md` Backing up and restoring state states the two levels). The reverse is also a restore precondition: a snapshot taken *with* the module needs it present to restore at all. So: stop the platform and boot **cold** -- no snapshot argument:
 
 ```sh
 /path/to/dgd/bin/dgd example.dgd
