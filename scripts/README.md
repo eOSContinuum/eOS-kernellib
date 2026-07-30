@@ -117,6 +117,8 @@ Both write generated fixtures; do not edit those by hand -- rerun the generator.
 
 ## Full regression sweep
 
+`DGD_BIN=<dgd> [LPC_EXT_CRYPTO=<crypto-module>] scripts/full-sweep.sh` runs this whole bar end to end -- every step below in order, a per-step verdict, and one final `FULL-SWEEP PASS` / `PASS (N skipped: ...)` / `FAIL (first: step N)` line. Without the crypto module the module-gated steps report SKIP, the documented module-less bar. Pass step numbers to run a subset (`scripts/full-sweep.sh 15 16 29`); each step's output is captured under `state/full-sweep-step<N>.log`. The steps 25-27 deploy-and-probe cycles the enumeration marks manual are automated inside the script with the same clean-slate reset. The enumeration below remains the annotated reference -- what each step exercises and the pass signal to read when running one by hand -- and the two are maintained together: a step added here is added to the script under the same number.
+
 Run in this order for the complete pre-PR bar. Each line names the command and the pass signal to look for; `<dgd>` is the path to a built DGD binary. Expect the full bar to take on the order of fifteen minutes end to end on the measured-baseline hardware -- no single step exceeds about two minutes.
 
 Everything the sweep needs, gathered once:
@@ -157,9 +159,10 @@ Everything the sweep needs, gathered once:
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 
-One doc-hygiene check rides the same bar and needs no DGD binary:
+Two doc-hygiene checks ride the same bar and need no DGD binary:
 
 29. `python3 scripts/gen-function-index.py --check` -- exits 0 when `docs/function-index.md` matches what the generator would produce from the current signature homes. A non-zero exit means a signature heading was added, renamed, or moved without regenerating the index; run `python3 scripts/gen-function-index.py` and commit the result.
+30. The anchor-capture check (`full-sweep.sh 30`, or `BASE_REF=<base> scripts/full-sweep.sh 30` off a non-main base) -- a heading added to a published file can capture a pre-existing dangling anchor and silently misdirect its inbound links: a stale `file.md#section` link that resolved to nothing yesterday resolves to the new heading today, pointing readers somewhere the link author never meant. For every heading the branch adds relative to the base, the check searches the tree for `#<slug>` references in files the diff does not touch and fails on any hit, printing the captured anchor and the referring line to review.
 
 ## When a run fails
 
