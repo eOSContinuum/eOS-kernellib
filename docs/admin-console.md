@@ -129,7 +129,7 @@ All four object-taking verbs (`clone`, `destruct`, `new`, `status`) also accept 
 - **Pre-deployment safety net**: `snapshot` before applying a substantial code change. If the change wedges the platform, restore from `dump_file.old`.
 - **Scheduled rotation**: the platform writes automatic snapshots every `dump_interval` seconds (config field). `snapshot` is the operator-on-demand variant; useful before maintenance windows.
 - **Recovery from a wedge**: `reboot` returns the platform to the last consistent state. Distinct from a host-level `kill`: `reboot` ensures the next boot starts from a consistent committed snapshot.
-- **Hot binary upgrade**: requires the `.dgd` configuration's `hotboot` tuple. Run `code "/usr/System/sys/userd"->hotboot()` (or operator-equivalent) to invoke `execv` against the new binary; connections survive; state restores from the freshly-written snapshot.
+- **Hot binary upgrade**: requires the `.dgd` configuration's `hotboot` tuple. Run the System console's `hotboot` verb (a registered operator login with full access; the kernel admin console does not carry the verb) to invoke `execv` against the binary at the tuple's path; connections survive; state restores from the freshly-written snapshot. The end-to-end sequence with its pre-flight and failure mode is `docs/operations.md` Replace the host binary, end to end.
 
 Cold shutdown (`shutdown`) leaves no snapshot of its own; the platform restarts from whichever snapshot was last written by `dump_interval` or by an explicit `snapshot`/`reboot`. Plan accordingly: a busy platform with `dump_interval = 3600` and no `snapshot` between rotations loses up to an hour of state on a cold-shutdown-then-recover cycle.
 
