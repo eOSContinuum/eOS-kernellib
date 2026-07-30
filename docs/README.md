@@ -37,7 +37,6 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [lpc-essentials.md](lpc-essentials.md): LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
 - [kernel-reference.md](kernel-reference.md): the function-level kernel reference (efun overrides, per-object lfuns and hooks including `patch()`, and the signature routers).
-- [kernel-heritage-model.md](kernel-heritage-model.md): the kernel library's conceptual overview inherited from the upstream `dworkin/cloud-server` documentation -- motivation, directory structure, resource control, file security, and user management, for the contributor mapping the kernel tier to its origins.
 - [function-index.md](function-index.md): a generated alphabetical index of every platform-authored callable -- name, kind, and the document that carries its signature.
 - [kernel-libraries.md](kernel-libraries.md): inheritable libraries under `src/lib/` (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities).
 - [where-code-belongs.md](where-code-belongs.md), placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility), with the authority choke-point and composition-seam disciplines behind the choices.
@@ -60,6 +59,14 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 - [operations.md](operations.md): the `.dgd` configuration, boot modes, state persistence, backup and restore, the availability and data-loss model, logging and diagnostics, resource limits and capacity, host-driver extension loading. The deployment surface.
 - [admin-console.md](admin-console.md), the operator's console (verb-based REPL on `telnet_port`): connecting, console security posture, per-task operational reference, verb appendix.
 - [security-posture.md](security-posture.md), the consolidated security overview: trust boundaries, what the platform enforces, the operator's deployment responsibilities, and the known limits. Routes to the authority model (`capability.md`), the deployment perimeter (`operations.md`), and the reporting policy (`../SECURITY.md`).
+
+### Contributing
+
+- `../CONTRIBUTING.md`: the contribution workflow -- how to propose a change, commit conventions, testing, Anatomy of a mergeable change, and code style.
+- [kernel-heritage-model.md](kernel-heritage-model.md): the kernel library's conceptual overview inherited from the upstream `dworkin/cloud-server` documentation -- motivation, directory structure, resource control, file security, and user management, for the contributor mapping the kernel tier to its origins.
+- [source-map.md](source-map.md): where each subsystem lives in the tree and which doc explains it (also under Reference below).
+- `../scripts/README.md`: the regression harness a change must keep green.
+- [architecture.md](architecture.md) The boot, in source order: the guided first read of the kernel source itself.
 
 ### Working examples
 
@@ -89,15 +96,20 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 ## Reading paths
 
-Common goals and the docs that serve them.
+Common goals and the docs that serve them, grouped by the audience each goal belongs to.
+
+### Evaluating the platform
 
 - **Run the platform and see it work**: [getting-started.md](getting-started.md), then `DGD_BIN=... ../scripts/run-example.sh merry-app` to watch the assertion sentinels pass, then [first-hour.md](first-hour.md) and [first-application.md](first-application.md), then `../examples/http-app/README.md`.
 - **Evaluate whether the platform fits**: start at [evaluating.md](evaluating.md), the one-page brief that assembles the verdict (its closing section orders the depth reading by remaining budget). The depth links: [runtime-primitives.md](runtime-primitives.md) for what is proven today (`../scripts/run-example.sh` runs the proofs), [runtime-platform-roadmap.md](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [operations.md](operations.md) Limits and capacity for the envelope, [security-posture.md](security-posture.md) for the trust boundaries and operator responsibilities, [architecture.md](architecture.md) The driver dependency for the AGPL runtime's license boundary and continuity posture, [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md) for what the platform replaces, and [debugging-applications.md](debugging-applications.md) The working environment, plainly for a team's day-to-day (editor reality, source-of-truth discipline, CI).
 - **Arriving from a cloud-services stack**: [coming-from-contemporary-infrastructure.md](coming-from-contemporary-infrastructure.md), then [persistence.md](persistence.md) Why orthogonal persistence.
-- **Do a recurring author task** (add a test driver, schedule recurring work, migrate live state, grant cross-domain access, add an operator verb, bind another port): [common-tasks.md](common-tasks.md), each recipe linking its owning mechanism doc.
 - **Understand the platform's architectural commitments**: [architecture.md](architecture.md), then [runtime-primitives.md](runtime-primitives.md), then [execution-model.md](execution-model.md) for the concurrency and latency model.
 - **Audit the platform's authority model**: [architecture.md](architecture.md) Capability tiers, [runtime-primitives.md](runtime-primitives.md) §2, then [capability.md](capability.md).
 - **Understand the platform's security posture**: [security-posture.md](security-posture.md), then [capability.md](capability.md) for the authority mechanism and [operations.md](operations.md) for the deployment perimeter.
+
+### Writing an application
+
+- **Do a recurring author task** (add a test driver, schedule recurring work, migrate live state, grant cross-domain access, add an operator verb, bind another port): [common-tasks.md](common-tasks.md), each recipe linking its owning mechanism doc.
 - **Authenticate human or agent users**: [identity.md](identity.md) for the substrate, passkey ceremonies, recovery, and the authorization split, then [system-daemons.md](system-daemons.md) for the `identityd` / `webauthnd` / `sessiond` surfaces and [application-authoring.md](application-authoring.md) Identity and request authentication for consuming an authenticated identity; then the task recipes in [common-tasks.md](common-tasks.md) -- register-and-gate a route, mint-and-delegate an agent -- and [composite-applications.md](composite-applications.md) Authenticating a wire request for the worked wire flow (its Reading the example in stages marks the identity-free skeleton to start from).
 - **Write an HTTP application**: [lpc-essentials.md](lpc-essentials.md), then the hands-on ramp [first-http-endpoint.md](first-http-endpoint.md) (assumes [first-application.md](first-application.md)), then [http-applications.md](http-applications.md) at reference depth beside `../examples/http-app/`.
 - **Write a non-HTTP application**: [lpc-essentials.md](lpc-essentials.md), [first-application.md](first-application.md) for a worked build from an empty domain, then [application-authoring.md](application-authoring.md) for the patterns at reference depth.
@@ -109,13 +121,22 @@ Common goals and the docs that serve them.
 - **Write a Vault-persisted application**: [lpc-essentials.md](lpc-essentials.md), [persistence.md](persistence.md), [vault-applications.md](vault-applications.md), `../examples/vault-app/`.
 - **Add scripted, sandboxed behavior to an object**: [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Write Merry source**: [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.
+- **Debug a misbehaving application**: [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
+
+### Operating a deployment
+
 - **Operate a running deployment**: [operations.md](operations.md), [admin-console.md](admin-console.md), [persistence.md](persistence.md).
 - **Reason about hot reload and code evolution**: [code-lifecycle.md](code-lifecycle.md), [changing-a-running-system.md](changing-a-running-system.md), then the hot-reload sections of [runtime-primitives.md](runtime-primitives.md) and the `../examples/hot-reload-demo/`, `../examples/hot-reload-master/`, and `../examples/upgrade-cascade/` demonstrations.
 - **Understand what survives a restart**: [persistence.md](persistence.md), then the persistence sections of [operations.md](operations.md).
-- **Debug a misbehaving application**: [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
+
+### Contributing to the kernel layer
+
+- **Contribute to the kernel layer**: `../CONTRIBUTING.md`, then [lpc-essentials.md](lpc-essentials.md) if LPC is new to you (the kernel source assumes that literacy), [architecture.md](architecture.md) for the model, [source-map.md](source-map.md) to find your way around the tree, [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference.md](kernel-reference.md) for the modified API surface. `../scripts/README.md` documents the regression harness a change must keep green. [architecture.md](architecture.md) The boot, in source order is the guided first read of the kernel source; ../CONTRIBUTING.md Anatomy of a mergeable change shows two merged units as templates.
+
+### For any reader
+
 - **Cross-reference an unfamiliar term mid-document**: [glossary.md](glossary.md).
 - **Follow a citation back to its source**: [references.md](references.md).
-- **Contribute to the kernel layer**: `../CONTRIBUTING.md`, then [lpc-essentials.md](lpc-essentials.md) if LPC is new to you (the kernel source assumes that literacy), [architecture.md](architecture.md) for the model, [source-map.md](source-map.md) to find your way around the tree, [where-code-belongs.md](where-code-belongs.md), [capability.md](capability.md), and [kernel-reference.md](kernel-reference.md) for the modified API surface. `../scripts/README.md` documents the regression harness a change must keep green. [architecture.md](architecture.md) The boot, in source order is the guided first read of the kernel source; ../CONTRIBUTING.md Anatomy of a mergeable change shows two merged units as templates.
 
 [DGD]: https://github.com/dworkin/dgd
 [lpc-doc]: https://github.com/dworkin/lpc-doc
