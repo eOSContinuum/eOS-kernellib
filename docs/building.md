@@ -43,9 +43,9 @@ The DGD source compiles on Linux, FreeBSD, and other POSIX-compatible systems wi
 
 ### Wider index types: unproven today
 
-The stock build's capacity ceilings trace to compile-time type widths: `uindex`, `Sector`, and `ssizet` default to `unsigned short` (`src/config.h` in the DGD source), which is why `swap_size` caps at 65535 sectors and swap capacity scales only through `sector_size` (`docs/operations.md` Limits and capacity). The driver's Makefile exposes a `DEFINES` hook and `config.h` takes `UINDEX_TYPE` / `SECTOR_TYPE` / `SSIZET_TYPE` overrides.
+The stock build's capacity ceilings trace to compile-time type widths: `uindex`, `Sector`, and `ssizet` default to `unsigned short` (`src/config.h` in the DGD source), which is why `swap_size` caps at 65535 sectors and swap capacity scales only through `sector_size` (`docs/configuration.md` Limits and capacity). The driver's Makefile exposes a `DEFINES` hook and `config.h` takes `UINDEX_TYPE` / `SECTOR_TYPE` / `SSIZET_TYPE` overrides.
 
-Stated as observed, not promised: a naive widening (all three types to `unsigned int`, 2026-07-12, macOS arm64) compiles cleanly and segfaults at cold boot before the first banner line. A working wider-index build is therefore a driver-level task with upstream guidance, not a flip of these defines; until one exists, the stock-snapshot-compatibility question and the wider-index memory cost stay unmeasured (`docs/operations.md` Unmeasured today).
+Stated as observed, not promised: a naive widening (all three types to `unsigned int`, 2026-07-12, macOS arm64) compiles cleanly and segfaults at cold boot before the first banner line. A working wider-index build is therefore a driver-level task with upstream guidance, not a flip of these defines; until one exists, the stock-snapshot-compatibility question and the wider-index memory cost stay unmeasured (`docs/configuration.md` Unmeasured today).
 
 ## eOS-kernellib
 
@@ -60,7 +60,8 @@ Verify the kernel layer compiles by running the driver against `example.dgd` per
 ## Where to next
 
 - [`docs/getting-started.md`](getting-started.md): run the example configuration once the driver is built.
-- [`docs/operations.md`](operations.md): the `.dgd` configuration field reference, boot modes, and operator surface.
+- [`docs/configuration.md`](configuration.md): the `.dgd` configuration field reference and capacity ceilings.
+- [`docs/operations.md`](operations.md): boot modes and the operator surface.
 - [`docs/architecture.md`](architecture.md): the platform's tier model and where the build fits.
 
 [DGD]: https://github.com/dworkin/dgd

@@ -200,7 +200,7 @@ An application that needs additional behavior typically registers a daemon that 
 ## What this doc does not cover
 
 - The host-driver implementation of the dispatch (the C code inside DGD that fires these events). See the upstream DGD source at <https://github.com/dworkin/dgd>.
-- The per-owner resource consumption of each transition (compile costs ticks, destruct frees them, clone consumes object-quota). See `docs/operations.md` Resource limits and the resource_daemon source.
+- The per-owner resource consumption of each transition (compile costs ticks, destruct frees them, clone consumes object-quota). See `docs/configuration.md` Resource limits and the resource_daemon source.
 - Per-tier access control on each transition (who can compile what, who can destruct what). See `docs/architecture.md` Capability tiers and the access_daemon source.
 
 ## Where to next

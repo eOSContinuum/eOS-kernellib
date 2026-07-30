@@ -229,14 +229,15 @@ The kernel daemons (driver, access_daemon, resource_daemon, userd, capabilityd) 
 
 For HTTP-based applications, the kernel's HTTP/1 server is already bound on the binary port. The kernel-defined mount point for the application's per-connection server is `/usr/WWW/obj/server`. `src/usr/System/sys/http_server.c` looks up that path at every incoming connection and, if present, clones it. `docs/http-applications.md` walks through writing the application server. `examples/http-app/` is a runnable reference.
 
-For non-HTTP applications, the patterns are covered in `docs/application-authoring.md`. The LPC language itself is covered in `docs/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` (string buffers, persistent collections, large arrays, iterators, async continuations, time) are catalogued in `docs/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, rlimits configuration, JIT deployment posture) are covered in `docs/operations.md`.
+For non-HTTP applications, the patterns are covered in `docs/application-authoring.md`. The LPC language itself is covered in `docs/lpc-essentials.md` (an orientation that bridges the reader into [LPC.md], the formal language spec). The inheritable libraries shipped under `src/lib/` (string buffers, persistent collections, large arrays, iterators, async continuations, time) are catalogued in `docs/kernel-libraries.md`. Operational concerns (admin_console use, statedump cadence, JIT deployment posture) are covered in `docs/operations.md`; rlimits configuration is covered in `docs/configuration.md`.
 
 ## Where to next
 
 - [`docs/runtime-primitives.md`](runtime-primitives.md): per-primitive foundation, demonstration, and status statement for the eight runtime guarantees the architecture surfaces.
 - [`docs/persistence.md`](persistence.md): the full orthogonal-persistence story (statedump cycle, hot boot mechanics, save_object semantics, boundaries).
 - [`docs/code-lifecycle.md`](code-lifecycle.md): compile, clone, destruct, recompile, and the object-manager event surface in detail.
-- [`docs/operations.md`](operations.md): the operator-facing deployment surface (`.dgd` configuration, boot modes, extensions).
+- [`docs/configuration.md`](configuration.md): the `.dgd` configuration fields and capacity ceilings.
+- [`docs/operations.md`](operations.md): the operator-facing deployment surface (boot modes, extensions).
 - [`docs/application-authoring.md`](application-authoring.md): writing tier-E applications on top of this architecture.
 
 [LPC.md]: https://github.com/dworkin/lpc-doc/blob/master/LPC.md

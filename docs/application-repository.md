@@ -10,7 +10,7 @@ The platform checkout stays pristine; your repository owns everything specific t
 
 - Your tier-E domain directories -- one `<App>/` per domain, each the exact tree that lands at `src/usr/<App>/` (`application-authoring.md` Domain layout owns the internal shape).
 - Any System-tier overlay file your service carries (most services carry none -- see below).
-- Your production `.dgd` configuration (splice your sizing into a copy of `example.dgd` per `operations.md` Limits and capacity, the production-shape starting point).
+- Your production `.dgd` configuration (splice your sizing into a copy of `example.dgd` per `configuration.md` Limits and capacity, the production-shape starting point).
 - Your harness runner and its sentinel expectations (below).
 - Your deploy script and your repository's ignore file -- when the secret recipe (`common-tasks.md` Provision an application secret out of source) says "add the path to your repository's ignore file", this repository is the one it means.
 

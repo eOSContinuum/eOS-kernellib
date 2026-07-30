@@ -50,7 +50,7 @@ The set of variables owned by a specific object instance (master or clone or LWO
 
 ## dump_file
 
-The `.dgd` config field naming the path the host runtime writes snapshots to and reads them back from on statedump-restore boot. Load-bearing in [operations.md](operations.md) .dgd configuration.
+The `.dgd` config field naming the path the host runtime writes snapshots to and reads them back from on statedump-restore boot. Load-bearing in [configuration.md](configuration.md) The .dgd configuration file.
 
 ## dump_state
 
@@ -142,7 +142,7 @@ The five capability layers. Tier A: host driver and dlopen-loaded extensions. Ti
 
 ## timeslice
 
-The execution-time unit DGD's scheduler uses between atomic operations. Statedumps fire between timeslices (never inside an atomic operation). Long-running atomic envelopes are charged ticks against the timeslice budget and may be terminated if they exceed `tick_max`. Load-bearing in [operations.md](operations.md) Resource limits.
+The execution-time unit DGD's scheduler uses between atomic operations. Statedumps fire between timeslices (never inside an atomic operation). Long-running atomic envelopes are charged ticks against the timeslice budget and may be terminated if they exceed `tick_max`. Load-bearing in [configuration.md](configuration.md) Resource limits.
 
 ## ur-parent / ur-child / ur-hierarchy
 
