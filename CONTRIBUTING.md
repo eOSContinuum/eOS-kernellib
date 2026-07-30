@@ -109,6 +109,8 @@ The common skeleton: one logical change, the regression that demonstrates it (se
 
 **The smallest code contribution.** The example checklist (`scripts/README.md` Adding a new example) is six steps because an example registers with the harness; a `/lib/util/` pure-function library is the asymmetric easy case: no harness step, no daemon, no boot-order -- consumers inherit it and its `static` helpers become part of their own program (`docs/where-code-belongs.md` Pure functions). A new library plus a sentinel-driver phase or verbset entry exercising it is a complete, mergeable unit.
 
+The loop this section narrates is executed end to end, command by command, in [docs/first-contribution.md](docs/first-contribution.md), on the first of the starter changes below.
+
 **Starter changes, concretely shaped.** Three open edges the docs themselves name, sized for a first PR: an additional dispatcher trace site (`docs/dispatcher.md`, the `set_dispatch_trace` entry, lists the untraced sites and states the flag-gating contract is established and site additions mechanical -- PR #31 is the exact template); an explicit test phase covering `cascade-aborted` (`docs/dispatcher.md` names it future work in its verification table); and a transport binding for the chat domain (`docs/chat-applications.md` What this example does not exercise scopes it, with `examples/composite-app` as the composition reference).
 
 ## Code style
