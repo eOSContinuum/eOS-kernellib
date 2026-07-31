@@ -180,7 +180,11 @@ Mints and validates bearer session tokens for authenticated principals -- the pr
 
 ### `string mint(string principal, varargs int ttl)`
 
-Mint a session; returns the plaintext token (the only time it exists). `ttl` caps at one day; a non-positive `ttl` uses the one-hour default.
+Mint a session; returns the plaintext token (the only time it exists). `ttl` caps at the operator-tunable ceiling below (one day at cold boot); a non-positive `ttl` uses the one-hour default.
+
+### `int query_max_ttl()` / `void set_max_ttl(int seconds)`
+
+The mint ceiling and its setter (positive seconds; errors otherwise). The ceiling is deployment policy, not a security boundary -- revocation is the boundary -- so it is runtime state: it persists across statedumps with the rest of the daemon's state, and a cold boot returns it to the one-day default. Changing it affects only future mints; live sessions keep the expiry they were minted with. The operator face is `session max-ttl [seconds]` on the console verb.
 
 ### `string validate(string token)`
 
