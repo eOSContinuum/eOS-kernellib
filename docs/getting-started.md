@@ -6,6 +6,8 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 **Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated 2026-07-18. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
 
+**Tested against (Linux)**: the same DGD commit on Debian 12 (bookworm, aarch64), validated 2026-07-30 by running every module-less example profile to its PASS sentinel through the committed container recipe (the Run it in a container section below). Linux build notes: [`docs/building.md`](building.md#linux).
+
 ## Prerequisites
 
 A POSIX-compatible system with a C compiler (`cc` or `gcc`), `make`, `bison` (or `yacc`), and `git`. For the administrative telnet port you also need a line-mode TCP client: `telnet` where available, or `nc` (netcat), which macOS ships (macOS has not shipped `telnet` since 10.13).
@@ -41,6 +43,20 @@ PASS
 ```
 
 The two boots bracket a snapshot restore, so the PERSIST sentinels prove application state survived a real process exit. [`scripts/README.md`](../scripts/README.md) documents the harness; `examples/` holds the other runnable examples. The sections below unpack each step, then boot the platform interactively.
+
+## Run it in a container
+
+The same proof runs without a C toolchain on the host. The committed [`Dockerfile`](../Dockerfile) builds the pinned driver inside the image and hands its arguments to `scripts/run-example.sh`:
+
+```sh
+git clone https://github.com/eOSContinuum/eOS-kernellib.git
+cd eOS-kernellib
+docker build -t eos-kernellib .
+docker run --rm eos-kernellib               # merry-app, ending in PASS as above
+docker run --rm eos-kernellib chat-app      # any other example profile
+```
+
+The container path is for evaluation: each run starts from the harness's clean slate and discards its state when the container exits. Interactive boots, published ports, and state that persists across runs are host-checkout concerns -- follow the native path below for those.
 
 ## Install DGD
 

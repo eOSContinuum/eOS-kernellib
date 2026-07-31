@@ -37,9 +37,13 @@ make YACC="/Library/Developer/CommandLineTools/usr/bin/bison -y" install
 
 The Command Line Tools' `bison` binary at the path above (GNU Bison 2.3) runs correctly when invoked directly.
 
+### Linux
+
+The Standard build works as written. Validated on Debian 12 (bookworm, aarch64) 2026-07-30: the toolchain is `gcc`, `g++`, `make`, `bison`, and `git` (Debian's `bison` package provides the `yacc` the Makefile invokes -- no workaround needed), and `scripts/run-example.sh` additionally needs `pgrep` from `procps`. The committed [`Dockerfile`](../Dockerfile) at the repository root is the executable form of these notes: it builds the pinned commit from this package set (plus `ca-certificates` for the HTTPS clone) and runs the example regressions to their PASS sentinel ([`docs/getting-started.md`](getting-started.md#run-it-in-a-container) Run it in a container).
+
 ### Other platforms
 
-The DGD source compiles on Linux, FreeBSD, and other POSIX-compatible systems with a working C toolchain. Platform detection happens via `uname -s` at the top of `dgd/src/Makefile`.
+The DGD source compiles on FreeBSD and other POSIX-compatible systems with a working C toolchain. Platform detection happens via `uname -s` at the top of `dgd/src/Makefile`. On Windows, no native build is validated: the supported route is the Linux path -- the container recipe above, or WSL2.
 
 ### Wider index types: unproven today
 

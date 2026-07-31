@@ -1,0 +1,17 @@
+# Keep the build context to the tracked tree: no git metadata, no local
+# runtime residue. state/ stays present (its tracked .gitignore rides
+# along) because run-example.sh writes its localized config and logs there.
+.git
+state/*
+!state/.gitignore
+src/usr/AgentApp
+src/usr/Cascade
+src/usr/Chat
+src/usr/ConsoleExt
+src/usr/Inventory
+src/usr/MerryApp
+src/usr/MyApp
+src/usr/Reload
+src/usr/SignalApp
+src/usr/WebAuthn
+src/usr/WWW
