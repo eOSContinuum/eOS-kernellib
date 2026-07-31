@@ -124,8 +124,9 @@ static void create() {
     * Seed the admin_console.caller capability: the registered extension
     * library is the sole authorized entrypoint into the verb_* elevation
     * surface. This object is /kernel-tier so it grants directly. It is
-    * compiled lazily on first admin-console use -- the same flow that
-    * first consults _check_caller -- so the seed is in place in time.
+    * compiled at boot by the driver (right after capabilityd), so the
+    * seed -- and the extend() surface a domain initd may call -- are in
+    * place before any domain boots.
     */
    CAPABILITYD->grant("admin_console.caller", LIB_MERRY_ADMIN_CONSOLE_EXT);
 
