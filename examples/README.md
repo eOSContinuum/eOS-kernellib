@@ -2,7 +2,7 @@
 
 Runnable evidence: each directory below is a minimal, deployable application demonstrating the platform's runtime primitives against a live DGD boot, not a diagram or a claim in prose.
 
-`DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh <example>` is the one-command harness -- clean-slate deploy, boot cycle, sentinel-count assertion -- for eleven of the thirteen examples (see the profile table at the top of the script for which). `http-app` verifies against a running server via HTTP probes, `https-app` via `scripts/https-smoke.sh`; `atomic-demo` and `hot-reload-demo` verify both ways. `../docs/README.md`'s Working examples section is the authoritative description and reading-path map; the rows below are one-liners, and each example's own README plus the harness profile carry the mutable sentinel counts (the verify command surfaces them).
+`DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh <example>` is the one-command harness -- clean-slate deploy, boot cycle, sentinel-count assertion -- for eleven of the fourteen examples (see the profile table at the top of the script for which). `http-app` verifies against a running server via HTTP probes, `https-app` via `scripts/https-smoke.sh`, `console-ext-app` via its verbset under `scripts/drive-verbs-smoke.sh`; `atomic-demo` and `hot-reload-demo` verify both ways. `../docs/README.md`'s Working examples section is the authoritative description and reading-path map; the rows below are one-liners, and each example's own README plus the harness profile carry the mutable sentinel counts (the verify command surfaces them).
 
 - `http-app/` -- HTTP/1 contracts. Doc: `../docs/http-applications.md`. Verify: manual `curl` steps in the README.
 - `https-app/` -- the native-TLS mount point. Doc: `../docs/operations.md` Network boundary and transport security. Verify: `scripts/https-smoke.sh` (needs `LPC_EXT_CRYPTO`).
@@ -17,6 +17,7 @@ Runnable evidence: each directory below is a minimal, deployable application dem
 - `upgrade-cascade/` -- an upgrade daemon recompiles a library's inheritors and `call_touch`-patches their clones, state intact. Doc: `../docs/code-lifecycle.md` Library upgrade. Verify: `scripts/run-example.sh upgrade-cascade`.
 - `webauthn-app/` -- the WebAuthn codec and ceremony substrate. Doc: `../docs/kernel-libraries.md` Utilities. Verify: `scripts/run-example.sh webauthn-app` (full set needs `LPC_EXT_CRYPTO`).
 - `agent-app/` -- the agent-identity worked example. Doc: `../docs/identity.md` Agent identities. Verify: `scripts/run-example.sh agent-app` (needs `LPC_EXT_CRYPTO`; the operator continuation runs via `scripts/verbsets/agent-app.verbset`).
+- `console-ext-app/` -- a first-class operator verb registered through the admin-console registry's capability-gated extend surface. Doc: `../docs/admin-console.md`. Verify: `DEPLOY="console-ext-app:ConsoleExt" scripts/drive-verbs-smoke.sh scripts/verbsets/console-ext.verbset`.
 
 ## Where to next
 

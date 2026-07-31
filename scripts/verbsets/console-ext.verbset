@@ -1,0 +1,98 @@
+# console-ext registry extension -- regression for the capability-gated
+# application verb-registration surface, driven against the ConsoleExt
+# deploy of examples/console-ext-app (deploy as console-ext-app:ConsoleExt).
+# Covers the full lifecycle (refused before approval, registered and
+# dispatching after, retracted, swept at unapprove) and every extend()
+# validation: builtin shadow, occupied verb, foreign-domain path,
+# non-cmd method, and a retract the domain never registered.
+
+# the boot-time attempt ran before any approval and recorded its refusal
+cmd: code "/usr/ConsoleExt/sys/extd"->query_boot_attempt()
+expect: capability denied: principal ConsoleExt lacks admin_console.extend
+
+# nothing is registered, no domain is approved
+cmd: console-ext
+expect: console-ext: 0 extension verb\(s\)
+expect: console-ext: approved domains: \(none\)
+
+# the verb does not dispatch before registration
+cmd: ext-hello
+expect: No command: ext-hello
+
+# an unapproved domain's registration attempt is refused
+cmd: code "/usr/ConsoleExt/sys/extd"->register_verbs()
+expect: Error: capability denied: principal ConsoleExt lacks admin_console.extend
+
+# approve the domain, register, and the verb dispatches
+cmd: console-ext approve ConsoleExt
+expect: console-ext: approved domain ConsoleExt
+
+cmd: code "/usr/ConsoleExt/sys/extd"->register_verbs()
+absent: Error
+
+cmd: console-ext
+expect: console-ext: 1 extension verb\(s\)
+expect: ext-hello -> /usr/ConsoleExt/sys/extd::cmd_ext_hello \(registrar ConsoleExt\)
+expect: console-ext: approved domains: ConsoleExt
+
+cmd: ext-hello operator
+expect: ext-hello: hello from the ConsoleExt domain to operator
+
+# the registered method keeps the built-in caller posture: a code-verb
+# tunnel compiles outside /kernel and is refused
+cmd: code "/usr/ConsoleExt/sys/extd"->cmd_ext_hello(nil, "ext-hello", "x")
+expect: Error: Access denied
+
+# extend() validation: a built-in cannot be shadowed
+cmd: code "/usr/ConsoleExt/sys/extd"->try_extend("rm", "/usr/ConsoleExt/sys/extd", "cmd_ext_hello")
+expect: Error: admin_console_registry: verb shadows a console built-in: rm
+
+# an occupied verb cannot be taken -- neither its own nor a kernel entry
+cmd: code "/usr/ConsoleExt/sys/extd"->try_extend("ext-hello", "/usr/ConsoleExt/sys/extd", "cmd_ext_hello")
+expect: Error: admin_console_registry: verb already registered: ext-hello
+
+cmd: code "/usr/ConsoleExt/sys/extd"->try_extend("session", "/usr/ConsoleExt/sys/extd", "cmd_ext_hello")
+expect: Error: admin_console_registry: verb already registered: session
+
+# the path must live in the registrar's own domain
+cmd: code "/usr/ConsoleExt/sys/extd"->try_extend("ext-two", "/usr/System/sys/sessiond", "cmd_session")
+expect: Error: admin_console_registry: path must live in the registrar's domain /usr/ConsoleExt
+
+# the method must carry the cmd_ prefix
+cmd: code "/usr/ConsoleExt/sys/extd"->try_extend("ext-two", "/usr/ConsoleExt/sys/extd", "query_boot_attempt")
+expect: Error: admin_console_registry: method must carry the cmd_ prefix
+
+# a domain retracts only what it registered -- kernel entries refuse
+cmd: code "/usr/ConsoleExt/sys/extd"->try_retract("session")
+expect: Error: admin_console_registry: no extension registered by ConsoleExt
+
+# retract, and the verb is gone
+cmd: code "/usr/ConsoleExt/sys/extd"->unregister_verbs()
+absent: Error
+
+cmd: ext-hello
+expect: No command: ext-hello
+
+cmd: console-ext
+expect: console-ext: 0 extension verb\(s\)
+
+# unapprove sweeps a still-registered domain's verbs with the capability
+cmd: code "/usr/ConsoleExt/sys/extd"->register_verbs()
+absent: Error
+
+cmd: console-ext unapprove ConsoleExt
+expect: console-ext: unapproved domain ConsoleExt, dropped 1 registered verb\(s\)
+
+cmd: ext-hello
+expect: No command: ext-hello
+
+# revocation immediacy: the very next registration attempt is refused
+cmd: code "/usr/ConsoleExt/sys/extd"->register_verbs()
+expect: Error: capability denied: principal ConsoleExt lacks admin_console.extend
+
+# usage validation
+cmd: console-ext approve
+expect: usage: console-ext
+
+cmd: console-ext bogus stuff
+expect: usage: console-ext
