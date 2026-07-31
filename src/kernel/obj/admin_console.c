@@ -107,16 +107,15 @@ static void process(string str)
 	     * Selective extension. Unknown verbs route through the
 	     * KERNEL-tier registry, which holds the verb -> (ext_path,
 	     * method) dispatch table populated for /usr/-tier domains
-	     * (Merry today; Vault/Schema/HTTP whenever future work
-	     * extends the registry's create()). If the registry has no
-	     * entry, or the registered extension is not loaded, the
-	     * "No command" fallback fires.
+	     * (kernel-layer entries at create(); application entries
+	     * through the capability-gated extend() surface). If the
+	     * registry has no entry, or the registered extension is not
+	     * loaded, the "No command" fallback fires.
 	     *
-	     * The registry is lazy-loaded -- DGD's string-form call_other
-	     * does not auto-compile, so find_object + compile_object on
-	     * first dispatch keeps the boot path free of an explicit
-	     * registry compile in driver.c. Subsequent dispatches find
-	     * the loaded master.
+	     * The registry is compiled at boot by the driver (a domain
+	     * initd may call its extend() surface before the console
+	     * ever runs); the find_object + compile_object pair here is
+	     * the recovery path should it ever be absent.
 	     */
 	    object reg;
 	    mapping entry;

@@ -373,6 +373,14 @@ private void _initialize(mapping tls)
      */
     _compile(CAPABILITYD);
 
+    /*
+     * the admin-console verb registry -- compiled here for the same
+     * reason: a domain initd may register operator verbs through the
+     * registry's extend() surface at boot, before the console's own
+     * lazy-load path would ever have compiled it
+     */
+    _compile(ADMIN_CONSOLE_REGISTRY);
+
     /* correct object count */
     resource_daemon->rsrc_incr("System", "objects", 8);
 
