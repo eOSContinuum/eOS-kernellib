@@ -106,7 +106,7 @@ $1 = </usr/WWW/initd>
 $2 = </usr/WWW/obj/server>
 ```
 
-(As in `first-application.md`: the `$N` indices assume you have run nothing extra at the console. Any additional value-producing command shifts every later slot, so compare the values, not the slot numbers.)
+(As in `first-application.md`: the `$N` indices assume you have run nothing extra at the console. Any additional value-producing command shifts every later slot, so compare the values, not the slot numbers. Also as there: a failed compile is a no-op -- fix the file and re-run -- and the finished copies of this tutorial's files, the WWW domain included, live in [`examples/kv-tutorial/`](../examples/kv-tutorial/) as a diff target.)
 
 From a second terminal on the host, drive the service over TCP (the binary port from `example.dgd` is 8080):
 

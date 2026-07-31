@@ -18,6 +18,7 @@ Runnable evidence: each directory below is a minimal, deployable application dem
 - `webauthn-app/` -- the WebAuthn codec and ceremony substrate. Doc: `../docs/kernel-libraries.md` Utilities. Verify: `scripts/run-example.sh webauthn-app` (full set needs `LPC_EXT_CRYPTO`).
 - `agent-app/` -- the agent-identity worked example. Doc: `../docs/identity.md` Agent identities. Verify: `scripts/run-example.sh agent-app` (needs `LPC_EXT_CRYPTO`; the operator continuation runs via `scripts/verbsets/agent-app.verbset`).
 - `console-ext-app/` -- a first-class operator verb registered through the admin-console registry's capability-gated extend surface. Doc: `../docs/admin-console.md`. Verify: `DEPLOY="console-ext-app:ConsoleExt" scripts/drive-verbs-smoke.sh scripts/verbsets/console-ext.verbset`.
+- `kv-tutorial/` -- not a harness example: the finished state of `../docs/first-application.md` and `../docs/first-http-endpoint.md`, shipped as a diff target for a hand-typed file that will not compile. No profile, no sentinels; its own README covers hand deployment.
 
 ## Where to next
 

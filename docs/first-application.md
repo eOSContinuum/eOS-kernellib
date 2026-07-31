@@ -95,6 +95,8 @@ $0 = </usr/KV/initd>
 $1 = </usr/KV/sys/kv_daemon>
 ```
 
+If either `compile` prints a compile-time diagnostic instead, nothing happened: a failed compile is a no-op -- nothing is installed, and whatever compiled before keeps running -- so fix the file and re-run the verb ([debugging-applications.md](debugging-applications.md) covers reading the diagnostic). And when a hand-typed file will not compile and the diagnostic does not land, the finished copies of every file this tutorial and the next build live in [`examples/kv-tutorial/`](../examples/kv-tutorial/) -- diff yours against the one there.
+
 From the next cold boot onward the initd does this automatically; the two-step form is a console-session fact, not the platform's boot story. The daemon is live now (its `create()` runs at its first use, initializing the empty store). Prove it by driving its verbs. `code` evaluates an LPC expression, and `->` calls a method on the object named by its path. (If you have run anything extra at the console, your `$N` indices will be higher: history numbers every value-producing command in sequence, so any experiment shifts all later slots. Compare the values to the right of the `=`, not the slot numbers.)
 
 ```text
