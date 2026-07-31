@@ -57,13 +57,13 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: an operator at the console can run `myapp-status` instead of a `code` one-liner.
 
-1. Know the honest constraint first: the console's extension-verb table is a hardcoded mapping in the kernel registry (`src/kernel/sys/admin_console_registry.c` `create()`), and there is no dynamic registration surface. Adding a verb is a platform contribution -- an edit to that table -- not an application-local act.
-2. Supply an extension object in your domain exposing a `cmd_<verb>(...)` method per registered entry, and add the verb-to-path/method row to the registry's `dispatch_table`. The registry seeds the `admin_console.caller` capability that gates who may invoke extension handlers; the Merry console extension (`src/usr/Merry/lib/admin_console_ext.c` and its registry rows) is the worked example.
-3. Until the platform grows a registration surface, the application-local alternative is a documented `code` call on your own daemon (`code "/usr/MyApp/sys/myappd"->status()`), which needs no kernel edit.
+1. Have the operator approve your domain once: `console-ext approve MyApp` on the kernel console grants the `admin_console.extend` capability to the domain principal (`console-ext` with no arguments lists the current entries and approved domains).
+2. Supply an object in your domain exposing a `cmd_<verb>(object user, string cmd, string str)` method, and register it from your own code -- typically the initd or daemon at boot: `ADMIN_CONSOLE_REGISTRY->extend("myapp-status", "/usr/MyApp/sys/myappd", "cmd_myapp_status")` (`ADMIN_CONSOLE_REGISTRY` from `<kernel/user.h>`). The contract: the registered path lives in your own domain, the method carries the `cmd_` prefix, and the verb is a single word that shadows no built-in and takes no already-registered name. `retract("myapp-status")` removes it; only the registering domain can. `examples/console-ext-app` is the worked example, including the boot-before-approval pattern.
+3. The zero-surface alternative remains a documented `code` call on your own daemon (`code "/usr/MyApp/sys/myappd"->status()`), which needs no approval and no registration.
 
-**Verify**: the new verb answers on the kernel console (`admin` login); `No command` means the row or the extension object path is wrong.
+**Verify**: the new verb answers on the kernel console (`admin` login); `No command` means the entry or the extension object path is wrong, and an `extend` refusal (`capability denied: principal MyApp lacks admin_console.extend`) means the domain is not approved.
 
-**Owning doc**: `docs/admin-console.md` (the extension model, under the registry discussion).
+**Owning doc**: `docs/admin-console.md` The application registration surface.
 
 ## Bind an additional port
 

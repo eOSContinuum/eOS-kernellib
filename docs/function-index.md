@@ -142,6 +142,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `query_label` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_labelstring-label--string-query_labels) |
 | `query_labels` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_labelstring-label--string-query_labels) |
 | `query_max_cascade_depth` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_max_cascade_depthint-n-and-query_max_cascade_depth) |
+| `query_max_ttl` | daemon API | [system-daemons.md](system-daemons.md#int-query_max_ttl--void-set_max_ttlint-seconds) |
 | `query_name` | daemon API | [system-daemons.md](system-daemons.md#object-query_objectstring-name--string-query_nameobject-ob) |
 | `query_object` | daemon API | [system-daemons.md](system-daemons.md#object-query_objectstring-name--string-query_nameobject-ob) |
 | `query_objects` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_tree--string-query_subdirsvarargs-string-path--string-query_objectsvarargs-string-path) |
@@ -193,6 +194,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `Set` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `set_dispatch_trace` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_dispatch_traceint-flag-and-query_dispatch_trace) |
 | `set_max_cascade_depth` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_max_cascade_depthint-n-and-query_max_cascade_depth) |
+| `set_max_ttl` | daemon API | [system-daemons.md](system-daemons.md#int-query_max_ttl--void-set_max_ttlint-seconds) |
 | `set_name` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-set_nameobject-ob-string-name--atomic-void-clear_namestring-name) |
 | `set_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |
 | `set_raw_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |

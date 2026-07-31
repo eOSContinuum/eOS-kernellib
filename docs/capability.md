@@ -1,6 +1,6 @@
 # Capability library
 
-The capability library is the kernel layer's single authority choke-point: one store and one membership check behind every gating surface that asks "may this caller do this?" It consolidates what would otherwise be heterogeneous per-subsystem gates (each surface carrying its own allowlist, its own mutator, and its own denial posture) into a shared store (`/kernel/sys/capabilityd`) and an inheritable check face (`/kernel/lib/capability`). Seven gating surfaces route through it.
+The capability library is the kernel layer's single authority choke-point: one store and one membership check behind every gating surface that asks "may this caller do this?" It consolidates what would otherwise be heterogeneous per-subsystem gates (each surface carrying its own allowlist, its own mutator, and its own denial posture) into a shared store (`/kernel/sys/capabilityd`) and an inheritable check face (`/kernel/lib/capability`). Eight gating surfaces route through it.
 
 This document covers what the library is, what "capability" means here and what it does not mean, the mechanism, the tier-split access path the kernel's own inheritance rules force, the bootstrap and persistence lifecycle, the design choices behind the shape, and the limitations a reader auditing the platform's authority model should know.
 
@@ -40,7 +40,7 @@ The host driver restricts `/kernel/lib` inheritance to objects whose creator is 
 
 One store, one membership function, one denial message. Only the path to it differs. A further wrinkle: the kernel auto (`/kernel/lib/auto`) cannot inherit the library either. Auto is the base every object implicitly inherits, the library included, so inheriting it there would be circular. The persistence helper surfaces the uniform check at the System tier while the auto's own `creator == "System"` test remains the foundational backstop beneath it.
 
-## The seven gating surfaces
+## The eight gating surfaces
 
 | Surface | Capability | Check | Denial |
 |---|---|---|---|
@@ -50,11 +50,12 @@ One store, one membership function, one denial message. Only the path to it diff
 | Persistence dump-and-exit | (none, fixed principal) | `require(owner == "System")` | throw |
 | HTTP acceptor binding | `http.binary_manager` | `is_allowed` against the manager's object name | silent nil |
 | Console verb-elevation callers | `admin_console.caller` | `require_member` | throw |
+| Console extension registration | `admin_console.extend` (domain principals) | `require_member` against the registrar domain at `extend`/`retract` | throw |
 | authd session administration | `session.admin` (identity-principal grant) | `require_member` per call against the caller's proven subject | throw |
 
 Platform capabilities granted to authenticated identities are ordinary store entries under an `identity:<uuid>` principal, checked by the same `is_allowed` -- not a new structural surface but a third principal *kind* the store already accommodates (see Identity principals below). `session.admin` is the first shipped capability whose intended principals are identities: no bootstrap seeding, operator-granted only (`identity grant <uuid> session.admin`), consumed by authd's session-administration entries (`docs/system-daemons.md` authd).
 
-Two postures coexist by design. Six surfaces throw: the daemon-diagnostic posture, where an unauthorized call is a programming error worth surfacing. The HTTP acceptor keeps a **silent nil**: erroring on every unauthorized connection attempt, port-scan probes included, buys nothing, so the accept path drops the connection quietly. The dual-check API (`require_member` for the throwers, `is_allowed` for the silent path) serves both with one mechanism.
+Two postures coexist by design. Seven surfaces throw: the daemon-diagnostic posture, where an unauthorized call is a programming error worth surfacing. The HTTP acceptor keeps a **silent nil**: erroring on every unauthorized connection attempt, port-scan probes included, buys nothing, so the accept path drops the connection quietly. The dual-check API (`require_member` for the throwers, `is_allowed` for the silent path) serves both with one mechanism.
 
 The observer-property gate deserves a note. A direct write to a `merry:on:*` (or `merry:on-inherit:*`) property, the keys that store observer registrations, is gated by the *same* registrar capability as `register_observer`, applied on the dispatched-write path. The writer's program is captured at the public `set_property` / `batched_set` entry and threaded to the dispatcher, which fails closed if it is absent. This closes the path where a raw property write would otherwise install an observer registration that `register_observer`'s own gate would have refused.
 
@@ -66,6 +67,8 @@ Capabilities whose owning surface cannot seed itself are seeded in `capabilityd:
 - `http.binary_manager` → the connection manager (`userd`). Same reason: the acceptor is System-tier but holds no grant elevation.
 
 `admin_console.caller` is seeded differently: by the console registry's own `create()`, because that object is kernel-tier and grants directly when it compiles. `identityd` holds it too (it hosts the operator grant path below). The driver compiles `capabilityd` at boot before the first check runs, so each table is in place in time.
+
+`admin_console.extend` has no boot seed at all: its principals are `/usr/` domains, and the only grant path is the operator's `console-ext approve <domain>` verb (revocation via `unapprove`, which also sweeps the domain's registered verbs -- a domain stripped of the capability could no longer retract its own entries, since `retract` checks the same capability). The application registration surface it gates is `docs/admin-console.md` The application registration surface.
 
 This bootstrap table is the documented ambient-authority seam: the initial grants are not themselves earned through a capability check. They are declared. A reader auditing the platform's root trust reads `capabilityd::create()` and the console registry's `create()`.
 
