@@ -12,6 +12,8 @@ A hands-on tutorial. In the next hour you will boot the platform, create a livin
 /path/to/dgd/bin/dgd example.dgd    # or state/local.dgd, wherever your localized config lives
 ```
 
+If this command fails on the configuration, that is the localization from the audience line above: the shipped `example.dgd` boots nowhere as-is (its `directory` is a placeholder path), so make the localized copy per [getting-started.md](getting-started.md#boot-it-yourself-the-configuration-and-the-ports) Boot it yourself and pass that file instead.
+
 The boot log prints, each line stamped with the host time (and the banner says 1.7.9 even on a newer `master` build -- `docs/getting-started.md` Install DGD):
 
 ```text
@@ -91,6 +93,8 @@ $1 = </usr/Pet/obj/pet>
 # clone /usr/Pet/obj/pet
 $2 = </usr/Pet/obj/pet#212>
 ```
+
+If a `compile` prints a compile-time diagnostic instead, nothing happened: a failed compile is a no-op -- nothing is installed, and whatever ran before keeps running -- so fix the file and re-run the verb ([debugging-applications.md](debugging-applications.md) covers reading the diagnostic).
 
 The platform was running the whole time. There was no build step, no deploy step, no restart: `compile` installed your programs into the live image, and `clone` instantiated one. The `$N` names are console history references. `$2` is your clone. (Your clone number will differ from `#212`. Clone indices are platform-global.)
 
