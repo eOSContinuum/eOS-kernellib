@@ -11,10 +11,11 @@ The platform is a fit when the workload wants what the runtime guarantees: long-
 It is the wrong platform, by design and not by immaturity, when any of these holds ([`coming-from-contemporary-infrastructure.md`](coming-from-contemporary-infrastructure.md#what-does-not-translate) What does not translate; [`../README.md`](../README.md#where-it-does-not-fit) Where it does not fit):
 
 - The workload needs **horizontal scale-out or multi-machine redundancy**. Single coherence domain: one process on one machine.
-- The workload needs **more than 255 concurrent connections** on a stock driver build, or a working set beyond the stock ceilings below.
+- The workload needs **more than 255 concurrent connections** on a stock driver build, or a working set beyond the stock ceilings below. The cap counts concurrent streams, not registered users -- what holds a slot, and what a pooling proxy does and does not buy, is [`operations.md`](operations.md#connection-slot-economics) Connection-slot economics.
 - The team needs **polyglot code inside the state domain**. LPC (and the Merry dialect) is the in-image language; everything else integrates at the transport boundary as a client.
 - The workload needs **declarative cross-entity queries**. There is no query planner over the image; enumeration and indexing are application structures.
 - The workload needs **multi-core CPU parallelism inside the state domain**. Exactly one task runs in the image at any instant, to completion; more cores do not parallelize in-image work, and added concurrency buys queueing, not parallelism ([`execution-model.md`](execution-model.md#run-to-completion) Run to completion; measured in [`configuration.md`](configuration.md#limits-and-capacity) Limits and capacity).
+- The workload is **CPU-bound computation in-image**. In-image code is interpreted LPC under a per-task tick budget: a full default budget is roughly 90-120 ms of wall clock on the measured hardware, and every task holds the single serialization point while it runs ([`execution-model.md`](execution-model.md#the-price-head-of-line-latency) The price). Compute-heavy stages -- analytics passes, media transforms, heavy parsing -- belong in a client at the transport boundary, or in a host-driver kfun extension with its documented open questions ([`operations.md`](operations.md#loading-host-driver-extensions) Loading host-driver extensions).
 
 ## From your system to the nearest example
 
