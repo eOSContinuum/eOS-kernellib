@@ -8,9 +8,10 @@
 # statedump discipline) is exercised by scripts/session-smoke.sh under a
 # module-bearing boot.
 
-# status reports the module-less stand-down
+# status reports the module-less stand-down and the shipped ttl ceiling
 cmd: session
 expect: session: sessions: 0
+expect: session: max-ttl: 86400
 expect: crypto module: absent
 
 # minting refuses cleanly without the module
@@ -24,6 +25,26 @@ expect: usage: session mint
 cmd: session bogus
 expect: usage: session
 
+# max-ttl: show, raise, show the new ceiling, restore the default
+cmd: session max-ttl
+expect: session: max-ttl: 86400
+
+cmd: session max-ttl 604800
+expect: session: max-ttl set to 604800
+
+cmd: session max-ttl
+expect: session: max-ttl: 604800
+
+cmd: session max-ttl 86400
+expect: session: max-ttl set to 86400
+
+# max-ttl argument validation: non-numeric and non-positive answer usage
+cmd: session max-ttl soon
+expect: usage: session max-ttl
+
+cmd: session max-ttl 0
+expect: usage: session max-ttl
+
 # the System-tier API refuses a console caller
 cmd: code "/usr/System/sys/sessiond"->mint("identity:x")
 expect: Error: Access denied
@@ -32,6 +53,12 @@ cmd: code "/usr/System/sys/sessiond"->validate("anything")
 expect: Error: Access denied
 
 cmd: code "/usr/System/sys/sessiond"->query_session_count()
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/sessiond"->set_max_ttl(60)
+expect: Error: Access denied
+
+cmd: code "/usr/System/sys/sessiond"->query_max_ttl()
 expect: Error: Access denied
 
 # the refusals left nothing behind
