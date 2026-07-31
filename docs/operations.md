@@ -390,6 +390,21 @@ The platform listens on two kinds of port (`docs/configuration.md` The .dgd conf
 
 **Exposure to abuse.** The platform ships no defense against a deliberate client: one peer can hold connection slots until the `users` cap silences every port (the console's included), and nothing in the image rate-limits, sheds, or evicts it (`docs/security-posture.md` Non-goals and known limits). Host-level controls own this surface: per-IP connection limits at the firewall (conntrack or equivalent), a fronting proxy's limits where one is deployed, and alerting on the `users` count as the early warning (Monitoring signals above). Plan the locked-out case before it happens: at the cap the driver refuses new connections only, so a console session already open keeps working -- hold one standing from the maintenance network, and its `reboot` verb still executes a controlled snapshot-and-exit from inside. Without one, the host is the fallback: SIGTERM writes the final incremental snapshot and exits (Running under a supervisor above), and the supervisor's restart clears the connection table.
 
+### Connection-slot economics
+
+The `users` cap counts **concurrent connections, not registered users**, and translating its stock 255 slots into a servable population is arithmetic a public-facing deployment should run before it ships. What holds a slot, and for how long:
+
+- an **in-flight request** holds a slot for its service time -- sub-millisecond for a light route, bounded above by the tick budget (a full default budget is roughly 90-120 ms of driver wall on the measured rig; `docs/configuration.md` Concurrency, measured once);
+- a **keep-alive connection** holds its slot between requests until the client closes or the flow layer's inactivity timeout reaps it (60 seconds by default; the server class's `inactivityTimeout()` override -- `docs/http-applications.md` API signatures);
+- a **streaming subscriber** holds a slot for the lifetime of the stream, by design (`docs/composite-applications.md` The event streams): a dashboard tab with an open SSE subscription is one slot for as long as the tab lives;
+- a **stranded connection** -- a server that never releases via `doneRequest()` -- holds its slot for the full inactivity window; under load that outpaces the reclaim rate the cap exhausts and every port goes silent (Common failure modes below).
+
+So the honest sizing unit is concurrent streams. Thousands of occasional-request users fit when connections are brief or idle ones are reaped; a few hundred always-on streaming subscribers saturate the table regardless of how few humans they represent.
+
+The fronting shape changes the arithmetic. **Direct exposure** spends a platform slot per client connection, keep-alive idle time included. **A pooling reverse proxy** holds the client connections itself and occupies platform slots only for in-flight upstream requests (plus whatever idle upstream keep-alives its pool retains), so many mostly-idle clients ride over few slots, and proxy buffering absorbs slow clients that would otherwise pin a slot for their transfer time -- at the price of the documented forwarded-address tradeoff (the reverse-proxy block above). What no proxy collapses: **live streams**. Each SSE subscriber needs its own end-to-end connection through the proxy, so streaming fan-out is bounded by the slot table whichever shape fronts it.
+
+The ceiling itself is compiled into the driver: the config parser refuses `users` past 255 at any boot (Booting above; Common failure modes carries the at-the-cap row), and a wider build is a driver-level task that is unproven today, with the snapshot-compatibility question unmeasured (`docs/building.md` Wider index types). Plan the fronting shape and the workload's slot profile, not a bigger ceiling.
+
 ## State file locations and permissions
 
 The platform's persistent state lives in host files whose contents range from the object graph to admin credentials, so their filesystem permissions are part of the security posture.
