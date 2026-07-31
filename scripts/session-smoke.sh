@@ -224,6 +224,39 @@ else
     rc=1
 fi
 
+echo "== phase 4b: the operator max-ttl ceiling clamps a requested ttl =="
+# Lower the ceiling to 1s, request a week: the mint must clamp to the
+# ceiling, so the session is gone after the same 2s the expiry phase
+# waits. Restore the shipped ceiling afterward so later phases mint
+# default-ttl sessions.
+if drive "cmd: session max-ttl 1
+expect: session: max-ttl set to 1
+
+cmd: session mint $PRINCIPAL 604800
+expect: session: token
+capture: token4 session: token (\\S+)
+
+cmd: session validate %{token4}
+expect: session: valid, principal $PRINCIPAL" state/session-smoke.clamp; then
+    TOKEN4=$(sed -n 's/^session: token \([A-Za-z0-9_-][A-Za-z0-9_-]*\).*/\1/p' \
+        state/session-smoke.clamp | head -1)
+    sleep 2
+    if [ -n "$TOKEN4" ] && drive "cmd: session validate $TOKEN4
+absent: valid, principal
+expect: no live session for that token
+
+cmd: session max-ttl 86400
+expect: session: max-ttl set to 86400"; then
+        echo "PASS: a week-long ttl request clamped to the 1s operator ceiling"
+    else
+        echo "FAIL: clamp validation phase failed" >&2
+        rc=1
+    fi
+else
+    echo "FAIL: clamp mint phase failed" >&2
+    rc=1
+fi
+
 echo "== phase 5: revoke-principal drops every session for a principal =="
 if drive "cmd: session mint $PRINCIPAL
 expect: session: token

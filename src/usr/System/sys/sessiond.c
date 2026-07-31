@@ -34,18 +34,20 @@ private inherit base64 "/lib/util/base64";
 private inherit hex "/lib/util/hex";
 
 # define DEFAULT_TTL	3600	/* one hour */
-# define MAX_TTL		86400	/* one day */
+# define MAX_TTL		86400	/* one day -- the boot default for max_ttl */
 
 # define SESS_PRINCIPAL	"principal"
 # define SESS_CREATED	"created"
 # define SESS_EXPIRES	"expires"
 
 private mapping sessions;	/* token hash (hex) : session record */
+private int max_ttl;		/* mint ttl ceiling; operator-tunable */
 
 static void create()
 {
     ::create();
     sessions = ([ ]);
+    max_ttl = MAX_TTL;
     sysLog("session: daemon up; crypto module " +
 # ifdef KF_SECURE_RANDOM
 	   "present"
@@ -95,8 +97,8 @@ private void reap(int now)
 
 /*
  * mint a session for a principal; returns the plaintext token (the only
- * time it exists). ttl caps at MAX_TTL; a non-positive ttl uses the
- * default.
+ * time it exists). ttl caps at the operator-tunable max_ttl; a
+ * non-positive ttl uses the default.
  */
 string mint(string principal, varargs int ttl)
 {
@@ -109,8 +111,8 @@ string mint(string principal, varargs int ttl)
     }
     if (ttl <= 0) {
 	ttl = DEFAULT_TTL;
-    } else if (ttl > MAX_TTL) {
-	ttl = MAX_TTL;
+    } else if (ttl > max_ttl) {
+	ttl = max_ttl;
     }
 # ifdef KF_SECURE_RANDOM
     now = time();
@@ -192,6 +194,30 @@ int query_session_count()
 }
 
 /*
+ * the mint ttl ceiling and its operator-tunable setter. The ceiling is
+ * deployment policy, not a security boundary -- revocation is the
+ * boundary -- so it is runtime state: set it once per deployment from
+ * the console (`session max-ttl <seconds>`) and it persists across
+ * statedumps with the rest of the daemon's state. A cold boot returns
+ * to the MAX_TTL default. Raising or lowering the ceiling affects only
+ * future mints; live sessions keep the expiry they were minted with.
+ */
+int query_max_ttl()
+{
+    check_system(previous_program());
+    return max_ttl;
+}
+
+void set_max_ttl(int seconds)
+{
+    check_system(previous_program());
+    if (seconds <= 0) {
+	error("session: max-ttl wants a positive number of seconds");
+    }
+    max_ttl = seconds;
+}
+
+/*
  * per-principal bookkeeping rows for the administration surface:
  * ({ id, created, expires }) per live session, where id is the stored
  * token hash (hex). The id can revoke but never authenticate --
@@ -257,6 +283,8 @@ private void _emit(object user, string msg)
  *		  session revoke-principal <p>  -- drop all of a principal's
  *		  session list <principal>     -- bookkeeping rows (id,
  *		                                  created, expires)
+ *		  session max-ttl [seconds]    -- show or set the mint
+ *		                                  ttl ceiling
  */
 void cmd_session(object user, string cmd, string str)
 {
@@ -271,6 +299,7 @@ void cmd_session(object user, string cmd, string str)
     if (sizeof(parts) == 0) {
 	_emit(user, "session: sessions: " +
 		    (string) query_session_count() + "\n" +
+		    "session: max-ttl: " + (string) max_ttl + "\n" +
 		    "session: crypto module: " +
 # ifdef KF_SECURE_RANDOM
 		    "present"
@@ -340,6 +369,24 @@ void cmd_session(object user, string cmd, string str)
 		    " session(s)\n");
 	return;
 
+    case "max-ttl":
+	if (sizeof(parts) == 1) {
+	    _emit(user, "session: max-ttl: " + (string) max_ttl + "\n");
+	    return;
+	}
+	{
+	    int seconds;
+
+	    if (sizeof(parts) != 2 || !sscanf(parts[1], "%d", seconds) ||
+		seconds <= 0) {
+		_emit(user, "usage: " + cmd + " max-ttl [seconds]\n");
+		return;
+	    }
+	    max_ttl = seconds;
+	    _emit(user, "session: max-ttl set to " + (string) seconds + "\n");
+	}
+	return;
+
     case "list":
 	if (sizeof(parts) != 2) {
 	    _emit(user, "usage: " + cmd + " list <principal>\n");
@@ -367,7 +414,8 @@ void cmd_session(object user, string cmd, string str)
     default:
 	_emit(user, "usage: " + cmd + " [mint <principal> [ttl] | " +
 		    "validate <token> | revoke <token> | " +
-		    "revoke-principal <principal> | list <principal>]\n");
+		    "revoke-principal <principal> | list <principal> | " +
+		    "max-ttl [seconds]]\n");
 	return;
     }
 }
