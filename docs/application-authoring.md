@@ -281,6 +281,28 @@ private void log_line(string msg)
 }
 ```
 
+### Iterating on a failing phase
+
+The clean-slate `run-example.sh` cycle is the regression bar, not the editing loop: with a twenty-phase suite and one phase red, a full cold boot per attempt is the slow path, and the platform's own hot-reload primitive makes a faster one. The test driver is an ordinary object -- the hot-fix loop `docs/debugging-applications.md` (The working environment, plainly) documents for application code applies to `sys/test.c` itself: edit the deployed copy under `src/usr/<Mount>/` (either console login carries `compile` and `code`), `compile /usr/<App>/sys/test.c` at the console to replace the driver in place, then drive the one failing phase with `code` and read the sentinel it appends. Recompiling preserves the driver's dataspace -- master variables survive and `create()` does not re-run, the same recompile semantics `docs/changing-a-running-system.md` (Changing the kernel layer) states for System daemons -- and a failed recompile is a no-op: the previous driver keeps answering while you fix the file and try again. One boundary to respect while iterating: the deployed copy is an artifact, not the source of truth -- `src/usr/<Mount>/` is created by copy from `examples/<name>/` (or your application repository), and the harness's clean-slate rerun deletes it -- so port the converged fix back to the canonical tree before running the cold bar.
+
+Two mechanics decide whether the loop is available:
+
+- **The phase must be callable cross-object.** The bundled drivers run their phases `static` (chat-app inlines them in one `run_tests()`; agent-app separates per-phase functions but keeps them `private`) -- fine at boot, unreachable from the console, and the failure shape is a trap: `code "/usr/<App>/sys/test"->run_<phase>()` against a `static` or `private` function does not error, it silently returns `nil` with the phase never run. A driver written for iteration exposes its phases as plain public functions, or one public `run_phase(string name)` dispatcher; nothing else about the sentinel pattern changes.
+- **Read the result log from a shell, not the console.** `code read_file("/usr/<App>/data/test-result.log")` answers `Error: Access denied.` -- the transient objects the `code` verb synthesizes run with the operator's own file access, not System's (`docs/admin-console.md` Inspecting runtime state). `tail src/usr/<App>/data/test-result.log` beside the console session is the working readback.
+
+One captured round of the loop, against vault-app's codec phase made public:
+
+```
+# compile /usr/MyApp/sys/test.c
+$0 = </usr/MyApp/sys/test>
+# code "/usr/MyApp/sys/test"->run_codec_test()
+$1 = nil
+```
+
+with a fresh `MyApp:test: CODEC OK` line appended to `data/test-result.log` -- the `nil` is just the phase function's `void` return; the sentinel line is the verdict. A phase that consumes fixtures earlier phases created re-runs cleanly only if those fixtures still stand: write phases to spawn what they need or reset what they mutate, the same idempotence the two-boot recipe below already demands of its verify half.
+
+What still needs the cold path: the two-boot persist phases below (their whole point is process death), the cold-boot negative case, and anything asserting boot ordering itself (the `call_out` deferral from `create()`). And the cold path keeps the last word: the iteration loop converges on a fix, the application's clean-slate `run-example.sh` profile proves it from zero, and the pre-PR gate remains the full sweep (`scripts/README.md` Full regression sweep).
+
 ### Two-boot snapshot-restore
 
 A driver that asserts survival across a restart follows the two-boot recipe `merry-app` and `chat-app` use for their restart phases (`vault-app`'s round-trip phases stay within one boot: they exercise export/import, not process death). `/usr/System/sys/persist_helper::trigger_dump_and_exit()` schedules a full `dump_state(FALSE)` plus `shutdown()` via a `call_out`, so the caller's stack unwinds before the snapshot is taken. Boot 1 runs its phases, keeps whatever objects need to survive as non-static globals (so the dump captures them), schedules a verify `call_out` far enough out to still be pending at dump time, then calls `trigger_dump_and_exit`. The process exits when `shutdown()` runs. Boot 2 restarts DGD against the written snapshot (`state/snapshot`). DGD's orthogonal persistence restores the object graph including the pending call_out, which fires as soon as the system is back up and asserts the restored state.
