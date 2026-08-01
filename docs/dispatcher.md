@@ -73,6 +73,25 @@ The single entry point that property writes route through when the Merry daemon 
 
 Cooperates with `set_property` via this contract: dispatcher does the implicit-batch wrap, the cascade-depth check, the cycle-chain check, the pre-observer fan-out, the raw write (`obj->set_raw_property(path, val)`), the main-observer fan-out, the post-observer fan-out, the cascade-depth decrement, and the implicit-batch exit. If a pre observer throws, the write does NOT land and the error propagates. If a main or post observer throws, the write HAS already landed; the error propagates and the batch status records `main-aborted` or `post-aborted`. The cycle check throws `merry: observer cycle detected at <object_name>:<path>` and records `cycle-detected`.
 
+The pre/main/post timing slots around the property write, with the cascade bound, as a diagram:
+
+```mermaid
+flowchart TD
+    ImplicitBatch["Implicit-batch wrap (if no batch already active)"]
+    CascadeCheck["Cascade-depth check"]
+    CascadeBound["cascade bound (set_max_cascade_depth, default 32)"]
+    CycleCheck["Cycle-chain check"]
+    PreFanout["Pre-observer fan-out"]
+    RawWrite["Raw write: obj->set_raw_property(path, val)"]
+    MainFanout["Main-observer fan-out"]
+    PostFanout["Post-observer fan-out"]
+    DepthDecrement["Cascade-depth decrement"]
+    BatchExit["Implicit-batch exit"]
+
+    ImplicitBatch --> CascadeCheck --> CycleCheck --> PreFanout --> RawWrite --> MainFanout --> PostFanout --> DepthDecrement --> BatchExit
+    CascadeCheck -.-> CascadeBound
+```
+
 ### Property-layer hook architecture
 
 `/lib/util/properties::set_property` is the inheritable LFUN every property-bearing host calls when it sets a logical property. It is the integration point between the property storage primitive and the dispatcher:

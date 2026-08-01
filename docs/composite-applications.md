@@ -153,6 +153,21 @@ audit commit or roll back together, with no queue and no reconciliation
 job. `GET /inventory/audit` reads the trail back over the wire, and the
 restore boot proves the binding itself persists.
 
+The two-domain request path for an authenticated mutation, assembled from the three sections above:
+
+```mermaid
+flowchart LR
+    Wire["Wire: incoming connection"]
+    Clone["Kernel clones the WWW mount-point server for the connection"]
+    Router["WWW router resolves the path via sys/router.c and relays to the handler"]
+    Handler["Inventory handler: routed-handler contract"]
+    Authd["Handler parses Bearer token and validates through authd facade"]
+    Daemon["Inventoryd: durable-state mutation inside an atomic function"]
+    Observer["Audit observer: Merry observer appends the event synchronously"]
+
+    Wire --> Clone --> Router --> Handler --> Authd --> Daemon --> Observer
+```
+
 ## The event streams
 
 One handler return form extends the one-shot contract: `({ 200, "OK",
