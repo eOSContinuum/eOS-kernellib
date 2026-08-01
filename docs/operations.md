@@ -146,7 +146,7 @@ A supervisor sending SIGTERM (the ordinary "stop the service" path outside admin
 **The off-host restore drill** (performed once, 2026-07-12): a snapshot written by the macOS/arm64 driver restored under the Linux/aarch64 driver built from the same source -- `State restored.` on the first boot line, and the deployed example's post-restore test phases ran to completion on the foreign host (its full sentinel count, including the persistence-verification phase). The procedure that worked, in full:
 
 1. Copy the backup set to the target host: the `src` tree (which carries `src/kernel/data/` and the Vault XML directories inside it), the dump pair, and the `.dgd` config.
-2. Edit one config field: `directory` to the tree's absolute path on the new host. The state-file fields resolve relative to `directory`, so a layout-preserving copy needs no other edit; the restore arguments resolve against the invocation directory.
+2. Edit one config field: `directory` to the tree's absolute path on the new host. The state-file fields resolve relative to `directory`, so a layout-preserving copy needs no other edit for the restore itself; the restore arguments resolve against the invocation directory. A rehearsal boot on a shared or reachable host additionally remaps the ports first (Rehearsal-boot hygiene below).
 3. Start the driver naming the snapshot: `dgd config dump_file [dump_file.old]`.
 
 Portability is stated exactly as tested: one macOS/arm64-to-Linux/aarch64 restore with driver binaries built from the same source succeeded. Other host and architecture pairs are unverified; the driver's own guard for an unusable file is the `Bad or incompatible restore file header` refusal, so an incompatible pair fails at boot rather than corrupting. This same drill is the reusable procedure behind two recurring practices: the scheduled restorability check (step 5 below) and the pre-release and host-binary-upgrade rehearsal (`docs/changing-a-running-system.md` Shipping a release).
@@ -168,6 +168,12 @@ Respawn is application code, not an operator verb: each domain respawns its own 
 3. **Copy the backup set at one cut**: `dump_file` and `<dump_file>.old` together, plus the `src` tree, which carries `src/kernel/data/` and the Vault XML inside it -- the full table above, at the same cut (Backup-set coherence above).
 4. **Close the race.** The automatic `dump_interval` cycle can rotate the pair mid-copy. After the copy, re-read `dump_file`'s mtime; if it moved during the copy, redo the copy. With `dump_interval` sized in hours the retry is rare.
 5. **Prove a generation restores.** On a schedule -- per generation, or weekly -- boot a throwaway driver on the backup host against the copied set, exactly the off-host restore drill above: assert `State restored.` on the first boot line plus the application's own sentinel probes, then discard the boot. Alert on failure. A backup no generation of which has ever restored is a hope, not a recovery plan, and the corrupt-snapshot failure mode below makes the stakes concrete: the `.old` fallback only helps if some generation is known-restorable. The same rehearsal boot doubles as the pre-release and host-binary-upgrade rehearsal (`docs/changing-a-running-system.md` Shipping a release).
+
+**Retention.** Each generation is self-sufficient -- the dump pair plus the tree at the same cut -- so retention cost is linear in generations, and the restore ladder above never reaches past one generation on its own (`<dump_file>.old` backs only its own pair). A defensible starting shape: a week of daily generations, the newest of them proven restorable by step 5, thinned to monthly beyond; tune the count against the same recovery-point economics that size `dump_interval` (Availability and data-loss model below).
+
+**Off-host sets carry credentials -- encrypt at rest.** The copied tree includes `src/kernel/data/` (the admin password hash and the access lists), and the dump pair carries the entire application state (the sensitivity table under State file locations and permissions below). Off-host generations therefore get encryption at rest and owner-only permissions as a floor. The property matters, not the tool: disk encryption on the backup volume or per-generation file encryption both satisfy it.
+
+**Rehearsal-boot hygiene.** Step 5's throwaway boot brings production up on the backup host: the restored image answers to production's operator passwords, the copied `src/kernel/data/admin.pwd` governs the admin login, and the stock config's bare `binary_port = 8080` form listens on every interface (observed live; the mapping form binds an address -- `telnet_port` already uses it in the stock config). Give the drill its own config: `binary_port` rewritten to the localhost-mapping form (`([ "localhost" : <port> ])`), port numbers on both listeners that cannot collide with anything else on the backup host, and discard the boot's state files with the drill. The rehearsal proves restorability; it does not stand up a second production.
 
 **Post-restore checklist.** `State restored.` as the first boot line after the version banner; the application's own verification (its sentinel driver or probes); clients reconnect (connections never survive a statedump restore); `Missing secondary snapshot` means an incremental primary was named without its base, and `Bad or incompatible restore file header` means the file and binary do not match. Expect one transient on an aged snapshot: its accumulated overdue `call_out` backlog fires immediately on restore, a burst of activity, log volume, and callout count that is catch-up, not a fault (`docs/persistence.md` Persistence boundaries, the Time bullet, carries the application-side lateness idioms).
 
@@ -381,6 +387,41 @@ Per-owner tick consumption is the other capacity signal. `rsrc ticks` (the resou
 The platform listens on two kinds of port (`docs/configuration.md` The .dgd configuration file): `telnet_port` for the operator console, and `binary_port` for application transports (HTTP and others). Their exposure and transport security are separate decisions.
 
 **The operator console is unencrypted.** `admin_console` speaks plain telnet: the wire carries the operator's password and every command in clear text. Bind `telnet_port` to a loopback interface or a dedicated maintenance network, never a public one, and reach it through an SSH tunnel or a host-terminated TLS tunnel. Console access is equivalent to host shell access on the platform's process (`docs/admin-console.md` Console security posture), so the tunnel endpoint and its credentials carry that weight.
+
+**A worked console tunnel.** The prescription above made literal, in the same spirit as the supervisor unit and proxy blocks: a dedicated account on the platform host that can forward exactly one port and do nothing else. In `sshd_config`:
+
+```text
+Match User dgd-console
+    AllowTcpForwarding local
+    PermitOpen 127.0.0.1:8023
+    PermitTTY no
+    ForceCommand /usr/bin/false
+    PasswordAuthentication no
+    AllowAgentForwarding no
+    X11Forwarding no
+```
+
+The operator's side is one invocation, then a local telnet against the near end of the tunnel:
+
+```text
+ssh -N -L 8023:127.0.0.1:8023 dgd-console@<host>
+telnet 127.0.0.1 8023
+```
+
+`-N` asks for no remote command, which is also all the account allows: `PermitOpen` pins forwarding to the console port, `PermitTTY no` and the `ForceCommand` refuse an interactive session, and `PasswordAuthentication no` makes the account key-only -- one `authorized_keys` entry per operator, which doubles as the access roster. Adjust `8023` to the deployment's `telnet_port` value.
+
+**Where session recording attaches.** The platform records no operator actions (`docs/security-posture.md` Non-goals and known limits), so a deployment that requires a console audit trail builds it into the tunnel endpoint. The mechanism: a second account whose forced command IS the console client wrapped in a recorder, instead of a port forward --
+
+```text
+Match User dgd-console-rec
+    AllowTcpForwarding no
+    PermitTTY yes
+    ForceCommand /usr/bin/script -a /var/log/console-sessions/$(date +%Y%m%d-%H%M%S)-$$.log -c "telnet 127.0.0.1 8023"
+    AllowAgentForwarding no
+    X11Forwarding no
+```
+
+(`ForceCommand` runs through the account's login shell, so the account needs a real shell for the substitutions; `script` here is the util-linux form.) Every keystroke and response lands in a per-session log on the host -- treat that directory as security log storage: root-owned with the account able to create but not prune (a sticky drop-box directory), shipped or rotated off-host promptly. The recording is only as trustworthy as the host that takes it: an operator with separate shell access to the platform host can bypass the recorded path entirely, the same boundary the console-equals-host-shell equivalence above already draws.
 
 **Application HTTP terminates TLS natively.** Native TLS 1.3 termination is the platform transport (`docs/runtime-platform-roadmap.md` Transport posture records the activation): the HTTPS bootstrap (`src/usr/System/sys/https_server.c`) serves the labeled `https` binary port, cloning the application's TLS server mount (`/usr/WWW/obj/tls_server`) per connection -- `examples/https-app/` is the reference application. Activation needs three things: the lpc-ext crypto module (the TLS stack's body is gated on the host driver being built with `KF_SECURE_RANDOM`; Loading host-driver extensions below), a second `binary_port` entry (the port-label registry declares `https` for index 1), and PEM credentials at the configured paths (`/usr/System/data/tls/cert.pem` and `key.pem` by default). Anything missing is a logged stand-down, not an error. The `tls-cert` console verb reports status, revalidates the files, re-points the paths, and completes a deferred registration without a restart (`docs/admin-console.md`). Certificate acquisition and renewal stay with the host's ACME client writing those paths; credentials are read per connection, so a renewed file is picked up on the next handshake with no verb. The platform sees the real client address -- there is no proxy hop whose origin information would need reconstructing from forwarded headers.
 
