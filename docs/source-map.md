@@ -59,29 +59,29 @@ An application adds its own tier-E domain under `src/usr/<App>/` the same way. S
 
 ## Finding a subsystem
 
-Each runtime surface, the code that implements it, and the document that explains it. The code column names an entry point, not every file; follow the owning document for the full surface.
+Each runtime surface, the code that implements it, the document that explains it, and the regression surface that exercises it. The code column names an entry point, not every file; follow the owning document for the full surface. Step numbers are the Full regression sweep's numbering (`scripts/README.md`), the same contract `scripts/full-sweep.sh` runs by -- a step added or renumbered there updates this column. The two doc-hygiene steps (29, the function-index check; 30, the anchor-capture check) apply to every change and are not repeated per row.
 
-| Subsystem | Entry-point code | Doc |
-|---|---|---|
-| Capability and authority | `src/kernel/sys/capabilityd.c`, `src/kernel/lib/capability.c`, `src/usr/System/lib/auto.c` | `docs/capability.md`, `docs/architecture.md` |
-| Persistence and statedump | the host driver, `src/usr/System/sys/persist_helper.c` | `docs/persistence.md` |
-| Property dispatch | `src/usr/Merry/sys/merry.c`, `src/lib/util/properties.c` | `docs/dispatcher.md` |
-| Observers | `src/usr/Merry/sys/merry.c` | `docs/observers.md` |
-| Schema | `src/usr/Schema/` | `docs/schema.md` |
-| Merry language | `src/usr/Merry/` | `docs/merry-language.md` |
-| HTTP and transport | `src/usr/HTTP/`, `src/usr/System/sys/http_server.c` | `docs/http-applications.md` |
-| TLS | `src/usr/TLS/` | `docs/operations.md` |
-| Connections, sessions, users | `src/kernel/sys/userd.c`, `src/usr/System/sys/userd.c`, `src/usr/System/sys/portd.c`, `src/kernel/lib/connection.c` | `docs/architecture.md`, `docs/admin-console.md` |
-| Resources and limits | `src/kernel/sys/resource_daemon.c` | `docs/configuration.md` |
-| Code lifecycle and upgrade | `src/kernel/sys/driver.c`, `src/usr/System/sys/upgraded.c`, `src/usr/System/sys/objectd.c` | `docs/code-lifecycle.md`, `docs/changing-a-running-system.md` |
-| Logging and diagnostics | `src/usr/System/sys/logd.c`, `src/usr/System/sys/errord.c` | `docs/operations.md`, `docs/debugging-applications.md` |
-| Platform identity substrate | `src/usr/System/sys/identityd.c`, `src/usr/System/obj/identity.c`, `src/include/identityd.h` | `docs/system-daemons.md` |
-| WebAuthn ceremonies | `src/lib/util/webauthn.c`, `src/usr/System/sys/webauthnd.c` | `docs/system-daemons.md`, `docs/kernel-libraries.md` |
-| Session tokens | `src/usr/System/sys/sessiond.c` | `docs/system-daemons.md` |
-| Consoles | `src/kernel/lib/admin_console.c`, `src/usr/System/obj/user.c` | `docs/admin-console.md` |
-| Coercion and serialization | `src/lib/util/coercion.c`, `src/usr/Marshal/` | `docs/schema.md` |
-| XML | `src/usr/XML/` | `docs/xml.md` |
-| Shared LPC libraries | `src/lib/` | `docs/kernel-libraries.md` |
+| Subsystem | Entry-point code | Doc | Regression surface |
+|---|---|---|---|
+| Capability and authority | `src/kernel/sys/capabilityd.c`, `src/kernel/lib/capability.c`, `src/usr/System/lib/auto.c` | `docs/capability.md`, `docs/architecture.md` | steps 11, 13, 15 (console-ext), 18 (identity-capability), 21 (agent-delegation) |
+| Persistence and statedump | the host driver, `src/usr/System/sys/persist_helper.c` | `docs/persistence.md` | steps 1, 4, 10, 11 (restore boots), 22, 23, 28 (statedump scans) |
+| Property dispatch | `src/usr/Merry/sys/merry.c`, `src/lib/util/properties.c` | `docs/dispatcher.md` | steps 4 (merry-app), 15 (dispatcher-verbs) |
+| Observers | `src/usr/Merry/sys/merry.c` | `docs/observers.md` | steps 1 (chat-app), 4 (merry-app), 15 (dispatcher-verbs) |
+| Schema | `src/usr/Schema/` | `docs/schema.md` | steps 7 (vault-app), 15 (schema-verbs) |
+| Merry language | `src/usr/Merry/` | `docs/merry-language.md` | steps 1 (sandbox phases), 4 (merry-app), 15 (dispatcher-verbs) |
+| HTTP and transport | `src/usr/HTTP/`, `src/usr/System/sys/http_server.c` | `docs/http-applications.md` | steps 10, 11, 25-27 |
+| TLS | `src/usr/TLS/` | `docs/operations.md` | steps 15 (tls-cert), 28 (https-smoke) |
+| Connections, sessions, users | `src/kernel/sys/userd.c`, `src/usr/System/sys/userd.c`, `src/usr/System/sys/portd.c`, `src/kernel/lib/connection.c` | `docs/architecture.md`, `docs/admin-console.md` | step 15 (admin-baseline, port-labels, operator-provision, operator-upgrade) |
+| Resources and limits | `src/kernel/sys/resource_daemon.c` | `docs/configuration.md` | none today: the `quota`/`rsrc` console verbs are driven by no sweep step |
+| Code lifecycle and upgrade | `src/kernel/sys/driver.c`, `src/usr/System/sys/upgraded.c`, `src/usr/System/sys/objectd.c` | `docs/code-lifecycle.md`, `docs/changing-a-running-system.md` | steps 2, 3, 6, 15 (operator-upgrade), 26 |
+| Logging and diagnostics | `src/usr/System/sys/logd.c`, `src/usr/System/sys/errord.c` | `docs/operations.md`, `docs/debugging-applications.md` | steps 15 (logging-verbs), 24 |
+| Platform identity substrate | `src/usr/System/sys/identityd.c`, `src/usr/System/obj/identity.c`, `src/include/identityd.h` | `docs/system-daemons.md` | steps 11, 12-13, 15 (identity-verbs), 16 (agent-records), 17, 18, 20, 21 |
+| WebAuthn ceremonies | `src/lib/util/webauthn.c`, `src/usr/System/sys/webauthnd.c` | `docs/system-daemons.md`, `docs/kernel-libraries.md` | steps 8-9, 11, 19, 20 |
+| Session tokens | `src/usr/System/sys/sessiond.c` | `docs/system-daemons.md` | steps 11, 15 (session-verbs), 22 |
+| Consoles | `src/kernel/lib/admin_console.c`, `src/usr/System/obj/user.c` | `docs/admin-console.md` | steps 15 (admin-baseline, console-ext, operator-provision, operator-upgrade), 16 (code-eval-baseline, initd-laundering) |
+| Coercion and serialization | `src/lib/util/coercion.c`, `src/usr/Marshal/` | `docs/schema.md` | step 7 (codec phases) |
+| XML | `src/usr/XML/` | `docs/xml.md` | steps 7, 15 |
+| Shared LPC libraries | `src/lib/` | `docs/kernel-libraries.md` | step 16 (kvstore-roundtrip) plus the consuming examples' profiles |
 
 ## How the layout is enforced
 
