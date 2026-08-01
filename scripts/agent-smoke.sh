@@ -60,15 +60,27 @@ fi
 
 HOST=127.0.0.1
 
-if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
-    echo "agent-smoke.sh: a dgd instance is already running (it holds the ports); stop it first:" >&2
-    pgrep -fl 'dgd .*\.dgd' >&2
+# Generated config path, named for this script: it keys the leftover
+# guard and the cleanup sweep, so only this script's own instances are
+# matched. A port probe then catches anything else holding the ports.
+CONFIG=state/agent-smoke.dgd
+if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
+    echo "agent-smoke.sh: a leftover agent-smoke dgd instance is running; stop it first:" >&2
+    pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
+for _port in 8023 8080; do
+    if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
+        echo "agent-smoke.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
+        exit 2
+    fi
+done
 
 DGDPID=""
 cleanup() {
     kill "$DGDPID" 2>/dev/null || true
+    sleep 1
+    pkill -9 -f "dgd .*$CONFIG" 2>/dev/null || true
     rm -f state/agent-smoke-key.pem state/agent-smoke-badkey.pem \
           state/agent-smoke-msg state/agent-smoke-sig.bin
 }
@@ -81,7 +93,6 @@ rm -f state/snapshot state/snapshot.old state/swap state/agent-smoke-boot.log
 rm -f src/kernel/data/access.data
 rm -rf src/usr/System/log src/usr/Merry/log src/usr/Merry/tmp
 
-CONFIG=state/agent-smoke.dgd
 sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
 printf 'modules\t\t= ([ "%s" : "" ]);\n' "$LPC_EXT_CRYPTO" >> "$CONFIG"
 

@@ -172,7 +172,7 @@ The harness leaves a failed run's evidence in place. The artifact map:
 - **Sentinels**: the deployed domain's `data/test-result.log` (`src/usr/<Mount>/data/test-result.log`) -- one line per test phase, in phase order, ` OK` or a failure note.
 - **The deploy itself**: a failed run does not clean up; the deployed mount, the generated config, and the state files are still there to inspect (the clean-slate reset runs at the START of the next run).
 
-Triage in that order: the sentinel log names the first failing phase; the boot log carries the compile error or error trace behind it; and when the failure needs live inspection, boot the still-deployed example yourself against the generated config the run left behind (`<dgd> state/run-example.dgd`) and poke it from the console (`docs/admin-console.md`). `docs/debugging-applications.md` owns trace reading and the error-message index. A `password rejected` failure from any drive-verbs-based smoke is the credential contract above: delete `src/kernel/data/admin.pwd` and rerun.
+Triage in that order: the sentinel log names the first failing phase; the boot log carries the compile error or error trace behind it; and when the failure needs live inspection, boot the still-deployed example yourself against the generated config the run left behind (each script generates its own: `<dgd> state/run-example.dgd` after a run-example.sh run, `state/drive-verbs-smoke.dgd` after drive-verbs-smoke.sh, and so on) and poke it from the console (`docs/admin-console.md`). `docs/debugging-applications.md` owns trace reading and the error-message index. A `password rejected` failure from any drive-verbs-based smoke is the credential contract above: delete `src/kernel/data/admin.pwd` and rerun.
 
 ## Adding a new example
 

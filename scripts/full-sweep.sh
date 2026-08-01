@@ -126,6 +126,7 @@ http_teardown() {
         wait "$HTTP_PID" 2>/dev/null
     fi
     HTTP_PID=""
+    pkill -9 -f 'dgd .*state/full-sweep-http\.dgd' 2>/dev/null || true
 }
 trap http_teardown EXIT INT TERM
 
