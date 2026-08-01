@@ -35,6 +35,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `call_out` | efun override | [kernel-reference.md](kernel-reference.md#call_out) |
 | `call_out_other` | efun override | [kernel-reference.md](kernel-reference.md#call_out_other) |
 | `call_trace` | efun override | [kernel-reference.md](kernel-reference.md#call_trace) |
+| `capability` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `cascade-depth` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `cd` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `ChainedContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#chainedcontinuation) |
@@ -50,6 +51,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `compile_object` | efun override | [kernel-reference.md](kernel-reference.md#compile_object) |
 | `configure` | daemon API | [system-daemons.md](system-daemons.md#void-configurestring-rpid-string-origin--string-query_rp_id--string-query_origin) |
 | `Connection1` | HTTP class | [http-applications.md](http-applications.md#connection1-flow-surface-srcusrhttplibconnection1c) |
+| `console-ext` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `Continuation` | library class | [kernel-libraries.md](kernel-libraries.md#continuation) |
 | `cp` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `create` | lfun | [kernel-reference.md](kernel-reference.md#create) |
@@ -93,6 +95,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `HttpFields` | HTTP class | [http-applications.md](http-applications.md#httpfield-and-httpfields-srcusrhttpapilibfieldc-fieldsc) |
 | `HttpRequest` | HTTP class | [http-applications.md](http-applications.md#httprequest-srcusrhttpapilibrequestc-and-httpresponse-srcusrhttpapilibresponsec) |
 | `HttpResponse` | HTTP class | [http-applications.md](http-applications.md#httprequest-srcusrhttpapilibrequestc-and-httpresponse-srcusrhttpapilibresponsec) |
+| `identity` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `In` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `Int` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `IntIterator` | library class | [kernel-libraries.md](kernel-libraries.md#intiterator) |
@@ -105,7 +108,9 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `KVstore` | library class | [kernel-libraries.md](kernel-libraries.md#kvstore) |
 | `LabelCall` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `LabelRef` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
+| `log` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `log` | daemon API | [system-daemons.md](system-daemons.md#void-logint-level-string-msg) |
+| `log-level` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `log_report` | daemon API | [system-daemons.md](system-daemons.md#void-log_reportstring-report) |
 | `logout` | daemon API | [system-daemons.md](system-daemons.md#string-validatestring-token--int-logoutstring-token) |
 | `ls` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
@@ -191,6 +196,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `rotate_recovery_codes` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-rotate_recovery_codesstring-uuid-int-n) |
 | `rsrc` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `send_atomic_message` | efun override | [kernel-reference.md](kernel-reference.md#send_atomic_message) |
+| `session` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `Set` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |
 | `set_dispatch_trace` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_dispatch_traceint-flag-and-query_dispatch_trace) |
 | `set_max_cascade_depth` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_max_cascade_depthint-n-and-query_max_cascade_depth) |
@@ -231,6 +237,7 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `suspend_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-suspend_agentstring-uuid--atomic-void-resume_agentstring-uuid) |
 | `swapout` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `Time` | library class | [kernel-libraries.md](kernel-libraries.md#time) |
+| `tls-cert` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
 | `tls_get` | efun override | [kernel-reference.md](kernel-reference.md#tls_get) |
 | `tls_set` | efun override | [kernel-reference.md](kernel-reference.md#tls_set) |
 | `touch_credential` | daemon API | [system-daemons.md](system-daemons.md#void-update_sign_countstring-uuid-string-credentialid-int-count--void-touch_credentialstring-uuid-string-credentialid) |
@@ -249,3 +256,4 @@ One boundary is deliberate rather than an omission: the Vault layout's five subs
 | `verify_key_assertion` | daemon API | [system-daemons.md](system-daemons.md#string-verify_key_assertionstring-challenge-string-credentialid-string-signature) |
 | `verify_registration_payload` | daemon API | [system-daemons.md](system-daemons.md#mapping-verify_registration_payloadstring-challenge-string-clientdatajson-string-attestationobject) |
 | `verify_token` | daemon API | [system-daemons.md](system-daemons.md#string-verify_tokenstring-token) |
+| `webauthn` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |
