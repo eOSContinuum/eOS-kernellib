@@ -54,7 +54,7 @@ The admin verb `cascade-depth [N]` (see `docs/admin-console.md` Dispatcher opera
 
 The stock driver build's index widths (matching the driver's own header comment: "default: 64K objects, 64K swap sectors, 255 users, max string length 64K") set the ceilings above. A driver rebuilt with wider `uindex`/`eindex` types raises them, at the cost of a larger per-object memory footprint. eOS-kernellib runs against a stock build, so the table above is the practical ceiling until that changes.
 
-The two ranges in the `swap_size` × `sector_size` row compound into the platform's absolute state ceiling: 65535 sectors times the 65535-byte maximum `sector_size` is just under 4.0 GiB of total persistent object storage on a stock build -- the most state the platform can hold at any configuration, however much RAM the host has (RAM sizes the resident set; the swap device bounds total state). Beyond that, the fix is a driver rebuilt with a wider sector index, not a config edit.
+The two ranges in the `swap_size` × `sector_size` row compound into the platform's absolute state ceiling: 65535 sectors times the 65535-byte maximum `sector_size` is just under 4.0 GiB of total persistent object storage on a stock build -- the most state the platform can hold at any configuration, however much RAM the host has (RAM sizes the resident set; the swap device bounds total state). Beyond that, the fix is a driver rebuilt with a wider sector index, not a config edit; the operational sequence for a deployment approaching this ceiling -- what to spend first, and the export-based terminal move -- is `docs/operations.md` When the image approaches the state ceiling.
 
 Ceilings that are not `.dgd` fields:
 
