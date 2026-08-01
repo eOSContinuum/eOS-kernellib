@@ -56,12 +56,6 @@ for tool in mkcert python3 openssl; do
         exit 2
     fi
 done
-if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
-    echo "demo-composite.sh: a dgd instance is already running (it holds the ports); stop it first:" >&2
-    pgrep -fl 'dgd .*\.dgd' >&2
-    exit 2
-fi
-
 HOST=127.0.0.1
 HTTP_PORT=8080
 HTTPS_PORT=8443
@@ -69,11 +63,29 @@ TLS_DATA_DIR=src/usr/System/data/tls
 CONFIG=state/demo-composite.dgd
 BOOT_LOG=state/demo-composite-boot.log
 
+# The guard is scoped to this script's generated config, so only its own
+# leftover blocks the run (the demo this script leaves live IS such a
+# leftover: stop it before relaunching). A port probe then catches
+# anything else holding the demo ports.
+if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
+    echo "demo-composite.sh: a demo-composite dgd instance is already running (an earlier demo, or a leftover); stop it first:" >&2
+    pgrep -fl "dgd .*$CONFIG" >&2
+    exit 2
+fi
+for _port in 8023 "$HTTP_PORT" "$HTTPS_PORT"; do
+    if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
+        echo "demo-composite.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
+        exit 2
+    fi
+done
+
 DGDPID=""
 READY=""
 cleanup() {
     if [ -z "$READY" ]; then
         kill "$DGDPID" 2>/dev/null || true
+        sleep 1
+        pkill -9 -f "dgd .*$CONFIG" 2>/dev/null || true
         rm -rf src/usr/WWW src/usr/Inventory "$TLS_DATA_DIR"
         rm -f src/usr/System/sys/demo_provisiond.c
         rm -f state/snapshot state/snapshot.old state/swap \

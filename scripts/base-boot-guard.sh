@@ -37,11 +37,21 @@ MAX_LINES="${MAX_LINES:-400}"
 BOOT_LOG=state/base-boot-guard.log
 SYSLOG=src/usr/System/log/system.log
 
-if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
-    echo "base-boot-guard.sh: a dgd instance is already running; stop it first:" >&2
-    pgrep -fl 'dgd .*\.dgd' >&2
+# Generated config path, named for this script: it keys the leftover
+# guard and the cleanup sweep, so only this script's own instances are
+# matched. A port probe then catches anything else holding the ports.
+CONFIG=state/base-boot-guard.dgd
+if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
+    echo "base-boot-guard.sh: a leftover base-boot-guard dgd instance is running; stop it first:" >&2
+    pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
+for _port in 8023 8080; do
+    if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
+        echo "base-boot-guard.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
+        exit 2
+    fi
+done
 
 echo "== clean slate (no example deployed) =="
 for mount in AgentApp Cascade Chat ConsoleExt Inventory MerryApp MyApp Reload SignalApp WebAuthn WWW; do
@@ -50,12 +60,12 @@ done
 rm -f state/snapshot state/snapshot.old state/swap "$BOOT_LOG"
 rm -rf src/usr/System/log src/usr/Merry/log src/usr/Merry/tmp
 
-CONFIG=state/run-example.dgd
 sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
 
 echo "== boot (no example; timed window) =="
 "$DGD_BIN" "$CONFIG" > "$BOOT_LOG" 2>&1 &
 PID=$!
+trap 'kill "$PID" 2>/dev/null || true; pkill -9 -f "dgd .*$CONFIG" 2>/dev/null || true' EXIT INT TERM
 sleep 6
 if ! kill -0 "$PID" 2>/dev/null; then
     echo "base-boot-guard.sh: driver exited during the boot window; log:" >&2

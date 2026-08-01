@@ -113,12 +113,31 @@ fi
 
 # A leftover DGD instance holds the telnet/binary ports; the new boot
 # then dies on "bind: Address already in use" and the failure surfaces
-# confusingly as "result log not written". Fail fast with the cause.
-if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
-    echo "run-example.sh: a dgd instance is already running (it holds the ports); stop it first:" >&2
-    pgrep -fl 'dgd .*\.dgd' >&2
+# confusingly as "result log not written". Fail fast with the cause,
+# scoped so only this script's own leftovers block the run: first a
+# leftover booted from this script's generated config, then a port
+# probe for anything else holding the default ports.
+if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
+    echo "run-example.sh: a leftover run-example dgd instance is running; stop it first:" >&2
+    pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
+if command -v python3 >/dev/null 2>&1; then
+    for _port in 8023 8080; do
+        if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
+            echo "run-example.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
+            exit 2
+        fi
+    done
+fi
+
+# Backstop for interrupted runs: a boot killed with the script keeps the
+# generated-config path in its command line, so the sweep is scoped to
+# this script's own instances.
+cleanup() {
+    pkill -9 -f "dgd .*$CONFIG" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 echo "== clean slate =="
 # Remove EVERY example deploy mount, not just this run's. A leftover mount

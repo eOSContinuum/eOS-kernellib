@@ -59,11 +59,23 @@ if [ -z "$VERBSETS" ]; then
     DEPLOY=${DEPLOY:-"vault-app:MyApp upgrade-cascade:Cascade console-ext-app:ConsoleExt"}
 fi
 
-if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
-    echo "drive-verbs-smoke.sh: a dgd instance is already running (it holds the ports); stop it first:" >&2
-    pgrep -fl 'dgd .*\.dgd' >&2
+# Generated config path, named for this script: it keys the leftover
+# guard and the cleanup sweep, so only this script's own instances are
+# matched -- an unrelated dgd never blocks the run and can never be
+# killed by it. A port probe then catches anything else holding the
+# default ports, with a clearer message than the eventual bind failure.
+CONFIG=state/drive-verbs-smoke.dgd
+if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
+    echo "drive-verbs-smoke.sh: a leftover drive-verbs-smoke dgd instance is running; stop it first:" >&2
+    pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
+for _port in 8023 8080; do
+    if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
+        echo "drive-verbs-smoke.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
+        exit 2
+    fi
+done
 
 echo "== clean slate (base boot) =="
 # A single coherent base boot: no leftover example deploy mount may run,
@@ -89,8 +101,8 @@ for dep in ${DEPLOY:-}; do
     cp -R "examples/$ex" "src/usr/$mount"
 done
 
-# example.dgd ships a placeholder base directory; localize it under state/.
-CONFIG=state/run-example.dgd
+# example.dgd ships a placeholder base directory; localize it under
+# state/ at the config path the guard above is scoped to.
 sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
 
 # Optional: load the lpc-ext crypto module (same knob as https-smoke.sh),
@@ -108,7 +120,12 @@ fi
 echo "== boot =="
 "$DGD_BIN" "$CONFIG" > state/drive-verbs-boot.log 2>&1 &
 DGDPID=$!
-trap 'kill "$DGDPID" 2>/dev/null || true' EXIT INT TERM
+cleanup() {
+    kill "$DGDPID" 2>/dev/null || true
+    sleep 1
+    pkill -9 -f "dgd .*$CONFIG" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 # Wait for the telnet console to accept connections.
 i=0

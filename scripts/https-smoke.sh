@@ -59,17 +59,29 @@ HOST=127.0.0.1
 HTTPS_PORT=8443
 TLS_DATA_DIR=src/usr/System/data/tls
 
-if pgrep -f 'dgd .*\.dgd' >/dev/null 2>&1; then
-    echo "https-smoke.sh: a dgd instance is already running (it holds the ports); stop it first:" >&2
-    pgrep -fl 'dgd .*\.dgd' >&2
+# Generated config path, named for this script: it keys the leftover
+# guard and the cleanup sweep, so only this script's own instances are
+# matched. A port probe then catches anything else holding the ports.
+CONFIG=state/https-smoke.dgd
+if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
+    echo "https-smoke.sh: a leftover https-smoke dgd instance is running; stop it first:" >&2
+    pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
+for _port in 8023 8080 "$HTTPS_PORT"; do
+    if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
+        echo "https-smoke.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
+        exit 2
+    fi
+done
 
 DGDPID=""
 SCLIENT_PID=""
 cleanup() {
     kill "$SCLIENT_PID" 2>/dev/null || true
     kill "$DGDPID" 2>/dev/null || true
+    sleep 1
+    pkill -9 -f "dgd .*$CONFIG" 2>/dev/null || true
     rm -rf "$TLS_DATA_DIR"
 }
 
@@ -87,7 +99,6 @@ cp -R examples/https-app src/usr/WWW
 # Localize example.dgd under state/: point directory at this checkout,
 # add a second binary port for TLS, and load the crypto module (the
 # optional-module hook -- the checked-in example.dgd stays module-less).
-CONFIG=state/https-smoke.dgd
 sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
     -e "s|^binary_port[	 ]*=.*|binary_port	= ([ \"*\" : 8080, \"*\" : $HTTPS_PORT ]);|" \
     example.dgd > "$CONFIG"
