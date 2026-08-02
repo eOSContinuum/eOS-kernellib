@@ -281,7 +281,7 @@ run_step 9  1 "run-example webauthn-app (ceremonies)" \
 run_step 10 0 "run-example composite-app (module-less)" \
     env DGD_BIN="$DGD_BIN" scripts/run-example.sh composite-app
 run_step 11 1 "run-example composite-app (full set)" \
-    env DGD_BIN="$DGD_BIN" LPC_EXT_CRYPTO="${LPC_EXT_CRYPTO:-}" EXPECTED_OK=51 \
+    env DGD_BIN="$DGD_BIN" LPC_EXT_CRYPTO="${LPC_EXT_CRYPTO:-}" EXPECTED_OK=52 \
     scripts/run-example.sh composite-app
 run_step 12 1 "run-example agent-app" \
     env DGD_BIN="$DGD_BIN" LPC_EXT_CRYPTO="${LPC_EXT_CRYPTO:-}" \
