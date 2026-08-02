@@ -89,6 +89,33 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/operations.md` Monitoring signals; `examples/http-app/` for the worked route.
 
+## Poll the health vector without an HTTP route
+
+**Goal**: a monitoring system reads the capacity counts over the console, for a deployment with no HTTP application to carry a status route -- the HTTP route's five fields in the same vocabulary, plus `swap-rate5`, which only the console path carries.
+
+1. Provision the monitoring credential once: `grant monitor access` from the admin console, with no directory grants, and walk its first login deliberately -- the set-a-password window is first-come (`docs/security-posture.md` Credential lifecycle). `docs/operations.md` (Monitoring signals, The monitoring credential) carries the credential's verified surface and its one standing caveat: `halt` has no access gate, so this credential is never read-only in blast radius.
+2. Write a verbset for the harness's telnet client (`scripts/drive-verbs.py`; block format in `scripts/README.md`): file-level `user:`/`password:` directives for the credential, then one `code` block emitting the same `key=used/cap` vocabulary the HTTP route uses, with an `expect:` per field:
+
+```text
+user: monitor
+password: <the credential>
+
+cmd: code (a = status()), "objects=" + a[ST_NOBJECTS] + "/" + a[ST_OTABSIZE] + "\ncallouts=" + (a[ST_NCOSHORT] + a[ST_NCOLONG]) + "/" + a[ST_COTABSIZE] + "\nswap-sectors=" + a[ST_SWAPUSED] + "/" + a[ST_SWAPSIZE] + "\nusers=" + a[ST_NUSERS] + "/" + a[ST_UTABSIZE] + "\nuptime=" + a[ST_UPTIME] + "\nswap-rate5=" + a[ST_SWAPRATE5]
+expect: objects=\d+/\d+
+expect: callouts=\d+/\d+
+expect: swap-sectors=\d+/\d+
+expect: users=\d+/\d+
+expect: uptime=\d+
+expect: swap-rate5=\d+
+```
+
+3. The collector runs `python3 scripts/drive-verbs.py <verbset> --port <telnet_port> --transcript <file>` on its polling interval: a nonzero exit is the alert for unreachable, failed login, or a missing field, and the transcript's `$N = "..."` result line carries all six fields in one string (the console prints the LPC string with its newlines escaped, so the collector regexes each `key=` pair out of the one line rather than splitting on real newlines).
+4. Map the fields to the threshold table (`docs/operations.md` Monitoring signals): `swap-sectors` earliest (warn 50%, page 70% -- the fatal ceiling), `objects`, `callouts`, and `users` at warn 70% / page 85%, `uptime` pages on any decrease, and `swap-rate5` is the five-minute swap-activity row (warn when nonzero on two consecutive polls, page when still nonzero fifteen minutes later). The one row no field carries -- health-route response time -- is the probe's own latency measurement.
+
+**Verify**: against a booted platform the invocation exits 0 with every `expect:` line PASS; stop the platform and rerun -- nonzero exit is the unreachable alert firing.
+
+**Owning doc**: `docs/operations.md` Monitoring signals (the thresholds and the monitoring credential); `scripts/README.md` for the verbset format and client.
+
 ## Make an outbound HTTP request
 
 **Goal**: your code calls another service over HTTP or HTTPS.
