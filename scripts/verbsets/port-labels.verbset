@@ -17,15 +17,16 @@ expect: "admin"
 expect: "http"
 
 # "admin" resolves to the configured telnet port and the System telnet manager
+# (the port number follows the boot's config -- the harness's SMOKE_TELNET_PORT
+# by default -- so the assertion is structural: label, a numeric port, manager)
 cmd: code "/usr/System/sys/portd"->query_label("admin")
-expect: "telnet"
-expect: 8023
+expect: "telnet", 0, \d+,
 expect: /usr/System/sys/userd
 
 # "http" resolves to the configured binary port and the HTTP bootstrap
+# (same structural shape: the number is the boot config's binary port)
 cmd: code "/usr/System/sys/portd"->query_label("http")
-expect: "binary"
-expect: 8080
+expect: "binary", 0, \d+,
 expect: /usr/System/sys/http_server
 
 # an unknown label answers nil, not an error

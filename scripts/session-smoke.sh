@@ -45,6 +45,12 @@ fi
 
 HOST=127.0.0.1
 
+# Dedicated smoke-tier ports so this harness coexists with a live
+# default-port instance on the same machine (scripts/README.md Port
+# allocation on a shared machine).
+: "${SMOKE_TELNET_PORT:=48023}"
+: "${SMOKE_BINARY_PORT:=48080}"
+
 # Generated config path, named for this script: it keys the leftover
 # guard and the cleanup sweep, so only this script's own instances are
 # matched. A port probe then catches anything else holding the ports.
@@ -54,7 +60,7 @@ if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
     pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
-for _port in 8023 8080; do
+for _port in "$SMOKE_TELNET_PORT" "$SMOKE_BINARY_PORT"; do
     if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
         echo "session-smoke.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
         exit 2
@@ -76,7 +82,14 @@ rm -f state/snapshot state/snapshot.old state/swap state/session-smoke-boot.log
 rm -f src/kernel/data/access.data
 rm -rf src/usr/System/log src/usr/Merry/log src/usr/Merry/tmp
 
-sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
+sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
+    -e "s|:[[:space:]]*8023[[:space:]]*\]|: $SMOKE_TELNET_PORT ]|" \
+    -e "s|^binary_port[[:space:]]*=[[:space:]]*8080|binary_port	= $SMOKE_BINARY_PORT|" \
+    example.dgd > "$CONFIG"
+if ! grep -q "$SMOKE_TELNET_PORT" "$CONFIG" || ! grep -q "binary_port.*$SMOKE_BINARY_PORT" "$CONFIG"; then
+    echo "session-smoke.sh: port rewrite did not land in $CONFIG (sed pattern miss?)" >&2
+    exit 2
+fi
 printf 'modules\t\t= ([ "%s" : "" ]);\n' "$LPC_EXT_CRYPTO" >> "$CONFIG"
 
 echo "== boot (crypto module loaded) =="
@@ -85,7 +98,7 @@ DGDPID=$!
 trap cleanup EXIT INT TERM
 
 i=0
-while ! python3 -c "import socket; socket.create_connection(('$HOST', 8023), 1).close()" 2>/dev/null; do
+while ! python3 -c "import socket; socket.create_connection(('$HOST', $SMOKE_TELNET_PORT), 1).close()" 2>/dev/null; do
     if ! kill -0 "$DGDPID" 2>/dev/null; then
         echo "session-smoke.sh: driver exited during boot; log:" >&2
         tail -20 state/session-smoke-boot.log >&2
@@ -108,10 +121,10 @@ drive() {
     printf '%s\n' "$1" > state/session-smoke.verbset
     if [ -n "${2:-}" ]; then
         python3 scripts/drive-verbs.py state/session-smoke.verbset \
-            --host "$HOST" --port 8023 --transcript "$2"
+            --host "$HOST" --port "$SMOKE_TELNET_PORT" --transcript "$2"
     else
         python3 scripts/drive-verbs.py state/session-smoke.verbset \
-            --host "$HOST" --port 8023
+            --host "$HOST" --port "$SMOKE_TELNET_PORT"
     fi
 }
 
@@ -364,7 +377,7 @@ cmd: code "/usr/System/sys/authd"->query_subject_sessions("%{admintok}", "$PRINC
 expect: Error: capability denied: principal identity:%{adminuuid} lacks session.admin
 VERBSET
 if python3 scripts/drive-verbs.py state/session-admin.verbset \
-        --host "$HOST" --port 8023; then
+        --host "$HOST" --port "$SMOKE_TELNET_PORT"; then
     echo "PASS: capability-gated session administration end to end"
 else
     echo "FAIL: session-administration phase failed" >&2
