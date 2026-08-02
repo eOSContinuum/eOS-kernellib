@@ -4,13 +4,15 @@ Thanks for your interest in eOS-kernellib. This document covers the conventions 
 
 ## Before you start
 
-- Read [README.md](README.md) for the project's framing and what the runtime platform provides.
-- Build and boot the platform per [docs/getting-started.md](docs/getting-started.md) before proposing code changes -- the Testing section's regression sweep assumes a built DGD and a bootable checkout, and the sweep's Prerequisites block in [scripts/README.md](scripts/README.md) lists the optional pieces worth installing early.
-- If LPC is new to you, read [docs/lpc-essentials.md](docs/lpc-essentials.md) first -- it exists to give you enough LPC literacy to read platform code, and the kernel source assumes it.
-- Read [docs/architecture.md](docs/architecture.md) for the architectural model: capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions. Its section The boot, in source order is the guided first read of the kernel source itself.
-- Skim [docs/source-map.md](docs/source-map.md) to find your way around the source tree: what lives in each directory, and which document owns each subsystem.
-- Read [docs/where-code-belongs.md](docs/where-code-belongs.md) for placement doctrine: which tier and which shape (library, daemon, cloneable, utility) new code takes, and the authority choke-point behind those choices.
-- Read [docs/runtime-primitives.md](docs/runtime-primitives.md) for the eight runtime primitives, each with foundation, demonstration status, supporting extensions, and open work.
+The reads below are tagged by change class so a small contribution does not pay the full list: **all changes** applies to everyone (trivial work -- typos, small documentation fixes -- can stop there and open a PR directly, per How to propose a change below); **code changes** adds what any patch to the tree needs; **kernel-tier and daemon changes** adds the architectural depth that tier-B/C work and new daemons assume.
+
+- **All changes**: read [README.md](README.md) for the project's framing and what the runtime platform provides.
+- **Code changes**: build and boot the platform per [docs/getting-started.md](docs/getting-started.md) before proposing them -- the Testing section's regression sweep assumes a built DGD and a bootable checkout, and the sweep's Prerequisites block in [scripts/README.md](scripts/README.md) lists the optional pieces worth installing early.
+- **Code changes**: if LPC is new to you, read [docs/lpc-essentials.md](docs/lpc-essentials.md) first -- it exists to give you enough LPC literacy to read platform code, and the kernel source assumes it.
+- **Kernel-tier and daemon changes**: read [docs/architecture.md](docs/architecture.md) for the architectural model: capability tiers, daemons, boot sequence, auto-inheritance, host-driver extensions. Its section The boot, in source order is the guided first read of the kernel source itself.
+- **Code changes**: skim [docs/source-map.md](docs/source-map.md) to find your way around the source tree: what lives in each directory, which document owns each subsystem, and which sweep steps regression-test it.
+- **Kernel-tier and daemon changes**: read [docs/where-code-belongs.md](docs/where-code-belongs.md) for placement doctrine: which tier and which shape (library, daemon, cloneable, utility) new code takes, and the authority choke-point behind those choices.
+- **Kernel-tier and daemon changes**: read [docs/runtime-primitives.md](docs/runtime-primitives.md) for the eight runtime primitives, each with foundation, demonstration status, supporting extensions, and open work.
 - For changes that touch the DGD driver itself, contributions belong upstream at [`dworkin/dgd`](https://github.com/dworkin/dgd). eOS-kernellib builds on DGD without modifying its source.
 - For changes that touch the upstream kernellib lineage, the relationships are: [`dworkin/cloud-server`](https://github.com/dworkin/cloud-server) is the immediate upstream; [`ChatTheatre/kernellib`](https://github.com/ChatTheatre/kernellib) is the public-domain ancestor; both remain valid contribution targets for changes appropriate to their scope.
 
