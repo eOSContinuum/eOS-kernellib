@@ -38,6 +38,18 @@
  * from examples/http-app/obj/server.c -- see that file and
  * docs/http-applications.md for the platform contracts (library-form
  * inheritance, the receiveRequest override rule, expectEntity).
+ *
+ * query_peer_address() extends the handler contract opt-in, without
+ * changing handle()'s signature: during dispatch, previous_object() in
+ * the handler IS this clone, so a handler that cares about the
+ * requesting connection's address (per-source rate limiting, audit
+ * keying) asks the clone directly. It is a public, unguarded read of
+ * policy-neutral data about the caller's own connection -- the caller
+ * is by construction the handler this same request is being relayed
+ * to, so there is nothing here a sys-tier guard would protect that the
+ * handler does not already have (the request itself). See
+ * docs/composite-applications.md and docs/http-applications.md for the
+ * documented contract and the statedump-retention note.
  */
 
 # include <kernel/user.h>
@@ -195,6 +207,15 @@ private string drainBody(StringBuffer buf)
 	}
     }
     return acc;
+}
+
+/*
+ * the requesting connection's peer address (ip_number(), inherited
+ * from /usr/System/lib/user), or nil if no connection is live
+ */
+string query_peer_address()
+{
+    return ip_number();
 }
 
 /*

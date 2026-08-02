@@ -81,6 +81,15 @@ path is:
    persist orthogonally and survive restore -- the example's boot-2
    phases prove all three over the wire.
 
+During step 2, `previous_object()` in the handler is the dispatching
+clone itself, and the handler asks it directly for the requesting
+connection's peer address: `query_peer_address()`, opt-in and
+unguarded, stated in full at its reference home, `docs/http-applications.md`
+The routed-handler contract. The example rides this on an existing
+wire request (`Inventory/sys/handler.c` records it at the top of
+`handle()`; `Inventory/sys/test.c`'s PEER-ADDRESS phase asserts the
+loopback value) rather than adding a dedicated route for it.
+
 Policy lives with the state, not the transport: inventoryd decides who
 may update an item (application-tier authorization, against the item's
 recorded creator) and whether a wipe is allowed (the platform
@@ -294,7 +303,7 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 52 sentinels with the
+multi-deploy profile form) and runs the driver: 53 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
 with examples/webauthn-app, the agent lifecycle -- mint, own-agents
 list, token ceremony, the ownership and delegability refusals, suspend
@@ -305,7 +314,10 @@ subscribed observer with exact data, the resume's event paired with
 its wire response, a refused mutation delivering nothing -- and the
 recovery ceremony: self-provisioned codes, the bad-code and
 wrong-purpose and never-bare-re-bind refusals, atomic recover onto the
-same identity, login with the recovered passkey), 5 in the
+same identity, login with the recovered passkey -- and the
+routed-handler peer-address query: the Inventory handler observes the
+requesting connection's address via the WWW server clone's
+`query_peer_address()` during a wire request's `handle()` call), 5 in the
 transport-only subset without it. Boot 2 restores the snapshot and re-drives the wire: items, a
 pre-restore session token, and the observer binding all survive. The
 sentinel comment block in `Inventory/sys/test.c` is the
