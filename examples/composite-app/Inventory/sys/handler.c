@@ -72,6 +72,16 @@
  * test driver plant the fixed challenge a foreign-generated ceremony
  * vector embeds. It is gated to callers from this domain and would not
  * exist in a production handler.
+ *
+ * Every handle() call records the requesting connection's peer address
+ * (previous_object() during dispatch is the WWW server clone;
+ * query_peer_address() is its opt-in query -- see
+ * examples/composite-app/WWW/obj/server.c) for the duration of that
+ * request. query_last_peer_address() is a same-domain test seam
+ * exposing the most recent value so the driver can assert a routed
+ * handler actually observed it; a production handler with a real use
+ * (per-source rate limiting, audit keying) would read it inline in the
+ * route it needs it for instead of caching it on the handler object.
  */
 
 # include <kernel/kernel.h>
@@ -89,6 +99,8 @@ private inherit base64 "/lib/util/base64";
 # define STREAM_SENTINEL	({ 200, "OK", "text/event-stream", nil })
 
 private mapping pendingChallenges;	/* challenge : purpose */
+private string lastPeerAddress;	/* most recent handle() caller's
+					   peer address (test seam) */
 
 static void create()
 {
@@ -135,6 +147,19 @@ void arm_challenge(string challenge, varargs string purpose)
 	error("Access denied");
     }
     pendingChallenges[challenge] = purpose ? purpose : "webauthn";
+}
+
+/*
+ * test seam: the peer address handle() observed on its most recent
+ * call, or nil if none has been recorded yet. Same-domain callers
+ * only; not a production surface.
+ */
+string query_last_peer_address()
+{
+    if (sscanf(previous_program(), "/usr/Inventory/%*s") == 0) {
+	error("Access denied");
+    }
+    return lastPeerAddress;
 }
 
 /*
@@ -661,6 +686,12 @@ mixed *handle(string method, string path, string body, string authorization)
 {
     string subject, uuid, streamToken, credentialId;
     int id, heartbeat;
+
+    /* previous_object() during dispatch is the WWW server clone that
+     * relayed this request; record its peer address for the test seam
+     * above (a production handler with a real use would read this
+     * inline instead of caching it) */
+    lastPeerAddress = previous_object()->query_peer_address();
 
     /* the anonymous surfaces */
     if (method == "GET" && path == "/inventory/health") {

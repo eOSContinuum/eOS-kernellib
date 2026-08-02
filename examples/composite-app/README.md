@@ -94,10 +94,10 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=52 scripts/run-example.sh composite-app
+    EXPECTED_OK=53 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the fifty-one wire-level phases -- the agent lifecycle
+Boot 1 runs the fifty-two wire-level phases -- the agent lifecycle
 (mint, own-agents list, token ceremony, the standing refusal on an
 agent session, the not-own and not-delegable refusals,
 suspend-revokes-sessions, resume-restores-authentication), the
@@ -114,7 +114,9 @@ never-bare-re-bind refusals, atomic recover, login with the recovered
 passkey), and passkey self-service (list, unknown-id refusal,
 revocation of the original passkey, the last-passkey guard, and
 enrollment: the wrong-purpose and agent-session refusals, the bind,
-the list showing both) -- and
+the list showing both), and the routed-handler peer-address query
+(the Inventory handler observes the requesting connection's address
+via the WWW server clone's `query_peer_address()`) -- and
 dumps a snapshot; boot 2
 restores it and proves items, a pre-restore session token, and the
 observer binding all survived (the sentinel comment block in

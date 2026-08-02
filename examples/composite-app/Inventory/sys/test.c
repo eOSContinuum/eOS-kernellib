@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (52 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (53 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -126,6 +126,12 @@
  *                                observes the terminal chunked-transfer
  *                                frame, a clean close, not a dead
  *                                connection
+ *   PEER-ADDRESS OK              the Inventory handler observed the
+ *                                requesting connection's peer address
+ *                                during a wire request's handle() call
+ *                                (previous_object()->query_peer_address()
+ *                                on the WWW server clone): loopback,
+ *                                "127.0.0.1"
  *   PERSIST SETUP OK             restore probe armed, snapshot dumped
  *
  * Boot 2 (restore): the call_out armed before the dump fires and
@@ -141,7 +147,7 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=52 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=53 for the full set.
  */
 
 # include <type.h>
@@ -215,11 +221,12 @@ private inherit hex "/lib/util/hex";
 # define P_STREAM_DRAIN_OPEN	51
 # define P_STREAM_DRAIN_REVOKE	52
 # define P_STREAM_DRAIN_TRIGGER	53
+# define P_PEER_ADDR		54
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	54
-# define P_PERSIST_SESSION	55
-# define P_PERSIST_OBSERVER	56
-# define P_PERSIST_HTTP		57	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	55
+# define P_PERSIST_SESSION	56
+# define P_PERSIST_OBSERVER	57
+# define P_PERSIST_HTTP		58	/* no-crypto restore probe */
 
 # define STREAM_DEADLINE	8	/* seconds an awaited event may take */
 # define SILENCE_WINDOW		2	/* seconds a refused mutation gets
@@ -257,6 +264,7 @@ private void arm_deadline();
 private void drop_streams();
 private void judge_suspend_events();
 private void finish_evt_resume();
+private void judge_peer_address();
 
 
 static void create()
@@ -690,6 +698,13 @@ static void start_phase()
 	 * session dead and drives end_stream on drainStream's connection */
 	http("POST", "/auth/agents", bearer(token1), nil);
 	arm_deadline();
+	break;
+
+    case P_PEER_ADDR:
+	/* no wire call: the drain-trigger mint just above already
+	 * exercised the loopback connection through the handler; judge
+	 * what it observed */
+	judge_peer_address();
 	break;
 
     case P_PERSIST_ITEMS:
@@ -1438,7 +1453,7 @@ void stream_end()
 	pass("STREAM-DRAIN-TEARDOWN");
 	destruct_object(drainStream);
 	drainStream = nil;
-	persist_setup();
+	advance();
 	break;
     }
 }
@@ -1519,6 +1534,25 @@ private void finish_evt_resume()
 	pass("EVENT-RESUMED-DELIVERED");
 	advance();
     }
+}
+
+/*
+ * P_RV_REBIND's request, just completed, drove its handle() call
+ * through the WWW server clone over the real loopback TCP connection;
+ * judge what the handler recorded via query_peer_address()
+ */
+private void judge_peer_address()
+{
+    string address;
+
+    address = HANDLER->query_last_peer_address();
+    if (address != "127.0.0.1") {
+	stop("PEER-ADDRESS: expected 127.0.0.1, got " +
+	     (address ? address : "nil"));
+	return;
+    }
+    pass("PEER-ADDRESS");
+    persist_setup();
 }
 
 /*

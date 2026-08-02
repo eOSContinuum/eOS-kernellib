@@ -15,6 +15,11 @@
  * session against the same deployed example is a deploy away. TLS
  * setup, clone self-wiring, and the binary-manager glue are replicated
  * from examples/https-app/obj/tls_server.c.
+ *
+ * query_peer_address() extends the handler contract opt-in, without
+ * changing handle()'s signature -- see obj/server.c for the rationale
+ * (public, unguarded read of policy-neutral data about the caller's
+ * own connection); identical here.
  */
 
 # include <kernel/user.h>
@@ -172,6 +177,15 @@ private string drainBody(StringBuffer buf)
 	}
     }
     return acc;
+}
+
+/*
+ * the requesting connection's peer address (ip_number(), inherited
+ * from /usr/System/lib/user), or nil if no connection is live
+ */
+string query_peer_address()
+{
+    return ip_number();
 }
 
 /*

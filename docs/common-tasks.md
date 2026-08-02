@@ -184,7 +184,7 @@ expect: swap-rate5=\d+
 3. Gate: parse the bearer token from the `Authorization` header and resolve it with `AUTHD->validate(token)` -- the subject string (`identity:<uuid>`), or nil to refuse with 401. Pass the subject, not the token, into your domain daemons.
 4. For an admin-only route, gate in the daemon at the capability choke-point -- `CAPABILITYD->is_allowed(<capability>, subject)`, the subject string being exactly what the store records as a principal -- and let the handler translate the refusal to 403 (the composite example's wipe route).
 
-**Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=52 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
+**Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=53 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
 
 **Owning doc**: `docs/composite-applications.md` Authenticating a wire request.
 
