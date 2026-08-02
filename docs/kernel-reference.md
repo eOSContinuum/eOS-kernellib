@@ -2,7 +2,7 @@
 
 The function-level kernel contract in one page: what the kernel layer changes about DGD's built-ins (the efun overrides), the per-object functions and hooks the platform calls on your objects, and the routers that send every other callable kind to its signature home.
 
-**Audience**: an LPC author needing the function-level kernel contract -- what the kernel layer changes about DGD's built-ins, and the per-object functions and hooks it calls. A contributor wanting the kernel library's conceptual model and its upstream origins will find that in [`kernel-heritage-model.md`](kernel-heritage-model.md); this page is signatures and routers only. For a flat name-to-home lookup across every callable kind, [`function-index.md`](function-index.md) is the generated alphabetical index.
+**Audience**: an LPC author needing the function-level kernel contract -- what the kernel layer changes about DGD's built-ins, and the per-object functions and hooks it calls. A contributor wanting the kernel library's conceptual model and its upstream origins will find that in [`kernel-heritage-model.md`](kernel-heritage-model.md); this page is signatures and routers only. For a flat name-to-home lookup across every callable kind, [`function-index.md`](function-index.md) is the generated alphabetical index and single lookup landing -- its preamble mirrors this page's Where signatures live router, generated from it.
 
 ## Where signatures live
 
