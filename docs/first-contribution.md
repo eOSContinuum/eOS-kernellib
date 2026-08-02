@@ -214,7 +214,7 @@ The pre-PR bar is the Full regression sweep ([scripts/README.md](../scripts/READ
 $ DGD_BIN=<dgd> scripts/full-sweep.sh 15 16 29
 ```
 
-Observed on this checkout: step 15's boot drives all ten default verbsets with dispatcher-verbs at 44/44; step 16's four console verbsets all report `DRIVE-VERBS PASS`; step 29 prints `function-index.md up to date` (the new calls are to an existing private helper, so the index owes nothing). One environment note from the shifted-port capture: `port-labels.verbset` asserts the canonical port numbers themselves, so it flags a config whose ports were moved -- on a stock checkout it passes. Your PR's verification section quotes these commands and their pass signals; nothing reruns them for you ([CONTRIBUTING.md](../CONTRIBUTING.md) Pull request flow).
+Observed on this checkout: step 15's boot drives all ten default verbsets with dispatcher-verbs at 44/44; step 16's four console verbsets all report `DRIVE-VERBS PASS`; step 29 prints `function-index.md up to date` (the new calls are to an existing private helper, so the index owes nothing). One environment note from the shifted-port capture: `port-labels.verbset` asserts the label-to-port wiring structurally (label, a numeric port, manager), so it passes whichever ports the boot's config chose. Your PR's verification section quotes these commands and their pass signals; CI reruns the module-less bar for you, and the module-bearing steps stay yours to evidence ([CONTRIBUTING.md](../CONTRIBUTING.md) Pull request flow).
 
 ## 9. Find the docs the change owes
 

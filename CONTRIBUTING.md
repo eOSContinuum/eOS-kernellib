@@ -144,12 +144,12 @@ Shell scripts under `examples/` follow POSIX conventions and target a portable i
 2. Create a branch named for the change shape: `feature/<short-name>`, `fix/<short-name>`, `docs/<short-name>`, or `refactor/<short-name>`.
 3. Commit per the conventions above.
 4. Open the PR against `main`. Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md) shape; fill in the linked issue, the change summary, and the verification steps.
-5. Know that no automated checks run on a PR today -- there is no CI workflow, so nothing reruns the regression sweep for you. The PR's verification section is the reproducible evidence a reviewer reruns locally: include the exact commands and pass signals from the Full regression sweep (`scripts/README.md`) that your change touches.
+5. The regression workflow (`.github/workflows/regression.yml`) runs on every PR: it builds the pinned DGD driver (cached by commit) and runs the module-less Full regression sweep bar, with the module-gated steps reporting their documented SKIPs (`scripts/README.md` Full regression sweep). What CI does not cover, the PR's verification section still carries as reproducible evidence: the module-bearing steps your change touches (crypto-module examples, the TLS and identity smokes), with the exact commands and pass signals for a reviewer to rerun locally.
 6. Maintainer review focuses on: does the change match an existing primitive or doc commitment; does it preserve capability-tier discipline; is the test evidence reproducible.
 
 ## Maintenance
 
-Facts an adopter or contributor prices, stated plainly: the project has a single primary maintainer today. Review of external contributions is best-effort, with no committed turnaround; nothing reruns the regression sweep automatically (Pull request flow above), so review leans on the PR's reproducible verification evidence. If maintenance pauses, the continuity posture mirrors what the platform states for its own driver dependency: the BSD-2-Clause-Patent license permits carrying a fork without negotiation, and the regression harness (`scripts/README.md`) defines what a fork must keep passing.
+Facts an adopter or contributor prices, stated plainly: the project has a single primary maintainer today. Review of external contributions is best-effort, with no committed turnaround; CI reruns the module-less regression bar on every PR (Pull request flow above), and review leans on the PR's reproducible verification evidence for the module-bearing remainder. If maintenance pauses, the continuity posture mirrors what the platform states for its own driver dependency: the BSD-2-Clause-Patent license permits carrying a fork without negotiation, and the regression harness (`scripts/README.md`) defines what a fork must keep passing.
 
 ## Code of Conduct
 

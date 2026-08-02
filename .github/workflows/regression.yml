@@ -1,0 +1,52 @@
+# The pre-PR bar, run on every pull request: build the pinned DGD driver
+# (cached by commit) and run the module-less full regression sweep --
+# module-gated steps report their documented SKIPs (scripts/README.md
+# Full regression sweep). The module-bearing steps remain the
+# contributor's local responsibility (CONTRIBUTING.md Testing).
+name: regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  full-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # The kernel layer requires preprocess_file(): DGD master at or
+      # after this commit (docs/building.md; same pin as the Dockerfile).
+      DGD_COMMIT: 975e927f7f2a65e1d26cdce616cdb2eb1e087bbd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The anchor-capture check (sweep step 30) diffs added headings
+          # against the base ref, so the full history is needed.
+          fetch-depth: 0
+
+      - name: Cache the pinned DGD build
+        id: dgd-cache
+        uses: actions/cache@v4
+        with:
+          path: dgd-build/bin/dgd
+          key: dgd-${{ env.DGD_COMMIT }}-${{ runner.os }}
+
+      - name: Build DGD at the pinned commit
+        if: steps.dgd-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends make gcc g++ bison
+          git init dgd-build
+          git -C dgd-build remote add origin https://github.com/dworkin/dgd.git
+          git -C dgd-build fetch --depth 1 origin "$DGD_COMMIT"
+          git -C dgd-build checkout FETCH_HEAD
+          make -C dgd-build/src install
+
+      - name: Run the module-less full sweep
+        # The anchor-capture step diffs against the PR's base; the CI
+        # checkout has no local branch names, so name the remote ref.
+        run: >
+          BASE_REF="origin/${{ github.base_ref || 'main' }}"
+          DGD_BIN="$PWD/dgd-build/bin/dgd"
+          scripts/full-sweep.sh
