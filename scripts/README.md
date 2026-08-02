@@ -4,6 +4,12 @@
 
 Ten scripts back the regression surface. The six shell scripts drive the platform through boot cycles and assert the result; they resolve `DGD_BIN` (env override, falling back to `dgd` on `PATH`) and refuse to start if a `dgd` instance already holds the ports. `drive-verbs.py` launches nothing — it is the telnet client the others use against an already-running instance; `measure-baseline.py` is the timing rig; the two `gen-*.py` vector generators write test fixtures and never launch the platform.
 
+Every script that boots an instance defaults to this harness's own port pair rather than `example.dgd`'s stock ports, so a smoke run coexists with a live default-port instance on the same machine: `SMOKE_TELNET_PORT` (default `48023`) and `SMOKE_BINARY_PORT` (default `48080`), with `SMOKE_HTTPS_PORT` (default `48443`) added by the scripts that open a second, TLS-labeled port. Override any of them to shift the smoke tier further still (`full-sweep.sh` exports all three to every step it runs). See "Port allocation on a shared machine" below for the full allocation picture. `demo-composite.sh` and the manual/tutorial doc flows are the exception: they stay on `example.dgd`'s stock 8023/8080/8443, since they are the teaching surface and (for the demo) a deliberately long-lived instance.
+
+## Port allocation on a shared machine
+
+`example.dgd`'s stock 8023 (telnet) / 8080 (binary) / 8443 (TLS) are the teaching surface and live-instance ports -- manual boots, tutorials, and the admin-console walkthroughs stay on them, and `demo-composite.sh` deliberately leaves a running instance on them too. This harness's smoke tier defaults instead to 48023 / 48080 / 48443, overridable via `SMOKE_TELNET_PORT` / `SMOKE_BINARY_PORT` / `SMOKE_HTTPS_PORT`, so a regression run does not collide with either surface. On a shared development machine, other long-lived tooling may reserve further pairs (e.g. successive `+10000` steps off the stock numbers); pick a smoke-tier override outside every pair already in use on the machine.
+
 ## run-example.sh
 
 ```sh

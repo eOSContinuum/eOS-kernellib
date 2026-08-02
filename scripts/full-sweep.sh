@@ -47,6 +47,17 @@ if [ -n "${LPC_EXT_CRYPTO:-}" ] && [ ! -f "$LPC_EXT_CRYPTO" ]; then
     exit 2
 fi
 
+# Dedicated smoke-tier ports so this harness coexists with a live
+# default-port instance on the same machine (scripts/README.md Port
+# allocation on a shared machine). Exported so every sub-script this
+# sweep invokes (run-example.sh, drive-verbs-smoke.sh, and so on) picks
+# up the same values even when they are the fallback defaults, not an
+# explicit override from the invoking shell.
+: "${SMOKE_TELNET_PORT:=48023}"
+: "${SMOKE_BINARY_PORT:=48080}"
+: "${SMOKE_HTTPS_PORT:=48443}"
+export SMOKE_TELNET_PORT SMOKE_BINARY_PORT SMOKE_HTTPS_PORT
+
 mkdir -p state
 
 # Step selection: no args = all steps; args = the numbered subset.
@@ -141,15 +152,22 @@ http_deploy_boot() {
     _example="$1"; _bootlog="$2"
     clean_slate
     cp -R "examples/$_example" src/usr/WWW || return 1
-    sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
+    sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
+        -e "s|:[[:space:]]*8023[[:space:]]*\]|: $SMOKE_TELNET_PORT ]|" \
+        -e "s|^binary_port[[:space:]]*=[[:space:]]*8080|binary_port	= $SMOKE_BINARY_PORT|" \
         example.dgd > state/full-sweep-http.dgd
+    if ! grep -q "$SMOKE_TELNET_PORT" state/full-sweep-http.dgd \
+            || ! grep -q "binary_port.*$SMOKE_BINARY_PORT" state/full-sweep-http.dgd; then
+        echo "full-sweep.sh: port rewrite did not land in state/full-sweep-http.dgd (sed pattern miss?)" >&2
+        return 1
+    fi
     "$DGD_BIN" state/full-sweep-http.dgd > "$_bootlog" 2>&1 &
     HTTP_PID=$!
     _i=0
     while [ "$_i" -lt 30 ]; do
         kill -0 "$HTTP_PID" 2>/dev/null || { HTTP_PID=""; return 1; }
         if curl -s -o /dev/null --connect-timeout 1 --max-time 2 \
-            "http://127.0.0.1:8080/"; then
+            "http://127.0.0.1:$SMOKE_BINARY_PORT/"; then
             return 0
         fi
         sleep 1
@@ -161,7 +179,7 @@ http_deploy_boot() {
 
 step25() {
     http_deploy_boot atomic-demo state/full-sweep-step25-boot.log || return 1
-    examples/atomic-demo/smoke.sh
+    examples/atomic-demo/smoke.sh "127.0.0.1:$SMOKE_BINARY_PORT"
     _rc=$?
     http_teardown
     return "$_rc"
@@ -169,7 +187,7 @@ step25() {
 
 step26() {
     http_deploy_boot hot-reload-demo state/full-sweep-step26-boot.log || return 1
-    examples/hot-reload-demo/smoke.sh
+    examples/hot-reload-demo/smoke.sh "127.0.0.1:$SMOKE_BINARY_PORT"
     _rc=$?
     http_teardown
     return "$_rc"
@@ -228,16 +246,16 @@ $_file
 step27() {
     http_deploy_boot http-app state/full-sweep-step27-boot.log || return 1
     _rc=0
-    _health=$(curl -sS --max-time 5 http://127.0.0.1:8080/health) || _rc=1
+    _health=$(curl -sS --max-time 5 "http://127.0.0.1:$SMOKE_BINARY_PORT/health") || _rc=1
     [ "$_health" = "ok" ] || { echo "GET /health: expected ok, got: $_health"; _rc=1; }
-    _status=$(curl -sS --max-time 5 http://127.0.0.1:8080/status) || _rc=1
+    _status=$(curl -sS --max-time 5 "http://127.0.0.1:$SMOKE_BINARY_PORT/status") || _rc=1
     case "$_status" in
         *objects=*/*callouts=*) echo "$_status" ;;
         *) echo "GET /status: missing count lines: $_status"; _rc=1 ;;
     esac
-    _echo=$(curl -sS --max-time 5 -d 'hello' http://127.0.0.1:8080/echo) || _rc=1
+    _echo=$(curl -sS --max-time 5 -d 'hello' "http://127.0.0.1:$SMOKE_BINARY_PORT/echo") || _rc=1
     [ "$_echo" = "hello" ] || { echo "POST /echo: expected hello, got: $_echo"; _rc=1; }
-    _notfound=$(curl -sS -i --max-time 5 http://127.0.0.1:8080/no-such-route) || _rc=1
+    _notfound=$(curl -sS -i --max-time 5 "http://127.0.0.1:$SMOKE_BINARY_PORT/no-such-route") || _rc=1
     case "$_notfound" in
         *"404 Not Found"*) ;;
         *) echo "GET /no-such-route: missing 404: $_notfound"; _rc=1 ;;

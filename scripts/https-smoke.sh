@@ -55,8 +55,15 @@ for tool in openssl python3; do
     fi
 done
 
+# Dedicated smoke-tier ports so this harness coexists with a live
+# default-port instance on the same machine (scripts/README.md Port
+# allocation on a shared machine).
+: "${SMOKE_TELNET_PORT:=48023}"
+: "${SMOKE_BINARY_PORT:=48080}"
+: "${SMOKE_HTTPS_PORT:=48443}"
+
 HOST=127.0.0.1
-HTTPS_PORT=8443
+HTTPS_PORT=$SMOKE_HTTPS_PORT
 TLS_DATA_DIR=src/usr/System/data/tls
 
 # Generated config path, named for this script: it keys the leftover
@@ -68,7 +75,7 @@ if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
     pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
-for _port in 8023 8080 "$HTTPS_PORT"; do
+for _port in "$SMOKE_TELNET_PORT" "$SMOKE_BINARY_PORT" "$HTTPS_PORT"; do
     if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
         echo "https-smoke.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
         exit 2
@@ -100,8 +107,13 @@ cp -R examples/https-app src/usr/WWW
 # add a second binary port for TLS, and load the crypto module (the
 # optional-module hook -- the checked-in example.dgd stays module-less).
 sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
-    -e "s|^binary_port[	 ]*=.*|binary_port	= ([ \"*\" : 8080, \"*\" : $HTTPS_PORT ]);|" \
+    -e "s|:[[:space:]]*8023[[:space:]]*\]|: $SMOKE_TELNET_PORT ]|" \
+    -e "s|^binary_port[	 ]*=.*|binary_port	= ([ \"*\" : $SMOKE_BINARY_PORT, \"*\" : $HTTPS_PORT ]);|" \
     example.dgd > "$CONFIG"
+if ! grep -q "$SMOKE_TELNET_PORT" "$CONFIG" || ! grep -q "binary_port.*$SMOKE_BINARY_PORT" "$CONFIG"; then
+    echo "https-smoke.sh: port rewrite did not land in $CONFIG (sed pattern miss?)" >&2
+    exit 2
+fi
 printf 'modules\t\t= ([ "%s" : "" ]);\n' "$LPC_EXT_CRYPTO" >> "$CONFIG"
 
 echo "== boot (no certificate yet) =="
@@ -140,7 +152,7 @@ tls_request() {
 # the live console.
 drive() {
     printf '%s\n' "$1" > state/https-smoke.verbset
-    python3 scripts/drive-verbs.py state/https-smoke.verbset --host "$HOST" --port 8023
+    python3 scripts/drive-verbs.py state/https-smoke.verbset --host "$HOST" --port "$SMOKE_TELNET_PORT"
 }
 
 echo "== phase 1: bootstrap stood down without a certificate =="

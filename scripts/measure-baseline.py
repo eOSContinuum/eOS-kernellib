@@ -108,10 +108,12 @@ The growth run also samples the driver process RSS (ps -o rss=) at the
 base image and each growth step, printed beside the snapshot-pause line:
 the resident-memory cost of the image the snapshot file sizes on disk.
 
-The ports default to example.dgd's 8023/8080 (8443 for --tls) and can
-be shifted -- MEASURE_TELNET_PORT, MEASURE_HTTP_PORT,
-MEASURE_HTTPS_PORT -- when another instance holds the defaults; the
-generated configs follow the shifted values.
+The ports default to this harness's smoke-tier values, 48023/48080
+(48443 for --tls) -- SMOKE_TELNET_PORT, SMOKE_BINARY_PORT,
+SMOKE_HTTPS_PORT if set, else the built-in defaults -- and can be
+shifted further still with MEASURE_TELNET_PORT, MEASURE_HTTP_PORT,
+MEASURE_HTTPS_PORT when even those are held; the generated configs
+follow the resolved values.
 
 Writes the report to stdout and the raw transcript beside the boot logs
 under state/. Run from the repository root, like the other scripts here.
@@ -135,9 +137,15 @@ import time
 import urllib.request
 
 HOST = "127.0.0.1"
-TELNET_PORT = int(os.environ.get("MEASURE_TELNET_PORT", "8023"))
-HTTP_PORT = int(os.environ.get("MEASURE_HTTP_PORT", "8080"))
-HTTPS_PORT = int(os.environ.get("MEASURE_HTTPS_PORT", "8443"))
+# The smoke-tier defaults (scripts/README.md Port allocation on a shared
+# machine) so this rig coexists with a live default-port instance; the
+# MEASURE_* variables override on top, same as before.
+_SMOKE_TELNET_DEFAULT = os.environ.get("SMOKE_TELNET_PORT", "48023")
+_SMOKE_BINARY_DEFAULT = os.environ.get("SMOKE_BINARY_PORT", "48080")
+_SMOKE_HTTPS_DEFAULT = os.environ.get("SMOKE_HTTPS_PORT", "48443")
+TELNET_PORT = int(os.environ.get("MEASURE_TELNET_PORT", _SMOKE_TELNET_DEFAULT))
+HTTP_PORT = int(os.environ.get("MEASURE_HTTP_PORT", _SMOKE_BINARY_DEFAULT))
+HTTPS_PORT = int(os.environ.get("MEASURE_HTTPS_PORT", _SMOKE_HTTPS_DEFAULT))
 TLS_DATA_DIR = "src/usr/System/data/tls"
 TLS_CERT = "/usr/System/data/tls/cert.pem"
 PARK = "/usr/admin/park"

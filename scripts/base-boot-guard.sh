@@ -37,6 +37,12 @@ MAX_LINES="${MAX_LINES:-400}"
 BOOT_LOG=state/base-boot-guard.log
 SYSLOG=src/usr/System/log/system.log
 
+# Dedicated smoke-tier ports so this harness coexists with a live
+# default-port instance on the same machine (scripts/README.md Port
+# allocation on a shared machine).
+: "${SMOKE_TELNET_PORT:=48023}"
+: "${SMOKE_BINARY_PORT:=48080}"
+
 # Generated config path, named for this script: it keys the leftover
 # guard and the cleanup sweep, so only this script's own instances are
 # matched. A port probe then catches anything else holding the ports.
@@ -46,7 +52,7 @@ if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
     pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
-for _port in 8023 8080; do
+for _port in "$SMOKE_TELNET_PORT" "$SMOKE_BINARY_PORT"; do
     if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
         echo "base-boot-guard.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
         exit 2
@@ -60,7 +66,14 @@ done
 rm -f state/snapshot state/snapshot.old state/swap "$BOOT_LOG"
 rm -rf src/usr/System/log src/usr/Merry/log src/usr/Merry/tmp
 
-sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
+sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
+    -e "s|:[[:space:]]*8023[[:space:]]*\]|: $SMOKE_TELNET_PORT ]|" \
+    -e "s|^binary_port[[:space:]]*=[[:space:]]*8080|binary_port	= $SMOKE_BINARY_PORT|" \
+    example.dgd > "$CONFIG"
+if ! grep -q "$SMOKE_TELNET_PORT" "$CONFIG" || ! grep -q "binary_port.*$SMOKE_BINARY_PORT" "$CONFIG"; then
+    echo "base-boot-guard.sh: port rewrite did not land in $CONFIG (sed pattern miss?)" >&2
+    exit 2
+fi
 
 echo "== boot (no example; timed window) =="
 "$DGD_BIN" "$CONFIG" > "$BOOT_LOG" 2>&1 &

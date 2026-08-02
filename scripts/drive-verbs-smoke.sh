@@ -45,8 +45,14 @@ if [ -z "$DGD_BIN" ] || [ ! -x "$DGD_BIN" ]; then
     exit 2
 fi
 
+# Dedicated smoke-tier ports so this harness coexists with a live
+# default-port instance on the same machine (scripts/README.md Port
+# allocation on a shared machine).
+: "${SMOKE_TELNET_PORT:=48023}"
+: "${SMOKE_BINARY_PORT:=48080}"
+
 HOST=127.0.0.1
-PORT=8023
+PORT=$SMOKE_TELNET_PORT
 
 VERBSETS=$*
 if [ -z "$VERBSETS" ]; then
@@ -70,7 +76,7 @@ if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
     pgrep -fl "dgd .*$CONFIG" >&2
     exit 2
 fi
-for _port in 8023 8080; do
+for _port in "$SMOKE_TELNET_PORT" "$SMOKE_BINARY_PORT"; do
     if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
         echo "drive-verbs-smoke.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
         exit 2
@@ -103,7 +109,14 @@ done
 
 # example.dgd ships a placeholder base directory; localize it under
 # state/ at the config path the guard above is scoped to.
-sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
+sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
+    -e "s|:[[:space:]]*8023[[:space:]]*\]|: $SMOKE_TELNET_PORT ]|" \
+    -e "s|^binary_port[[:space:]]*=[[:space:]]*8080|binary_port	= $SMOKE_BINARY_PORT|" \
+    example.dgd > "$CONFIG"
+if ! grep -q "$SMOKE_TELNET_PORT" "$CONFIG" || ! grep -q "binary_port.*$SMOKE_BINARY_PORT" "$CONFIG"; then
+    echo "drive-verbs-smoke.sh: port rewrite did not land in $CONFIG (sed pattern miss?)" >&2
+    exit 2
+fi
 
 # Optional: load the lpc-ext crypto module (same knob as https-smoke.sh),
 # for verbsets whose active paths need secure_random/SHA256 -- e.g.

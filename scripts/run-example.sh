@@ -92,13 +92,26 @@ if [ -z "$DGD_BIN" ] || [ ! -x "$DGD_BIN" ]; then
     exit 2
 fi
 
+# Dedicated smoke-tier ports so this harness coexists with a live
+# default-port instance on the same machine (scripts/README.md Port
+# allocation on a shared machine).
+: "${SMOKE_TELNET_PORT:=48023}"
+: "${SMOKE_BINARY_PORT:=48080}"
+
 LOG_PREFIX="state/run-$EXAMPLE-boot"
 
 # example.dgd ships with a placeholder base directory (getting-started
 # has you localize it by hand). Generate a localized copy under state/
 # so this script works unedited from any checkout location.
 CONFIG="state/run-example.dgd"
-sed "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" example.dgd > "$CONFIG"
+sed -e "s|^directory[	 ]*=.*|directory	= \"$REPO_ROOT/src\";|" \
+    -e "s|:[[:space:]]*8023[[:space:]]*\]|: $SMOKE_TELNET_PORT ]|" \
+    -e "s|^binary_port[[:space:]]*=[[:space:]]*8080|binary_port	= $SMOKE_BINARY_PORT|" \
+    example.dgd > "$CONFIG"
+if ! grep -q "$SMOKE_TELNET_PORT" "$CONFIG" || ! grep -q "binary_port.*$SMOKE_BINARY_PORT" "$CONFIG"; then
+    echo "run-example.sh: port rewrite did not land in $CONFIG (sed pattern miss?)" >&2
+    exit 2
+fi
 
 # Optional: load the lpc-ext crypto module (same knob as the smoke
 # scripts). webauthn-app's ceremony phases need it and skip without it;
@@ -123,7 +136,7 @@ if pgrep -f "dgd .*$CONFIG" >/dev/null 2>&1; then
     exit 2
 fi
 if command -v python3 >/dev/null 2>&1; then
-    for _port in 8023 8080; do
+    for _port in "$SMOKE_TELNET_PORT" "$SMOKE_BINARY_PORT"; do
         if python3 -c "import socket; socket.create_connection(('127.0.0.1', $_port), 0.5).close()" 2>/dev/null; then
             echo "run-example.sh: port $_port is already in use (another dgd or service holds it); free it first" >&2
             exit 2
@@ -164,6 +177,25 @@ case "$DEPLOY_NAME" in
         ;;
 esac
 RESULT_DOMAIN=${DEPLOY_NAME##*+}
+
+# Deployed copies of example-internal test clients hardcode the stock
+# binary port ('# define PORT	8080'); rewrite them in the DEPLOYED
+# artifact only (the canonical examples/ tree keeps the teaching
+# default) so the loopback probes hit this run's own instance rather
+# than whatever live service holds 8080. Backstop like the config
+# rewrite: a deployed define that still says 8080 fails the run.
+if [ "$SMOKE_BINARY_PORT" != "8080" ]; then
+    for clientsrc in src/usr/*/obj/*.c; do
+        [ -f "$clientsrc" ] || continue
+        if grep -q '^#[[:space:]]*define[[:space:]]*PORT[[:space:]]*8080' "$clientsrc"; then
+            sed "s|^#\([[:space:]]*\)define\([[:space:]]*\)PORT\([[:space:]]*\)8080|#\1define\2PORT\3$SMOKE_BINARY_PORT|" "$clientsrc" > "$clientsrc.tmp" && mv "$clientsrc.tmp" "$clientsrc"
+            if grep -q '^#[[:space:]]*define[[:space:]]*PORT[[:space:]]*8080' "$clientsrc"; then
+                echo "run-example.sh: PORT define rewrite did not land in $clientsrc" >&2
+                exit 2
+            fi
+        fi
+    done
+fi
 
 if [ "$BOOT1_MODE" = "selfexit" ]; then
     echo "== boot 1 (cold; driver dumps + self-exits) =="
