@@ -37,7 +37,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [lpc-essentials.md](lpc-essentials.md): LPC language orientation, bridging to the formal language reference at [dworkin/lpc-doc][lpc-doc]. Read this first if LPC is unfamiliar.
 - [kernel-reference.md](kernel-reference.md): the function-level kernel reference (efun overrides, per-object lfuns and hooks including `patch()`, and the signature routers).
-- [function-index.md](function-index.md): a generated alphabetical index of every platform-authored callable -- name, kind, and the document that carries its signature.
+- [function-index.md](function-index.md): the single lookup landing for every platform-authored callable, by name or by kind -- a generated alphabetical index (name, kind, the document that carries its signature) plus a kind-grouped listing.
 - [kernel-libraries.md](kernel-libraries.md): inheritable libraries under `src/lib/` (strings, persistent collections, large arrays, iteration, asynchronous control, time, utilities).
 - [where-code-belongs.md](where-code-belongs.md), placement doctrine: plain LPC at a capability tier versus a Merry script on a property, and for plain LPC which shape (library, daemon, cloneable, utility), with the authority choke-point and composition-seam disciplines behind the choices.
 - [common-tasks.md](common-tasks.md): task-shaped recipes for the recurring author jobs -- test driver, recurring work, live-state migration, access grants, operator verbs, extra ports -- each linking the doc that owns its mechanism.
@@ -93,7 +93,7 @@ Grouped by audience and goal. Each doc opens with its own `Audience:` callout na
 
 - [source-map.md](source-map.md): a map of the source tree and a fast index from each subsystem to the code that implements it and the doc that explains it. The navigation companion to `architecture.md`.
 - [glossary.md](glossary.md): definitions for terms used inline across the doc set (atomic, auto-inheritance, dataspace, statedump, hotboot, capability tier, mount point, principal, master, clone, LWO, and similar).
-- [kernel-reference.md](kernel-reference.md) carries the "Where signatures live" router: which doc holds the signature for each kind of callable (efun override, library class, property surface, daemon LFUN, merryfun, console verb).
+- [kernel-reference.md](kernel-reference.md) owns the "Where signatures live" router: which doc holds the signature for each kind of callable (efun override, library class, property surface, daemon LFUN, merryfun, console verb); [function-index.md](function-index.md) mirrors it as the generated lookup table.
 - [system-daemons.md](system-daemons.md): the System-daemon application surface -- per-function signatures, gating, and semantics for objectd, upgraded, errord, logd, capabilityd, identityd, webauthnd, sessiond, authd, and the Index daemon.
 - [references.md](references.md): citations for the orthogonal-persistence literature (Atkinson and Morrison 1995; KeyKOS / EROS), DGD mailing-list discussions (Allen 2000, Croes 2003, Croes 2010), and upstream documentation (DGD itself, lpc-doc, kernellib lineage).
 

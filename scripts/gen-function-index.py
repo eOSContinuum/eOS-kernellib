@@ -40,6 +40,73 @@ def read(name):
         return f.read().splitlines()
 
 
+def strip_markdown(text):
+    """Reduce inline markdown to prose: links keep their text, backtick
+    code spans and bold/italic markers are dropped."""
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = text.replace("`", "")
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"\*([^*]+)\*", r"\1", text)
+    return text
+
+
+def first_sentence(text, limit=90):
+    """The first sentence of collapsed prose, truncated on a word
+    boundary at ~limit chars with a trailing ellipsis."""
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+    m = re.search(r"[.!?](\s|$)", text)
+    sentence = text[:m.end()].strip() if m else text
+    if len(sentence) <= limit:
+        return sentence
+    truncated = sentence[:limit]
+    cut = truncated.rfind(" ")
+    if cut > 0:
+        truncated = truncated[:cut]
+    return truncated.rstrip(".,;:") + "..."
+
+
+def harvest_synopsis(lines, heading_idx):
+    """The first sentence of prose following the heading at heading_idx,
+    or "" if the next content is not plain prose. A leading fenced code
+    block (kernel-reference.md's signature blocks) is skipped past before
+    looking for prose; a table, list, heading, or further fence yields an
+    empty cell rather than a garbled fragment."""
+    i = heading_idx + 1
+    n = len(lines)
+
+    def skip_blank(i):
+        while i < n and lines[i].strip() == "":
+            i += 1
+        return i
+
+    i = skip_blank(i)
+    if i < n and lines[i].lstrip().startswith("```"):
+        i += 1
+        while i < n and not lines[i].lstrip().startswith("```"):
+            i += 1
+        i += 1
+        i = skip_blank(i)
+    if i >= n:
+        return ""
+    stripped = lines[i].lstrip()
+    if (stripped.startswith(("|", "#", "-", "*", ">"))
+            or re.match(r"^\d+\.", stripped)):
+        return ""
+    chunk = []
+    while i < n and lines[i].strip() != "":
+        ln = lines[i]
+        if ln.lstrip().startswith(("|", "```", "#")):
+            break
+        chunk.append(ln)
+        i += 1
+    text = strip_markdown(" ".join(chunk))
+    if not text or "|" in text:
+        return ""
+    return first_sentence(text)
+
+
 def names_from_signature(text):
     """Every callable name in a heading that may carry more than one
     signature, however they are joined -- system-daemons.md uses ' / ',
@@ -71,13 +138,15 @@ def in_fence_tracker():
 
 
 def collect():
-    entries = []  # (name, kind, docfile, anchor)
+    entries = []  # (name, kind, docfile, anchor, synopsis)
 
-    def add(name, kind, docfile, anchor):
-        entries.append((name, kind, docfile, anchor))
+    def add(name, kind, docfile, anchor, synopsis=""):
+        entries.append((name, kind, docfile, anchor, synopsis))
 
     # 1. kernel-reference.md: bare-name ### headings under the three
-    #    signature sections; the overview above them is skipped.
+    #    signature sections; the overview above them is skipped. Each
+    #    heading is its own signature block, so its first prose sentence
+    #    (past the fenced signature) is a usable per-name synopsis.
     lines = read("kernel-reference.md")
     inside = in_fence_tracker()
     kind_by_section = {
@@ -86,7 +155,7 @@ def collect():
         "Driver and user-daemon hooks": "driver/userd hook",
     }
     current = None
-    for ln in lines:
+    for idx, ln in enumerate(lines):
         fence = inside(ln)
         m2 = re.match(r"^## (.+)$", ln)
         if m2 and not fence:
@@ -97,12 +166,14 @@ def collect():
             m3 = re.match(r"^### `?([A-Za-z_][A-Za-z0-9_]*)`?\s*$", ln)
             if m3:
                 name = m3.group(1)
-                add(name, current, "kernel-reference.md", "#" + slug(name))
+                add(name, current, "kernel-reference.md", "#" + slug(name),
+                    harvest_synopsis(lines, idx))
 
     # 2. system-daemons.md: ### `<signature>` headings (may hold two).
+    #    Own heading per entry (or per pair), so harvest applies.
     lines = read("system-daemons.md")
     inside = in_fence_tracker()
-    for ln in lines:
+    for idx, ln in enumerate(lines):
         fence = inside(ln)
         if fence:
             continue
@@ -110,28 +181,34 @@ def collect():
         if m:
             heading = m.group(1)
             anchor = "#" + slug(ln[4:].strip())
+            synopsis = harvest_synopsis(lines, idx)
             for name in names_from_signature(heading):
-                add(name, "daemon API", "system-daemons.md", anchor)
+                add(name, "daemon API", "system-daemons.md", anchor,
+                    synopsis)
 
     # 3. dispatcher.md: ### `<signature>` headings (skip prose ###).
     lines = read("dispatcher.md")
     inside = in_fence_tracker()
-    for ln in lines:
+    for idx, ln in enumerate(lines):
         fence = inside(ln)
         if fence:
             continue
         m = re.match(r"^### (`.+`)\s*$", ln)
         if m and "(" in m.group(1):
             anchor = "#" + slug(ln[4:].strip())
+            synopsis = harvest_synopsis(lines, idx)
             for name in names_from_signature(m.group(1)):
-                add(name, "dispatcher LFUN", "dispatcher.md", anchor)
+                add(name, "dispatcher LFUN", "dispatcher.md", anchor,
+                    synopsis)
 
     # 4. kernel-libraries.md: ### `Class` / `/lib/...` module headings,
     #    plus the property-surface bullets under /lib/util/properties.c.
+    #    The bullets share the module's own heading/anchor rather than
+    #    having one of their own, so they get no per-name synopsis.
     lines = read("kernel-libraries.md")
     inside = in_fence_tracker()
     in_props = False
-    for ln in lines:
+    for idx, ln in enumerate(lines):
         fence = inside(ln)
         if fence:
             continue
@@ -140,10 +217,13 @@ def collect():
             label = m.group(1)
             anchor = "#" + slug(ln[4:].strip())
             in_props = label.endswith("properties.c")
+            synopsis = harvest_synopsis(lines, idx)
             if "/" in label or label.endswith(".c"):
-                add(label, "utility module", "kernel-libraries.md", anchor)
+                add(label, "utility module", "kernel-libraries.md", anchor,
+                    synopsis)
             else:
-                add(label, "library class", "kernel-libraries.md", anchor)
+                add(label, "library class", "kernel-libraries.md", anchor,
+                    synopsis)
             continue
         if in_props:
             b = re.match(r"^- `[^`]*?([A-Za-z_][A-Za-z0-9_]*)\s*\(", ln)
@@ -152,7 +232,8 @@ def collect():
                     "#" + slug("/lib/util/properties.c"))
 
     # 5. merry-language.md: merryfun table rows `| `Name` | `sig` | ... |`.
-    #    Section anchor only (no per-row anchor).
+    #    Section anchor only (no per-row anchor); every merryfun would
+    #    otherwise inherit the same section-level sentence, so no synopsis.
     lines = read("merry-language.md")
     inside = in_fence_tracker()
     merry_anchor = None
@@ -171,7 +252,7 @@ def collect():
     lines = read("http-applications.md")
     inside = in_fence_tracker()
     in_api = False
-    for ln in lines:
+    for idx, ln in enumerate(lines):
         fence = inside(ln)
         if fence:
             continue
@@ -181,14 +262,18 @@ def collect():
             continue
         if in_api and ln.startswith("### "):
             anchor = "#" + slug(ln[4:].strip())
+            synopsis = harvest_synopsis(lines, idx)
             # A heading may title several classes ("`HttpRequest` (...) and
             # `HttpResponse` (...)"). Take every backtick token that is a
             # bare class name, not a file path.
             for tok in re.findall(r"`([^`]+)`", ln):
                 if re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", tok):
-                    add(tok, "HTTP class", "http-applications.md", anchor)
+                    add(tok, "HTTP class", "http-applications.md", anchor,
+                        synopsis)
 
-    # 7. admin-console.md: verb-appendix table rows. Section anchor only.
+    # 7. admin-console.md: verb-appendix table rows. Section anchor only;
+    #    same section-sentence-for-every-verb reasoning as merryfuns, so
+    #    no synopsis.
     lines = read("admin-console.md")
     inside = in_fence_tracker()
     verb_anchor = None
@@ -206,15 +291,47 @@ def collect():
     return entries
 
 
-def render(entries):
+def parse_kind_router():
+    """Extract the "Where signatures live" markdown table from
+    kernel-reference.md verbatim, to mirror in the generated preamble.
+    Fails loudly if the section or its table is missing, so a renamed or
+    restructured router does not silently drop out of the mirror."""
+    lines = read("kernel-reference.md")
+    start = None
+    for i, ln in enumerate(lines):
+        if re.match(r"^## Where signatures live\s*$", ln):
+            start = i
+            break
+    if start is None:
+        sys.exit(
+            "gen-function-index.py: kernel-reference.md is missing the "
+            "'Where signatures live' section; cannot mirror it into "
+            "function-index.md")
+    i = start + 1
+    while i < len(lines) and not lines[i].lstrip().startswith("|"):
+        if re.match(r"^#{1,6} ", lines[i]):
+            break
+        i += 1
+    table = []
+    while i < len(lines) and lines[i].lstrip().startswith("|"):
+        table.append(lines[i])
+        i += 1
+    if not table:
+        sys.exit(
+            "gen-function-index.py: kernel-reference.md's 'Where "
+            "signatures live' section has no table to mirror")
+    return table
+
+
+def render(entries, kind_router_table):
     seen = set()
     rows = []
-    for name, kind, docfile, anchor in entries:
+    for name, kind, docfile, anchor, synopsis in entries:
         key = (name, kind, docfile)
         if key in seen:
             continue
         seen.add(key)
-        rows.append((name, kind, docfile, anchor))
+        rows.append((name, kind, docfile, anchor, synopsis))
     rows.sort(key=lambda r: (r[0].lower(), r[1]))
 
     out = []
@@ -244,18 +361,45 @@ def render(entries):
         "pages ([vault-applications.md](vault-applications.md), "
         "[schema.md](schema.md), [xml.md](xml.md)).")
     out.append("")
-    out.append("| Name | Kind | Signature home |")
-    out.append("|---|---|---|")
-    for name, kind, docfile, anchor in rows:
-        out.append("| `{}` | {} | [{}]({}{}) |".format(
-            name, kind, docfile, docfile, anchor))
+    out.append(
+        "The table below is mirrored by the generator from "
+        "`kernel-reference.md`'s Where signatures live router, so a query "
+        "shaped as \"what kind of callable is X\" can start here too, "
+        "before dropping to the flat name index -- kernel-reference.md "
+        "stays the owner; edit the router there, not the table below.")
     out.append("")
+    out.extend(kind_router_table)
+    out.append("")
+    out.append("| Name | Kind | Signature home | Synopsis |")
+    out.append("|---|---|---|---|")
+    for name, kind, docfile, anchor, synopsis in rows:
+        out.append("| `{}` | {} | [{}]({}{}) | {} |".format(
+            name, kind, docfile, docfile, anchor, synopsis))
+    out.append("")
+    out.append("## By kind")
+    out.append("")
+    out.append(
+        "The same names grouped by kind, for a \"what does the platform "
+        "give me for X kind\" browse; names only, no synopses -- see the "
+        "table above for those.")
+    out.append("")
+    kinds = sorted(set(r[1] for r in rows))
+    for kind in kinds:
+        names_in_kind = sorted({r[0] for r in rows if r[1] == kind},
+                                key=str.lower)
+        links = []
+        for name in names_in_kind:
+            docfile, anchor = next(
+                (r[2], r[3]) for r in rows if r[0] == name and r[1] == kind)
+            links.append("[`{}`]({}{})".format(name, docfile, anchor))
+        out.append("**{}:** {}".format(kind, ", ".join(links)))
+        out.append("")
     return "\n".join(out)
 
 
 def main():
     check = "--check" in sys.argv[1:]
-    content = render(collect())
+    content = render(collect(), parse_kind_router())
     if check:
         try:
             with open(INDEX, encoding="utf-8") as f:
