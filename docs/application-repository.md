@@ -63,6 +63,22 @@ CI is that runner, headless: build the driver at the pinned commit (seconds, cac
 
 Production deployment is the release ladder in `changing-a-running-system.md`; its step that brings "the domain's source to the release state (a git checkout or copy on the host)" is your repository landing through the same copy script. The reverse flow -- a platform update underneath your deployed application -- is a pin advance: your repository records the platform ref it last validated; to update, advance the pin in a rehearsal environment first (the restored-copy rehearsal, `changing-a-running-system.md`), re-run your CI runner against the new ref, then roll production up the same ladder.
 
+## Assembling a production application
+
+The tutorials and reference docs each teach one pattern in isolation. Standing up a real service means sequencing them: each step below depends on the ones before it, and each is one or two sentences plus the doc that owns its mechanics -- this list owns only the order.
+
+1. **Split the repository.** Give the service its own repository per The split above, with each `domains/<App>/` a byte-for-byte copy of what lands at `src/usr/<App>/` (A recommended layout above). Everything that follows assumes this posture, not a fork of the platform checkout.
+2. **Lay out the domain.** One directory per domain under `src/usr/<App>/` with the `lib`/`obj`/`sys`/`data` convention, and an `initd.c` that compiles the domain's boot-time objects (`application-authoring.md` Domain layout; The initd's role).
+3. **Add the sentinel suite from day one.** A `sys/test.c` boot-time driver, deferred past every domain's `initd`, writing `OK`/`FAIL` lines to a result log -- write it alongside the domain's first objects, not after (`application-authoring.md` Testing your application; `common-tasks.md` Add a boot-time test driver to your domain).
+4. **Wire grants and any System-tier overlay.** Provision the cross-domain access the domain needs from the console (`common-tasks.md` Grant another domain access to your files), and carry a System-tier overlay file only if a System-gated call forces one (System-tier overlay files above).
+5. **Move secrets out of source.** Anything the domain needs at runtime that must not sit in the repository -- an API key, a credential -- lives as a host file under the domain's data directory, read at use time (`common-tasks.md` Provision an application secret out of source).
+6. **Expose a health route.** A status route on the domain's own transport, answering with the capacity-headroom counts a monitor can poll with no console login (`common-tasks.md` Expose a health check for monitoring).
+7. **Decide durability per write.** For each write the service acknowledges to a client, choose snapshot-on-critical-path or edge-file persistence before it ships (`common-tasks.md` Make one write durable at acknowledge time); a domain persisting more than one entity kind through the Vault models each kind's schema at this point too (`vault-applications.md` Application layout).
+8. **Add the operator surface the service actually needs.** Start with a capability-gated route on the domain's own transport, and reach for a registered console verb only once it has earned its place there (`application-authoring.md` Give your application an operator surface owns the preference order; `common-tasks.md` Add an operator verb for your application has the registration mechanics).
+9. **Order Day 0 and hand off to a supervisor.** The claim-admin-first, transport-security-before-traffic, extensions-are-cold-boot-facts ordering (`operations.md` Day 0: standing up a production deployment), then a process supervisor that sends `SIGTERM` and gives the stop timeout room for the snapshot (`operations.md` Running under a supervisor).
+
+What this checklist is not: a tutorial, and not a substitute for reading the docs it links. It also does not resolve into a shipped example -- the full production-shaped composition (users, sessions, transport, multiple persisted entity kinds, an operator surface) is deliberately not one of the bundled reference applications; each of those exercises one primitive at a time, and the omission is stated plainly at `application-authoring.md` Reference applications.
+
 ## Where to next
 
 - `application-authoring.md` -- everything inside a domain directory: layout, data modeling, the initd, testing.
