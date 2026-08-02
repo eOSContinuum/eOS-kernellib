@@ -144,6 +144,7 @@ _SMOKE_TELNET_DEFAULT = os.environ.get("SMOKE_TELNET_PORT", "48023")
 _SMOKE_BINARY_DEFAULT = os.environ.get("SMOKE_BINARY_PORT", "48080")
 _SMOKE_HTTPS_DEFAULT = os.environ.get("SMOKE_HTTPS_PORT", "48443")
 TELNET_PORT = int(os.environ.get("MEASURE_TELNET_PORT", _SMOKE_TELNET_DEFAULT))
+SECTOR_SIZE = int(os.environ.get("MEASURE_SECTOR_SIZE", "8192"))
 HTTP_PORT = int(os.environ.get("MEASURE_HTTP_PORT", _SMOKE_BINARY_DEFAULT))
 HTTPS_PORT = int(os.environ.get("MEASURE_HTTPS_PORT", _SMOKE_HTTPS_DEFAULT))
 TLS_DATA_DIR = "src/usr/System/data/tls"
@@ -215,11 +216,12 @@ def write_config(root, dst_name="measure.dgd", module=None):
                 line = 'telnet_port\t= ([ "localhost" : %d ]);\n' \
                        % TELNET_PORT
             elif line.startswith("binary_port"):
-                line = "binary_port\t= %d;\n" % HTTP_PORT
+                line = 'binary_port\t= ([ "localhost" : %d ]);\n' % HTTP_PORT
             elif line.startswith("sector_size"):
-                line = "sector_size\t= 8192;\t/* raised for measurement" \
+                line = "sector_size\t= %d;\t/* raised for measurement" \
                        " runs: the stock build caps swap_size at 65535" \
-                       " sectors, so capacity scales via sector size */\n"
+                       " sectors, so capacity scales via sector size */\n" \
+                       % SECTOR_SIZE
             out.write(line)
         if module:
             out.write('modules\t\t= ([ "%s" : "" ]);\n' % module)
