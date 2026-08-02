@@ -125,6 +125,7 @@ Common goals and the docs that serve them, grouped by the audience each goal bel
 - **Add scripted, sandboxed behavior to an object**: [lpc-essentials.md](lpc-essentials.md), [runtime-primitives.md](runtime-primitives.md), [merry-applications.md](merry-applications.md), `../examples/merry-app/`.
 - **Write Merry source**: [lpc-essentials.md](lpc-essentials.md), [merry-language.md](merry-language.md), then [merry-applications.md](merry-applications.md) for the binding surface.
 - **Debug a misbehaving application**: [debugging-applications.md](debugging-applications.md), then [operations.md](operations.md) Logging and diagnostics.
+- **Stand up a real service after the tutorials**: [application-repository.md](application-repository.md) Assembling a production application, the dependency-ordered checklist that sequences the recipes above into a deployable service.
 
 ### Operating a deployment
 

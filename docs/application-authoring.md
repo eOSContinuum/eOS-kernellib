@@ -257,7 +257,7 @@ When to adapt the shape:
 - Production-style application with users, sessions, transport, persisted state across multiple object kinds, scripted behavior. The example pattern is a starting point for boot-up wiring and access posture, not a layout template.
 - The application needs a long-running operator surface (admin console verbs, configuration daemons, monitoring hooks). These are System-tier or co-tier additions that the reference examples deliberately omit.
 
-The shape is a teaching surface for the platform's individual primitives, not the recommended posture for a tier-E application that means to do useful work. Read `docs/runtime-primitives.md` for what each example assumes about the runtime. Read this document's earlier sections (`Domain layout`, `The initd's role`, `Owner and access`, `Live code upgrade through call_touch`) for the patterns that apply regardless of primitive count.
+The shape is a teaching surface for the platform's individual primitives, not the recommended posture for a tier-E application that means to do useful work. Read `docs/runtime-primitives.md` for what each example assumes about the runtime. Read this document's earlier sections (`Domain layout`, `The initd's role`, `Owner and access`, `Live code upgrade through call_touch`) for the patterns that apply regardless of primitive count. `docs/application-repository.md` Assembling a production application sequences those patterns, and the recurring-task recipes below, into a dependency-ordered checklist for standing up a real service once the tutorials are done.
 
 ## Testing your application
 
