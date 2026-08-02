@@ -159,7 +159,7 @@ echo "== clean slate =="
 # shutdown() when its driver finishes) it tears the driver down before this
 # example's driver completes, truncating the result. Isolation requires a
 # single deployed example per boot.
-for mount in AgentApp Cascade Chat ConsoleExt Inventory MerryApp MyApp Reload SignalApp WebAuthn WWW; do
+for mount in AgentApp Cascade Chat ConsoleExt Inventory KV MerryApp MyApp Reload SignalApp WebAuthn WWW; do
     rm -rf "src/usr/$mount"
 done
 rm -f state/snapshot state/snapshot.old state/swap "$LOG_PREFIX"1.log "$LOG_PREFIX"2.log "$LOG_PREFIX"3.log

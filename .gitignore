@@ -12,6 +12,7 @@ src/kernel/data/access.data
 # deployment artifact created via `cp -R examples/<name> src/usr/<Mount>`.
 src/usr/AgentApp/
 src/usr/MyApp/
+src/usr/KV/
 src/usr/SignalApp/
 src/usr/MerryApp/
 src/usr/Chat/
