@@ -94,10 +94,10 @@ transport-only subset runs (5 sentinels). With it, the full set:
 
 ```sh
 DGD_BIN=/path/to/dgd LPC_EXT_CRYPTO=/path/to/crypto.<ext> \
-    EXPECTED_OK=51 scripts/run-example.sh composite-app
+    EXPECTED_OK=52 scripts/run-example.sh composite-app
 ```
 
-Boot 1 runs the fifty wire-level phases -- the agent lifecycle
+Boot 1 runs the fifty-one wire-level phases -- the agent lifecycle
 (mint, own-agents list, token ceremony, the standing refusal on an
 agent session, the not-own and not-delegable refusals,
 suspend-revokes-sessions, resume-restores-authentication), the
@@ -106,7 +106,9 @@ streams (open, observer-driven audit push, agent-state snapshot and
 change push, bad-token refusal), the identity mutation events (the
 suspend's event delivered to a subscribed observer with exact data,
 the resume's event paired with its wire response, a refused mutation
-delivering nothing), the recovery ceremony
+delivering nothing), a server-driven stream-drain teardown (a revoked
+subscriber, torn down by the next refresh sweep, observed on the wire
+as a clean chunked-transfer close), the recovery ceremony
 (self-provisioned codes, the bad-code, wrong-purpose, and
 never-bare-re-bind refusals, atomic recover, login with the recovered
 passkey), and passkey self-service (list, unknown-id refusal,

@@ -12,7 +12,7 @@
  * vectors are scripts/gen-webauthn-vectors.py output, shared with
  * examples/webauthn-app).
  *
- * Boot 1 (cold, selfexit), with the crypto module (51 sentinels
+ * Boot 1 (cold, selfexit), with the crypto module (52 sentinels
  * total):
  *
  *   HEALTH OK                    transport -> router -> handler chain
@@ -117,6 +117,15 @@
  *   NEVER-BARE-REBIND OK         re-registering the bound credential
  *                                refuses (a fresh registration cannot
  *                                touch an existing record)
+ *   STREAM-DRAIN-TEARDOWN OK     a live agent stream, holding a pushed
+ *                                snapshot, is torn down by the SERVER:
+ *                                its subscribing session is revoked,
+ *                                then a refresh sweep (an unrelated
+ *                                agent mint) finds the dead session and
+ *                                drives end_stream -- the client
+ *                                observes the terminal chunked-transfer
+ *                                frame, a clean close, not a dead
+ *                                connection
  *   PERSIST SETUP OK             restore probe armed, snapshot dumped
  *
  * Boot 2 (restore): the call_out armed before the dump fires and
@@ -132,7 +141,7 @@
  * (challenge returns 503); the driver then runs the transport-only
  * subset: HEALTH, ROUTE-MISS, AUTH-REQUIRED, PERSIST SETUP, and
  * PERSIST-HTTP after restore -- 5 sentinels, the profile default. Run with
- * LPC_EXT_CRYPTO=<module> EXPECTED_OK=51 for the full set.
+ * LPC_EXT_CRYPTO=<module> EXPECTED_OK=52 for the full set.
  */
 
 # include <type.h>
@@ -203,11 +212,14 @@ private inherit hex "/lib/util/hex";
 # define P_ENROLL		48
 # define P_ENROLL_LIST		49
 # define P_RV_REBIND		50
+# define P_STREAM_DRAIN_OPEN	51
+# define P_STREAM_DRAIN_REVOKE	52
+# define P_STREAM_DRAIN_TRIGGER	53
 /* phase numbers: boot 2 (restore) */
-# define P_PERSIST_ITEMS	51
-# define P_PERSIST_SESSION	52
-# define P_PERSIST_OBSERVER	53
-# define P_PERSIST_HTTP		54	/* no-crypto restore probe */
+# define P_PERSIST_ITEMS	54
+# define P_PERSIST_SESSION	55
+# define P_PERSIST_OBSERVER	56
+# define P_PERSIST_HTTP		57	/* no-crypto restore probe */
 
 # define STREAM_DEADLINE	8	/* seconds an awaited event may take */
 # define SILENCE_WINDOW		2	/* seconds a refused mutation gets
@@ -230,6 +242,7 @@ private string agentToken;	/* its mint-time token (plaintext) */
 private string agentSession;	/* the agent's own session (boot 1) */
 private object auditStream;	/* held-open audit event stream */
 private object agentStream;	/* held-open agent-state event stream */
+private object drainStream;	/* agent stream torn down by the server */
 private string rvUuid;		/* first identity's bare uuid */
 private string rvCode;		/* a provisioned recovery code */
 private mixed *seamEvents;	/* identity events recorded while the
@@ -651,6 +664,32 @@ static void start_phase()
 	HANDLER->arm_challenge(WA_CH_REG3);
 	http("POST", "/auth/register", nil,
 	     register_body(WA_CH_REG3, WA_REG3_CDJ_HEX, WA_REG3_AO_HEX));
+	break;
+
+    case P_STREAM_DRAIN_OPEN:
+	/* tokenEd is otherwise idle at this point in the boot; subscribe
+	 * it to a fresh agent stream. Subscribing arms an immediate
+	 * refresh sweep, so the stream's first pushed frame -- its own
+	 * empty-agents snapshot -- lands before the next phase even runs */
+	drainStream = clone_object(STREAM_CLIENT);
+	drainStream->open(this_object(),
+			  "/auth/agents/stream?token=" + tokenEd);
+	arm_deadline();
+	break;
+
+    case P_STREAM_DRAIN_REVOKE:
+	/* kill the subscribing session while the stream stays open; the
+	 * broker does not learn this until the next refresh sweep */
+	http("POST", "/auth/logout", bearer(tokenEd), nil);
+	break;
+
+    case P_STREAM_DRAIN_TRIGGER:
+	/* an unrelated mint under token1 fires IDEV_AGENT_MINTED, which
+	 * arms streamd's coalesced refresh sweep for EVERY agent
+	 * subscriber, drainStream included; the sweep finds tokenEd's
+	 * session dead and drives end_stream on drainStream's connection */
+	http("POST", "/auth/agents", bearer(token1), nil);
+	arm_deadline();
 	break;
 
     case P_PERSIST_ITEMS:
@@ -1236,7 +1275,24 @@ void http_done(int code, string body)
 	    return;
 	}
 	pass("NEVER-BARE-REBIND");
-	persist_setup();
+	advance();
+	break;
+
+    case P_STREAM_DRAIN_REVOKE:
+	parsed = jbody(body);
+	if (code != 200 || parsed["revoked"] != 1) {
+	    stop("STREAM-DRAIN-TEARDOWN: revoke " + code + " " + body);
+	    return;
+	}
+	advance();
+	break;
+
+    case P_STREAM_DRAIN_TRIGGER:
+	/* the mint's own response; the sentinel lands on the server-driven
+	 * stream_end below */
+	if (code != 201) {
+	    stop("STREAM-DRAIN-TEARDOWN: mint " + code + " " + body);
+	}
 	break;
 
     case P_PERSIST_ITEMS:
@@ -1319,6 +1375,13 @@ void stream_open(int code)
 	}
 	/* the sentinel lands on the snapshot event */
 	break;
+
+    case P_STREAM_DRAIN_OPEN:
+	if (code != 200) {
+	    stop("STREAM-DRAIN-TEARDOWN: open " + code);
+	}
+	/* the phase advances on the pushed snapshot below */
+	break;
     }
 }
 
@@ -1349,6 +1412,33 @@ void stream_event(string event, string data)
 	    drop_streams();
 	    advance();
 	}
+	break;
+
+    case P_STREAM_DRAIN_OPEN:
+	/* the subscribe-time snapshot: the frame that proves the stream
+	 * is live before the server-side teardown is driven */
+	if (event == "agents") {
+	    advance();
+	}
+	break;
+    }
+}
+
+/*
+ * the terminal chunked-transfer frame: a server-driven close, distinct
+ * from a dead connection (which never reaches this callback)
+ */
+void stream_end()
+{
+    if (sscanf(previous_program(), "/usr/Inventory/%*s") == 0) {
+	error("Access denied");
+    }
+    switch (phase) {
+    case P_STREAM_DRAIN_TRIGGER:
+	pass("STREAM-DRAIN-TEARDOWN");
+	destruct_object(drainStream);
+	drainStream = nil;
+	persist_setup();
 	break;
     }
 }

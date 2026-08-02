@@ -11,6 +11,14 @@
  * open. The driver owns teardown: it destructs the clone (the peer
  * sees the close) when a phase is done with the stream.
  *
+ * A server-driven close is a distinct signal from a dead connection:
+ * connection1.c hands the terminal chunked-transfer frame to receiveChunk
+ * as a nil StringBuffer (the same call the library uses for trailers),
+ * so a clean end-of-stream is directly observable here and reported via
+ * stream_end() before any teardown callback fires. A connection that
+ * dies mid-stream never reaches receiveChunk(nil, ...); it only ever
+ * reaches connectFailed/flow_logout, which stream_end() does not cover.
+ *
  * The request deliberately omits Connection: close -- the point is a
  * held-open connection. Framing follows the SSE wire form the WWW
  * servers emit: "event: <name>\ndata: <json>\n\n" per event, each
@@ -103,12 +111,19 @@ private string drainBody(StringBuffer buf)
 
 /*
  * one transfer chunk: accumulate, then report every complete SSE
- * frame ("event: <name>\ndata: <data>\n\n")
+ * frame ("event: <name>\ndata: <data>\n\n"). A nil chunk is the
+ * terminal chunked-transfer frame -- the clean end of the body, not a
+ * connection failure -- so it is reported once via stream_end() and
+ * the client stops expecting further chunks.
  */
 static void receiveChunk(StringBuffer chunk, varargs HttpFields trailers)
 {
     string frame, rest, event, data;
 
+    if (!chunk) {
+	driver->stream_end();
+	return;
+    }
     acc += drainBody(chunk);
     while (sscanf(acc, "%s\n\n%s", frame, rest) != 0) {
 	acc = rest;

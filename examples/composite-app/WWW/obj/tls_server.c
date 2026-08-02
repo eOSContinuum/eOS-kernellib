@@ -36,6 +36,7 @@ inherit "/usr/System/lib/user";
 int received;				/* received at least one request */
 private HttpRequest pendingRequest;	/* awaiting body */
 private int streaming;			/* holding an event stream open */
+private int closingStream;		/* endChunk sent, awaiting drain */
 
 static void create()
 {
@@ -133,7 +134,27 @@ void end_stream()
     }
     if (streaming) {
 	streaming = FALSE;
+	closingStream = TRUE;
 	this_object()->endChunk();
+    }
+}
+
+/*
+ * connection1.c's messageChunk() calls this on every full outbuf
+ * drain, not just the terminal one (see docs/http-applications.md
+ * "Streaming teardown: the doneChunk drain contract") -- so it must
+ * gate on the closing flag end_stream sets rather than destructing on
+ * the first call. This joins the receiveXxx() family of
+ * connection1.c-to-relay callbacks (receiveRequest, receiveEntity,
+ * receiveResponse, ...) above, which this file leaves unguarded:
+ * relay is this_object() itself (set at create time), so the caller
+ * is never an external principal the way push_event/end_stream's sys
+ * daemons are.
+ */
+static void doneChunk()
+{
+    if (closingStream) {
+	closingStream = FALSE;
 	call_out("_logout", 0, TRUE);
     }
 }

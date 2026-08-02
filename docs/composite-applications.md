@@ -230,17 +230,26 @@ it. The countermeasure is application code, in three pieces:
   kernel connection's pending message), so the server clone tracks
   its own: count bytes at each `sendChunk`, subtract on the
   `doneChunk` relay callback the connection library fires when the
-  output buffer empties. No in-tree code implements `doneChunk` yet;
-  implementing it is part of the pattern. The high-water mark between
-  drains is the lagging-subscriber signal.
+  output buffer empties. The composite example implements `doneChunk`
+  as the drain-gated teardown described next (`docs/http-applications.md`
+  Streaming teardown: the doneChunk drain contract); the same callback
+  is the high-water-mark hook -- a byte counter maintained the same
+  way, checked before the closing-flag branch, is the lagging-subscriber
+  signal between drains.
 - **Shed by tearing the subscription down.** The example's lever is
   the server clone's `end_stream` -- streamd invokes it when a
   subscriber's session stops validating: it marks the stream closed,
-  queues the terminal chunk, and destructs the clone through a
+  sends the terminal chunk, and sets a closing flag rather than
+  destructing in the same task. The clone tears itself down (a
   zero-delay logout, taking the broker's registry entry and every
-  application-side resource with it. Verified against a live stalled
-  client: the shed subscriber's `closed` event was queued, the
-  subscription ended, and no further pushes reached it.
+  application-side resource with it) only when `doneChunk` next fires
+  with that flag set -- the drain signal for the terminal chunk's own
+  write completing, not the call that sent it. Destructing in the same
+  task as `endChunk()` is the data-loss mode this pattern avoids: bytes
+  still queued die with the object and the peer is left half-open with
+  no EOF. Verified against a live stalled client: the shed subscriber's
+  `closed` event was queued, the subscription ended, and no further
+  pushes reached it.
 - **Know the graceful path's limit.** For a client that has genuinely
   stopped reading, the graceful teardown cannot deliver: TCP
   backpressure holds the terminal chunk off the wire, and the kernel
@@ -285,7 +294,7 @@ should start from `Inventory/obj/client.c`, not `obj/client1.c`.
 ## Verification
 
 `scripts/run-example.sh composite-app` deploys both domains (the
-multi-deploy profile form) and runs the driver: 51 sentinels with the
+multi-deploy profile form) and runs the driver: 52 sentinels with the
 crypto module (ceremonies against the foreign-generated vectors shared
 with examples/webauthn-app, the agent lifecycle -- mint, own-agents
 list, token ceremony, the ownership and delegability refusals, suspend
