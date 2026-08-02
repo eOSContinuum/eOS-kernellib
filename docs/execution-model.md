@@ -72,6 +72,28 @@ What gives when offered load exceeds drain rate, stated from driver source, with
 
 An `atomic` function is a rollback envelope *inside* a task, not a second serialization mechanism. Declaring a function `atomic` does not change when it runs or whether it can be interrupted (every task already runs uninterrupted). It changes what happens if the function errors: its dataspace mutations, and its nested calls', roll back as a unit instead of leaving a partial write in place (`docs/lpc-essentials.md` Atomicity). A task with no `atomic` function anywhere on its call stack still runs to completion. It just has no rollback if it errors partway through a mutation.
 
+One task's lifecycle, with the atomic envelope as an optional inner boundary:
+
+```mermaid
+flowchart TD
+    T1["Task begins: host driver calls into LPC"]
+    T2["Task runs to completion, no preemption"]
+    A1["Atomic function entered: rollback envelope inside the task"]
+    A2{"Atomic function errors?"}
+    A3["Mutations and nested calls commit"]
+    A4["Mutations and nested calls roll back as a unit"]
+    T3["Task returns or errors; run-to-completion holds either way"]
+
+    T1 --> T2
+    T2 --> A1
+    A1 --> A2
+    A2 -->|No| A3
+    A2 -->|Yes| A4
+    A3 --> T3
+    A4 --> T3
+    T2 -->|no atomic function on the call stack| T3
+```
+
 ## Deferred work ordering
 
 A `call_out` scheduled during a task does not run inside that task, however short the delay: the scheduling call returns, the current task finishes, and the deferred call fires afterward as a new, independent task. It is an ordinary, non-atomic call unless the called function is itself declared `atomic` (`docs/lpc-essentials.md` Deferred work: call_out). `docs/dispatcher.md` names the new-task fact directly for an observer's `$delay` continuation: "the rest of the source resumes `seconds` later in a fresh `call_out` (a new task, a new dispatch batch)". The platform's logging facility depends on the same ordering for correctness: `logd` cannot write synchronously from inside an atomic dispatch, so it buffers the line and schedules `call_out(0)`, and the buffered batch is flushed to disk in that later, non-atomic task (`docs/operations.md` Logging and diagnostics). A `call_out(0)` fired from inside a task is not "immediate". It is "next", after the current task and anything already ahead of it in the queue.

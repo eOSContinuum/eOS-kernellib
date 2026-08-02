@@ -29,6 +29,28 @@ Two implications matter for builders authoring on top of the kernel layer:
 
 Adding a new tier-E domain means creating a subdirectory under `src/usr/` and an `initd.c` at its root. The System initd iterates `/usr/[A-Z]*/initd.c` at boot and compiles each domain under its tier.
 
+The tier stack and the C-to-E inheritance path, as a diagram:
+
+```mermaid
+flowchart TD
+    A["Tier A: C code (host driver)"]
+    B["Tier B: /kernel/ (hard-trusted kernel-tier LPC)"]
+    C["Tier C: /usr/System/ (System auto, inheritance root)"]
+    D["Tier D: /usr/HTTP/, /usr/TLS/, /usr/LPC/, etc (shipped platform domains)"]
+    E["Tier E: Application-supplied /usr/DOMAIN/"]
+    KernelSyn["three-tier synonym: Kernel"]
+    SystemSyn["three-tier synonym: System"]
+    UserSyn["three-tier synonym: User"]
+
+    A --> B --> C
+    C -->|inherits via System auto| D
+    C -->|C-to-E inheritance path| E
+    B -.-> KernelSyn
+    C -.-> SystemSyn
+    D -.-> UserSyn
+    E -.-> UserSyn
+```
+
 ### Path conventions inside a domain
 
 Within each user-tier domain (tiers C, D, E), four subdirectories carry conventional meanings the host driver and the kernel libraries rely on:
@@ -81,6 +103,25 @@ The host driver starts, reads the `.dgd` configuration file, and compiles `src/k
 5. Loads `sys/http_server` last, after every domain initd, so the binary-port manager binds once the domains it may route to exist.
 
 The boot completes when the System initd's `create()` returns. The host driver then accepts external connections on the ports declared in the config.
+
+The cold-boot sequence from config read to open ports, as a diagram:
+
+```mermaid
+flowchart TD
+    Config["Host driver reads the .dgd config file"]
+    DriverC["Compiles src/kernel/sys/driver.c"]
+    KernelAuto["Compiles kernel auto + other tier-B objects: resource daemon, access daemon, kernel userd, admin console, capabilityd"]
+    SystemInitd["Compiles src/usr/System/initd.c"]
+    Grants["1. Publish boot-time global-read grants"]
+    Daemons["2. Compile System-tier daemons and bootstrap objects"]
+    DomainList["3. Build domain list: fixed TLS, HTTP, LPC prefix + remaining /usr domains"]
+    TwoPasses["4. Walk domain list twice: register owners, then compile each initd.c"]
+    HttpServer["5. Load sys/http_server last, after every domain initd"]
+    BootDone["System initd create() returns; host driver accepts external connections"]
+
+    Config --> DriverC --> KernelAuto --> SystemInitd
+    SystemInitd --> Grants --> Daemons --> DomainList --> TwoPasses --> HttpServer --> BootDone
+```
 
 The property-layer hook in `/lib/util/properties` checks at every `set_property` call whether `/usr/Merry/sys/merry` is loaded. If so, the write routes through `MERRY->dispatch_set`, otherwise it falls through to `set_raw_property` directly. The check is per-call, so early-bootstrap code that runs before the Merry domain's initd compiles (the System-tier daemons in step 2, and the domains ahead of Merry in the step-3 order) sees direct writes. Once Merry's initd has compiled the dispatcher daemon, subsequent writes flow through it. Hosts that need to bypass the dispatcher post-boot (raw schema initialization, fixture seeding) call `set_raw_property` directly.
 
