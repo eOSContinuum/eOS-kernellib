@@ -27,6 +27,7 @@ Deploys the named example fresh under `src/usr/<Deploy>`, runs its boot sequence
 | composite-app | WWW+Inventory | 2 | selfexit | 5 |
 | hot-reload-demo | WWW | 1 | timed | 2 |
 | hot-reload-master | Reload | 1 | timed | 3 |
+| http-app | WWW | 1 | probe | 4 |
 | merry-app | MerryApp | 2 | selfexit | 28 |
 | signal-app | SignalApp | 1 | timed | 1 |
 | upgrade-cascade | Cascade | 1 | timed | 7 |
@@ -35,7 +36,7 @@ Deploys the named example fresh under `src/usr/<Deploy>`, runs its boot sequence
 
 A `+`-joined Deploy is a multi-domain example: one example subdirectory per part, each deployed as its own domain, with sentinels read from the last part's `data/`. Module notes: `agent-app` needs `LPC_EXT_CRYPTO` for every phase, and its operator continuation (4 more sentinels) is driven by `scripts/verbsets/agent-app.verbset` -- see the example README. `composite-app`'s 5 is the module-less transport subset; the full set is `LPC_EXT_CRYPTO=<module> EXPECTED_OK=53`. `webauthn-app`'s 13 is the codec half; the ceremony phases need the module (`EXPECTED_OK=26`).
 
-`http-app` has no profile here -- it verifies over live HTTP via the probe commands in its README; `https-app` verifies via `scripts/https-smoke.sh`; `atomic-demo` and `hot-reload-demo` verify both ways (their profiles above, plus each example's bundled HTTP smoke).
+`http-app`'s profile drives the four routes its README documents (`GET /health`, `GET /status`, `POST /echo`, `GET /no-such-route`) as live HTTP probes against the running boot and writes their pass/fail as sentinel lines, so it verifies the same one-command way as every other profile; `https-app` verifies via `scripts/https-smoke.sh` (no `run-example.sh` profile, since its TLS activation step falls outside the sentinel-file/HTTP-probe shape); `atomic-demo` and `hot-reload-demo` verify both ways (their profiles above, plus each example's bundled HTTP smoke).
 
 ## drive-verbs.py + scripts/verbsets/
 
@@ -44,6 +45,15 @@ python3 scripts/drive-verbs.py scripts/verbsets/admin-baseline.verbset
 ```
 
 Logs into the console over telnet, then drives each block of a verbset file in session order. A verbset block is one `cmd:` line (the verb to send) plus zero or more `expect:` / `absent:` regex lines (`re.search`, `re.MULTILINE`) checked against the response; blocks separate on a blank line, `#` lines are comments. An `expect:` that fails to match, or an `absent:` that matches, both fail the entry; the run exits non-zero on any entry failure. Consecutive entries share one session, so a verbset can express mutate -> verify -> undo -> verify-undo. A block may also carry `capture: <name> <regex-with-one-group>` lines: on match, the group's text is stored and later `cmd:`/`expect:`/`absent:`/`capture:` lines can reference it as `%{name}` (regex-escaped inside patterns, raw in cmd lines) -- the mechanism for threading runtime values (a minted id, a generated secret shown once) through later verbs; a capture that does not match fails its block, and later references to it fail theirs.
+
+**A string-valued `code` result.** The console renders a returned string as an LPC literal, escaped quotes and all, so an `expect:` pattern against a string result has to match those backslashes literally, not just the text they quote:
+
+```
+cmd: code "/sys/jsonencode"->encode((["a": ({1, 2})]))
+expect: \$\d+ = "\{\\"a\\":\[1,2\]\}"
+```
+
+The console answers `$N = "{\"a\":[1,2]}"` -- the JSON text `{"a":[1,2]}` wrapped in a quoted LPC string literal, its embedded `"` characters backslash-escaped by the console's own rendering. A pattern that quotes the plain JSON (`"\{"a":\[1,2\]\}"`) never matches: the response line carries the literal backslashes, so the regex needs `\\"` wherever the rendered string has an escaped quote.
 
 Two composability constraints when batching verbsets into one boot: a verbset asserting a daemon's module-less stand-down cannot share a module-bearing boot (the stand-down refusals it expects answer differently with the crypto module loaded), and a verbset asserting absolute counts (identity rosters, store totals, patch counters) needs its own boot -- state accumulated by earlier verbsets in the same session shifts the counts.
 
@@ -170,7 +180,7 @@ Everything the sweep needs, gathered once:
 24. `DGD_BIN=<dgd> scripts/base-boot-guard.sh` -- `GUARD PASS`, boot log and `system.log` both at or under 400 lines (`MAX_LINES`, no example deployed).
 25. Deploy atomic-demo (`cp -R examples/atomic-demo src/usr/WWW`), boot against `example.dgd`, then run `examples/atomic-demo/smoke.sh` -- `=== PASS: counter unchanged across deliberate-failure increment ===`; the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 14. Steps 25-27 are manual deploys with no built-in clean slate: before each, stop the running `dgd` and remove the prior deploy and state (`rm -rf src/usr/WWW state/snapshot state/snapshot.old state/swap`) -- `cp -R` into an existing mount nests the new example inside the old one instead of replacing it, silently deploying a broken tree.
 26. Same reset first, then deploy hot-reload-demo (`cp -R examples/hot-reload-demo src/usr/WWW`), boot, then run `examples/hot-reload-demo/smoke.sh` -- `=== PASS: post-recompile response contains expected marker ===`; this is the HTTP half of the example's dual verification, alongside its headless sentinel profile at step 2.
-27. Same reset first, then deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the four curl probes from `examples/http-app/README.md` Verify -- `ok`, the `/status` count lines, the echoed body, and `404 Not Found` respectively. This example has no bundled `smoke.sh` in this tree; the probes are manual.
+27. Same reset first, then deploy http-app (`cp -R examples/http-app src/usr/WWW`), boot, then run the four curl probes from `examples/http-app/README.md` Verify -- `ok`, the `/status` count lines, the echoed body, and `404 Not Found` respectively. This is the manual form of the same four probes `DGD_BIN=<dgd> scripts/run-example.sh http-app` now drives in one command (`run-example.sh` above), reported as `" OK"` sentinels ending in `PASS`.
 28. `LPC_EXT_CRYPTO=<crypto-module> DGD_BIN=<dgd> scripts/https-smoke.sh` -- `HTTPS-SMOKE PASS` after the nine native-TLS phases (certless stand-down, `tls-cert reload` activation, five service probes, and the two statedump key-scans). Needs the lpc-ext crypto module built (`make crypto` in `dworkin/lpc-ext`); without it this step is the documented skip -- the platform's TLS posture degrades cleanly and the other steps do not exercise it.
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.

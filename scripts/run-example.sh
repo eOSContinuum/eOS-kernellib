@@ -21,17 +21,22 @@
 #            cold-again (the no-snapshot negative case)
 #   boot1    selfexit = the driver dumps a snapshot and exits on its
 #            own (waited on, 30s cap); timed = boot runs for a fixed
-#            window, then is stopped
+#            window, then is stopped; probe = the driver stays up while
+#            this script drives live HTTP requests against it, then
+#            stops it (http-app's profile: there is no self-testing
+#            driver to selfexit, so the four documented routes are the
+#            proof, written as sentinel lines this script generates)
 #   ok       expected " OK" sentinel count (EXPECTED_OK overrides);
 #            bump when a test-driver phase adds a sentinel
 #
-# Sentinels are read from the deployed domain's data/test-result.log.
-# Boot output is captured under state/run-<example>-bootN.log.
+# Sentinels are read from the deployed domain's data/test-result.log;
+# for a "probe" profile this script writes that file itself from the
+# HTTP responses it observes, so the tail of the script (sentinel count,
+# PASS/FAIL) is unchanged either way. Boot output is captured under
+# state/run-<example>-bootN.log.
 #
-# http-app has no profile here: it verifies against a running server
-# via live HTTP probes (see its README). atomic-demo and hot-reload-demo
-# verify both ways -- a headless sentinel profile below, plus each
-# example's bundled HTTP smoke.
+# atomic-demo and hot-reload-demo verify both ways -- a headless
+# sentinel profile below, plus each example's bundled HTTP smoke.
 #
 # Reruns start from a clean slate: the deployed domain, any snapshot,
 # and prior boot logs are removed first, so state never carries across
@@ -59,6 +64,9 @@ example_profile() {
                            # module: LPC_EXT_CRYPTO=... EXPECTED_OK=53
         hot-reload-demo)   echo "WWW 1 timed 2" ;;
         hot-reload-master) echo "Reload 1 timed 3" ;;
+        http-app)          echo "WWW 1 probe 4" ;;
+                           # 4 = the four routes README.md Verify
+                           # documents: /health, /status, /echo, 404
         merry-app)         echo "MerryApp 2 selfexit 30" ;;
         signal-app)        echo "SignalApp 1 timed 1" ;;
         upgrade-cascade)   echo "Cascade 1 timed 7" ;;
@@ -71,14 +79,13 @@ example_profile() {
 EXAMPLE="${1:-}"
 if [ -z "$EXAMPLE" ]; then
     echo "usage: scripts/run-example.sh <example>" >&2
-    echo "known examples: agent-app atomic-demo chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
+    echo "known examples: agent-app atomic-demo chat-app composite-app hot-reload-demo hot-reload-master http-app merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
     exit 2
 fi
 PROFILE=$(example_profile "$EXAMPLE")
 if [ -z "$PROFILE" ]; then
     echo "run-example.sh: no profile for '$EXAMPLE'; add one to example_profile()" >&2
-    echo "known examples: agent-app atomic-demo chat-app composite-app hot-reload-demo hot-reload-master merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
-    echo "(http-app verifies via live HTTP probes; see its README)" >&2
+    echo "known examples: agent-app atomic-demo chat-app composite-app hot-reload-demo hot-reload-master http-app merry-app signal-app upgrade-cascade vault-app webauthn-app" >&2
     exit 2
 fi
 set -- $PROFILE
@@ -197,7 +204,58 @@ if [ "$SMOKE_BINARY_PORT" != "8080" ]; then
     done
 fi
 
-if [ "$BOOT1_MODE" = "selfexit" ]; then
+if [ "$BOOT1_MODE" = "probe" ]; then
+    echo "== boot 1 (cold; live HTTP probes) =="
+    "$DGD_BIN" "$CONFIG" > "${LOG_PREFIX}1.log" 2>&1 &
+    B1=$!
+    i=0
+    READY=""
+    while [ "$i" -lt 20 ]; do
+        if curl -s -o /dev/null "http://127.0.0.1:$SMOKE_BINARY_PORT/health" 2>/dev/null; then
+            READY=1
+            break
+        fi
+        i=$((i + 1))
+        sleep 0.5
+    done
+    RESULT_DIR="src/usr/$RESULT_DOMAIN/data"
+    mkdir -p "$RESULT_DIR"
+    PROBE_LOG="$RESULT_DIR/test-result.log"
+    : > "$PROBE_LOG"
+    if [ -z "$READY" ]; then
+        echo "GET /health: FAIL (server did not become ready within 10s)" >> "$PROBE_LOG"
+    else
+        BODY=$(curl -s "http://127.0.0.1:$SMOKE_BINARY_PORT/health")
+        if [ "$BODY" = "ok" ]; then
+            echo "GET /health: OK" >> "$PROBE_LOG"
+        else
+            echo "GET /health: FAIL (body '$BODY')" >> "$PROBE_LOG"
+        fi
+
+        BODY=$(curl -s "http://127.0.0.1:$SMOKE_BINARY_PORT/status")
+        if printf '%s' "$BODY" | grep -q '^objects='; then
+            echo "GET /status: OK" >> "$PROBE_LOG"
+        else
+            echo "GET /status: FAIL (body '$BODY')" >> "$PROBE_LOG"
+        fi
+
+        BODY=$(curl -s -d 'hello' "http://127.0.0.1:$SMOKE_BINARY_PORT/echo")
+        if [ "$BODY" = "hello" ]; then
+            echo "POST /echo: OK" >> "$PROBE_LOG"
+        else
+            echo "POST /echo: FAIL (body '$BODY')" >> "$PROBE_LOG"
+        fi
+
+        CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SMOKE_BINARY_PORT/no-such-route")
+        if [ "$CODE" = "404" ]; then
+            echo "GET /no-such-route: OK" >> "$PROBE_LOG"
+        else
+            echo "GET /no-such-route: FAIL (status $CODE)" >> "$PROBE_LOG"
+        fi
+    fi
+    kill "$B1" 2>/dev/null || true
+    wait "$B1" 2>/dev/null || true
+elif [ "$BOOT1_MODE" = "selfexit" ]; then
     echo "== boot 1 (cold; driver dumps + self-exits) =="
     "$DGD_BIN" "$CONFIG" > "${LOG_PREFIX}1.log" 2>&1 &
     B1=$!
