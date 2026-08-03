@@ -10,6 +10,7 @@ The jobs this doc (and its task-shaped companions) cover, by name:
 
 | I need to... | Where |
 |---|---|
+| **Diagnose a dead or misbehaving process, right now** | **Common failure modes; Monitoring signals** |
 | Stand up a fresh production deployment, in order | Day 0: standing up a production deployment |
 | Choose config values, raise a ceiling | `docs/configuration.md` The .dgd configuration file; Limits and capacity |
 | Size a workload's storage shape | `docs/configuration.md` Limits and capacity, Sizing a workload |
@@ -22,7 +23,6 @@ The jobs this doc (and its task-shaped companions) cover, by name:
 | Serve HTTPS on the labeled port | Network boundary and transport security; `docs/common-tasks.md` Serve HTTPS on the labeled port |
 | Load a host-driver extension | Loading host-driver extensions |
 | Plan for the image approaching the state ceiling | When the image approaches the state ceiling |
-| Diagnose a dead or misbehaving process | Common failure modes; Monitoring signals |
 | Ship a release; roll one back | `docs/changing-a-running-system.md` Shipping a release, Rolling back a release |
 | Provision, rotate, or offboard an operator credential | `docs/security-posture.md` Credential lifecycle |
 
@@ -311,6 +311,35 @@ WantedBy=multi-user.target
 
 `KillSignal` stays `SIGTERM` because it is the only signal the driver catches for the graceful snapshot; `Restart=on-failure` rather than `always` so a deliberate operator `halt` stays down.
 
+**Running in a container.** The repository's own `Dockerfile` is dev/CI-only (its header says nothing persists across runs unless `state/` is mounted, and its `ENTRYPOINT` runs the regression harness, not a production boot) -- it is the wrong base for this shape. Rather than build an image and then override its working directory and entrypoint out from under it, mount the same `/srv/eos` host layout the systemd unit above already assumes (the `dgd` binary, `run-dgd.sh`, `server.dgd`, `state/`, `src/` all live there per that section) into a stock minimal image that supplies nothing but a userspace for the mounted binary to run in. A worked service, syntax-validated with `docker compose config`:
+
+```yaml
+services:
+  eos:
+    image: debian:bookworm-slim
+    user: "1000:1000"
+    working_dir: /srv/eos
+    entrypoint: ["/srv/eos/run-dgd.sh"]
+    volumes:
+      - /srv/eos:/srv/eos
+    ports:
+      - "127.0.0.1:8023:8023"    # telnet_port: host-loopback only, never published
+      - "8080:8080"              # binary_port
+    stop_signal: SIGTERM
+    stop_grace_period: 300s
+    restart: on-failure
+```
+
+Each field traces to a fact stated above or in `docs/configuration.md`:
+
+- `image: debian:bookworm-slim` matches the base the repository's own `Dockerfile` builds `dgd` against, so the mounted binary's glibc expectations match the container's -- a host-built `dgd` bind-mounted into an image on a different base (a different glibc, or a musl-based image like `alpine`) is not guaranteed to run; pin the container's base to whatever distro actually built the binary being mounted, not necessarily this one.
+- `volumes: - /srv/eos:/srv/eos` is the whole point of this shape: the image itself carries no `dgd` binary and no LPC source tree, so `working_dir: /srv/eos` and `entrypoint: ["/srv/eos/run-dgd.sh"]` below resolve only because this one bind mount supplies every path both of them name -- the binary at `/srv/eos/dgd/bin/dgd`, the wrapper script itself, `server.dgd`, and the `state/` and `src/` directories the wrapper and the restore need (the snapshot pair `dump_file` / `<dump_file>.old`, `swap_file`, and the object tree the snapshot references). None of it is baked into the image, so a container recreate does not discard it.
+- `entrypoint: ["/srv/eos/run-dgd.sh"]` reuses the boot-state-invariant wrapper from this section verbatim -- the same fork-in-the-road (restore arguments fatal when the files are absent, silently stale when omitted with a snapshot present) applies inside a container, and the mount above is what makes this path resolve.
+- `stop_signal: SIGTERM` and `stop_grace_period: 300s` are the container-runtime names for the same two facts the systemd unit's `KillSignal` and `TimeoutStopSec` encode above: `SIGTERM` is the only signal the driver catches for the snapshot-then-exit path, and the grace period must outlast the dump, which scales with image size (`docs/configuration.md` Limits and capacity) -- size it the same way `TimeoutStopSec=300` was sized.
+- `restart: on-failure` matches the systemd unit's choice and its reason: a deliberate operator `halt` should stay down, not bounce.
+- `user: "1000:1000"` runs the process as an unprivileged UID, the container analogue of the unit's `User=eos`; it must own (or have read/write access to) the mounted `/srv/eos` tree on the host side, the same requirement the systemd unit's `User=eos` carries.
+- the `telnet_port` publish binds to `127.0.0.1` on the host, keeping the operator console reachable only through the host's own loopback or an SSH tunnel into it (Network boundary and transport security below) -- never publish it on `0.0.0.0` or a container network others can reach; `binary_port` is the only port meant for outside traffic.
+
 **Native TLS.** The platform terminates TLS 1.3 itself (Network boundary and transport security below): configure a second `binary_port` entry for the `https` label, load the crypto module (Loading host-driver extensions below), and place PEM credentials at the configured paths. The host's ACME client owns issuance and renewal -- e.g. a certbot deploy hook copying fullchain and private key into `<directory>/usr/System/data/tls/` (readable only by the runtime user). A first-ever certificate that lands after boot is activated with `tls-cert reload` on the console; renewals need only the file copy, since credentials are read per connection.
 
 **Reverse proxy (alternative).** Where one host already fronts several services with a single proxy, terminating TLS there remains valid:
@@ -463,6 +492,30 @@ Match User dgd-console-rec
 **A reverse proxy remains an option, not the doctrine.** Where one host fronts several services with a single proxy, terminating TLS at the proxy and forwarding cleartext HTTP to `binary_port` on the loopback remains a valid deployment (the alternative block under Running under a supervisor above); behind a proxy the platform sees the proxy's address as the client, the usual forwarded-header tradeoff. The choice also has an assurance dimension: the native stack is a from-scratch TLS 1.3 implementation in interpreted LPC with no external audit (`docs/security-posture.md` Non-goals and known limits), so where that posture is insufficient the proxy path terminates TLS with a mainstream implementation.
 
 **Exposure to abuse.** The platform ships no defense against a deliberate client: one peer can hold connection slots until the `users` cap silences every port (the console's included), and nothing in the image rate-limits, sheds, or evicts it (`docs/security-posture.md` Non-goals and known limits). Host-level controls own this surface: per-IP connection limits at the firewall (conntrack or equivalent), a fronting proxy's limits where one is deployed, and alerting on the `users` count as the early warning (Monitoring signals above). Plan the locked-out case before it happens: at the cap the driver refuses new connections only, so a console session already open keeps working -- hold one standing from the maintenance network, and its `reboot` verb still executes a controlled snapshot-and-exit from inside. Without one, the host is the fallback: SIGTERM writes the final incremental snapshot and exits (Running under a supervisor above), and the supervisor's restart clears the connection table.
+
+**A worked per-IP limit.** The firewall rule above made literal, syntax-checked with `nft -c`, sized against the `users` cap's stock 255 slots (Connection-slot economics below):
+
+```text
+table inet eos_slots {
+    chain input {
+        type filter hook input priority filter; policy accept;
+
+        tcp dport 8080 ct state new \
+            meter eos_binary_port_per_ip { ip saddr ct count over 32 } \
+            counter drop
+    }
+}
+```
+
+`ct count over 32` refuses a new connection from an address already holding 32 concurrent ones on `binary_port` -- roughly an eighth of the 255-slot table, chosen so no single peer can exhaust it alone even after every other client is idle, while staying well above what one legitimate multi-tab or multi-device client needs (Connection-slot economics below: a keep-alive or streaming subscriber is one slot each). Lower it for a deployment expecting few concurrent peers per legitimate client; a deployment behind a NAT-heavy client base (many real users sharing one egress address) needs a higher ceiling or an exemption list, since the rule cannot distinguish one abusive peer from many legitimate ones behind the same address. Add the equivalent two lines to the nginx alternative above when that is the fronting shape:
+
+```nginx
+limit_conn_zone $binary_remote_addr zone=eos_perip:10m;
+# inside the server or location block:
+limit_conn eos_perip 32;
+```
+
+`limit_conn_zone` is unvalidated against a running nginx on this machine (no local nginx binary); the directive names and zone/limit shape follow nginx's documented `ngx_http_limit_conn_module` syntax, and the `32` mirrors the nftables rule's sizing above so both paths agree on the same ceiling.
 
 ### Connection-slot economics
 
