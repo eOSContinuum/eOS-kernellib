@@ -176,19 +176,20 @@ void end_stream()
 
 /*
  * connection1.c's messageChunk() calls this on every full outbuf
- * drain, not just the terminal one (see docs/http-applications.md
- * "Streaming teardown: the doneChunk drain contract") -- so it must
- * gate on the closing flag end_stream sets rather than destructing on
- * the first call. This joins the receiveXxx() family of
- * connection1.c-to-relay callbacks (receiveRequest, receiveEntity,
- * receiveResponse, ...) above, which this file leaves unguarded:
- * relay is this_object() itself (set at create time), so the caller
- * is never an external principal the way push_event/end_stream's sys
- * daemons are.
+ * drain, not just the terminal one, passing final TRUE only on the
+ * drain that empties outbuf after the terminating chunk end_stream
+ * queued (see docs/http-applications.md "Streaming teardown: the
+ * doneChunk drain contract") -- so teardown gates on BOTH the closing
+ * flag end_stream sets AND final, not on the first call. This joins
+ * the receiveXxx() family of connection1.c-to-relay callbacks
+ * (receiveRequest, receiveEntity, receiveResponse, ...) above, which
+ * this file leaves unguarded: relay is this_object() itself (set at
+ * create time), so the caller is never an external principal the way
+ * push_event/end_stream's sys daemons are.
  */
-static void doneChunk()
+static void doneChunk(varargs int final)
 {
-    if (closingStream) {
+    if (closingStream && final) {
 	closingStream = FALSE;
 	call_out("_logout", 0, TRUE);
     }

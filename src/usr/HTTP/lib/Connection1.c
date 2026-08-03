@@ -33,6 +33,8 @@ private int idle;		/* idle mode? */
 private int quiet;		/* quiet output? */
 private int persistent;		/* is connection persistent? */
 private int webSocket;		/* WebSocket enabled? */
+private int finalPending;	/* terminal chunk handed to sendMessage,
+				 * awaiting the drain that empties it */
 
 /*
  * initialize HTTP/1.x connection
@@ -509,10 +511,21 @@ static void receiveBytes(string str)
  */
 static void messageChunk()
 {
+    int final;
+
     if (!outbuf || outbuf->length() == 0) {
 	outbuf = nil;
+	/*
+	 * this is the drain that empties outbuf; if finalPending is
+	 * set, the bytes that just finished draining are the terminal
+	 * (length-0) chunk _endChunk queued -- consume the flag here,
+	 * whether or not quiet suppresses the callback, so it can
+	 * never carry forward onto a later, unrelated drain
+	 */
+	final = finalPending;
+	finalPending = FALSE;
 	if (!quiet) {
-	    relay->doneChunk();
+	    relay->doneChunk(final);
 	}
     } else {
 	flow_message(outbuf);
@@ -598,6 +611,16 @@ void sendChunk(StringBuffer chunk, varargs string *params)
 static void _endChunk(string *params, HttpFields trailers, object prev)
 {
     if (prev == relay) {
+	/*
+	 * mark the terminal chunk as queued before handing it to
+	 * sendMessage: whether sendMessage sends it immediately
+	 * (outbuf was empty) or appends it behind a send already in
+	 * flight, no further sendChunk/endChunk call can legally
+	 * follow the terminator, so the next drain that empties
+	 * outbuf is unambiguously this chunk's drain -- see
+	 * messageChunk()
+	 */
+	finalPending = TRUE;
 	sendMessage(chunked(nil, params, trailers));
     }
 }
