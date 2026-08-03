@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Run the full pre-PR regression sweep end to end: the 29 steps
+# Run the full pre-PR regression sweep end to end: the 31 steps
 # scripts/README.md enumerates under "Full regression sweep", executed
 # in order with a per-step verdict and one final summary line. This is
 # the runnable form of that section; the README keeps the annotated
@@ -328,6 +328,7 @@ run_step 28 1 "https-smoke" \
     env DGD_BIN="$DGD_BIN" LPC_EXT_CRYPTO="${LPC_EXT_CRYPTO:-}" scripts/https-smoke.sh
 run_step 29 0 "function-index --check"        python3 scripts/gen-function-index.py --check
 run_step 30 0 "anchor-capture check"          anchor_capture_check
+run_step 31 0 "tutorial-smoke"                env DGD_BIN="$DGD_BIN" scripts/tutorial-smoke.sh
 
 # ---- summary --------------------------------------------------------
 
