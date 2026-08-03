@@ -29,79 +29,79 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `/lib/util/ur.c` | utility module | [kernel-libraries.md](kernel-libraries.md#libutilurc) | Ur-object infrastructure: parent and child tracking for the prototype-inheritance... |
 | `_fire_timing_slot` | dispatcher LFUN | [dispatcher.md](dispatcher.md#_fire_timing_slotobject-obj-string-path-string-timing-) | The per-timing-slot fan-out. |
 | `_resolve_observer` | dispatcher LFUN | [dispatcher.md](dispatcher.md#_resolve_observermixed-val) | The dispatcher stores observers as compiled object references (the original design stored... |
-| `access` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `add_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `approve-registrar` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `Arr` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `access` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Inspect access bits for a user, a directory, or globally |
+| `add_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | merge a map of properties into the table |
+| `approve-registrar` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Add a caller domain to MERRY's approved-registrars set (extension) |
+| `Arr` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Coerce to array: nil is ({ }), an array passes through, any other value wraps as a... |
 | `Array` | library class | [kernel-libraries.md](kernel-libraries.md#array) | Inherits Iterable. |
 | `authenticate` | daemon API | [system-daemons.md](system-daemons.md#mixed-authenticatestring-challenge-string-credentialid-string-clientdatajson-string-authenticatordata-string-signature-varargs-int-ttl) | The assertion ceremony plus session mint in one step; returns ({ subject, token }). |
 | `authenticate_agent_key` | daemon API | [system-daemons.md](system-daemons.md#mixed-authenticate_agent_keystring-challenge-string-credentialid-string-signature-varargs-int-ttl--mixed-authenticate_agent_tokenstring-agenttoken-varargs-int-ttl) | The agent ceremonies (verified by agentauthd) plus session mint in one step; returns ({... |
 | `authenticate_agent_token` | daemon API | [system-daemons.md](system-daemons.md#mixed-authenticate_agent_keystring-challenge-string-credentialid-string-signature-varargs-int-ttl--mixed-authenticate_agent_tokenstring-agenttoken-varargs-int-ttl) | The agent ceremonies (verified by agentauthd) plus session mint in one step; returns ({... |
 | `batch` | dispatcher LFUN | [dispatcher.md](dispatcher.md#batchobject-obj-string-func-mixed-args-varargs-mapping-opts-and-batched_setobject-obj-mapping-kv_map-varargs-mapping-opts) | Two batching APIs. |
-| `batch-status` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `batch-status` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Query a batch's status + reason (extension) |
 | `batched_set` | dispatcher LFUN | [dispatcher.md](dispatcher.md#batchobject-obj-string-func-mixed-args-varargs-mapping-opts-and-batched_setobject-obj-mapping-kv_map-varargs-mapping-opts) | Two batching APIs. |
-| `BatchedSet` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `BatchedSet` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Multi-key property write via MERRY->batched_set(o, kv_map[, opts]). |
 | `bind_agent_token` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-mint_agentstring-controlleruuid-string-credentialid-mapping-row--atomic-string-mint_agent_with_tokenstring-controlleruuid-varargs-int-ttl--atomic-string-bind_agent_tokenstring-uuid-varargs-int-ttl) | Agent minting: with a caller-supplied agent-key row (public key material only), or with a... |
 | `bind_credential` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-bind_credentialstring-uuid-string-credentialid-mapping-row--atomic-void-unbind_credentialstring-uuid-string-credentialid) | Add a credential (globally unique id) / remove one (refuses to empty the record). |
 | `BTnode` | library class | [kernel-libraries.md](kernel-libraries.md#btnode) | Internal B+ tree node backing BTree; applications use BTree, not BTnode directly. |
 | `BTree` | library class | [kernel-libraries.md](kernel-libraries.md#btree) | Inherits Iterable (and private-inherits /lib/util/random for access-key generation). |
-| `Call` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `Call` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Cross-object call (replacement for ->). |
 | `call_limited` | efun override | [kernel-reference.md](kernel-reference.md#call_limited) | Call a function in the current object, using the resource limits of the current object's... |
 | `call_other` | efun override | [kernel-reference.md](kernel-reference.md#call_other) | Call a function in an object. |
 | `call_out` | efun override | [kernel-reference.md](kernel-reference.md#call_out) | Start a callout: schedule the given function in the current object to be called delay... |
 | `call_out_other` | efun override | [kernel-reference.md](kernel-reference.md#call_out_other) | Start a callout in an object. |
 | `call_trace` | efun override | [kernel-reference.md](kernel-reference.md#call_trace) | Return the function call trace as an array. |
-| `capability` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `cascade-depth` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `cd` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `capability` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | List the capability store (principal count and delegable flag per capability); delegable... |
+| `cascade-depth` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Read or set the max cascade depth bound (extension) |
+| `cd` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Change session directory |
 | `ChainedContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#chainedcontinuation) | Inherits Continuation. |
-| `clear` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `clear_all_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `clear` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Empty the code-history ring buffer |
+| `clear_all_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | reset the table, preserving the merry:* runtime wiring (observer registrations... |
 | `clear_name` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-set_nameobject-ob-string-name--atomic-void-clear_namestring-name) | Gated to /lib/util/named by previous_program(). |
 | `clear_name_for_object` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-clear_name_for_objectobject-ob) | KERNEL()-gated destruct-time cleanup: looks up and clears whatever name ob holds. |
-| `clear_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `clone` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `clear_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | remove a single property |
+| `clone` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Clone a master; stores clone in history |
 | `clone_object` | efun override | [kernel-reference.md](kernel-reference.md#clone_object) | Create a clone of the specified object with an unique name of the form "object_name#1234". |
-| `code` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `compile` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `code` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Evaluate an LPC expression; stores result in history ($N) |
+| `compile` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Compile one or more LPC source files |
 | `compile_object` | efun override | [kernel-reference.md](kernel-reference.md#compile_object) | Compile an object from a LPC file, specified by the first argument with ".c" appended. |
 | `configure` | daemon API | [system-daemons.md](system-daemons.md#void-configurestring-rpid-string-origin--string-query_rp_id--string-query_origin) | Relying-party configuration; nil leaves a value unchanged. |
 | `Connection1` | HTTP class | [http-applications.md](http-applications.md#connection1-flow-surface-srcusrhttplibconnection1c) | The HTTP/1.x protocol base both server and client inherit. |
-| `console-ext` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `console-ext` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | List registered extension verbs and approved domains; approve grants admin_console.extend... |
 | `Continuation` | library class | [kernel-libraries.md](kernel-libraries.md#continuation) | Build a chain of steps with add / chain (or the + / >> operators), then start it once... |
-| `cp` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `cp` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Copy files (access-checked at each side) |
 | `create` | lfun | [kernel-reference.md](kernel-reference.md#create) | This function is called when an object is initialized. |
 | `create_identity` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-create_identitystring-credentialid-mapping-row--atomic-mixed-mint_with_codesint-n) | Mint a record with its first credential (a record never exists empty): from a validated... |
 | `declare_label` | daemon API | [system-daemons.md](system-daemons.md#void-declare_labelstring-label-string-type-int-index) | SYSTEM()-gated. |
-| `Decode` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `Decode` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | The round-trip inverse of Encode: tolerant of whitespace variation, loud on anything... |
 | `DelayedContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#delayedcontinuation) | Inherits Continuation. |
 | `delegate_capability` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-delegate_capabilitystring-controlleruuid-string-agentuuid-string-capability--atomic-void-undelegate_capabilitystring-controlleruuid-string-agentuuid-string-capability) | Controller-to-agent delegation, checked against live state in one atomic operation... |
-| `destruct` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `destruct` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Destruct an object |
 | `destruct_object` | efun override | [kernel-reference.md](kernel-reference.md#destruct_object) | Destruct the object given as the argument, which can be an object or the name of an... |
-| `dispatch-trace` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `dispatch-trace` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Toggle or report verbose dispatch-entry tracing (extension) |
 | `dispatch_set` | dispatcher LFUN | [dispatcher.md](dispatcher.md#dispatch_setobject-obj-string-path-mixed-val-varargs-string-caller_program) | The single entry point that property writes route through when the Merry daemon is loaded. |
 | `DistContinuation` | library class | [kernel-libraries.md](kernel-libraries.md#distcontinuation) | Inherits Continuation. |
 | `driver` | driver/userd hook | [kernel-reference.md](kernel-reference.md#driver) | Get the creator of a file. |
-| `Dump` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `Duplicate` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `ed` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `Encode` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `Dump` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Human-facing debug printer (dumpValue): same literal shape as the admin console's value... |
+| `Duplicate` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Clones ob's program and re-imports its full state via Schema marshaling. |
+| `ed` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Open the platform's line editor on a file |
+| `Encode` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Canonical serialization of a sandbox-legal value (nil/int/float/string/array/mapping... |
 | `enroll_passkey` | daemon API | [system-daemons.md](system-daemons.md#string-enroll_passkeystring-sessiontoken-string-challenge-string-clientdatajson-string-attestationobject) | Add-passkey enrollment: a live session binds an ADDITIONAL passkey to its own record --... |
-| `Every` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `Every` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Schedules a recurring re-fire of signal every seconds. |
 | `file_info` | efun override | [kernel-reference.md](kernel-reference.md#file_info) | Get information about a file. |
 | `find_by_credential` | daemon API | [system-daemons.md](system-daemons.md#object-find_identitystring-uuid--string-find_by_credentialstring-credentialid--int-query_identity_count) | Lookups (System/kernel-tier like the rest of the surface). |
 | `find_identity` | daemon API | [system-daemons.md](system-daemons.md#object-find_identitystring-uuid--string-find_by_credentialstring-credentialid--int-query_identity_count) | Lookups (System/kernel-tier like the rest of the surface). |
 | `find_object` | efun override | [kernel-reference.md](kernel-reference.md#find_object) | The string argument is resolved as a file path, and the object with the resulting name is... |
-| `FindMerry` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `Flt` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `Get` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `FindMerry` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Walks oref's Ur-hierarchy and returns the ancestor holding the named... |
+| `Flt` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Coerce to float: nil and "" are 0.0, an int converts, a string parses via sscanf %f. |
+| `Get` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | o->query_property(p). |
 | `get_dir` | efun override | [kernel-reference.md](kernel-reference.md#get_dir) | Get information about a file or files in a directory. |
-| `GetVar` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `GetVar` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Reads args[lower_case(n)] from the inherited args mapping |
 | `GMTime` | library class | [kernel-libraries.md](kernel-libraries.md#gmtime) | Inherits Time; constructs from a formatted GMT string (the inverse of Time's gmctime()). |
-| `grant` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `grant` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Grant directory access (default write), create a user's file access, or add global read |
 | `grant_capability` | daemon API | [system-daemons.md](system-daemons.md#void-grant_capabilitystring-uuid-string-capability--void-revoke_capabilitystring-uuid-string-capability--string-query_grantsstring-uuid) | The operator path binding a platform capability to an identity's principal... |
 | `halt` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `history` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `history` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Show last N values from the code-history ring |
 | `hotboot` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
 | `Http1Client` | HTTP class | [http-applications.md](http-applications.md#http1client-srcusrhttpapilibclient1c) | The inheritable HTTP/1 client library. |
 | `Http1Server` | HTTP class | [http-applications.md](http-applications.md#http1server-srcusrhttpapilibserver1c) | The inheritable per-connection server library; the mount-point object inherits it beside... |
@@ -111,9 +111,9 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `HttpFields` | HTTP class | [http-applications.md](http-applications.md#httpfield-and-httpfields-srcusrhttpapilibfieldc-fieldsc) | A single header and the ordered header collection. |
 | `HttpRequest` | HTTP class | [http-applications.md](http-applications.md#httprequest-srcusrhttpapilibrequestc-and-httpresponse-srcusrhttpapilibresponsec) | The message value types. |
 | `HttpResponse` | HTTP class | [http-applications.md](http-applications.md#httprequest-srcusrhttpapilibrequestc-and-httpresponse-srcusrhttpapilibresponsec) | The message value types. |
-| `identity` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `In` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `Int` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `identity` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Identity-record lifecycle: mint <n>, show, rotate-codes, redeem, revoke, bind, and... |
+| `In` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Schedules a single re-fire of signal on this at t+seconds via schedule_entry. |
+| `Int` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Coerce to integer: nil and "" are 0, a float rounds to nearest (DGD's own float-to-int... |
 | `IntIterator` | library class | [kernel-libraries.md](kernel-libraries.md#intiterator) | Inherits Iterable and Iterator; walks an integer range. |
 | `issue_challenge` | daemon API | [system-daemons.md](system-daemons.md#string-issue_challenge) | A fresh single-use challenge, base64url (32 bytes of secure_random); errors without the... |
 | `issues` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
@@ -122,35 +122,35 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `Iterator` | library class | [kernel-libraries.md](kernel-libraries.md#iterator) |  |
 | `KVnode` | library class | [kernel-libraries.md](kernel-libraries.md#kvnode) | Internal tree node backing KVstore: inherits BTnode, creating nodes as clones and... |
 | `KVstore` | library class | [kernel-libraries.md](kernel-libraries.md#kvstore) | Inherits BTree: the mutators wrap BTree's atomic implementations with key validation (a... |
-| `LabelCall` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `LabelRef` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `log` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `LabelCall` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Looks up the handler registered for script-space space via the Merry daemon's registry... |
+| `LabelRef` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Returns the script-space's registered handler object without calling it |
+| `log` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Tail the last N lines of the persistent log; the read is bounded so a large unrotated log... |
 | `log` | daemon API | [system-daemons.md](system-daemons.md#void-logint-level-string-msg) | Public. |
-| `log-level` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `log-level` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Show or set the persistent-log severity threshold (hosted by logd) |
 | `log_report` | daemon API | [system-daemons.md](system-daemons.md#void-log_reportstring-report) | Gated to SYSTEM() or KERNEL() callers; errord's persistence path. |
 | `logout` | daemon API | [system-daemons.md](system-daemons.md#string-validatestring-token--int-logoutstring-token) | sessiond's validate and revoke, passed through: the subject a live token authenticates... |
-| `ls` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `ls` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | List directory; -l shows size + timestamp |
 | `make_dir` | efun override | [kernel-reference.md](kernel-reference.md#make_dir) | Create the directory named by path. |
 | `mint` | daemon API | [system-daemons.md](system-daemons.md#string-mintstring-principal-varargs-int-ttl) | Mint a session; returns the plaintext token (the only time it exists). |
 | `mint_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-mint_agentstring-controlleruuid-string-credentialid-mapping-row--atomic-string-mint_agent_with_tokenstring-controlleruuid-varargs-int-ttl--atomic-string-bind_agent_tokenstring-uuid-varargs-int-ttl) | Agent minting: with a caller-supplied agent-key row (public key material only), or with a... |
 | `mint_agent_with_token` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-mint_agentstring-controlleruuid-string-credentialid-mapping-row--atomic-string-mint_agent_with_tokenstring-controlleruuid-varargs-int-ttl--atomic-string-bind_agent_tokenstring-uuid-varargs-int-ttl) | Agent minting: with a caller-supplied agent-key row (public key material only), or with a... |
 | `mint_with_codes` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-create_identitystring-credentialid-mapping-row--atomic-mixed-mint_with_codesint-n) | Mint a record with its first credential (a record never exists empty): from a validated... |
-| `mkdir` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `mv` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `new` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `mkdir` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Create directories |
+| `mv` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Rename / move files |
+| `new` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Instantiate an LWO from a data/ master |
 | `new_object` | efun override | [kernel-reference.md](kernel-reference.md#new_object) | Create a new light-weight instance of the specified object with a name of the form... |
-| `Obj` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `observers` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `password` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `Obj` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Coerce to object: nil and objects pass through; a string resolves via find_object with... |
+| `observers` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | List observers: local slot (indexed), observed-path enumeration, or effective walk view... |
+| `password` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Rotate the connected operator's password (old, new, retype); the new hash is written to... |
 | `patch` | lfun | [kernel-reference.md](kernel-reference.md#patch) | The per-clone migration hook. |
-| `people` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `pwd` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `query-approved-registrars` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `people` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | List login sessions with address and idle time (application transport connections do not... |
+| `pwd` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Print session directory |
+| `query-approved-registrars` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | List MERRY's approved-registrars set (extension) |
 | `query_agents` | daemon API | [system-daemons.md](system-daemons.md#string-query_agentsstring-controlleruuid--string-query_grant_sourcesstring-uuid-string-capability) | The agents a controller controls (the controller index) / the tracked reasons a grant... |
-| `query_ascii_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `query_ascii_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | marshal a value through the /lib/util/coercion codec (the Core:Entry schema's property... |
 | `query_delegations` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_delegationsstring-uuid--atomic-string-reconcile_delegationsstring-uuid) | An agent's delegations (capability : grantor uuid, a copy) / the bypass heal: revoke any... |
 | `query_dispatch_trace` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_dispatch_traceint-flag-and-query_dispatch_trace) | Toggle the optional verbose dispatcher trace logging. |
-| `query_downcased_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `query_downcased_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | read by an already-lower-cased key |
 | `query_grant_sources` | daemon API | [system-daemons.md](system-daemons.md#string-query_agentsstring-controlleruuid--string-query_grant_sourcesstring-uuid-string-capability) | The agents a controller controls (the controller index) / the tracked reasons a grant... |
 | `query_grants` | daemon API | [system-daemons.md](system-daemons.md#void-grant_capabilitystring-uuid-string-capability--void-revoke_capabilitystring-uuid-string-capability--string-query_grantsstring-uuid) | The operator path binding a platform capability to an identity's principal... |
 | `query_identity_count` | daemon API | [system-daemons.md](system-daemons.md#object-find_identitystring-uuid--string-find_by_credentialstring-credentialid--int-query_identity_count) | Lookups (System/kernel-tier like the rest of the surface). |
@@ -158,7 +158,7 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `query_includes` | daemon API | [system-daemons.md](system-daemons.md#string-query_includesint-index) | The files the program at index includes. |
 | `query_inherited` | daemon API | [system-daemons.md](system-daemons.md#int-query_inheritedint-index) | The indices of programs that inherit the program at index, with the same bucket-shaped... |
 | `query_inherits` | daemon API | [system-daemons.md](system-daemons.md#int-query_inheritsint-index) | The indices of programs the program at index inherits. |
-| `query_intrinsic_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `query_intrinsic_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | the full raw table, including merry:* |
 | `query_issues` | daemon API | [system-daemons.md](system-daemons.md#int-query_issuesstring-path) | The active program issue indices for path. |
 | `query_label` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_labelstring-label--string-query_labels) | Public -- the query surface is open to every tier. |
 | `query_labels` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_labelstring-label--string-query_labels) | Public -- the query surface is open to every tier. |
@@ -171,26 +171,26 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `query_owner` | lfun | [kernel-reference.md](kernel-reference.md#query_owner) | This function is predefined in all objects. |
 | `query_passkeys` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_passkeysstring-sessiontoken--void-revoke_passkeystring-sessiontoken-string-credentialid) | Passkey self-service on the session's own record. |
 | `query_path` | daemon API | [system-daemons.md](system-daemons.md#string-query_pathint-index) | The object path registered at program index index, or nil. |
-| `query_prefixed_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `query_prefixed_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | every stored key sharing prefix (the Merry-script lookup surface) |
 | `query_principal_sessions` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_principal_sessionsstring-principal--int-revoke_session_idstring-principal-string-id) | The administration bookkeeping pair. |
-| `query_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `query_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `query_property_indices` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `query_raw_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `query_properties` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | the property map; excludes the reserved merry:* namespace unless a non-zero argument is... |
+| `query_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | read a property (lower-cases the key first) |
+| `query_property_indices` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | the property keys (same opaque rule) |
+| `query_raw_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | read by the exact key, without the lower-casing pass |
 | `query_rp_id` | daemon API | [system-daemons.md](system-daemons.md#void-configurestring-rpid-string-origin--string-query_rp_id--string-query_origin) | Relying-party configuration; nil leaves a value unchanged. |
 | `query_session_count` | daemon API | [system-daemons.md](system-daemons.md#int-revokestring-token--int-revoke_principalstring-principal--int-query_session_count) | Drop one session (TRUE iff a live one was removed); drop every session for a principal (a... |
 | `query_subdirs` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_tree--string-query_subdirsvarargs-string-path--string-query_objectsvarargs-string-path) | Public introspection over the name tree: the full nested mapping, the folder names under... |
 | `query_subject_sessions` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_subject_sessionsstring-sessiontoken-string-subject--int-revoke_subject_sessionstring-sessiontoken-string-subject-string-sessionid--int-revoke_subject_sessionsstring-sessiontoken-string-subject) | Session administration: bookkeeping and revocation for subjects OTHER than the caller --... |
 | `query_threshold` | daemon API | [system-daemons.md](system-daemons.md#void-set_thresholdint-level--int-query_threshold) | The write is KERNEL()-gated (an ungated caller gets an error, not a silent nil) and... |
 | `query_tree` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_tree--string-query_subdirsvarargs-string-path--string-query_objectsvarargs-string-path) | Public introspection over the name tree: the full nested mapping, the folder names under... |
-| `queryStateRoot` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `quota` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `reboot` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `queryStateRoot` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | the schema state-root name for marshaling (default "Core:Entries"; inheritors override... |
+| `quota` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Read or set per-owner resource limits |
+| `reboot` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Incremental snapshot + cold shutdown (recovers from snapshot on next boot). |
 | `reconcile_delegations` | daemon API | [system-daemons.md](system-daemons.md#mapping-query_delegationsstring-uuid--atomic-string-reconcile_delegationsstring-uuid) | An agent's delegations (capability : grantor uuid, a copy) / the bypass heal: revoke any... |
 | `recover_identity` | daemon API | [system-daemons.md](system-daemons.md#mixed-recover_identitystring-uuid-string-code-string-challenge-string-clientdatajson-string-attestationobject-varargs-int-ttl) | The recovery ceremony plus session mint: verifies the NEW passkey's registration payload... |
 | `redeem_and_replace` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-redeem_recovery_codestring-uuid-string-code--atomic-void-redeem_and_replacestring-uuid-string-code-string-newid-mapping-row) | Single-use redemption (refuses to consume the last credential) / the recovery ceremony's... |
 | `redeem_recovery_code` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-redeem_recovery_codestring-uuid-string-code--atomic-void-redeem_and_replacestring-uuid-string-code-string-newid-mapping-row) | Single-use redemption (refuses to consume the last credential) / the recovery ceremony's... |
-| `register-observer` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `register-observer` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Install a runtime observer (extension) |
 | `register_credential` | daemon API | [system-daemons.md](system-daemons.md#string-register_credentialstring-challenge-string-clientdatajson-string-attestationobject) | The TOFU registration ceremony; returns the new principal string (identity:<uuid>). |
 | `register_identity` | daemon API | [system-daemons.md](system-daemons.md#mixed-register_identitystring-challenge-string-clientdatajson-string-attestationobject-varargs-int-ttl) | The TOFU registration ceremony plus session mint in one step; returns ({ subject, token... |
 | `register_manager` | daemon API | [system-daemons.md](system-daemons.md#void-register_managerstring-label-object-manager) | SYSTEM()-gated. |
@@ -206,26 +206,26 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `revoke_session_id` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_principal_sessionsstring-principal--int-revoke_session_idstring-principal-string-id) | The administration bookkeeping pair. |
 | `revoke_subject_session` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_subject_sessionsstring-sessiontoken-string-subject--int-revoke_subject_sessionstring-sessiontoken-string-subject-string-sessionid--int-revoke_subject_sessionsstring-sessiontoken-string-subject) | Session administration: bookkeeping and revocation for subjects OTHER than the caller --... |
 | `revoke_subject_sessions` | daemon API | [system-daemons.md](system-daemons.md#mixed-query_subject_sessionsstring-sessiontoken-string-subject--int-revoke_subject_sessionstring-sessiontoken-string-subject-string-sessionid--int-revoke_subject_sessionsstring-sessiontoken-string-subject) | Session administration: bookkeeping and revocation for subjects OTHER than the caller --... |
-| `rm` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `rmdir` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `rm` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Remove files (refuses directories) |
+| `rmdir` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Remove empty directories |
 | `rotate_credential` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-rotate_credentialstring-uuid-string-newid-mapping-row-string-oldid) | Add-then-revoke as one atomic step -- the record never passes through a zero-credential... |
 | `rotate_recovery_codes` | daemon API | [system-daemons.md](system-daemons.md#atomic-string-rotate_recovery_codesstring-uuid-int-n) | Replace the record's recovery-code set with n fresh codes; returns the plaintext codes. |
-| `rsrc` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `rsrc` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Read or set platform-wide resource caps |
 | `send_atomic_message` | efun override | [kernel-reference.md](kernel-reference.md#send_atomic_message) | Add a string to the list of messages that can be retrieved after an atomic rollback... |
-| `session` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `Set` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `session` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Session-count and mint-ceiling status; mint <principal> [ttl], max-ttl [seconds]... |
+| `Set` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | o->set_property(p, v). |
 | `set_dispatch_trace` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_dispatch_traceint-flag-and-query_dispatch_trace) | Toggle the optional verbose dispatcher trace logging. |
 | `set_max_cascade_depth` | dispatcher LFUN | [dispatcher.md](dispatcher.md#set_max_cascade_depthint-n-and-query_max_cascade_depth) | Configure the depth-shaped cascade bound. |
 | `set_max_ttl` | daemon API | [system-daemons.md](system-daemons.md#int-query_max_ttl--void-set_max_ttlint-seconds) | The mint ceiling and its setter (positive seconds; errors otherwise). |
 | `set_name` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-set_nameobject-ob-string-name--atomic-void-clear_namestring-name) | Gated to /lib/util/named by previous_program(). |
-| `set_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
-| `set_raw_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) |  |
+| `set_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | public write; routes through the Merry dispatcher when the daemon is loaded, else writes... |
+| `set_raw_property` | property surface | [kernel-libraries.md](kernel-libraries.md#libutilpropertiesc) | write directly, bypassing dispatch (the dispatcher's own write step; also for... |
 | `set_threshold` | daemon API | [system-daemons.md](system-daemons.md#void-set_thresholdint-level--int-query_threshold) | The write is KERNEL()-gated (an ungated caller gets an error, not a silent nil) and... |
-| `SetVar` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `shutdown` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `Slay` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `snapshot` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `Spawn` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `SetVar` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Writes v into the inherited args mapping under lower_case(n) |
+| `shutdown` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Cold shutdown without snapshot. |
+| `Slay` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Calls obj->suicide() to schedule destruction. |
+| `snapshot` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Write a full statedump to dump_file |
+| `Spawn` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Clones the ur's clonable (via the ::clone_object escape) and stamps the result with ur as... |
 | `src/lib/util/ascii.c` | utility module | [kernel-libraries.md](kernel-libraries.md#srclibutilasciic) |  |
 | `src/lib/util/asn.c` | utility module | [kernel-libraries.md](kernel-libraries.md#srclibutilasnc) | Arbitrary-precision integers are carried as byte strings; these convert and measure that... |
 | `src/lib/util/base64.c` | utility module | [kernel-libraries.md](kernel-libraries.md#srclibutilbase64c) |  |
@@ -243,25 +243,25 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `src/lib/util/unicode.c` | utility module | [kernel-libraries.md](kernel-libraries.md#srclibutilunicodec) | Operate on a single Unicode code point. |
 | `src/lib/util/url.c` | utility module | [kernel-libraries.md](kernel-libraries.md#srclibutilurlc) |  |
 | `src/lib/util/webauthn.c` | utility module | [kernel-libraries.md](kernel-libraries.md#srclibutilwebauthnc) | WebAuthn (W3C Web Authentication Level 2) ceremony verification as pure functions: no... |
-| `status` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `status` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | System-wide health vector, or per-object status |
 | `status` | efun override | [kernel-reference.md](kernel-reference.md#status) | Called without an argument, this kfun returns information about resources used by the... |
-| `Stop` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
-| `Str` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) |  |
+| `Stop` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Cancels a scheduled In or Every entry by id via unschedule_entry |
+| `Str` | merryfun | [merry-language.md](merry-language.md#merryfun-call-surface) | Coerce to string: nil is "", int/float convert, a string passes through, an object... |
 | `String` | library class | [kernel-libraries.md](kernel-libraries.md#string) | Inherits Iterable (a String iterates over its characters); private-inherits... |
 | `StringBuffer` | library class | [kernel-libraries.md](kernel-libraries.md#stringbuffer) |  |
 | `subscribe_events` | daemon API | [system-daemons.md](system-daemons.md#void-subscribe_eventsobject-daemon) | The mutation-notification seam. |
 | `suspend_agent` | daemon API | [system-daemons.md](system-daemons.md#atomic-int-suspend_agentstring-uuid--atomic-void-resume_agentstring-uuid) | The kill switch: suspend blocks authentication at ceremony time, revokes the agent's live... |
-| `swapout` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `swapout` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Swap all in-memory objects to the swap file |
 | `Time` | library class | [kernel-libraries.md](kernel-libraries.md#time) |  |
-| `tls-cert` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `tls-cert` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Certificate and registration status; reload revalidates the PEM files and completes a... |
 | `tls_get` | efun override | [kernel-reference.md](kernel-reference.md#tls_get) | Get the Task Local Storage value described by the index. |
 | `tls_set` | efun override | [kernel-reference.md](kernel-reference.md#tls_set) | Set the Task Local Storage value described by the index. |
 | `touch_credential` | daemon API | [system-daemons.md](system-daemons.md#void-update_sign_countstring-uuid-string-credentialid-int-count--void-touch_credentialstring-uuid-string-credentialid) | WebAuthn bookkeeping on a bound passkey (sets the authenticator counter and last-used... |
-| `unapprove-registrar` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `unapprove-registrar` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Remove a caller domain from MERRY's approved-registrars set (extension) |
 | `unbind_credential` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-bind_credentialstring-uuid-string-credentialid-mapping-row--atomic-void-unbind_credentialstring-uuid-string-credentialid) | Add a credential (globally unique id) / remove one (refuses to empty the record). |
 | `undelegate_capability` | daemon API | [system-daemons.md](system-daemons.md#atomic-void-delegate_capabilitystring-controlleruuid-string-agentuuid-string-capability--atomic-void-undelegate_capabilitystring-controlleruuid-string-agentuuid-string-capability) | Controller-to-agent delegation, checked against live state in one atomic operation... |
-| `ungrant` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
-| `unregister-observer` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `ungrant` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Remove a directory grant, a user's file access, or a global-read entry |
+| `unregister-observer` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Clear all observers at (obj, path, timing), or remove one by index (extension) |
 | `unregister_observer` | dispatcher LFUN | [dispatcher.md](dispatcher.md#unregister_observerobject-ob-string-path-string-timing) | Removes ALL observers at the (ob, path, timing) triple by clearing the... |
 | `update_sign_count` | daemon API | [system-daemons.md](system-daemons.md#void-update_sign_countstring-uuid-string-credentialid-int-count--void-touch_credentialstring-uuid-string-credentialid) | WebAuthn bookkeeping on a bound passkey (sets the authenticator counter and last-used... |
 | `upgrade` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
@@ -272,7 +272,7 @@ The table below is mirrored by the generator from `kernel-reference.md`'s Where 
 | `verify_key_assertion` | daemon API | [system-daemons.md](system-daemons.md#string-verify_key_assertionstring-challenge-string-credentialid-string-signature) | The key ceremony: signature over the domain-separated message against the bound agent-key... |
 | `verify_registration_payload` | daemon API | [system-daemons.md](system-daemons.md#mapping-verify_registration_payloadstring-challenge-string-clientdatajson-string-attestationobject) | Registration-ceremony verification without a mint: returns the verified credential row... |
 | `verify_token` | daemon API | [system-daemons.md](system-daemons.md#string-verify_tokenstring-token) | The token ceremony: hash lookup, full-hash match, expiry and record checks; returns the... |
-| `webauthn` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) |  |
+| `webauthn` | console verb | [admin-console.md](admin-console.md#appendix-alphabetical-verb-reference) | Relying-party status and configuration (rpid/origin); register and authenticate drive the... |
 
 ## By kind
 

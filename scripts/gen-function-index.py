@@ -50,6 +50,20 @@ def strip_markdown(text):
     return text
 
 
+def split_table_row(line):
+    """Split a markdown table row into its cell texts, honoring a `\\|`
+    escaped pipe inside a cell (the admin-console.md verb column uses one
+    to show alternation, e.g. "<user>\\|<directory>\\|global") -- a naive
+    split('|') would cut that cell in two. Drops the empty leading/
+    trailing fields the outer pipes produce."""
+    cells = re.split(r"(?<!\\)\|", line)
+    if cells and cells[0].strip() == "":
+        cells = cells[1:]
+    if cells and cells[-1].strip() == "":
+        cells = cells[:-1]
+    return [c.replace("\\|", "|").strip() for c in cells]
+
+
 def first_sentence(text, limit=90):
     """The first sentence of collapsed prose, truncated on a word
     boundary at ~limit chars with a trailing ellipsis."""
@@ -228,12 +242,18 @@ def collect():
         if in_props:
             b = re.match(r"^- `[^`]*?([A-Za-z_][A-Za-z0-9_]*)\s*\(", ln)
             if b:
+                # The bullet's own trailing " -- <description>" past the
+                # closing backtick of its signature (or the last of a
+                # "`sig1` / `sig2`" pair) is the synopsis; every bullet in
+                # this block uses that shape.
+                d = re.search(r"`\s*--\s*(.+)$", ln)
+                synopsis = first_sentence(strip_markdown(d.group(1))) if d else ""
                 add(b.group(1), "property surface", "kernel-libraries.md",
-                    "#" + slug("/lib/util/properties.c"))
+                    "#" + slug("/lib/util/properties.c"), synopsis)
 
-    # 5. merry-language.md: merryfun table rows `| `Name` | `sig` | ... |`.
-    #    Section anchor only (no per-row anchor); every merryfun would
-    #    otherwise inherit the same section-level sentence, so no synopsis.
+    # 5. merry-language.md: merryfun table rows `| `Name` | `sig` |
+    #    Behavior |`. Section anchor only (no per-row anchor), but the
+    #    row's own Behavior cell is per-name, so it becomes the synopsis.
     lines = read("merry-language.md")
     inside = in_fence_tracker()
     merry_anchor = None
@@ -246,7 +266,11 @@ def collect():
             merry_anchor = "#" + slug(h.group(1))
         m = re.match(r"^\| `([A-Za-z_][A-Za-z0-9_]*)` \| `[^`]+\([^|]*` \|", ln)
         if m and merry_anchor:
-            add(m.group(1), "merryfun", "merry-language.md", merry_anchor)
+            cells = split_table_row(ln)
+            behavior = cells[2] if len(cells) > 2 else ""
+            synopsis = first_sentence(strip_markdown(behavior))
+            add(m.group(1), "merryfun", "merry-language.md", merry_anchor,
+                synopsis)
 
     # 6. http-applications.md: ### `Class` headings under ## API signatures.
     lines = read("http-applications.md")
@@ -271,9 +295,9 @@ def collect():
                     add(tok, "HTTP class", "http-applications.md", anchor,
                         synopsis)
 
-    # 7. admin-console.md: verb-appendix table rows. Section anchor only;
-    #    same section-sentence-for-every-verb reasoning as merryfuns, so
-    #    no synopsis.
+    # 7. admin-console.md: verb-appendix table rows (`| Verb | Category |
+    #    Brief |`). Section anchor only, but the row's own Brief cell is
+    #    per-verb, so it becomes the synopsis.
     lines = read("admin-console.md")
     inside = in_fence_tracker()
     verb_anchor = None
@@ -286,7 +310,11 @@ def collect():
             verb_anchor = "#" + slug(h.group(1))
         m = re.match(r"^\| `([A-Za-z_][A-Za-z0-9_-]*)", ln)
         if m and verb_anchor:
-            add(m.group(1), "console verb", "admin-console.md", verb_anchor)
+            cells = split_table_row(ln)
+            brief = cells[2] if len(cells) > 2 else ""
+            synopsis = first_sentence(strip_markdown(brief))
+            add(m.group(1), "console verb", "admin-console.md", verb_anchor,
+                synopsis)
 
     return entries
 
