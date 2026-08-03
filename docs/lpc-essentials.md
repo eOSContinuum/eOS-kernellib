@@ -42,7 +42,7 @@ LPC.md §3.4.2 lists eight types:
 | Type | Holds | Notes |
 |---|---|---|
 | `nil` | The "no value" value | Default for uninitialized variables |
-| `int` | 32-bit signed integer | -2147483648 through 2147483647 |
+| `int` | 32-bit signed integer | -2147483648 through 2147483647; `time()` and epoch-seconds values inherit this width, rolling over at 2038-01-19 03:14:07 UTC (`docs/configuration.md` Ceilings that are not `.dgd` fields) |
 | `float` | Double-precision floating point | IEEE 754 |
 | `string` | Sequence of characters | Immutable; first-class value |
 | `object` | Reference to another object | Master or clone |

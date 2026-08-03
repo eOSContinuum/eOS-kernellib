@@ -83,7 +83,7 @@ New to eOS-kernellib? Read [`docs/getting-started.md`](docs/getting-started.md) 
 DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
 ```
 
-A passing run ends with the expected `OK` sentinel count. [`scripts/README.md`](scripts/README.md) documents the harness; each example under [`examples/`](examples/) names its own profile, and the Full regression sweep there is the complete bar — every example and smoke in about fifteen minutes end to end on the measured-baseline hardware.
+A passing run ends with the expected `OK` sentinel count — [`docs/getting-started.md`](docs/getting-started.md#zero-to-a-passing-proof) shows the captured transcript, and [`docs/getting-started.md`](docs/getting-started.md#run-it-in-a-container) has the same proof running in a container with no C toolchain on the host, if DGD is not yet built. [`scripts/README.md`](scripts/README.md) documents the harness; each example under [`examples/`](examples/) names its own profile, and the Full regression sweep there is the complete bar — every example and smoke in about fifteen minutes end to end on the measured-baseline hardware.
 
 **Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated as of 2026-07-18. Other POSIX-compatible systems should work; [`docs/building.md`](docs/building.md) covers platform-specific build notes.
 

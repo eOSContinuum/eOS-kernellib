@@ -14,6 +14,8 @@ A hands-on tutorial. In the next hour you will boot the platform, create a livin
 
 If this command fails on the configuration, that is the localization from the audience line above: the shipped `example.dgd` boots nowhere as-is (its `directory` is a placeholder path), so make the localized copy per [getting-started.md](getting-started.md#boot-it-yourself-the-configuration-and-the-ports) Boot it yourself and pass that file instead.
 
+If it instead fails to bind (something else already holds 8023 or 8080 -- another instance on the same machine, most often), the fix is the same localized copy with different ports: edit the `telnet_port` and `binary_port` entries in your `state/local.dgd` (or `example.dgd`) to free numbers, then use those numbers everywhere this tutorial says 8023 or 8080 -- the connect command in the next step and every `curl`/`telnet` line after it. `scripts/README.md` Port allocation on a shared machine names the pattern other tooling on this checkout uses (a `+10000`-stepped pair) if you want to stay consistent with it.
+
 The boot log prints, each line stamped with the host time (and the banner says 1.7.9 even on a newer `master` build -- `docs/getting-started.md` Install DGD):
 
 ```text

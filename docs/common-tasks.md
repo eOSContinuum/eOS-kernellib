@@ -65,6 +65,19 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/admin-console.md` The application registration surface.
 
+## React to a property change with a sandboxed script
+
+**Goal**: code runs automatically, inside the write, when a specific property on one of your objects changes.
+
+1. Give the target object the property API: inherit `/lib/util/properties` (most application objects already carry this for their own state).
+2. Register the reaction: `MERRY->register_observer(target, "your:property", "main", "<Merry source>")` -- the Merry source compiles into the sandbox at registration time (a 51-entry kfun deny list; no raw object access outside the provided surface) and is stored as a property on `target` itself, so it persists and replicates with the object like any other state.
+3. Pick the timing: `"pre"` runs before the write lands and can veto it, `"main"` runs after the write with the new value visible, `"post"` runs after every `"main"` observer at that triple has fired -- ordering, veto, multi-observer fan-out, and cascade bounds are `dispatcher.md`'s.
+4. `register_observer` (and `unregister_observer`, `remove_observer`) pass the registrar gate (`_check_registrar`), which accepts exactly three callers: a program under `/kernel/`, a caller whose creator domain holds the `merry.registrar` capability, or a caller registering on a target in its own domain -- the self-domain path almost every application uses. A cross-domain registration without the capability is refused; grant it via the `approve-registrar` admin verb if your domain genuinely needs to register on objects it does not own.
+
+**Verify**: `DGD_BIN=<dgd> scripts/run-example.sh signal-app` -- `PASS`, 1 `" OK"` sentinel: the worked form of exactly this recipe (one property host, one `"main"` observer, one write, one assertion that the reaction already ran when the write returned).
+
+**Owning doc**: `docs/signal-applications.md` (the walkthrough); `docs/dispatcher.md` (timings, ordering, the registrar gate, cascade bounds); `docs/observers.md` (the observer lifecycle contract).
+
 ## Bind an additional port
 
 **Goal**: your application accepts raw (non-HTTP) connections on its own port.
@@ -85,7 +98,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 2. The route rides your existing `binary_port` mount, cleartext or TLS (`docs/operations.md` Network boundary and transport security); no new port and no operator credential is involved.
 3. Point the monitor at the route on an interval and alert on the thresholds in `docs/operations.md` Monitoring signals -- the swap-sector line earliest, because its ceiling is fatal rather than degrading.
 
-**Verify**: `curl http://localhost:8080/status` against the deployed example returns the five `key=value` lines; cross-check the capacity caps and the `users` count against the console `status` block. The used counts (objects, callouts, sectors) legitimately drift a few units between the two probes -- the probe connection and the console login are themselves objects -- so matching caps and `users` is the check, not equal object counts.
+**Verify**: `curl http://localhost:<binary_port>/status` (your configured `binary_port` -- 8080 on an unedited `example.dgd`; `scripts/README.md` Port allocation on a shared machine if something else already holds that port) against the deployed example returns the five `key=value` lines; cross-check the capacity caps and the `users` count against the console `status` block. The used counts (objects, callouts, sectors) legitimately drift a few units between the two probes -- the probe connection and the console login are themselves objects -- so matching caps and `users` is the check, not equal object counts.
 
 **Owning doc**: `docs/operations.md` Monitoring signals; `examples/http-app/` for the worked route.
 
@@ -93,7 +106,7 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Goal**: a monitoring system reads the capacity counts over the console, for a deployment with no HTTP application to carry a status route -- the HTTP route's five fields in the same vocabulary, plus `swap-rate5`, which only the console path carries.
 
-1. Provision the monitoring credential once: `grant monitor access` from the admin console, with no directory grants, and walk its first login deliberately -- the set-a-password window is first-come (`docs/security-posture.md` Credential lifecycle). `docs/operations.md` (Monitoring signals, The monitoring credential) carries the credential's verified surface and its one standing caveat: `halt` has no access gate, so this credential is never read-only in blast radius.
+1. Provision the monitoring credential once: `grant monitor access` from the admin console, with no directory grants, and walk its first login deliberately -- the set-a-password window is first-come (`docs/security-posture.md` Credential lifecycle). The grant creates `src/usr/monitor` (the kernel makes every newly granted user's directory, regardless of whether the grant carries any directory access), so a checkout that has run this recipe carries that empty mount from then on. `docs/operations.md` (Monitoring signals, The monitoring credential) carries the credential's verified surface and its one standing caveat: `halt` has no access gate, so this credential is never read-only in blast radius.
 2. Write a verbset for the harness's telnet client (`scripts/drive-verbs.py`; block format in `scripts/README.md`): file-level `user:`/`password:` directives for the credential, then one `code` block emitting the same `key=used/cap` vocabulary the HTTP route uses, with an `expect:` per field:
 
 ```text
@@ -255,7 +268,7 @@ expect: swap-rate5=\d+
 **Goal**: the composite example's guided walk running in your browser over TLS the browser trusts, from one command.
 
 1. Prerequisites, once per machine: `mkcert` with its CA installed (`mkcert -install`), `python3`, `openssl`. The identity ceremonies need the host crypto module.
-2. `LPC_EXT_CRYPTO=/path/to/crypto.<ver> DGD_BIN=/path/to/dgd scripts/demo-composite.sh` deploys the interactive shape, generates the certificate, boots with native TLS on the labeled `https` port, drives the bring-up console verbs (two provision -- the provisioner compile and the capability's delegable flag -- the rest verify), and leaves the instance running -- `DEMO READY` (with the server pid) is the success signal. The script refuses to start while another dgd instance is running.
+2. `LPC_EXT_CRYPTO=/path/to/crypto.<ver> DGD_BIN=/path/to/dgd scripts/demo-composite.sh` deploys the interactive shape, generates the certificate, boots with native TLS on the labeled `https` port, drives the bring-up console verbs (two provision -- the provisioner compile and the capability's delegable flag -- the rest verify), and leaves the instance running -- `DEMO READY` (with the server pid) is the success signal. The script is deliberately fixed to the stock 8023/8080/8443 ports (it is the teaching and demo surface, `scripts/README.md` Port allocation on a shared machine) and refuses to start with a clear message when another instance already holds one of them; free the port (stop the other instance, or find it with `lsof -iTCP:8443 -sTCP:LISTEN`) rather than editing the script.
 3. Open `https://localhost:8443/demo` and follow the numbered walk: the register / login / recover entry triad, delegation with an observable effect, the intended refusals at all three authorization tiers, and passkey self-service including add-passkey enrollment.
 4. Teardown when done: the script's header lists the exact commands -- kill the printed pid, then remove the deployed mounts, the TLS material, the provisioner copy, the demo's state files, and the kernel access-grant residue (`src/kernel/data/access.data`).
 
@@ -280,7 +293,7 @@ expect: swap-rate5=\d+
 
 **Goal**: a from-checkout boot with no residue from prior example runs or operator provisioning.
 
-1. Remove every deployed example mount (`src/usr/<Mount>/` -- the full list is `run-example.sh`'s clean-slate loop, and it includes `WWW`, the same mount name the `first-http-endpoint.md` tutorial uses), plus the tutorial domains the harness does not know about (`src/usr/Pet`, `src/usr/KV`) -- leftover domains re-register on every cold boot. Remove the snapshot pair and swap (`state/snapshot`, `state/snapshot.old`, `state/swap`) and the provisioning residue the console flows create (`src/usr/testop/`, `src/kernel/data/access.data`).
+1. Remove every deployed example mount (`src/usr/<Mount>/` -- the full list is `run-example.sh`'s clean-slate loop, and it includes `WWW`, the same mount name the `first-http-endpoint.md` tutorial uses), plus the tutorial domains the harness does not know about (`src/usr/Pet`, `src/usr/KV`), plus any mount a credential grant created (`src/usr/monitor` from `grant monitor access`, `src/usr/testop` from the operator-provisioning recipes, and any other user you registered -- `grant <user> access` makes `src/usr/<user>` unconditionally) -- leftover domains re-register on every cold boot. Remove the snapshot pair and swap (`state/snapshot`, `state/snapshot.old`, `state/swap`) and the provisioning residue the console flows create (`src/usr/testop/`, `src/kernel/data/access.data`).
 2. For a full reset, also delete the admin credential (`src/kernel/data/admin.pwd`): the next console login re-claims it, and the smoke scripts expect the default password `drive-verbs` there, not one you picked in the tutorials (`scripts/README.md`).
 3. Or let the harness do it: every `scripts/drive-verbs-smoke.sh` run performs the mount-and-state reset first; `scripts/run-example.sh` resets the mounts and state files but leaves the operator-provisioning residue (`src/usr/testop/`, `access.data`) in place. Both remove `src/usr/WWW` -- it is in the example-mount list, and a tutorial-authored WWW domain goes with it -- but neither touches `admin.pwd`, `src/usr/Pet`, or `src/usr/KV` (`scripts/README.md`).
 
