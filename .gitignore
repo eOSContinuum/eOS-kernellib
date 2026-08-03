@@ -18,6 +18,11 @@ src/usr/MerryApp/
 src/usr/Chat/
 src/usr/WWW/
 src/usr/Inventory/
+
+# docs/first-hour.md's tutorial domain, created live by hand (or by
+# scripts/tutorial-smoke.sh replaying the doc) rather than deployed from
+# examples/.
+src/usr/Pet/
 src/usr/WebAuthn/
 src/usr/Reload/
 src/usr/Cascade/
