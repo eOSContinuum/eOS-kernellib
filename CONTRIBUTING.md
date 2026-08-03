@@ -71,6 +71,10 @@ Two documentation surfaces:
 
 New docs added to `docs/` use lowercase-hyphenated filenames matching the existing pattern. The `docs/README.md` folder index is updated to include any new doc in the appropriate audience group.
 
+Three docs carry an executable transcript, not just illustrative prose: `docs/first-hour.md`, `docs/first-application.md`, and `docs/first-http-endpoint.md`. `scripts/tutorial-smoke.sh` parses each doc's own fenced blocks at run time and replays them against a live boot on every PR (`scripts/README.md` `tutorial-smoke.sh`, sweep step 31); a fenced command or its expected output is not free-standing prose, and a hand-edit that drifts from what the platform actually prints fails CI. The update mechanic is always the same: change the tutorial, boot the platform, re-drive the changed step by hand to capture the real output, paste that transcript back into the doc, then rerun `scripts/tutorial-smoke.sh` locally before opening the PR -- never hand-adjust expected output to make a guess pass.
+
+Other docs' transcripts (`docs/first-contribution.md` among them) are illustrative captures only; nothing replays them, and a behavior change that touches their quoted output still needs a manual re-verify.
+
 The platform sits at the junction of several traditions (DGD driver, kernellib, SkotOS, WebAuthn, contemporary infrastructure), and their vocabularies collide. The doc set resolves collisions by register separation, not renaming: each plane keeps its home tradition's term, with a one-sentence bridge at each seam where planes meet (the glossary's "principal" and "subject" entries are worked examples). A rename is right only when a plane's own term misleads at its interface.
 
 A behavior change updates the document that owns it. At subsystem grain, `docs/source-map.md` maps each subsystem to its doc; the most-restated mechanisms cross subsystems, so their owners are named here directly -- update the owner first, and let other docs reference rather than restate:
@@ -144,7 +148,7 @@ Shell scripts under `examples/` follow POSIX conventions and target a portable i
 2. Create a branch named for the change shape: `feature/<short-name>`, `fix/<short-name>`, `docs/<short-name>`, or `refactor/<short-name>`.
 3. Commit per the conventions above.
 4. Open the PR against `main`. Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md) shape; fill in the linked issue, the change summary, and the verification steps.
-5. The regression workflow (`.github/workflows/regression.yml`) runs on every PR: it builds the pinned DGD driver (cached by commit) and runs the module-less Full regression sweep bar, with the module-gated steps reporting their documented SKIPs (`scripts/README.md` Full regression sweep). What CI does not cover, the PR's verification section still carries as reproducible evidence: the module-bearing steps your change touches (crypto-module examples, the TLS and identity smokes), with the exact commands and pass signals for a reviewer to rerun locally.
+5. The regression workflow (`.github/workflows/regression.yml`) runs on every PR: it builds the pinned DGD driver (cached by commit) and runs the module-less Full regression sweep bar, with the module-gated steps reporting their documented SKIPs (`scripts/README.md` Full regression sweep). What CI does not cover, the PR's verification section still carries as reproducible evidence: the module-bearing steps your change touches (crypto-module examples, the TLS and identity smokes), with the exact commands and pass signals for a reviewer to rerun locally. If a step goes red in CI, `scripts/README.md` When a run fails names the reproduction recipe (rerun that step number locally, then the committed Dockerfile if it does not reproduce on your host OS).
 6. Maintainer review focuses on: does the change match an existing primitive or doc commitment; does it preserve capability-tier discipline; is the test evidence reproducible.
 
 ## Maintenance

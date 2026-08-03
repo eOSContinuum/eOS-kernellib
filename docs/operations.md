@@ -210,6 +210,14 @@ The platform is a single process on a single machine. There is no replica to fai
 
 **Portability.** A snapshot restores only against a driver started with the same `auto_object` and `driver_object`, and with the same `modules` extensions loaded (Common failure modes below, the same conditions `docs/persistence.md` states for hot boot). It is a resume point for a specific configuration, not a portable backup format across incompatible driver configurations.
 
+**Availability arithmetic, worked.** The pieces above, composed into three numbers for one concrete deployment shape: a 506 MB image, stock `sector_size`, `dump_interval` 3600 (one hour). The numbers are this rig's, measured on the hardware named in `docs/configuration.md` Snapshot-pause scaling -- not a guarantee for any other machine or workload.
+
+- **Planned pause time per day.** `dump_interval` 3600 runs 24 dumps a day; the stock-`sector_size` client-observed pause at this image size is the top of the measured 0.003-0.037 s range (`docs/configuration.md` Snapshot-pause scaling, measured across two sector sizes). 24 x 0.037 s is about 0.9 s of runtime-blocked time per day.
+- **Worst-case unclean-stop loss.** The RPO is `dump_interval` itself ("The RPO is `dump_interval` ... a sizing decision the operator makes, not a platform-supplied guarantee", Recovery point above): up to one hour of committed-but-undumped writes, including writes already acknowledged to clients.
+- **Expected down-window for a supervisor restart.** The restore boot measured at 0.06 s to console-ready, holding at that figure from a 237 MB snapshot up through a 1.08 GB snapshot (Recovery time above, `docs/configuration.md` Snapshot-pause scaling); a systemd `Restart=on-failure` unit (Running under a supervisor below) reacts to the process's own exit without a health-check poll, so detection is near-instant for a crash and the down-window is dominated by that 0.06 s restore boot. A supervisor that instead polls a health check on an interval adds that interval on top -- not measured here, and worth pricing against the specific supervisor configuration in use.
+
+Time to steady state -- clients reconnecting, demand paging warming, an overdue `call_out` backlog catching up -- is the longer tail Recovery time names above, and is not included in the down-window figure: it depends on the deployment's own reconnect and warmup behavior, not a rig measurement.
+
 ## Logging and diagnostics
 
 The driver provides a `message(string)` function that timestamps and emits diagnostic output:

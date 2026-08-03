@@ -1,14 +1,18 @@
 #!/bin/sh
 #
-# Doc-drift regression for the two-tutorial application-authoring path:
-# docs/first-application.md and docs/first-http-endpoint.md. Parses the
-# command/expected-output pairs out of both docs' fenced transcripts AT
-# RUN TIME (scripts/tutorial-replay.py does the parsing and driving --
-# no generated mirror of the transcripts exists anywhere, because a
-# mirror would drift out of sync with the docs, which is exactly the
-# failure mode this guard exists to catch) and replays them against a
-# clean-slate boot, including the two in-tutorial `reboot` +
-# snapshot-restore cycles each doc ends with.
+# Doc-drift regression for the three-tutorial getting-started path:
+# docs/first-hour.md, docs/first-application.md, and
+# docs/first-http-endpoint.md. Parses the command/expected-output pairs
+# out of all three docs' fenced transcripts AT RUN TIME
+# (scripts/tutorial-replay.py does the parsing and driving -- no
+# generated mirror of the transcripts exists anywhere, because a mirror
+# would drift out of sync with the docs, which is exactly the failure
+# mode this guard exists to catch) and replays them against a
+# clean-slate boot, including each doc's in-tutorial `reboot` +
+# snapshot-restore cycle. first-hour.md's interactive telnet-connect and
+# login-banner blocks, and its initial cold-boot invocation line, are
+# named SKIPs rather than assertions (tutorial-replay.py's module
+# docstring names the three).
 #
 # Usage:
 #   DGD_BIN=/path/to/dgd/bin/dgd scripts/tutorial-smoke.sh
@@ -58,11 +62,12 @@ for _port in "$SMOKE_TELNET_PORT" "$SMOKE_BINARY_PORT"; do
 done
 
 echo "== clean slate =="
-# The tutorials assume fresh KV/WWW grants and a first-connect console
-# claim (first-hour.md sections 1-2, which first-application.md points
-# back to); the WWW mount they build also collides with the harness's
-# own reserved WWW mount (first-http-endpoint.md Cleaning up).
-rm -rf src/usr/KV src/usr/WWW
+# The tutorials assume fresh Pet/KV/WWW grants and a first-connect
+# console claim (first-hour.md sections 1-2, which first-application.md
+# points back to); the WWW mount first-http-endpoint.md builds also
+# collides with the harness's own reserved WWW mount (first-http-
+# endpoint.md Cleaning up).
+rm -rf src/usr/Pet src/usr/KV src/usr/WWW
 rm -f state/snapshot state/snapshot.old state/swap state/tutorial-smoke-boot.log
 rm -f src/kernel/data/access.data src/kernel/data/admin.pwd
 

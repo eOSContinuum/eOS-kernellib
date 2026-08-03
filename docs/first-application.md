@@ -8,6 +8,8 @@ A hands-on tutorial. In [first-hour.md](first-hour.md) you drove the console and
 
 The service is the in-memory key-value store sketched in [application-authoring.md](application-authoring.md) (Worked example sketch). This tutorial builds it for real.
 
+**Editing this tutorial**: this transcript runs against a live boot on every PR (`scripts/tutorial-smoke.sh`). After changing a command or its expected output here, rerun `DGD_BIN=<dgd> scripts/tutorial-smoke.sh` and recapture the changed block from the live session rather than hand-editing the expected output -- `scripts/README.md` (the `tutorial-smoke.sh` section) documents the fence-language whitelist and the anchor-sentence phrasings the parser keys on.
+
 ## 1. Create the domain
 
 Boot the platform and claim the `admin` console exactly as in [first-hour.md](first-hour.md) (sections 1 and 2), then create an owner for your application:

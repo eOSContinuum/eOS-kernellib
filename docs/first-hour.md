@@ -6,6 +6,8 @@ A hands-on tutorial. In the next hour you will boot the platform, create a livin
 
 **What you'll have at the end**: a domain you created, a singleton and a clone you compiled, properties you set, an observer that fired the instant a property changed, and (the point of the whole platform) all of it alive after the process was stopped and restarted.
 
+**Editing this tutorial**: most of this transcript runs against a live boot on every PR (`scripts/tutorial-smoke.sh`); the interactive `telnet`/`nc` connect lines and the login-banner blocks are named SKIPs, not assertions -- `scripts/tutorial-replay.py`'s module docstring lists them. After changing a command or its expected output here, rerun `DGD_BIN=<dgd> scripts/tutorial-smoke.sh` and recapture the changed block from the live session rather than hand-editing the expected output -- `scripts/README.md` (the `tutorial-smoke.sh` section) documents the fence-language whitelist and the anchor-sentence phrasings the parser keys on.
+
 ## 1. Boot
 
 ```sh

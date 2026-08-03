@@ -1,19 +1,41 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-2-Clause-Patent
-"""Replay docs/first-application.md and docs/first-http-endpoint.md against
-a live boot, driven by scripts/tutorial-smoke.sh.
+"""Replay docs/first-hour.md, docs/first-application.md, and
+docs/first-http-endpoint.md against a live boot, driven by
+scripts/tutorial-smoke.sh.
 
-Parses the two tutorials' fenced blocks AT RUN TIME -- no generated mirror
-of the transcripts is kept, because a mirror would drift out of sync with
-the docs, which is exactly the failure mode this guard exists to catch.
-Both tutorials use exactly three fence languages (verified by inspection
-of every ``` marker in both files); ALLOWED_KINDS below is that whitelist.
-Every fence in either document is classified -- a fence whose language is
-not in ALLOWED_KINDS is a named FAIL (file, line, language), before any
-boot, not a quietly-ignored block: a renamed fence marker must not be
-able to drop a whole class of assertions while the guard stays quiet
-because some other fence kind still parsed to a nonzero count. For each
+Parses the three tutorials' fenced blocks AT RUN TIME -- no generated
+mirror of the transcripts is kept, because a mirror would drift out of
+sync with the docs, which is exactly the failure mode this guard exists
+to catch. All three tutorials use exactly three fence languages (verified
+by inspection of every ``` marker in all three files); ALLOWED_KINDS
+below is that whitelist. Every fence in every document is classified --
+a fence whose language is not in ALLOWED_KINDS is a named FAIL (file,
+line, language), before any boot, not a quietly-ignored block: a renamed
+fence marker must not be able to drop a whole class of assertions while
+some other fence kind still parsed to a nonzero count. For each
 recognized fence, in document order:
+
+first-hour.md is a separate console session from the other two: it
+covers its own fresh cold boot and does not chain into
+first-application.md's console history (first-application.md's own
+transcript starts back at `$0`, matching a fresh connection). DOCS below
+marks first-application as needing a fresh boot immediately before its
+actions run, discarding first-hour's snapshot the way a reader
+re-booting a clean environment for the next tutorial would; first-hour
+and first-http-endpoint need no such marker (first-hour is first, so the
+harness's own initial boot already covers it, and first-http-endpoint
+continues first-application's session with no boot in between, matching
+its own transcript's continuing `$N` count). Within first-hour.md, three
+kinds of block resist replay outright and are named SKIPs rather than
+assertions: the cold-boot invocation line (the harness performs that
+boot itself, once, before any doc's actions run), the interactive
+`telnet`/`nc` connect lines (the harness drives a raw console socket via
+drive-verbs.py's Session/login instead), and the login-banner transcript
+blocks (`login: admin` / `Pick a new password:` / ... -- the same
+Session/login call handles both the first-claim and returning-login
+shapes already, so the banner text is illustrative, not a block this
+parser can turn into a command/expected-output pair).
 
   ```text  fences  -- console transcripts. Each "# <cmd>" line starts a
                       new entry; the following non-"# " lines (up to the
@@ -120,16 +142,17 @@ drive_verbs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(drive_verbs)
 
 DOCS = [
-    ("first-application", "docs/first-application.md"),
-    ("first-http-endpoint", "docs/first-http-endpoint.md"),
+    ("first-hour", "docs/first-hour.md", False),
+    ("first-application", "docs/first-application.md", True),
+    ("first-http-endpoint", "docs/first-http-endpoint.md", False),
 ]
 
-# The complete set of fence languages the two tutorials use, derived by
-# inspecting every ``` marker in both files (`grep -n '^```' docs/first-
-# application.md docs/first-http-endpoint.md`): text (console
-# transcripts), sh (shell/curl lines), c (LPC source). A fence in either
-# document tagged with anything else is unrecognized and a hard FAIL --
-# see classify_fence_kind below.
+# The complete set of fence languages the three tutorials use, derived by
+# inspecting every ``` marker in all three files (`grep -n '^```' docs/
+# first-hour.md docs/first-application.md docs/first-http-endpoint.md`):
+# text (console transcripts), sh (shell/curl/boot lines), c (LPC source).
+# A fence in any document tagged with anything else is unrecognized and
+# a hard FAIL -- see classify_fence_kind below.
 ALLOWED_KINDS = {"text", "sh", "c"}
 
 FENCE_RE = re.compile(r"^```(\w+)\s*$")
@@ -208,8 +231,17 @@ def classify_console(content):
     return actions
 
 
+INLINE_COMMENT_RE = re.compile(r"\s+#.*$")
+
+
 def classify_shell(content):
-    """```sh fence -> list of {'op': 'shell'|'restart'|'http_assert', ...}."""
+    """```sh fence -> list of {'op': 'shell'|'restart'|'http_assert'|
+    'skip', ...}. A trailing "    # ..." inline comment (first-hour.md's
+    boot and telnet lines carry one, e.g. "... example.dgd    # or
+    state/local.dgd, ...") is stripped before classification; it never
+    appears on the curl/expected-output pairs below, which put their
+    "# <expected>" comment on its own following line instead, so this
+    strip cannot collide with that pairing."""
     lines = [l for l in content.split("\n")]
     actions = []
     i = 0
@@ -219,10 +251,28 @@ def classify_shell(content):
         if not line.strip():
             i += 1
             continue
-        stripped = line.strip()
+        stripped = INLINE_COMMENT_RE.sub("", line.strip()).strip()
+        if not stripped:
+            i += 1
+            continue
+        if stripped.startswith("telnet ") or stripped.startswith("nc "):
+            actions.append({"op": "skip", "reason":
+                             "interactive telnet/nc connect line; the "
+                             "harness drives a raw console socket "
+                             "(drive-verbs.py Session/login) instead"})
+            i += 1
+            continue
         if "example.dgd" in stripped:
             rest = stripped.split("example.dgd", 1)[1].strip()
-            snapshot_args = rest.split() if rest else []
+            if not rest:
+                actions.append({"op": "skip", "reason":
+                                 "initial cold boot invocation; the "
+                                 "harness performs this boot itself, "
+                                 "once, before any tutorial's actions "
+                                 "run"})
+                i += 1
+                continue
+            snapshot_args = rest.split()
             actions.append({"op": "restart", "snapshot_args": snapshot_args})
             i += 1
             continue
@@ -298,12 +348,29 @@ def build_actions(name, relpath):
             raise TutorialParseError(
                 f"{relpath}:{item['line']}: unrecognized fence language "
                 f"'{item['kind']}' -- this parser only recognizes "
-                f"{sorted(ALLOWED_KINDS)} in these two tutorials "
+                f"{sorted(ALLOWED_KINDS)} in these three tutorials "
                 f"(ALLOWED_KINDS in tutorial-replay.py)")
         if item["kind"] == "text":
-            actions.extend(classify_console(item["content"]))
+            if item["content"].strip().startswith("login:"):
+                print(f"SKIP [{name}] interactive login-banner transcript "
+                      f"at line {item['line']} (the harness's own "
+                      f"drive-verbs.py Session/login already handles both "
+                      f"the first-claim and returning-login shapes; the "
+                      f"banner text is illustrative, not replayed "
+                      f"verbatim)")
+                continue
+            console_actions = classify_console(item["content"])
+            if not console_actions:
+                print(f"SKIP [{name}] illustrative text fence at line "
+                      f"{item['line']} with no `# <cmd>` line to drive")
+                continue
+            actions.extend(console_actions)
         elif item["kind"] == "sh":
-            actions.extend(classify_shell(item["content"]))
+            for act in classify_shell(item["content"]):
+                if act["op"] == "skip":
+                    print(f"SKIP [{name}] {act['reason']}")
+                else:
+                    actions.append(act)
         elif item["kind"] == "c":
             code_action = classify_code(relpath, item["context"],
                                          item["content"])
@@ -381,12 +448,26 @@ def execute_code_action(action):
 
 SLOT_RE = re.compile(r"^\$(\d+)\s*=\s*(.*)$", re.DOTALL)
 
+# The second run-varying expectation class, first-hour.md only: a clone
+# object's numeric index ("</usr/Pet/obj/pet#212>") is platform-global
+# and run-dependent, exactly as the doc itself says ("Your clone number
+# will differ from `#212`. Clone indices are platform-global."). Neither
+# of the other two tutorials embeds a clone index in expected output
+# (verified by inspection: `#\d+` appears nowhere in their fenced
+# blocks), so normalizing it here cannot mask a real mismatch there.
+CLONE_INDEX_RE = re.compile(r"#\d+")
+
 
 def outputs_match(expected_lines, actual_text):
-    expected = "\n".join(expected_lines).strip("\r\n")
-    actual = actual_text.strip("\r\n")
+    # Telnet lines are CRLF; a multi-line expected block (e.g. the
+    # `observers` verb's tree output) is written in the doc with plain
+    # LF, so normalize line endings before any other comparison.
+    expected = "\n".join(expected_lines).replace("\r\n", "\n").strip("\r\n")
+    actual = actual_text.replace("\r\n", "\n").strip("\r\n")
     if expected == "":
         return actual.strip() == ""
+    expected = CLONE_INDEX_RE.sub("#N", expected)
+    actual = CLONE_INDEX_RE.sub("#N", actual)
     m_exp = SLOT_RE.match(expected)
     m_act = SLOT_RE.match(actual)
     if m_exp and m_act:
@@ -500,7 +581,7 @@ def run_shell(cmd):
 
 def main():
     all_actions = {}
-    for name, relpath in DOCS:
+    for name, relpath, _fresh_boot in DOCS:
         try:
             actions = build_actions(name, relpath)
         except TutorialParseError as e:
@@ -520,10 +601,21 @@ def main():
 
     runner = Runner()
     failures = []
-    counts = {name: {"console": 0, "http": 0} for name, _ in DOCS}
+    counts = {name: {"console": 0, "http": 0} for name, _, _ in DOCS}
     try:
         runner.start_dgd([])
-        for name, _ in DOCS:
+        for name, _relpath, fresh_boot in DOCS:
+            if fresh_boot:
+                # first-application.md's own transcript starts back at
+                # $0 (a fresh connection), and its audience line says
+                # "boot the platform ... exactly as in first-hour.md
+                # sections 1 and 2" -- a clean environment, not a
+                # continuation of first-hour's Pet objects and console
+                # history. Tear down and cold-boot again (no snapshot
+                # arg); admin.pwd and access.data are file-backed and
+                # survive this exactly as the tutorials themselves say.
+                runner.teardown()
+                runner.start_dgd([])
             for action in all_actions[name]:
                 op = action["op"]
                 if op in ("write_file", "replace_function",
@@ -566,7 +658,7 @@ def main():
 
     summary = ", ".join(
         f"{name}: {counts[name]['console']} console + "
-        f"{counts[name]['http']} http" for name, _ in DOCS)
+        f"{counts[name]['http']} http" for name, _, _ in DOCS)
     if failures:
         print(f"TUTORIAL-SMOKE FAIL (first: {failures[0]})", file=sys.stderr)
         return 1

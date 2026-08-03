@@ -6,6 +6,8 @@ A hands-on tutorial, continuing from [first-application.md](first-application.md
 
 **What you'll have at the end**: a second domain fronting your first one over real TCP, three HTTP routes you wrote (read, write, health), one route added to the live service without a restart, and the same persistence proof as before -- this time observed through `curl`.
 
+**Editing this tutorial**: this transcript runs against a live boot on every PR (`scripts/tutorial-smoke.sh`). After changing a command or its expected output here, rerun `DGD_BIN=<dgd> scripts/tutorial-smoke.sh` and recapture the changed block from the live session rather than hand-editing the expected output -- `scripts/README.md` (the `tutorial-smoke.sh` section) documents the fence-language whitelist and the anchor-sentence phrasings the parser keys on.
+
 ## 1. The transport domain
 
 The platform's HTTP/1 bootstrap clones a server object at one kernel-defined mount point per connection: `/usr/WWW/obj/server`. Serving HTTP therefore means owning the `WWW` domain and putting a server clonable at that path. At the console:
