@@ -252,8 +252,10 @@ it. The countermeasure is application code, in three pieces:
   destructing in the same task. The clone tears itself down (a
   zero-delay logout, taking the broker's registry entry and every
   application-side resource with it) only when `doneChunk` next fires
-  with that flag set -- the drain signal for the terminal chunk's own
-  write completing, not the call that sent it. Destructing in the same
+  with that flag set AND its `final` argument true -- the drain signal
+  for the terminal chunk's own write completing, not the call that
+  sent it, and not any earlier drain a still-in-flight write might
+  deliver while the flag is up. Destructing in the same
   task as `endChunk()` is the data-loss mode this pattern avoids: bytes
   still queued die with the object and the peer is left half-open with
   no EOF. Verified against a live stalled client: the shed subscriber's
