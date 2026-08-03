@@ -41,6 +41,68 @@ Task-shaped recipes for the application author's recurring jobs after `docs/firs
 
 **Owning doc**: `docs/code-lifecycle.md` Touch; `docs/changing-a-running-system.md` rung 3; `docs/vault-applications.md` Schema evolution for the on-disk half.
 
+## Walk every object in your domain
+
+**Goal**: run a periodic sweep over every live clone your domain owns -- the "Periodic global touch" mitigation the upgrade doctrine names -- with no platform query to enumerate them by.
+
+1. **State the gap honestly first.** The platform's object manager (`/usr/System/sys/objectd.c`) tracks the compiled-program graph -- path, inheritance, includes, issues -- not clone populations: its query surface (`query_path`, `query_issues`, `query_includes` / `query_included`, `query_inherits` / `query_inherited`) answers "what does this program depend on" and "what depends on it", never "which clones exist" or "which clones does owner X hold". There is no by-owner or per-master enumeration to walk. A domain that needs one tracks its own.
+2. **Keep a clone registry.** The owning daemon records each clone's ref at create time and drops it at destruct time, in the same `atomic` function as the write that creates or removes the entity -- the same discipline `docs/application-authoring.md` Modeling domain data already teaches for a field index, applied to the whole population instead of one field:
+
+```c
+private mapping clones;             /* id : object */
+
+atomic int spawn()
+{
+    object clone;
+    int id;
+
+    id = nextId++;
+    clone = clone_object("obj/thing");
+    clones[id] = clone;
+    return id;
+}
+
+atomic void remove(int id)
+{
+    object clone;
+
+    clone = clones[id];
+    if (clone) {
+        clones[id] = nil;
+        destruct_object(clone);
+    }
+}
+```
+
+The registry can never disagree with what actually exists, for the same reason a secondary field index cannot: the store mutation and the registry write commit or roll back together.
+
+3. **Sweep the registry in slices.** Walking the whole registry in one task risks `Out of ticks` on a large domain, so slice it the way "Schedule recurring or oversized work" above does -- a bounded chunk per `call_out`, cursor saved between slices, each slice landing under a fresh tick budget:
+
+```c
+static void do_sweep(int *ids, int cursor)
+{
+    int end, i;
+    object clone;
+
+    end = (cursor + CHUNK < sizeof(ids)) ? cursor + CHUNK : sizeof(ids);
+    for (i = cursor; i < end; i++) {
+        clone = clones[ids[i]];
+        if (clone) {
+            "/usr/System/sys/<yourApp>_touch"->touch(clone);
+        }
+    }
+    if (end < sizeof(ids)) {
+        call_out("do_sweep", 0, ids, end);
+    }
+}
+```
+
+4. **Route the touch through a System-tier overlay.** `call_touch` is System-creator-gated (`/kernel/lib/auto.c`), the same gate `dump_state` sits behind, so a tier-E domain cannot call it directly -- confirmed live: an in-domain `call_touch(clone)` refuses with `Permission denied`. Carry a small overlay file the same way the durability recipe ("Make one write durable at acknowledge time" above) routes `dump_state`: a one-method System-tier object your deploy step lands under `src/usr/System/sys/` (`docs/application-repository.md` System-tier overlay files) that does nothing but call `call_touch` on the object it's handed.
+
+**Verify**: against a live boot, spawn several clones, remove one, and confirm the registry's count drops by exactly one and the removed id resolves to nil; run the sweep and confirm it took more than one `call_out` slice for a registry sized past one chunk, and that every surviving clone's `patch()` ran exactly once (a `touched` counter on the clonable, incremented in `patch()`, is the witness) -- verified live at this shape: five clones spawned, one removed (four remain, the removed id nils), a two-slice sweep against a chunk size of two, and every surviving clone's touch counter at 1.
+
+**Owning doc**: `docs/application-authoring.md` Live code upgrade through `call_touch` and Object tracking (the objectd query surface); `docs/code-lifecycle.md` Touch; `docs/common-tasks.md` Find objects by a field value (the index discipline this extends) and Make one write durable at acknowledge time (the System-tier overlay pattern).
+
 ## Grant another domain access to your files
 
 **Goal**: domain `Foo` can read (or write) under `/usr/Bar/`.
@@ -200,6 +262,19 @@ expect: swap-rate5=\d+
 **Verify**: `LPC_EXT_CRYPTO=<module> EXPECTED_OK=53 DGD_BIN=<dgd> scripts/run-example.sh composite-app` -- the registration, auth-gate, and capability-refusal phases assert exactly this sequence over real TCP.
 
 **Owning doc**: `docs/composite-applications.md` Authenticating a wire request.
+
+## Bind a session to a browser with a cookie
+
+**Goal**: a browser-served route keeps a user logged in across page reloads, instead of holding the bearer token in page JS (the shape "Register a user and gate an HTTP route" above uses).
+
+1. Mint the session the same way the bearer flow does: a ceremony through `AUTHD` (`examples/composite-app/Inventory/sys/handler.c`'s `/auth/register` and `/auth/login`) returns a subject and a bearer token. Nothing here changes on the minting side -- the binding to the client is the only thing that differs.
+2. On the response that hands the client its token, append the handler contract's optional fifth element (the extra-headers mapping the Cache-Control recipe above already uses) instead of putting the token in the JSON body: `({ 200, "OK", "application/json", body, ([ "Set-Cookie" : "session=" + token + "; Path=/; HttpOnly; SameSite=Strict" ]) })`. `HttpOnly` keeps the value out of page JS; `SameSite=Strict` is the cheapest cross-site mitigation available at this layer (see the CSRF caveat below); add `Secure` once the route is HTTPS-only (`docs/common-tasks.md` Serve HTTPS on the labeled port).
+3. On the return path, read the request's `Cookie` header and split it yourself: `HttpFields` has no dedicated `Cookie` case, so a generic header falls through `RemoteFields.c`'s default branch and parses as a comma-separated list -- `request->headerValue("Cookie")` answers an **array** of list-items, not a string. Join it back (`implode(values, "; ")`) before splitting on `;` into `name=value` pairs, the same delimiter the wire uses between cookie-pairs. Look up the pair you set (`session`) and validate exactly as the bearer flow does: `AUTHD->validate(token)` for the subject, or nil to refuse.
+4. State the CSRF consequence plainly, because the bearer flow does not carry it and a cookie-bound route inherits it the moment credentials travel automatically: a browser attaches cookies to a request it did not initiate on your origin (a form post or fetch from another page), so any state-changing route reachable this way needs a CSRF defense the platform does not ship -- a same-site cookie (step 2) blocks the common case, but a belt-and-suspenders application also checks a per-request token the attacker's page cannot read, or requires a custom header (fetch cannot set one cross-origin without triggering CORS preflight, which itself refuses without an allow-listed origin). The bearer pattern above sidesteps this entirely: nothing attaches an `Authorization` header automatically, so cross-site requests arrive unauthenticated.
+
+**Verify**: `curl -i` the minting route and confirm the `Set-Cookie` header carries the token; `curl -i -b <(echo "session=<token>")` (or a cookie jar: `curl -c jar.txt <mint-route>` then `curl -b jar.txt <protected-route>`) against the protected route and confirm it answers with the subject; a request with no cookie or a bogus one gets 401. The CSRF mitigation itself is asserted only by inspection here (SameSite attribute present, no per-request token issued) -- no same-origin-vs-cross-origin browser probe backs it in this recipe.
+
+**Owning doc**: `docs/identity.md` Sessions; `docs/http-applications.md` The routed-handler contract; `docs/application-authoring.md` Identity and request authentication (What an application still builds).
 
 ## Mint an agent identity and delegate a capability to it
 
