@@ -124,7 +124,7 @@ Cross-domain reach for tier-E code is mediated at every relevant kfun call by th
 
 **HTTP connections are anonymous until the application binds a session.** The identity daemons are System-tier surfaces a tier-E application cannot call; the transport reaches ceremonies and sessions through the `authd` facade, and the binding is the application's -- no cookie handling and no bearer parsing ship, so an application threads a validated session onto its own request flow. (The HTTP surface does carry RFC-shape parsers for the `Authorization` and `WWW-Authenticate` headers -- value objects under `src/usr/HTTP/api/lib/Authentication.c` -- that nothing in the HTTP layer enforces.) `examples/composite-app` is the worked binding (`docs/composite-applications.md` Authenticating a wire request).
 
-**What an application still builds.** The platform contributes the credential substrate, the ceremonies, the session primitive, and the capability discipline. An application still supplies: the transport binding (cookie, bearer, or its own scheme), its application-tier authorization policy (gate its verbs the way the chat example gates rooms, `docs/chat-applications.md`), and any per-user state beyond the shared record. Quotas remain per-owner, not per-identity.
+**What an application still builds.** The platform contributes the credential substrate, the ceremonies, the session primitive, and the capability discipline. An application still supplies: the transport binding (cookie, bearer, or its own scheme -- `docs/common-tasks.md` Bind a session to a browser with a cookie is the worked cookie form, alongside this section's own bearer example above), its application-tier authorization policy (gate its verbs the way the chat example gates rooms, `docs/chat-applications.md`), and any per-user state beyond the shared record. Quotas remain per-owner, not per-identity.
 
 ## Give your application an operator surface
 
@@ -174,7 +174,7 @@ Why not upgrade immediately when a library recompiles? Two reasons:
 
 The trade-off: long-idle objects can accumulate multiple pending upgrades without being touched. If the migration logic depends on the most-recent prior version's data shape, a long-idle object may have an upgrade chain that no longer matches. Mitigations:
 
-- **Periodic global touch.** A scheduled job (via `call_out`) walks all objects within a domain at low frequency (daily, weekly) and ensures each has been touched at least once per cycle.
+- **Periodic global touch.** A scheduled job (via `call_out`) walks all objects within a domain at low frequency (daily, weekly) and ensures each has been touched at least once per cycle. The walk needs a clone registry your domain maintains -- `docs/common-tasks.md` Walk every object in your domain is the worked mechanism.
 - **Snapshot-and-restore.** Statedump preserves all object state. A planned restart cycle that statedumps and restores can pair with an explicit touch pass during the restore phase.
 
 The `call_touch` primitive itself is host-driver-level (tier A). The kernel auto wraps it. Objectd dispatches it. The System auto's `_F_touch()` gate forwards to the application's `patch()` hook.
