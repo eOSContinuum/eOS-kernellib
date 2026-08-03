@@ -41,6 +41,9 @@ atomic static void create(int maxSize, varargs string accessKey,
  */
 mixed get(mixed key)
 {
+    if (key == nil) {
+	error("Invalid key");
+    }
     return root->get(accessKey, key);
 }
 
@@ -49,6 +52,9 @@ mixed get(mixed key)
  */
 atomic int set(mixed key, mixed value)
 {
+    if (key == nil) {
+	error("Invalid key");
+    }
     return root->set(accessKey, key, value, 0, nil, nil, nil, nil)[CHANGE];
 }
 
@@ -57,6 +63,9 @@ atomic int set(mixed key, mixed value)
  */
 atomic int add(mixed key, mixed value)
 {
+    if (key == nil) {
+	error("Invalid key");
+    }
     return root->set(accessKey, key, value, -1, nil, nil, nil, nil)[CHANGE];
 }
 
@@ -65,6 +74,9 @@ atomic int add(mixed key, mixed value)
  */
 atomic int change(mixed key, mixed value)
 {
+    if (key == nil) {
+	error("Invalid key");
+    }
     return root->set(accessKey, key, value, 1, nil, nil, nil, nil)[CHANGE];
 }
 
@@ -218,12 +230,10 @@ private mixed **stackPrev(mixed **stack)
 /*
  * reset an iterator
  */
-mixed iteratorStart(mixed from, mixed to)
+mixed iteratorStart(mixed first, mixed last)
 {
-    mixed first, last, **stack;
+    mixed **stack;
 
-    first = from;
-    last = to;
     if (first != nil && last != nil && first > last) {
 	/*
 	 * backwards
