@@ -221,7 +221,7 @@ anchor_capture_check() {
         _slug=$(printf '%s' "$_h" | tr '[:upper:]' '[:lower:]' \
             | sed -e 's/[^a-z0-9 _-]//g' -e 's/ /-/g')
         [ -z "$_slug" ] && continue
-        grep -rn --include='*.md' -F "#$_slug" . 2>/dev/null \
+        grep -rnE --include='*.md' "#${_slug}([^a-z0-9_-]|\$)" . 2>/dev/null \
             | grep -v '^\./\.git/' | while IFS= read -r _line; do
             _file=${_line%%:*}
             _file=${_file#./}
