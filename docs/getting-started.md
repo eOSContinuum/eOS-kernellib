@@ -24,7 +24,7 @@ cd eOS-kernellib
 DGD_BIN=$PWD/../dgd/bin/dgd scripts/run-example.sh merry-app
 ```
 
-A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1.7.9 on macOS 26.5 arm64):
+A passing run takes a few seconds and ends like this (captured 2026-08-06, DGD 1.7.9 on macOS 26.5 arm64):
 
 ```text
 == clean slate ==
@@ -35,10 +35,10 @@ A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1
 MerryApp:test: starting
 MerryApp:test: ANCESTRY OK
 MerryApp:test: SANDBOX OK
-[... 24 more sentinels ...]
+[... 26 more sentinels ...]
 MerryApp:test: OBSERVER EVICT OK
 MerryApp:test: PERSIST VERIFY OK
-== 28 " OK" sentinels (expected 28) ==
+== 30 " OK" sentinels (expected 30) ==
 PASS
 ```
 
@@ -127,6 +127,7 @@ The HTTP/1 port (8080) accepts connections from any HTTP/1 client, but with no a
 ## Where to next
 
 - [`docs/first-hour.md`](first-hour.md) is the natural next step: a hands-on hour from this booted platform to the persistence loop (your own objects, state, and reactions surviving a process restart).
+- [`docs/adopting.md`](adopting.md) is the wider frame if this boot is the start of a real trial: the twelve-week pathway from here to a migrate-or-step-back decision, with this page's proof as its week-1 opening step.
 - [`docs/coming-from-contemporary-infrastructure.md`](coming-from-contemporary-infrastructure.md) maps the cloud-service stack (database, queue, deploy pipeline, IAM) onto the platform's mechanisms, if that is where you are arriving from.
 - [`examples/http-app/README.md`](../examples/http-app/README.md) and [`docs/http-applications.md`](http-applications.md) cover the HTTP/1 application pattern; the example is the natural next read once the platform is running.
 - [`docs/admin-console.md`](admin-console.md) covers connecting to the telnet port, the first-cold-boot admin-password prompt, and the operator's verb surface.

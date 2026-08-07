@@ -28,7 +28,7 @@ Deploys the named example fresh under `src/usr/<Deploy>`, runs its boot sequence
 | hot-reload-demo | WWW | 1 | timed | 2 |
 | hot-reload-master | Reload | 1 | timed | 3 |
 | http-app | WWW | 1 | probe | 4 |
-| merry-app | MerryApp | 2 | selfexit | 28 |
+| merry-app | MerryApp | 2 | selfexit | 30 |
 | signal-app | SignalApp | 1 | timed | 1 |
 | upgrade-cascade | Cascade | 1 | timed | 7 |
 | vault-app | MyApp | 1 | timed | 10 |
@@ -157,7 +157,7 @@ Everything the sweep needs, gathered once:
 1. `DGD_BIN=<dgd> scripts/run-example.sh chat-app` -- `PASS`, 20 " OK" sentinels across 3 boots (cold selfexit, snapshot restore, cold no-snapshot).
 2. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-demo` -- `PASS`, 2 " OK" sentinels (1 timed boot).
 3. `DGD_BIN=<dgd> scripts/run-example.sh hot-reload-master` -- `PASS`, 3 " OK" sentinels (1 timed boot).
-4. `DGD_BIN=<dgd> scripts/run-example.sh merry-app` -- `PASS`, 28 " OK" sentinels across 2 boots (cold selfexit, snapshot restore).
+4. `DGD_BIN=<dgd> scripts/run-example.sh merry-app` -- `PASS`, 30 " OK" sentinels across 2 boots (cold selfexit, snapshot restore).
 5. `DGD_BIN=<dgd> scripts/run-example.sh signal-app` -- `PASS`, 1 " OK" sentinel (1 timed boot).
 6. `DGD_BIN=<dgd> scripts/run-example.sh upgrade-cascade` -- `PASS`, 7 " OK" sentinels (1 timed boot).
 7. `DGD_BIN=<dgd> scripts/run-example.sh vault-app` -- `PASS`, 10 " OK" sentinels (1 timed boot).

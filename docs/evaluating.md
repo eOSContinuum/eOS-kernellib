@@ -72,3 +72,5 @@ Stock-build compiled bounds, not tuning knobs ([`configuration.md`](configuratio
 ## Spending the rest of the budget
 
 In order, as budget allows: [`runtime-primitives.md`](runtime-primitives.md) At a glance (run a proof beside it), [`configuration.md`](configuration.md#limits-and-capacity) Limits and capacity, [`security-posture.md`](security-posture.md), [`runtime-platform-roadmap.md`](runtime-platform-roadmap.md) for the ships-today-versus-next boundary, [`coming-from-contemporary-infrastructure.md`](coming-from-contemporary-infrastructure.md) for what the platform replaces, and [`debugging-applications.md`](debugging-applications.md#the-working-environment-plainly) The working environment, plainly for the team's day-to-day.
+
+If this page's verdict is that the platform fits and the next question is what a trial looks like, [`adopting.md`](adopting.md) carries it from a first boot to a migrate-or-step-back decision. It assumes the fit decision this page makes, and it is explicit about the stages the platform serves least -- the parallel run has no comparison harness pointed at your application and no cost model behind it.
