@@ -24,7 +24,7 @@ cd eOS-kernellib
 DGD_BIN=$PWD/../dgd/bin/dgd scripts/run-example.sh merry-app
 ```
 
-A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1.7.9 on macOS 26.5 arm64):
+A passing run takes a few seconds and ends like this (captured 2026-08-06, DGD 1.7.9 on macOS 26.5 arm64):
 
 ```text
 == clean slate ==
@@ -35,10 +35,10 @@ A passing run takes a few seconds and ends like this (captured 2026-07-12, DGD 1
 MerryApp:test: starting
 MerryApp:test: ANCESTRY OK
 MerryApp:test: SANDBOX OK
-[... 24 more sentinels ...]
+[... 26 more sentinels ...]
 MerryApp:test: OBSERVER EVICT OK
 MerryApp:test: PERSIST VERIFY OK
-== 28 " OK" sentinels (expected 28) ==
+== 30 " OK" sentinels (expected 30) ==
 PASS
 ```
 
