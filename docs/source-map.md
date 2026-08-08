@@ -59,7 +59,7 @@ An application adds its own tier-E domain under `src/usr/<App>/` the same way. S
 
 ## Finding a subsystem
 
-Each runtime surface, the code that implements it, the document that explains it, and the regression surface that exercises it. The code column names an entry point, not every file; follow the owning document for the full surface. Step numbers are the Full regression sweep's numbering (`scripts/README.md`), the same contract `scripts/full-sweep.sh` runs by -- a step added or renumbered there updates this column. The two doc-hygiene steps (29, the function-index check; 30, the anchor-capture check) apply to every change and are not repeated per row.
+Each runtime surface, the code that implements it, the document that explains it, and the regression surface that exercises it. The code column names an entry point, not every file; follow the owning document for the full surface. Step numbers are the Full regression sweep's numbering (`scripts/README.md`), the same contract `scripts/full-sweep.sh` runs by -- a step added or renumbered there updates this column. The three doc-hygiene steps (29, the function-index check; 30, the anchor-capture check; 31, the documented-sentinel-count check) apply to every change and are not repeated per row.
 
 | Subsystem | Entry-point code | Doc | Regression surface |
 |---|---|---|---|

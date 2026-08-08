@@ -185,14 +185,16 @@ Everything the sweep needs, gathered once:
 
 This is the pre-PR bar `CONTRIBUTING.md`'s Testing section points to.
 
-Two doc-hygiene checks ride the same bar and need no DGD binary:
+Three doc-hygiene checks ride the same bar and need no DGD binary:
 
 29. `python3 scripts/gen-function-index.py --check` -- exits 0 when `docs/function-index.md` matches what the generator would produce from the current signature homes. A non-zero exit means a signature heading was added, renamed, or moved without regenerating the index; run `python3 scripts/gen-function-index.py` and commit the result.
 30. The anchor-capture check (`full-sweep.sh 30`, or `BASE_REF=<base> scripts/full-sweep.sh 30` off a non-main base) -- a heading added to a published file can capture a pre-existing dangling anchor and silently misdirect its inbound links: a stale `file.md#section` link that resolved to nothing yesterday resolves to the new heading today, pointing readers somewhere the link author never meant. For every heading the branch adds relative to the base, the check searches the tree for `#<slug>` references in files the diff does not touch and fails on any hit, printing the captured anchor and the referring line to review.
 
-A third check needs a DGD binary but no crypto module -- the tutorial doc-drift guard:
+31. `python3 scripts/doc-sentinel-check.py` -- `doc-sentinel-check: N assertion(s) over documented sentinel counts in <files> match run-example.sh`. A doc that captures an example's run transcript hard-codes numbers `run-example.sh`'s profile table owns: the `" OK"` tally, the `(expected N)` the harness printed, and -- where the transcript elides its middle -- how many sentinels the elision stands for. Nothing tied those to the table, so a profile change left the prose stale silently (`docs/getting-started.md`'s merry-app count sat at 28 through the profile's move to 30). The check reads the count from the profile table and the example name from the transcript's own `== deploy <example> as ... ==` line, so no doc-to-example mapping lives in the script and a new doc is covered the moment it carries a count. A transcript stating a count whose example cannot be identified, or naming one with no profile, is a hard failure rather than a guess; parsing zero counts across the doc set, or zero profiles out of `run-example.sh`, fails for the same reason -- either means the check is asserting nothing.
 
-31. `DGD_BIN=<dgd> scripts/tutorial-smoke.sh` -- `TUTORIAL-SMOKE PASS (first-hour: N console + M http, first-application: P console + Q http, first-http-endpoint: R console + S http)` after replaying every documented command/expected-output pair in `docs/first-hour.md`, `docs/first-application.md`, and `docs/first-http-endpoint.md`, parsed from the docs' own fenced transcripts at run time, including each tutorial's `reboot` + snapshot-restore cycle as a real process restart (`first-hour.md`'s interactive telnet-connect and login-banner blocks are named SKIPs, not assertions). See `tutorial-smoke.sh` below for the parse strategy and normalization rules.
+A fourth check needs a DGD binary but no crypto module -- the tutorial doc-drift guard, the replay half of the concern step 31 covers statically:
+
+32. `DGD_BIN=<dgd> scripts/tutorial-smoke.sh` -- `TUTORIAL-SMOKE PASS (first-hour: N console + M http, first-application: P console + Q http, first-http-endpoint: R console + S http)` after replaying every documented command/expected-output pair in `docs/first-hour.md`, `docs/first-application.md`, and `docs/first-http-endpoint.md`, parsed from the docs' own fenced transcripts at run time, including each tutorial's `reboot` + snapshot-restore cycle as a real process restart (`first-hour.md`'s interactive telnet-connect and login-banner blocks are named SKIPs, not assertions). See `tutorial-smoke.sh` below for the parse strategy and normalization rules.
 
 ## When a run fails
 
