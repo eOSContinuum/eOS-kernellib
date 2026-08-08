@@ -177,9 +177,63 @@ drive_verbs = importlib.util.module_from_spec(_dv_spec)
 _dv_spec.loader.exec_module(drive_verbs)
 
 
-def clean_slate(root):
-    for mount in ("Cascade", "Chat", "Inventory", "MerryApp", "MyApp",
-                  "Reload", "SignalApp", "WWW", "testop"):
+BASE_MOUNTS = ("Cascade", "Chat", "Inventory", "MerryApp", "MyApp",
+               "Reload", "SignalApp", "WWW", "testop")
+# src/usr names the platform owns; an application target may not land on
+# one, because clean_slate would then delete a kernel or audit domain
+# between boots rather than the application's own mount.
+RESERVED_MOUNTS = ("System", "admin", "Merry")
+
+
+class Target:
+    """What a measured run deploys, and which routes it answers on.
+
+    Every shape in this rig already assembles the same four parts by
+    hand: the source trees to mount under src/usr, an optional loadable
+    module the domain needs in the generated config, the route that
+    signals readiness, and the route the throughput figures drive. This
+    names that tuple once so an adopter can supply their own via the
+    --app-* flags instead of measuring the bundled example."""
+
+    def __init__(self, label, sources, module=None, health_path="/health",
+                 route_path=None):
+        self.label = label
+        self.sources = sources		# [(source dir, src/usr mount), ...]
+        self.module = module
+        self.health_path = health_path
+        self.route_path = route_path or health_path
+
+    @property
+    def mounts(self):
+        return [mount for _, mount in self.sources]
+
+    def url(self, path):
+        return "http://%s:%d%s" % (HOST, HTTP_PORT, path)
+
+    @property
+    def health_url(self):
+        return self.url(self.health_path)
+
+    @property
+    def route_url(self):
+        return self.url(self.route_path)
+
+    def deploy(self, root):
+        """Copy each source tree onto its mount. A relative source
+        resolves against the repository root; os.path.join leaves an
+        absolute one alone, which is what an --app-dir outside this
+        checkout needs."""
+        for src, mount in self.sources:
+            dst = os.path.join(root, "src/usr", mount)
+            shutil.rmtree(dst, ignore_errors=True)
+            shutil.copytree(os.path.join(root, src), dst)
+
+
+BUNDLED_HTTP = Target("http-app", [("examples/http-app", "WWW")])
+
+
+def clean_slate(root, target=BUNDLED_HTTP):
+    for mount in sorted(set(BASE_MOUNTS) | set(target.mounts)):
         shutil.rmtree(os.path.join(root, "src/usr", mount),
                       ignore_errors=True)
     for f in ("snapshot", "snapshot.old", "swap", "measure-boot1.log",
@@ -197,8 +251,7 @@ def clean_slate(root):
         pass
     for d in ("src/usr/System/log", "src/usr/Merry/log", "src/usr/Merry/tmp"):
         shutil.rmtree(os.path.join(root, d), ignore_errors=True)
-    shutil.copytree(os.path.join(root, "examples/http-app"),
-                    os.path.join(root, "src/usr/WWW"))
+    target.deploy(root)
 
 
 def write_config(root, dst_name="measure.dgd", module=None):
@@ -286,12 +339,11 @@ def status_line(sess, label):
             print("  [%s] %s" % (label, ln.strip()))
 
 
-def http_throughput(n):
+def http_throughput(n, url):
     t0 = time.monotonic()
     ok = 0
     for _ in range(n):
-        with urllib.request.urlopen(
-                "http://%s:%d/health" % (HOST, HTTP_PORT), timeout=5) as r:
+        with urllib.request.urlopen(url, timeout=5) as r:
             if r.status == 200:
                 ok += 1
     dt = time.monotonic() - t0
@@ -517,11 +569,11 @@ def measure_state_workload(dgd, root, n):
         boot_log.close()
 
 
-def concurrent_load(n, per_client):
-    """n parallel clients, each a serial loop of per_client GET /health
-    requests on a fresh connection (the server closes per response, so n
-    is the number of connections in flight). Returns (ok, errors, wall
-    seconds, per-request latency list)."""
+def concurrent_load(n, per_client, url):
+    """n parallel clients, each a serial loop of per_client GETs against
+    the target's route on a fresh connection (the server closes per
+    response, so n is the number of connections in flight). Returns (ok,
+    errors, wall seconds, per-request latency list)."""
     barrier = threading.Barrier(n + 1)
     lat = [[] for _ in range(n)]
     err = [0] * n
@@ -531,7 +583,7 @@ def concurrent_load(n, per_client):
         for _ in range(per_client):
             t0 = time.monotonic()
             try:
-                with urllib.request.urlopen(HEALTH_URL, timeout=15) as r:
+                with urllib.request.urlopen(url, timeout=15) as r:
                     if r.status == 200:
                         lat[k].append(time.monotonic() - t0)
                     else:
@@ -551,17 +603,17 @@ def concurrent_load(n, per_client):
     return len(times), sum(err), wall, times
 
 
-def measure_concurrent(dgd, root, counts, per_client):
-    """Drive parallel GET /health load at each client count, reporting
-    aggregate throughput and per-request latency. Each count gets its own
-    clean-slate boot, and the request total stays inside USER_BUDGET (the
-    slot-release regression bound; docstring)."""
+def measure_concurrent(dgd, root, counts, per_client, target=BUNDLED_HTTP):
+    """Drive parallel load against the target's route at each client
+    count, reporting aggregate throughput and per-request latency. Each
+    count gets its own clean-slate boot, and the request total stays
+    inside USER_BUDGET (the slot-release regression bound; docstring)."""
     for n in counts:
         clients = per_client or max(1, (USER_BUDGET - WARM_REQUESTS) // n)
-        print("== concurrent load, %d clients: clean slate, http-app"
-              " deployed as WWW ==" % n)
-        clean_slate(root)
-        config = write_config(root)
+        print("== concurrent load, %d clients: clean slate, %s deployed"
+              " as %s ==" % (n, target.label, "+".join(target.mounts)))
+        clean_slate(root, target)
+        config = write_config(root, module=target.module)
 
         boot_log = open(os.path.join(root,
                                      "state/measure-concurrent-boot.log"),
@@ -571,9 +623,10 @@ def measure_concurrent(dgd, root, counts, per_client):
         try:
             t_boot = wait_port(TELNET_PORT, proc)
             print("cold boot to console-ready: %.2fs" % t_boot)
-            warm_http(proc)
+            warm_http(proc, target.health_url)
 
-            ok, errors, wall, times = concurrent_load(n, clients)
+            ok, errors, wall, times = concurrent_load(n, clients,
+                                                      target.route_url)
             if not times:
                 print("  %2d clients: no successful requests (%d errors)"
                       % (n, errors))
@@ -887,6 +940,59 @@ def measure_tls(dgd, root, tls_requests, handshakes):
         shutil.rmtree(os.path.join(root, TLS_DATA_DIR), ignore_errors=True)
 
 
+def build_target(args):
+    """BUNDLED_HTTP, or an adopter's own domain built from the --app-*
+    flags. Everything is validated here rather than at first use, so a
+    typo fails before a boot instead of surfacing thirty seconds later as
+    a health-route timeout with a live driver to clean up."""
+    dependents = (("--app-mount", args.app_mount),
+                  ("--app-route", args.app_route),
+                  ("--app-module", args.app_module))
+    if args.app_dir is None:
+        for flag, value in dependents:
+            if value is not None:
+                raise SystemExit("%s has no effect without --app-dir" % flag)
+        if args.app_health != "/health":
+            raise SystemExit("--app-health has no effect without --app-dir")
+        return BUNDLED_HTTP
+
+    if args.tls or args.headline or args.state_workload:
+        raise SystemExit("--app-dir drives the default and --concurrent"
+                         " shapes only; --tls, --headline, and"
+                         " --state-workload measure fixed platform"
+                         " machinery against their own bundled examples")
+
+    src = os.path.abspath(os.path.expanduser(args.app_dir))
+    if not os.path.isdir(src):
+        raise SystemExit("--app-dir %s is not a directory" % args.app_dir)
+    # WWW, not the directory basename. The platform's HTTP/1 bootstrap
+    # (src/usr/System/sys/http_server.c) clones the application at the
+    # kernel-defined path /usr/WWW/obj/server, so an HTTP application
+    # answers on no other mount: deploying examples/http-app as "Shop"
+    # boots the driver fine and then never answers its health route.
+    # --app-mount exists for a domain that is not the HTTP entry point,
+    # and carries that constraint as its own problem.
+    mount = args.app_mount or "WWW"
+    if not re.match(r"^[A-Za-z][A-Za-z0-9_]*$", mount):
+        raise SystemExit("--app-mount %r is not usable: an src/usr domain"
+                         " must start with a letter and contain only"
+                         " letters, digits, and underscores" % mount)
+    if mount in RESERVED_MOUNTS:
+        raise SystemExit("--app-mount %s is a platform-owned src/usr name"
+                         " (%s); pick another" % (mount,
+                                                  ", ".join(RESERVED_MOUNTS)))
+    for flag, path in (("--app-health", args.app_health),
+                       ("--app-route", args.app_route)):
+        if path is not None and not path.startswith("/"):
+            raise SystemExit("%s must be a route beginning with / (got %r)"
+                             % (flag, path))
+    if args.app_module and not os.path.isfile(args.app_module):
+        raise SystemExit("--app-module %s is not a file" % args.app_module)
+    return Target(os.path.basename(src.rstrip(os.sep)), [(src, mount)],
+                  module=args.app_module, health_path=args.app_health,
+                  route_path=args.app_route)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sizes", default="4,12,28")
@@ -907,8 +1013,26 @@ def main():
                     help="drive N sequential authenticated inventory"
                          " writes against the composite-app (needs"
                          " LPC_EXT_CRYPTO); runs this shape only")
+    ap.add_argument("--app-dir", default=None, metavar="PATH",
+                    help="deploy this directory as the measured"
+                         " application instead of the bundled http-app;"
+                         " drives the default and --concurrent shapes")
+    ap.add_argument("--app-mount", default=None, metavar="NAME",
+                    help="src/usr mount name for --app-dir (default WWW,"
+                         " the kernel-defined path an HTTP application"
+                         " must answer on)")
+    ap.add_argument("--app-health", default="/health", metavar="ROUTE",
+                    help="route that signals the application is ready"
+                         " (default /health)")
+    ap.add_argument("--app-route", default=None, metavar="ROUTE",
+                    help="route the throughput figures drive (default:"
+                         " --app-health)")
+    ap.add_argument("--app-module", default=None, metavar="PATH",
+                    help="loadable module the application needs, appended"
+                         " to the generated config")
     args = ap.parse_args()
     steps = [int(x) for x in args.sizes.split(",")]
+    target = build_target(args)
 
     dgd = os.environ.get("DGD_BIN") or shutil.which("dgd")
     if not dgd or not os.access(dgd, os.X_OK):
@@ -918,7 +1042,8 @@ def main():
     if args.concurrent or args.headline or args.state_workload:
         if args.concurrent:
             counts = [int(x) for x in args.concurrent.split(",")]
-            measure_concurrent(dgd, root, counts, args.concurrent_requests)
+            measure_concurrent(dgd, root, counts, args.concurrent_requests,
+                               target)
         if args.headline:
             measure_headline(dgd, root)
         if args.state_workload:
@@ -926,9 +1051,10 @@ def main():
         print("== done; transcript and boot logs under state/ ==")
         return
 
-    print("== measure-baseline: clean slate, http-app deployed as WWW ==")
-    clean_slate(root)
-    config = write_config(root)
+    print("== measure-baseline: clean slate, %s deployed as %s =="
+          % (target.label, "+".join(target.mounts)))
+    clean_slate(root, target)
+    config = write_config(root, module=target.module)
 
     boot_log = open(os.path.join(root, "state/measure-boot1.log"), "w")
     proc = subprocess.Popen([dgd, config], stdout=boot_log, stderr=boot_log)
@@ -971,9 +1097,17 @@ def main():
     t_restore = wait_port(TELNET_PORT, proc2)
     print("restore boot to console-ready (final image): %.2fs" % t_restore)
 
-    ok, n, dt = http_throughput(args.requests)
-    print("http-app GET /health: %d/%d ok in %.2fs (%.0f req/s, sequential"
-          " one-connection-per-request)" % (ok, n, dt, n / dt))
+    if target is not BUNDLED_HTTP:
+        # An arbitrary application domain may still be compiling when the
+        # restore boot answers the console. The bundled path deliberately
+        # keeps its unwarmed shape, so the figure docs/configuration.md
+        # publishes stays the same measurement it has always been.
+        warm_http(proc2, target.health_url)
+
+    ok, n, dt = http_throughput(args.requests, target.route_url)
+    print("%s GET %s: %d/%d ok in %.2fs (%.0f req/s, sequential"
+          " one-connection-per-request)"
+          % (target.label, target.route_path, ok, n, dt, n / dt))
 
     proc2.send_signal(signal.SIGINT)
     try:
