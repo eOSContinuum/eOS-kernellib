@@ -128,9 +128,12 @@ Port and value normalization live entirely in `tutorial-replay.py`: any parsed c
 
 ```sh
 DGD_BIN=/path/to/dgd scripts/measure-baseline.py [--sizes 4,12,28] [--requests 200]
+DGD_BIN=/path/to/dgd scripts/measure-baseline.py --app-dir ../my-app [--app-route /orders]
 ```
 
 The timing rig, not a pass/fail gate: boots cold (timed to console-ready), grows the image in steps by parking integer arrays in a scratch object, records the client-observed snapshot pause and the snapshot file size at each step, times a restore boot against the final snapshot, and drives sequential GETs against the deployed http-app for a throughput figure. It writes its own config copy with `sector_size` raised, because the stock build caps `swap_size` at 65535 sectors and the image must fit the swap device. `MEASURE_SECTOR_SIZE` (env, default `8192`) overrides that raised value, so a larger `--sizes` run can reach past the swap ceiling the default would hit -- the 1 GiB-scale run in `docs/configuration.md` Snapshot-pause scaling used `MEASURE_SECTOR_SIZE=32768`. Numbers land in `docs/configuration.md` Limits and capacity; re-run there means re-measuring on your machine, not trusting ours.
+
+`--app-dir` measures an application other than the bundled one: it deploys that directory as a `src/usr` domain and drives the default and `--concurrent` shapes against it, with `--app-health` naming the readiness route (default `/health`), `--app-route` the route driven for the throughput figures (default: the health route), and `--app-module` a loadable module the domain needs appended to the generated config. The mount defaults to `WWW` rather than the directory's basename, because the HTTP/1 bootstrap (`src/usr/System/sys/http_server.c`) clones the application at the kernel-defined path `/usr/WWW/obj/server` -- an HTTP application deployed under any other name boots cleanly and then never answers its health route, so `--app-mount` is for a domain that is not the HTTP entry point. The load is unauthenticated GETs. `--tls`, `--headline`, and `--state-workload` refuse `--app-dir` and say so: each measures fixed platform machinery against its own bundled example. The bundled sequential path deliberately keeps its unwarmed shape so the published figures stay the same measurement; only a non-bundled target waits on its health route before the timed window.
 
 ## Vector generators
 

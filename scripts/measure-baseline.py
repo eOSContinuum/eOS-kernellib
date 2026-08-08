@@ -8,8 +8,9 @@ each step the client-observed snapshot pause (the window between sending
 the `snapshot` verb and the console answering again -- the operationally
 relevant number, since the driver blocks during the dump). Then stops the
 driver cold, times a restore boot against the final snapshot, and drives
-sequential HTTP requests against the deployed http-app for a throughput
-figure.
+sequential HTTP requests against the deployed application for a
+throughput figure. That application is the bundled http-app unless
+--app-dir names another (see Application targets below).
 
 With --tls it adds a second capacity figure beside the plain-HTTP one: a
 dedicated boot of the reference HTTPS application over the native TLS 1.3
@@ -79,6 +80,8 @@ Usage:
     DGD_BIN=/path/to/dgd scripts/measure-baseline.py --headline
     LPC_EXT_CRYPTO=/path/to/crypto DGD_BIN=/path/to/dgd \
         scripts/measure-baseline.py --state-workload 200
+    DGD_BIN=/path/to/dgd scripts/measure-baseline.py --app-dir ../my-app
+                                                    [--app-route /orders]
 
   --sizes     cumulative `code` growth calls per step (each call parks
               about 8 MB of integer arrays in the scratch object; the
@@ -103,6 +106,40 @@ Usage:
   --state-workload  sequential authenticated POST /inventory/items
                     writes for the state-touching figure (needs
                     LPC_EXT_CRYPTO, like --tls)
+  --app-dir       deploy this directory as the measured application
+                  instead of the bundled http-app
+  --app-mount     src/usr mount name for --app-dir (default WWW; see
+                  Application targets below before overriding it)
+  --app-health    route that signals the application is ready
+                  (default /health)
+  --app-route     route the throughput figures drive (default: the
+                  --app-health route)
+  --app-module    loadable module the application needs, appended to
+                  the generated config
+
+Application targets. --app-dir measures an application other than the
+bundled one, across the default and --concurrent shapes. Three limits
+shape what it can answer:
+
+  * The mount defaults to WWW and an HTTP application answers on no
+    other name. The HTTP/1 bootstrap (src/usr/System/sys/http_server.c)
+    clones the application at the kernel-defined path
+    /usr/WWW/obj/server, so a domain deployed elsewhere boots cleanly,
+    reports console-ready, and then never answers its health route.
+    --app-mount is for a domain that is not the HTTP entry point, and
+    carries that constraint as its own problem.
+  * The load is unauthenticated GETs. A workload behind a bearer token
+    or shaped by a request body needs a driver of its own; the
+    --state-workload shape is what an authenticated path looks like
+    here, and it is bundled-only.
+  * --tls, --headline, and --state-workload refuse --app-dir. Each
+    measures fixed platform machinery against its own example rather
+    than the application under test.
+
+The bundled sequential path keeps its unwarmed shape deliberately, so
+the figure docs/configuration.md publishes stays the same measurement it
+has always been; only a non-bundled target waits on its health route
+before the timed window opens.
 
 The growth run also samples the driver process RSS (ps -o rss=) at the
 base image and each growth step, printed beside the snapshot-pause line:
