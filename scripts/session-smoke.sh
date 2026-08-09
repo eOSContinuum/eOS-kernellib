@@ -367,6 +367,36 @@ expect: [$]\d+ = \(\{\s*\}\)
 cmd: session list $PRINCIPAL
 expect: session: 0 live session\(s\) for $PRINCIPAL
 
+# self-service logout-everywhere: possession of a live token is the
+# whole authority -- no capability -- and the sweep spares exactly the
+# session that presents it
+cmd: session mint $PRINCIPAL
+expect: session: token
+capture: keeptok session: token (\S+)
+
+cmd: session mint $PRINCIPAL
+expect: session: token
+
+cmd: session mint $PRINCIPAL
+expect: session: token
+
+cmd: code "/usr/System/sys/authd"->revoke_other_sessions("%{keeptok}")
+expect: [$]\d+ = 2\b
+
+cmd: code "/usr/System/sys/authd"->validate("%{keeptok}")
+expect: $PRINCIPAL
+
+cmd: session list $PRINCIPAL
+expect: session: 1 live session\(s\) for $PRINCIPAL
+
+# a dead token proves nothing and sweeps nothing
+cmd: code "/usr/System/sys/authd"->revoke_other_sessions("not-a-token")
+expect: [$]\d+ = -1\b
+
+# leave the ledger as the capability checks below expect it
+cmd: code "/usr/System/sys/authd"->logout("%{keeptok}")
+expect: [$]\d+ = 1\b
+
 # revocation immediacy: the capability check hits the live store on
 # every call, so an ungrant denies the very next call -- same admin,
 # same live session token

@@ -238,6 +238,10 @@ Session administration: bookkeeping and revocation for subjects OTHER than the c
 
 sessiond's validate and revoke, passed through: the subject a live token authenticates (or nil), and single-session revocation (TRUE iff a live one was removed).
 
+### `int revoke_other_sessions(string token)`
+
+Self-service logout-everywhere: revoke every OTHER live session for the subject the presented token proves, sparing the session that presents it. Possession of a live token is the whole authority -- the sweep never leaves the caller's own subject, so no capability applies; ending sessions that belong to ANOTHER subject is the administration surface below, behind `session.admin`. Returns the count removed, or -1 when the token proves nothing (unknown or expired). An application offering its members "log out everywhere else" binds this entry with the presenting session's token; a plaintext token never needs to exist anywhere else for the sweep to run. Live proof: `scripts/session-smoke.sh` phase 6.
+
 ### `mixed *authenticate_agent_key(string challenge, string credentialId, string signature, varargs int ttl)` / `mixed *authenticate_agent_token(string agentToken, varargs int ttl)`
 
 The agent ceremonies (verified by agentauthd) plus session mint in one step; returns `({ subject, token })` exactly like the human flow -- a session is minted only for a ceremony-proven subject.
