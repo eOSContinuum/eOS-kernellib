@@ -154,11 +154,11 @@ The System daemon mediating incoming connections per binding. Each `.dgd`-declar
 
 ## wiztool
 
-The interactive wizard-tier shell that ships with cloud-server's upstream. eOS-kernellib's analogous interactive surface is the admin_console (the term "harness-shell" is the eOS-DeepContext graph's vocabulary refresh, and either name refers to the same kind of tier-C operator surface). Load-bearing in [admin-console.md](admin-console.md).
+The interactive wizard-tier shell that ships with cloud-server's upstream. eOS-kernellib's analogous interactive surface is the admin_console; a reader arriving with the term "harness-shell" is naming the same kind of tier-C operator surface. Load-bearing in [admin-console.md](admin-console.md).
 
 ## Vocabulary bridges
 
-Readers arrive from two adjacent vocabularies: the SkotOS/kernellib lineage this platform descends from, and the eOS-DeepContext companion graph that documents the platform's design commitments in its own terms. The bridges:
+Readers arrive with two adjacent vocabularies: the SkotOS/kernellib lineage this platform descends from, and an earlier design vocabulary the project's own writing used before the terms defined above settled. This glossary carries the platform's terms; the bridges:
 
 **From the SkotOS lineage**:
 
@@ -169,9 +169,9 @@ Readers arrive from two adjacent vocabularies: the SkotOS/kernellib lineage this
 | Wiztool | admin_console | See the `wiztool` entry above |
 | Meriadoc / Merry (SkotOS subsystem) | The Merry subsystem (`src/usr/Merry/`) | The shipped implementation of the same decoration-and-compile pattern ([runtime-primitives.md](runtime-primitives.md) §5) |
 
-**From the eOS-DeepContext graph**:
+**From the earlier design vocabulary**:
 
-| Graph term | Platform term |
+| Earlier term | Platform term |
 |---|---|
 | substrate | runtime platform |
 | harness-shell | admin_console |
