@@ -149,7 +149,8 @@ eOS-kernellib participates in the [eOSContinuum](https://github.com/eOSContinuum
 - **Bug reports, feature requests, and questions**: [Issues on this repository](https://github.com/eOSContinuum/eOS-kernellib/issues). Use the template that matches your shape.
 - **Security reports**: see [SECURITY.md](SECURITY.md) for private vulnerability reporting.
 - **Code of Conduct**: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). The conventions are minimal and trust-based; we treat contributors as capable collaborators.
-- **Cross-repository discussion**: the [eOS-DeepContext](https://github.com/eOSContinuum/eOS-DeepContext) graph carries the cross-repository architectural commitments and decisions; the [`dworkin/dgd` discussion](https://github.com/dworkin/dgd/discussions) and the [DGD mailing list](https://mail.dworkin.nl/mailman/listinfo/dgd) cover driver-layer topics.
+- **Design questions and cross-cutting discussion**: [Discussions on this repository](https://github.com/eOSContinuum/eOS-kernellib/discussions). The platform's architectural commitments are written down here: [`docs/architecture.md`](docs/architecture.md) for the platform model, [`docs/runtime-primitives.md`](docs/runtime-primitives.md) for the per-primitive commitments and their status, and [`docs/runtime-platform-roadmap.md`](docs/runtime-platform-roadmap.md) for what is committed forward and on what trigger.
+- **Driver-layer topics**: the [`dworkin/dgd` discussion](https://github.com/dworkin/dgd/discussions) and the [DGD mailing list](https://mail.dworkin.nl/mailman/listinfo/dgd).
 
 ## License
 
