@@ -465,3 +465,17 @@ int logout(string token)
 {
     return SESSIOND->revoke(token);
 }
+
+/*
+ * self-service logout-everywhere: revoke every OTHER live session for
+ * the subject the presented token proves, sparing the session that
+ * presents it. Possession of a live token is the whole authority --
+ * the sweep never leaves the caller's own subject, so no capability
+ * applies; acting on ANOTHER subject's sessions is the administration
+ * surface above, behind session.admin. Returns the count removed, or
+ * -1 when the token proves nothing.
+ */
+int revoke_other_sessions(string token)
+{
+    return SESSIOND->revoke_other_sessions(token);
+}

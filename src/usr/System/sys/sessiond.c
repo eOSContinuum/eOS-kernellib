@@ -186,6 +186,35 @@ int revoke_principal(string principal)
     return removed;
 }
 
+/*
+ * revoke every OTHER live session for the principal a presented token
+ * proves (the self-service logout-everywhere primitive): possession
+ * of a live token is the whole authority, and the sweep spares
+ * exactly the session that presents it. Returns the count removed,
+ * or -1 for a token that proves nothing (unknown or expired).
+ */
+int revoke_other_sessions(string token)
+{
+    string *hashes, own, principal;
+    int i, removed;
+
+    check_system(previous_program());
+    principal = validate(token);
+    if (!principal) {
+	return -1;
+    }
+    own = token_hash(token);
+    hashes = map_indices(sessions);
+    for (i = 0; i < sizeof(hashes); i++) {
+	if (hashes[i] != own &&
+	    sessions[hashes[i]][SESS_PRINCIPAL] == principal) {
+	    sessions[hashes[i]] = nil;
+	    removed++;
+	}
+    }
+    return removed;
+}
+
 int query_session_count()
 {
     check_system(previous_program());
