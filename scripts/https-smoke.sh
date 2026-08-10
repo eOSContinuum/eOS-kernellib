@@ -235,6 +235,32 @@ case "$cleartext" in
     *) echo "PASS: cleartext request refused" ;;
 esac
 
+echo "== phase 8: PKCS#8 ECDSA key (certbot/Let's Encrypt shape) =="
+# Phase 2's key is SEC1 ("BEGIN EC PRIVATE KEY"); certbot writes ECDSA
+# keys in PKCS#8 ("BEGIN PRIVATE KEY"), Let's Encrypt's default
+# issuance. Swap in a PKCS#8 key and prove the handshake still works;
+# the statedump phases below then scan for this key's material.
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 \
+    -out "$TLS_DATA_DIR/key.pem" 2>/dev/null
+openssl req -x509 -key "$TLS_DATA_DIR/key.pem" -out "$TLS_DATA_DIR/cert.pem" \
+    -days 2 -subj "/CN=localhost"
+if ! grep -q 'BEGIN PRIVATE KEY' "$TLS_DATA_DIR/key.pem"; then
+    echo "FAIL: openssl genpkey did not produce a PKCS#8 key" >&2
+    rc=1
+fi
+if drive 'cmd: tls-cert reload
+expect: credentials validated' >/dev/null; then
+    echo "PASS: tls-cert reload accepted the PKCS#8 key"
+else
+    echo "FAIL: tls-cert reload rejected the PKCS#8 key" >&2
+    rc=1
+fi
+response=$(tls_request 'GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' || true)
+case "$response" in
+    "HTTP/1.1 200 OK"*ok*) echo "PASS: /health served with the PKCS#8 ECDSA key" ;;
+    *) echo "FAIL: handshake with the PKCS#8 ECDSA key: $response" >&2; rc=1 ;;
+esac
+
 # snapshot_and_scan <label> -- drive the console snapshot verb, wait for
 # the dump to land, and scan it for the private key in every in-memory
 # representation. The "https" port label is the positive control: it
@@ -288,12 +314,12 @@ print('PASS: private key absent from statedump (%s; %d bytes scanned)'
 PYEOF
 }
 
-echo "== phase 8: statedump scan, idle =="
+echo "== phase 9: statedump scan, idle =="
 if ! snapshot_and_scan "idle"; then
     rc=1
 fi
 
-echo "== phase 9: statedump scan, live established TLS connection =="
+echo "== phase 10: statedump scan, live established TLS connection =="
 { printf 'GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n'; sleep 45; } | \
     openssl s_client -connect "$HOST:$HTTPS_PORT" -tls1_3 -quiet \
         -no_ign_eof >/dev/null 2>&1 &
