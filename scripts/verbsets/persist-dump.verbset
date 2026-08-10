@@ -1,0 +1,59 @@
+# persist.snapshot -- the /usr/-callable dump-only surface
+# (persist_helper->trigger_dump) and its capability posture: default
+# deny, operator grant/revoke through the capability verb, and the
+# property that distinguishes it from the dump-and-exit path -- the
+# runtime keeps serving after the dump. Verbs that run after the
+# trigger_dump call execute in later tasks over the same telnet
+# session, so each one is evidence the server survived the snapshot.
+#
+# Runs against a base boot; no example deploy, no module:
+#   DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh scripts/verbsets/persist-dump.verbset
+# The snapshot-file landing itself is asserted by
+# scripts/persist-dump-smoke.sh, which boots, drives this verbset, and
+# checks state/snapshot while the driver is still up (the dump file
+# lives outside the LPC root, so no verb can see it; and the kernel
+# driver dumps on SIGTERM, so only a mid-run check discriminates).
+
+# default-deny: no principal holds persist.snapshot at boot. The
+# code-verb caller's principal is the console owner's user name.
+cmd: code "/usr/System/sys/persist_helper"->trigger_dump()
+expect: Error: capability denied: principal admin lacks persist.snapshot
+
+# the operator grant path: a store entry through the KERNEL()-gated
+# console verb
+cmd: capability grant persist.snapshot admin
+expect: capability: granted persist.snapshot to admin
+
+# the choke-point every authority decision routes through answers true
+cmd: code "/kernel/sys/capabilityd"->is_allowed("persist.snapshot", "admin")
+expect: \$\d+ = 1
+
+# the dump-only call now succeeds and returns immediately: the kfun
+# marks the state for dumping, the driver writes the snapshot after
+# this task completes
+cmd: code "/usr/System/sys/persist_helper"->trigger_dump()
+expect: \$\d+ = nil
+
+# the runtime keeps serving after the dump: the same session still
+# answers, and evaluation still works
+cmd: status
+expect: Server:\s+DGD
+expect: Uptime:
+
+cmd: code 2 + 3
+expect: \$\d+ = 5
+
+# capabilityd's own mutators stay KERNEL()-gated: a console code caller
+# is refused (the operator path above is the only console route)
+cmd: code "/kernel/sys/capabilityd"->grant("persist.snapshot", "evil")
+expect: Error: capabilityd: grant not callable from outside /kernel
+
+# revoke, and the surface denies again -- the operator lever is real
+cmd: capability revoke persist.snapshot admin
+expect: capability: revoked persist.snapshot from admin
+
+cmd: code "/kernel/sys/capabilityd"->is_allowed("persist.snapshot", "admin")
+expect: \$\d+ = 0
+
+cmd: code "/usr/System/sys/persist_helper"->trigger_dump()
+expect: Error: capability denied: principal admin lacks persist.snapshot

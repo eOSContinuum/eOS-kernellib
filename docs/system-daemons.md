@@ -88,7 +88,7 @@ The capability store behind the platform's gating surfaces. `docs/capability.md`
 - `void require_member(string capability, string principal)` -- throwing check, uniform denial message
 - `void grant(string capability, string principal)` / `void revoke(string capability, string principal)` -- KERNEL()-gated mutation (an ungated caller gets an error)
 - `string *query_principals(string capability)` / `string *query_capabilities()` -- public reads
-- `void set_delegable(string capability, int flag)` / `int query_delegable(string capability)` -- the per-capability delegable flag gating controller-to-agent delegation (`docs/capability.md` Identity principals); mutation KERNEL()-gated, read public. The operator face is the `capability` console verb (list the store; `capability delegable <cap> on|off`).
+- `void set_delegable(string capability, int flag)` / `int query_delegable(string capability)` -- the per-capability delegable flag gating controller-to-agent delegation (`docs/capability.md` Identity principals); mutation KERNEL()-gated, read public. The operator face is the `capability` console verb (list the store; `capability delegable <cap> on|off`; `capability grant <cap> <principal>` / `capability revoke <cap> <principal>`, the domain- and program-principal operator path).
 
 ## identityd -- `src/usr/System/sys/identityd.c`
 
