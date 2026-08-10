@@ -40,7 +40,7 @@ The intro promised the comparison. Here it is. Each alternative solves real prob
 |---|---|---|---|---|
 | Representations the author maintains | Two (objects + schema) plus the mapping | Two (objects + format) plus save/load code | One | One |
 | What persists | What the schema covers | What the author remembered to serialize | The whole process image, untyped | The whole image, typed |
-| Save points | Per-transaction, explicit | Explicit calls | External snapshot | Runtime snapshot cycle (automatic + on-demand) |
+| Save points | Per-transaction, explicit | Explicit calls | External snapshot | Runtime snapshot cycle (deliberately triggered: operator verb, application call, stop signal) |
 | Restore | Reconnect + rehydrate | Explicit load + validation | Same machine/kernel shape, fragile | Type-aware restore from the versioned snapshot format |
 | Schema / code evolution | Migration framework | Hand-written format versioning | None: the image is opaque | Hot reload + lazy upgrade (`call_touch`). See `docs/code-lifecycle.md` |
 | Transactionality | In the database, separate from program state | None | None | Atomic functions over the same state the snapshot captures (§1) |
@@ -82,14 +82,19 @@ The "what doesn't persist" entries above are the platform's contract boundary: t
 - `dump_state(0)` (or `dump_state()`): **full snapshot**. Writes the entire image. The prior `dump_file` rotates to `<dump_file>.old`.
 - `dump_state(1)`: **incremental snapshot**. Writes changes since the prior full snapshot. The platform's recovery sequence restores the most-recent full snapshot, then applies the most-recent incremental on top.
 
-Two trigger mechanisms:
+Every snapshot is deliberately triggered -- **the platform schedules none on its own** (verified live: a boot left idle across six `dump_interval` periods wrote nothing; the config field governs post-restore rebuild spreading, not a dump timer -- see The rebuild interval below). The trigger paths:
 
-1. **Automatic**: the `.dgd` configuration's `dump_interval` field (typical: 3600 seconds). The platform writes a snapshot every interval. The rotation moves `<dump_file>` → `<dump_file>.old` before the new snapshot is written, so if the new write is interrupted, the prior snapshot survives.
-2. **Explicit**: an operator invokes the `snapshot` verb in `admin_console`, or code invokes `dump_state()` directly. Useful before maintenance windows, before risky deploys, or when an externally-triggered consistent backup is needed.
+1. **Operator**: the `snapshot` verb in `admin_console` (full dump, runtime keeps serving), or `reboot` (incremental dump, then shutdown). Useful before maintenance windows, before risky deploys, or when an externally-triggered consistent backup is needed.
+2. **Application**: `persist_helper->trigger_dump()` (The programmatic surface below), the capability-gated path an application uses to build its own cadence -- periodic dumps or milestone dumps.
+3. **Stop signal**: SIGTERM reaches the kernel driver's interrupt hook, which writes an incremental dump before shutting down -- a clean supervisor stop loses nothing, but a crash, SIGKILL, or power loss preserves only the last deliberate dump.
+
+Whichever path triggers it, the rotation moves `<dump_file>` → `<dump_file>.old` before the new snapshot is written, so if the new write is interrupted, the prior snapshot survives.
 
 `dump_state` is **atomic with respect to in-flight operations**: the snapshot represents a consistent commit boundary. The runtime guarantees that the snapshot does not capture a state in the middle of an atomic context. Statedumps occur between timeslices, never inside an atomic operation.
 
-The cost of a snapshot is proportional to the in-memory image size. A multi-gigabyte image can take seconds to write. The runtime briefly blocks during the dump. Workloads that cannot tolerate a brief pause should plan `dump_interval` against their peak-traffic schedule.
+The cost of a snapshot is proportional to the in-memory image size. A multi-gigabyte image can take seconds to write. The runtime briefly blocks during the dump. Workloads that cannot tolerate a brief pause should plan their snapshot cadence against their peak-traffic schedule.
+
+**The rebuild interval.** What the `.dgd` configuration's `dump_interval` field actually governs: after a boot from a snapshot, the driver spreads the work of migrating objects out of the snapshot file into live state across roughly the configured interval, in chunks, instead of paying one large I/O spike at boot (`dgd/src/object.cpp`: `dinterval` is derived as ~19/20 of the field and drives the chunked post-restore copy). It schedules no snapshots. The field's name predates this platform and reads like a dump timer; sizing it trades post-restore I/O smoothing, not durability.
 
 ## Snapshot restore: cold boot from snapshot
 
@@ -147,7 +152,7 @@ The `static` modifier on a variable excludes it from `save_object`'s output. Sta
 
 Use `save_object`/`restore_object` when:
 
-- An object needs a checkpoint independent of the platform's snapshot cadence (e.g., a critical operation just completed and needs durable confirmation before the next `dump_interval`).
+- An object needs a checkpoint independent of the image snapshot cadence the deployment runs (e.g., a critical operation just completed and needs durable confirmation before the next scheduled dump).
 - State needs to be portable across platforms (the per-object save file is human-readable and can be hand-edited or imported into a different platform).
 - A subset of an object's state needs a stable on-disk representation distinct from the snapshot.
 
@@ -185,7 +190,7 @@ The persistence cycle from the operator's view:
 Common operator scenarios:
 
 - **Pre-deployment safety net**: `snapshot` before applying a risky code change. If the change wedges the platform, the operator falls back to `<dump_file>.old`.
-- **Scheduled rotation**: the platform writes automatic snapshots at `dump_interval`. `snapshot` is the operator-on-demand variant.
+- **Scheduled rotation**: the platform schedules no snapshots itself (The statedump cycle above), so a deployment that wants a cadence runs one: an application call_out loop around `persist_helper->trigger_dump()` (The programmatic surface below), or host-side automation driving the `snapshot` verb.
 - **Hot binary upgrade**: requires the `.dgd` `hotboot` tuple. Preserves connections and pending state across an `execv` replace.
 - **Recovery from a wedge**: `reboot` returns the platform to the last consistent state without operator coordination across the host filesystem.
 

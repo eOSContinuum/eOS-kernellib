@@ -133,7 +133,7 @@ The host driver loads the snapshot file named by the config's `dump_file` and re
 
 The host driver writes a snapshot, replaces the running executable via `execv` (e.g., to pick up a new DGD binary or change a config value), reloads the snapshot, and continues serving the same persistent connections that were open before the replace. The connection file descriptors survive the `execv` via POSIX fd inheritance. The host runtime serializes per-connection state during hotboot and restores it on the receiving side. The kernel driver's `restored(int hotboot)` hook distinguishes hotboot-resume from statedump-resume so userd and initd can re-attach to the surviving connections. Hot boot enables platform-level deployment without disconnecting active sessions. Cold boot is the fallback when the snapshot is unrecoverable.
 
-Statedump cadence is governed by the config's `dump_interval`. Statedumps occur between timeslices, never inside an atomic operation. The runtime guarantees that the snapshot represents a consistent state-graph commit boundary.
+Statedumps are deliberately triggered (operator verbs, the application dump surface, or a SIGTERM stop -- `docs/persistence.md` The statedump cycle; the config's `dump_interval` spreads the post-restore rebuild, scheduling nothing). Statedumps occur between timeslices, never inside an atomic operation. The runtime guarantees that the snapshot represents a consistent state-graph commit boundary.
 
 ### The boot, in source order
 

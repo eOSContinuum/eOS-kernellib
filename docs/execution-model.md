@@ -45,7 +45,7 @@ Two things bound that cost instead of letting it become a hang:
 
 The budget also prices a fit boundary. In-image code is interpreted, and a full default budget is roughly 90-120 ms of driver wall clock on the measured hardware (`docs/configuration.md` Concurrency, measured twice) -- each such task holding the whole image's queue while it runs. That is why CPU-bound computation is an anti-fit in-image (`docs/evaluating.md` Fit and anti-fit): chunking spreads the cost across the queue but does not shrink it, and the escape valves are a client at the transport boundary or a host-driver kfun extension.
 
-One stall lives outside both bounds: the statedump pause. When the image writes -- every `dump_interval`, or on an explicit dump -- the runtime itself briefly blocks, and no tick budget meters it because it is not a task running. It recurs by design and scales with image size; its measurements and the sizing trade are priced in `docs/operations.md` Availability and data-loss model.
+One stall lives outside both bounds: the statedump pause. When the image writes -- on each dump of whatever cadence the deployment runs, or an explicit one -- the runtime itself briefly blocks, and no tick budget meters it because it is not a task running. It recurs by design and scales with image size; its measurements and the sizing trade are priced in `docs/operations.md` Availability and data-loss model.
 
 ## The tick budget, mechanically
 
