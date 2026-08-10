@@ -127,11 +127,11 @@ All four object-taking verbs (`clone`, `destruct`, `new`, `status`) also accept 
 **What for**:
 
 - **Pre-deployment safety net**: `snapshot` before applying a substantial code change. If the change wedges the platform, restore from `dump_file.old`.
-- **Scheduled rotation**: the platform writes automatic snapshots every `dump_interval` seconds (config field). `snapshot` is the operator-on-demand variant; useful before maintenance windows.
+- **Scheduled rotation**: the platform schedules no snapshots itself (`docs/persistence.md` The statedump cycle) -- a deployment that wants a cadence runs one, application-side (`persist_helper->trigger_dump()`) or as host automation driving `snapshot`. `snapshot` is the operator-on-demand dump; useful before maintenance windows.
 - **Recovery from a wedge**: `reboot` returns the platform to the last consistent state. Distinct from a host-level `kill`: `reboot` ensures the next boot starts from a consistent committed snapshot.
 - **Hot binary upgrade**: requires the `.dgd` configuration's `hotboot` tuple. Run the System console's `hotboot` verb (a registered operator login with full access; the kernel admin console does not carry the verb) to invoke `execv` against the binary at the tuple's path; connections survive; state restores from the freshly-written snapshot. The end-to-end sequence with its pre-flight and failure mode is `docs/operations.md` Replace the host binary, end to end.
 
-Cold shutdown (`shutdown`) leaves no snapshot of its own; the platform restarts from whichever snapshot was last written by `dump_interval` or by an explicit `snapshot`/`reboot`. Plan accordingly: a busy platform with `dump_interval = 3600` and no `snapshot` between rotations loses up to an hour of state on a cold-shutdown-then-recover cycle.
+Cold shutdown (`shutdown`) leaves no snapshot of its own; the platform restarts from whichever snapshot was last deliberately written (`snapshot`, `reboot`, an application `trigger_dump`, or a SIGTERM stop). Plan accordingly: a busy platform whose last dump is an hour old loses that hour on a cold-shutdown-then-recover cycle, and a deployment running no snapshot cadence at all has nothing newer than its last manual dump to restart from.
 
 ### Managing permissions
 

@@ -59,7 +59,7 @@ Verify the kernel layer compiles by running the driver against `example.dgd` per
 
 ## State and snapshot files
 
-`example.dgd` references swap and snapshot files under `../state/`. The `state/` directory ships with the checkout (it holds a tracked `.gitignore`). If you point those settings elsewhere, create the directory they name before starting the driver. The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph at the last `dump_interval` checkpoint.
+`example.dgd` references swap and snapshot files under `../state/`. The `state/` directory ships with the checkout (it holds a tracked `.gitignore`). If you point those settings elsewhere, create the directory they name before starting the driver. The swap file is recreated on each boot. The snapshot file persists across boots and stores the runtime's object graph as of the last dump taken (snapshots are always deliberately triggered -- `docs/persistence.md` The statedump cycle).
 
 ## Where to next
 

@@ -95,7 +95,7 @@ The in-memory object graph survives restart without explicit serialization.
 - Two-level mapping (port candidate, `bigmap` / `bigmap_iterator`): bypasses the host runtime's per-mapping size limit, with iterator pattern for subclass masking. Useful when a persistent collection grows past the host-language ceiling.
 
 **Open**:
-- Statedump scheduling and integrity policy (when does the platform write a full image dump? What happens on dump failure?). Operator-facing, outside the platform's enforcement surface.
+- Statedump integrity policy on dump failure (partial-write detection beyond the rotation's prior-snapshot guarantee). The scheduling half is answered and documented: the platform writes no dump on its own -- every snapshot is deliberately triggered, and cadence is the deployment's to run (`docs/persistence.md` The statedump cycle).
 
 ---
 
