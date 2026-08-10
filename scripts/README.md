@@ -106,6 +106,14 @@ DGD_BIN=/path/to/dgd/bin/dgd scripts/agent-smoke.sh
 
 Agent identity end-to-end with its statedump-discipline proof. Boots with the crypto module and drives, over the console: the key ceremony against a real foreign signer (Ed25519 via the `openssl` CLI, so the platform verifies bytes it did not produce), including the domain-tag refusal (a signature over the bare challenge is refused); the token ceremony including required expiry (a short-TTL token authenticates, then expires and is refused); suspension killing live sessions and delegated grants while a coexisting operator grant of the same capability survives on its own source, with resume restoring authentication but never grants; and the load-bearing scan -- a statedump taken with a live agent token and a live agent session is scanned for the token plaintext (must be absent) with the token's SHA-256 hash and the agent's principal string as positive controls. `AGENT-SMOKE PASS` is the pass signal. Needs python3 (stdlib only) and an `openssl` CLI with Ed25519 support (OpenSSL 1.1.1+; LibreSSL will not do), plus the crypto module like the other module-bearing steps.
 
+## persist-dump-smoke.sh
+
+```sh
+DGD_BIN=/path/to/dgd/bin/dgd scripts/persist-dump-smoke.sh
+```
+
+The /usr/-callable dump-only surface (`persist_helper->trigger_dump`) end to end, module-less against a base boot. Drives `scripts/verbsets/persist-dump.verbset` over the console -- the default-deny refusal, the operator grant (`capability grant persist.snapshot admin`), the successful dump call, the still-serving verbs after it, and the revoke returning the surface to deny -- then, while the driver is still up, asserts the snapshot actually landed at `state/snapshot` and the console still answers. The mid-run placement of the file check is load-bearing: the kernel driver writes its own snapshot on SIGTERM, so a file found after teardown proves nothing about `trigger_dump`. `PERSIST-DUMP PASS` is the pass signal; boot output lands in `state/persist-dump-boot.log`.
+
 ## base-boot-guard.sh
 
 ```sh
@@ -198,6 +206,10 @@ Three doc-hygiene checks ride the same bar and need no DGD binary:
 A fourth check needs a DGD binary but no crypto module -- the tutorial doc-drift guard, the replay half of the concern step 31 covers statically:
 
 32. `DGD_BIN=<dgd> scripts/tutorial-smoke.sh` -- `TUTORIAL-SMOKE PASS (first-hour: N console + M http, first-application: P console + Q http, first-http-endpoint: R console + S http)` after replaying every documented command/expected-output pair in `docs/first-hour.md`, `docs/first-application.md`, and `docs/first-http-endpoint.md`, parsed from the docs' own fenced transcripts at run time, including each tutorial's `reboot` + snapshot-restore cycle as a real process restart (`first-hour.md`'s interactive telnet-connect and login-banner blocks are named SKIPs, not assertions). See `tutorial-smoke.sh` below for the parse strategy and normalization rules.
+
+Last, the programmatic persistence surface, module-less:
+
+33. `DGD_BIN=<dgd> scripts/persist-dump-smoke.sh` -- `PERSIST-DUMP PASS` after the dump-only surface's full posture cycle (default-deny, operator grant, a successful `trigger_dump`, revoke, deny again) with the snapshot-file landing asserted mid-run, while the driver is still up and answering -- the property that distinguishes this surface from the dump-and-exit path. See `persist-dump-smoke.sh` above for why the check cannot run after teardown.
 
 ## When a run fails
 

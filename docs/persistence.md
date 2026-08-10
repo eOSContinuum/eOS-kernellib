@@ -189,6 +189,19 @@ Common operator scenarios:
 - **Hot binary upgrade**: requires the `.dgd` `hotboot` tuple. Preserves connections and pending state across an `execv` replace.
 - **Recovery from a wedge**: `reboot` returns the platform to the last consistent state without operator coordination across the host filesystem.
 
+## The programmatic surface
+
+Applications reach the snapshot operations without a console: `/usr/System/sys/persist_helper` is the `/usr/`-facing persistence surface, two entry points with two postures.
+
+`trigger_dump()` is the durability primitive: it writes a full snapshot while the runtime keeps serving, for applications that need snapshot cadence -- periodic dumps, or dumps at workload milestones such as a completed batch. The call is gated by the `persist.snapshot` capability against the calling object's owner: default-deny, operator-granted per principal with `capability grant persist.snapshot <principal>` and operator-revocable (`docs/capability.md` Bootstrap and lifecycle). Two properties matter to callers:
+
+- **It returns immediately.** The `dump_state()` kfun only marks the state for dumping; the driver writes the snapshot after the current task completes. The caller's stack has unwound by write time, so no `call_out` indirection is needed around the call.
+- **Cadence is the caller's.** The kernel layer supplies the primitive, not a schedule: an application that wants interval dumps arms its own `call_out` loop around `trigger_dump()`. An armed `call_out` loop is itself captured by each snapshot, so a restore resumes the cadence with no re-arming.
+
+`trigger_dump_and_exit()` is the test-harness cycle path (Substrate verification below): dump then `shutdown()`, via a `call_out` so the caller's stack unwinds before the snapshot captures it. It is deliberately ungated -- it stops the runtime, which is loud, and its callers are example test drivers.
+
+The regression for the dump-only surface is `scripts/persist-dump-smoke.sh` (`scripts/README.md`): the deny/grant/revoke cycle over a live console, with the snapshot landing asserted while the driver is still up and answering.
+
 ## Persistence boundaries
 
 The platform's persistence model has explicit boundaries. Each requires application-layer handling:

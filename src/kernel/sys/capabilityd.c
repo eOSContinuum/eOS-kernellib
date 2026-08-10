@@ -160,6 +160,19 @@ private void _emit(object user, string msg) {
  *		admin-console registry:
  *		  capability                        -- list the store
  *		  capability delegable <cap> on|off -- flip the delegable flag
+ *		  capability grant <cap> <principal>  -- add a store entry
+ *		  capability revoke <cap> <principal> -- remove one
+ *
+ *		grant/revoke here is the operator path for domain and
+ *		program principals: this program is /kernel-tier, so the
+ *		KERNEL()-gated mutation runs from a /kernel caller, per
+ *		the bootstrap doctrine above. Identity principals have
+ *		their own constrained operator path (`identity grant`,
+ *		which refuses non-"identity:" principals); this verb does
+ *		not duplicate that constraint because the console operator
+ *		already holds the broader authority (snapshot, shutdown,
+ *		code) that the constraint exists to keep off /usr/-tier
+ *		reachable seams.
  */
 void cmd_capability(object user, string cmd, string str) {
    string *parts, *names;
@@ -191,5 +204,24 @@ void cmd_capability(object user, string cmd, string str) {
                   "\n");
       return;
    }
-   _emit(user, "usage: " + cmd + " [delegable <capability> on|off]\n");
+   if (parts[0] == "grant" || parts[0] == "revoke") {
+      if (sizeof(parts) != 3) {
+         _emit(user, "usage: " + cmd + " " + parts[0] +
+                     " <capability> <principal>\n");
+         return;
+      }
+      if (parts[0] == "grant") {
+         grant(parts[1], parts[2]);
+         _emit(user, "capability: granted " + parts[1] + " to " + parts[2] +
+                     "\n");
+      } else {
+         revoke(parts[1], parts[2]);
+         _emit(user, "capability: revoked " + parts[1] + " from " + parts[2] +
+                     "\n");
+      }
+      return;
+   }
+   _emit(user, "usage: " + cmd + " [delegable <capability> on|off | " +
+               "grant <capability> <principal> | " +
+               "revoke <capability> <principal>]\n");
 }

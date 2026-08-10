@@ -1,14 +1,30 @@
 /*
- * Test-helper exposing a dump-and-exit path to /usr/ callers.
+ * The /usr/-facing persistence surface: programmatic access to the
+ * kernel layer's snapshot operations. dump_state() and shutdown() are
+ * gated to System-creator in /kernel/lib/auto, so /usr/ callers reach
+ * them through the two entry points here, each with its own posture.
  *
- * dump_state() and shutdown() are gated to System-creator in
- * /kernel/lib/auto. Example applications that verify orthogonal-
- * persistence properties (observer survival, vault-state round-trips,
- * scheduled call_out resumption) need a way to write a snapshot and
- * exit cleanly so an external test harness can restart the driver
- * against the snapshot. This object exposes a single LFUN that any
- * /usr/ caller can invoke; the dump + shutdown sequence runs via
- * call_out so the caller's stack unwinds before the snapshot is taken
+ * trigger_dump() -- the durability primitive. Writes a snapshot while
+ * the runtime keeps serving, for applications that need snapshot
+ * cadence: periodic dumps, or dumps at workload milestones. Gated by
+ * the "persist.snapshot" capability against the calling object's
+ * owner: default-deny, operator-granted and -revocable per principal
+ * (`capability grant persist.snapshot <principal>` on the admin
+ * console). The dump_state() kfun only marks the state for dumping --
+ * the driver writes the snapshot after the current task completes --
+ * so the call returns immediately, the caller's stack has unwound by
+ * write time, and no call_out indirection is needed. Cadence itself
+ * (intervals, milestone triggers) stays application-side by design;
+ * an armed call_out loop rides each snapshot across restores, so a
+ * caller's cadence survives a restore with no re-arming.
+ *
+ * trigger_dump_and_exit() -- the test-harness cycle path. Example
+ * applications that verify orthogonal-persistence properties (observer
+ * survival, vault-state round-trips, scheduled call_out resumption)
+ * need a way to write a snapshot and exit cleanly so an external test
+ * harness can restart the driver against the snapshot. Any /usr/
+ * caller can invoke it; the dump + shutdown sequence runs via call_out
+ * so the caller's stack unwinds before the snapshot is taken
  * (otherwise the snapshot captures the caller mid-execution and the
  * resumed run is messy).
  *
@@ -21,7 +37,7 @@
  * of one process-restart in the harness.
  *
  * Application state (objects, properties, call_outs, the dispatcher
- * substrate's observer cache and batch state) survives the cycle via
+ * substrate's observer cache and batch state) survives either cycle via
  * DGD's standard orthogonal-persistence guarantees.
  */
 
@@ -34,6 +50,19 @@ inherit "/kernel/lib/capability";
 static void create()
 {
     ::create();
+}
+
+/*
+ * The capability check runs at this public entry, against the true
+ * external caller (previous_object() here is the calling surface, not
+ * a helper frame). The principal is the caller's owner -- a /usr
+ * domain, or a console operator's user name for code-verb calls.
+ */
+void trigger_dump()
+{
+    require_member("persist.snapshot",
+		   previous_object() ? previous_object()->query_owner() : nil);
+    dump_state(FALSE);
 }
 
 void trigger_dump_and_exit()

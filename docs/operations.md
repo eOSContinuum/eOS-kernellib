@@ -138,7 +138,7 @@ A complete backup covers more than the dump file:
 
 **Restore.** Two forms, both invoked as `dgd config_file [restore files]`:
 
-- **Full restore**: `dgd config_file dump_file`. Works when `dump_file` holds a full snapshot: the `snapshot` verb (`dump_state(FALSE)`, `src/kernel/lib/admin_console.c` `cmd_snapshot`) and the console dump-and-exit path (`dump_state(FALSE)`, `src/usr/System/sys/persist_helper.c:54`) both leave one.
+- **Full restore**: `dgd config_file dump_file`. Works when `dump_file` holds a full snapshot: the `snapshot` verb (`dump_state(FALSE)`, `src/kernel/lib/admin_console.c` `cmd_snapshot`), the programmatic dump-only surface (`persist_helper->trigger_dump()`, `docs/persistence.md` The programmatic surface), and the dump-and-exit path (`dump_state(FALSE)`, `src/usr/System/sys/persist_helper.c:83`) all leave one.
 - **Two-file (incremental) restore**: `dgd config_file dump_file dump_file.old`. Required when `dump_file` holds an incremental snapshot written by `dump_state(1)`/`dump_state(TRUE)`. The argument order (the current dump file first, its full base second) is verified from the DGD driver's own usage line, `Usage: dgd config_file [[partial_snapshot] snapshot]`, and from `Config::restore(fd, fd2)`: the header read from the first file is checked for the partial flag, and the second file is opened only to back it. This is the same order already documented for the `.dgd` file's `hotboot` tuple (`{ binary, config, snapshot, snapshot.old }`, `docs/configuration.md` The .dgd configuration file). An unset second argument on a partial primary fails at boot with "Missing secondary snapshot".
 
 This two-file form is a different recovery than the corrupt-snapshot fallback in Common failure modes below, which discards the newer `dump_file` outright and restores from `<dump_file>.old` alone as a self-contained snapshot. The two-file form instead restores using both files together, applying the incremental on top of its base.
@@ -150,7 +150,8 @@ Which stop path leaves which case:
 | Kill signal (SIGTERM) | `prepare_reboot()` then `dump_state(1)` (`src/kernel/sys/driver.c:757-766`) | `dump_file` + `dump_file.old` (in practice, see below) |
 | `reboot` verb | `dump_state(TRUE)` then `shutdown()` (`cmd_reboot`, `src/kernel/lib/admin_console.c`) | `dump_file` + `dump_file.old` (in practice, see below) |
 | `snapshot` verb | `dump_state(FALSE)` (`cmd_snapshot`) | `dump_file` alone |
-| Console dump-and-exit path | `dump_state(FALSE)` then `shutdown()` (`src/usr/System/sys/persist_helper.c:54`) | `dump_file` alone |
+| Console dump-and-exit path | `dump_state(FALSE)` then `shutdown()` (`src/usr/System/sys/persist_helper.c:83`) | `dump_file` alone |
+| Programmatic dump-only (not a stop: the runtime keeps serving) | `dump_state(FALSE)` (`persist_helper->trigger_dump()`, capability-gated) | `dump_file` alone |
 
 A supervisor sending SIGTERM (the ordinary "stop the service" path outside admin_console) and the `reboot` verb both write an incremental. Strictly, a `dump_state(1)` dump is written as a partial only when swapped-out objects are pending at dump time. A small freshly-booted image can produce a self-contained file (which is why the tutorial's single-file restore succeeds after its first `reboot`), but on a long-running image the partial case is the norm. Routine operator practice should keep `<dump_file>.old` alongside `dump_file` rather than treat it as disposable. A restore attempted with only `dump_file` after either path is the likely cause of a "Missing secondary snapshot" failure at boot.
 

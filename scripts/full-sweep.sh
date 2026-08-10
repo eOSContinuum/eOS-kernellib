@@ -330,6 +330,7 @@ run_step 29 0 "function-index --check"        python3 scripts/gen-function-index
 run_step 30 0 "anchor-capture check"          anchor_capture_check
 run_step 31 0 "doc-sentinel-check"            python3 scripts/doc-sentinel-check.py
 run_step 32 0 "tutorial-smoke"                env DGD_BIN="$DGD_BIN" scripts/tutorial-smoke.sh
+run_step 33 0 "persist-dump-smoke"            env DGD_BIN="$DGD_BIN" scripts/persist-dump-smoke.sh
 
 # ---- summary --------------------------------------------------------
 

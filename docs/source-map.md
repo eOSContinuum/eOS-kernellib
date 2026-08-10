@@ -30,7 +30,7 @@ The inheritable LPC types and utilities available to every tier, below the platf
 
 Privileged code owned by `System`, published for global read at boot so every domain inherits the System auto (`lib/auto.c`).
 
-- `sys/` holds the System daemons: `userd.c` (the telnet manager that routes logins), `objectd.c` (the compile-time program graph), `errord.c` (error logging), `upgraded.c` (upgrade-cascade coordination), `portd.c` (the port-label registry over the kernel's numeric port registration), `http_server.c` (the binary-port HTTP manager), `https_server.c` (the HTTPS bootstrap on the labeled TLS port), `identityd.c` (the platform identity registry), `webauthnd.c` (the WebAuthn ceremony daemon), `sessiond.c` (the session-token daemon), `logd.c` (persistent logging), and `persist_helper.c` (statedump support).
+- `sys/` holds the System daemons: `userd.c` (the telnet manager that routes logins), `objectd.c` (the compile-time program graph), `errord.c` (error logging), `upgraded.c` (upgrade-cascade coordination), `portd.c` (the port-label registry over the kernel's numeric port registration), `http_server.c` (the binary-port HTTP manager), `https_server.c` (the HTTPS bootstrap on the labeled TLS port), `identityd.c` (the platform identity registry), `webauthnd.c` (the WebAuthn ceremony daemon), `sessiond.c` (the session-token daemon), `logd.c` (persistent logging), and `persist_helper.c` (the programmatic persistence surface: capability-gated dump-only, plus dump-and-exit).
 - `lib/` holds `auto.c` (the inheritance root for every user-tier object) and `user.c`; `obj/` holds the System login console (`user.c`), the `objectd.c` clonable, and the identity record (`identity.c`).
 
 ### `src/usr/<Domain>/` (tier D, the platform domains)
@@ -64,7 +64,7 @@ Each runtime surface, the code that implements it, the document that explains it
 | Subsystem | Entry-point code | Doc | Regression surface |
 |---|---|---|---|
 | Capability and authority | `src/kernel/sys/capabilityd.c`, `src/kernel/lib/capability.c`, `src/usr/System/lib/auto.c` | `docs/capability.md`, `docs/architecture.md` | steps 11, 13, 15 (console-ext), 18 (identity-capability), 21 (agent-delegation) |
-| Persistence and statedump | the host driver, `src/usr/System/sys/persist_helper.c` | `docs/persistence.md` | steps 1, 4, 10, 11 (restore boots), 22, 23, 28 (statedump scans) |
+| Persistence and statedump | the host driver, `src/usr/System/sys/persist_helper.c` | `docs/persistence.md` | steps 1, 4, 10, 11 (restore boots), 22, 23, 28 (statedump scans), 33 (dump-only surface) |
 | Property dispatch | `src/usr/Merry/sys/merry.c`, `src/lib/util/properties.c` | `docs/dispatcher.md` | steps 4 (merry-app), 15 (dispatcher-verbs) |
 | Observers | `src/usr/Merry/sys/merry.c` | `docs/observers.md` | steps 1 (chat-app), 4 (merry-app), 15 (dispatcher-verbs) |
 | Schema | `src/usr/Schema/` | `docs/schema.md` | steps 7 (vault-app), 15 (schema-verbs) |
