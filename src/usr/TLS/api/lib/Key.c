@@ -43,6 +43,61 @@ static void eddsaKey(string str)
 }
 
 /*
+ * obtain EC key data (RFC 5915 ECPrivateKey with the curve named by the
+ * enclosing PKCS#8 algorithm; the embedded parameters and public key
+ * are optional here)
+ */
+static void ecKey(string str, string curve)
+{
+    Asn1 *list, node;
+    int sz, offset;
+
+    list = expect(new Asn1Der(str), ASN1_SEQUENCE);
+    if (expect(list[0], ASN1_INTEGER) != "\1") {
+	error("Bad key");
+    }
+    privateKey = expect(list[1], ASN1_OCTET_STRING);
+    sz = sizeof(list);
+    offset = 2;
+    if (offset < sz && list[offset]->class() == ASN1_CLASS_CONTEXTUAL &&
+	list[offset]->tag() == 0) {
+	({ node }) = list[offset++]->contents();
+	if (expect(node, ASN1_OBJECT_IDENTIFIER) != curve) {
+	    error("Bad key");
+	}
+    }
+    if (offset < sz && list[offset]->class() == ASN1_CLASS_CONTEXTUAL &&
+	list[offset]->tag() == 1) {
+	({ node }) = list[offset++]->contents();
+	publicKey = expect(node, ASN1_BIT_STRING);
+	if (publicKey[0] != '\0') {
+	    error("Bad key");
+	}
+	publicKey = publicKey[1 ..];
+    }
+    if (offset != sz) {
+	error("Bad key");
+    }
+
+    switch (curve) {
+    case OID_SECP256R1:
+	type = TLS_ECDSA_SECP256R1_SHA256;
+	break;
+
+    case OID_SECP384R1:
+	type = TLS_ECDSA_SECP384R1_SHA384;
+	break;
+
+    case OID_SECP521R1:
+	type = TLS_ECDSA_SECP521R1_SHA512;
+	break;
+
+    default:
+	error("Bad key");
+    }
+}
+
+/*
  * initialize key
  */
 static void create(string str)
@@ -77,6 +132,11 @@ static void create(string str)
 	case OID_ED448:
 	    type = TLS_ED448;
 	    eddsaKey(expect(list[2], ASN1_OCTET_STRING));
+	    break;
+
+	case OID_EC_PUBLIC_KEY:
+	    ecKey(expect(list[2], ASN1_OCTET_STRING),
+		  expect(algo[1], ASN1_OBJECT_IDENTIFIER));
 	    break;
 
 	default:
