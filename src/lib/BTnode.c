@@ -28,8 +28,7 @@ private int changes;		/* structural change counter */
 /*
  * create a new BTnode
  */
-static object newNode(string accessKey, int maxSize, mixed *keys,
-		      mixed *values)
+static object newNode(string accessKey, int maxSize, mixed *keys, mixed *values)
 {
     return new BTnode(accessKey, maxSize, keys, values);
 }
