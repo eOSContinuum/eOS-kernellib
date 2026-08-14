@@ -45,11 +45,43 @@ The Standard build works as written. Validated on Debian 12 (bookworm, aarch64) 
 
 The DGD source compiles on FreeBSD and other POSIX-compatible systems with a working C toolchain. Platform detection happens via `uname -s` at the top of `dgd/src/Makefile`. On Windows, no native build is validated: the supported route is the Linux path -- the container recipe above, or WSL2.
 
-### Wider index types: unproven today
+### Wider index types
 
-The stock build's capacity ceilings trace to compile-time type widths: `uindex`, `Sector`, and `ssizet` default to `unsigned short` (`src/config.h` in the DGD source), which is why `swap_size` caps at 65535 sectors and swap capacity scales only through `sector_size` (`docs/configuration.md` Limits and capacity). The driver's Makefile exposes a `DEFINES` hook and `config.h` takes `UINDEX_TYPE` / `SECTOR_TYPE` / `SSIZET_TYPE` overrides.
+The stock build's capacity ceilings trace to compile-time type widths: `uindex` and `ssizet` default to `unsigned short` (`src/config.h` in the DGD source), which is why `swap_size` caps at 65535 sectors and swap capacity scales only through `sector_size` (`docs/configuration.md` Limits and capacity). The driver's Makefile exposes a `DEFINES` hook and `config.h` takes `UINDEX_TYPE` / `SECTOR_TYPE` / `SSIZET_TYPE` overrides. `SECTOR_TYPE` and `CINDEX_TYPE` both default to whatever `UINDEX_TYPE` is, so widening that one type carries the sector and call-out indices with it.
 
-Stated as observed, not promised: a naive widening (all three types to `unsigned int`, 2026-07-12, macOS arm64) compiles cleanly and segfaults at cold boot before the first banner line. A working wider-index build is therefore a driver-level task with upstream guidance, not a flip of these defines; until one exists, the stock-snapshot-compatibility question and the wider-index memory cost stay unmeasured (`docs/configuration.md` Unmeasured today).
+Two rebuilds are known to work, and they carry different amounts of evidence here. Both are stated as observed, not promised.
+
+**The validated form** widens the object and sector indices and leaves string length at its default:
+
+```sh
+make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX' install
+```
+
+On Linux and Solaris, restate the large-file flag the Makefile would otherwise contribute (The `DEFINES` override, below):
+
+```sh
+make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX -D_FILE_OFFSET_BITS=64' install
+```
+
+Validated 2026-08-10 against driver `25dad1dd` and kernel layer `b5bcde1`, on macOS arm64 and on Debian 12 aarch64: every example profile passes on both platforms at the module-less bar (the crypto-gated steps skip, as they do for any build without the extension module), and `swap_size` accepts values past 65535 where a stock build refuses with `Config error: int value out of range`.
+
+**Upstream's fuller form** additionally widens the maximum string length to 1 MB:
+
+```sh
+make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX -DSSIZET_TYPE="unsigned int" -DSSIZET_MAX=1048576' install
+```
+
+This is the form DGD's author recommends when strings need to grow as well as indices, and the bounded `SSIZET_MAX` is the point of it (see the naive-widening failure below). It is verified here only to build, cold boot, and accept `swap_size = 200000`, on macOS arm64 alone -- no example sweep, no snapshot-compatibility check, no memory measurement. Prefer the validated form unless the workload needs strings past 64K.
+
+**Why a naive widening fails.** Setting all three types to `unsigned int` compiles cleanly and segfaults at cold boot before the first banner line. The cause is a cast, not the width: `config.h` defines `MAX_STRLEN` as `SSIZET_MAX`, and string creation guards on `len > (LPCint) MAX_STRLEN`, so an `SSIZET_MAX` of `UINT_MAX` becomes -1 in the driver's signed 32-bit `LPCint`, every string allocation takes the error path, and the error path builds its own message through the same allocator until the stack guard fires. Bounding `SSIZET_MAX` to a value that survives the cast is what makes the fuller form work. (`-DLARGENUM` also produces a working build, by widening `LPCint` so the cast no longer overflows, but it enables an unrelated feature and is not the intended route.)
+
+**The `DEFINES` override.** Passing `DEFINES` on the `make` command line replaces the Makefile's variable outright and suppresses the Makefile's own appends to it -- including the `DEFINES+=-D_FILE_OFFSET_BITS=64` that `src/Makefile` adds for Linux and Solaris hosts. Writing `+=` on the command line does not change this: a command-line assignment overrides a plain makefile append whichever operator either side uses. Restate the flag by hand on those hosts, as the second recipe above does, or the build silently narrows `off_t`.
+
+**What a wide build costs, and which ceiling it does not lift.** On the same example and machine, the snapshot grew about 5.7% for identical state (613,376 to 648,192 bytes) and resident memory at rest grew about 80 KB. Treat that memory figure as a floor rather than an estimate: the widened types are per-object and per-sector, so the cost scales with the object graph, and it was measured on a small one. Widening `uindex` does not touch the connection ceiling -- `users` is bounded by `EINDEX_MAX`, a different compile-time type -- and on a connection-driven workload that is the ceiling that binds first (`docs/operations.md` Connection-slot economics).
+
+**Migration is one-way.** A stock-written snapshot restores under a wide driver, so moving forward works; a wide-written snapshot offered back to a stock driver refuses cleanly with `Config error: initialization failed` rather than crashing or restoring partially. Plan the rebuild as a forward-only deploy and keep a pre-migration snapshot (`docs/operations.md` Config changes across a restore states what a restore boot accepts, driver build included).
+
+Still unmeasured on a wide build: the crypto-gated surfaces (native TLS and the identity and agent ceremonies were not exercised under one), memory cost at a realistic graph size, and sustained multi-day behavior.
 
 ## eOS-kernellib
 
