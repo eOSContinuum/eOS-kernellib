@@ -4,9 +4,9 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 **Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the platform.
 
-**Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated 2026-07-18. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
+**Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated by hand, most recently 2026-07-18 -- CI does not cover macOS, so this one is a date rather than a standing claim. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
 
-**Tested against (Linux)**: the same DGD commit on Debian 12 (bookworm, aarch64), validated 2026-07-30 by running every module-less example profile to its PASS sentinel through the committed container recipe (the Run it in a container section below). Linux build notes: [`docs/building.md`](building.md#linux).
+**Tested against (Linux)**: the same DGD commit, continuously. The [regression workflow](../.github/workflows/regression.yml) builds that pinned commit and runs the module-less Full regression sweep on every pull request and every push to `main`, on `ubuntu-latest`; the module-gated steps report their documented SKIPs. The first Debian 12 (bookworm, aarch64) validation was 2026-07-30, run by hand through the committed container recipe (the Run it in a container section below), and CI has carried the claim since. Linux build notes: [`docs/building.md`](building.md#linux).
 
 ## Prerequisites
 
