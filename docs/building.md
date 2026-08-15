@@ -65,6 +65,8 @@ make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX -D_FILE_OFFSET_
 
 Validated 2026-08-10 against driver `25dad1dd` and kernel layer `b5bcde1`, on macOS arm64 and on Debian 12 aarch64: every example profile passes on both platforms at the module-less bar (the crypto-gated steps skip, as they do for any build without the extension module), and `swap_size` accepts values past 65535 where a stock build refuses with `Config error: int value out of range`.
 
+That validation driver is one commit past the `975e927f` pinned in the Standard build above, and the commit between them ("Properly clear the goto list after a function") changes a single line of `src/comp/codegen.cpp`. Nothing the recipe touches differs across the two trees, so it applies to the pinned commit as written. Build the pin unless you have a reason not to: it is what the container recipe and the regression workflow build.
+
 **Upstream's fuller form** additionally widens the maximum string length to 1 MB:
 
 ```sh
