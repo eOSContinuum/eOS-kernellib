@@ -134,6 +134,13 @@ static Handshake sendCertificateVerify()
 	signature
     }) = certificateSign("server", serverKey, certificateAlgorithms,
 			 cipherSuite);
+    /*
+     * The certificate key signs only the server's CertificateVerify;
+     * post-handshake traffic and KeyUpdate run on the derived secrets.
+     * Dropping it here keeps the private key handshake-transient, so an
+     * established session carries no key material into a statedump.
+     */
+    serverKey = nil;
     return new Handshake(new CertificateVerify(scheme, signature));
 }
 
@@ -527,15 +534,6 @@ mixed *receiveMessage(string str)
 			error("DECRYPT_ERROR");
 		    }
 		    receiveFinished(message, output);
-		    /*
-		     * The certificate key signs only the server's
-		     * CertificateVerify; post-handshake traffic and
-		     * KeyUpdate run on the derived secrets. Dropping it
-		     * here keeps the private key handshake-transient, so
-		     * an established session carries no key material
-		     * into a statedump.
-		     */
-		    serverKey = nil;
 		    status = nil;
 		    state = STATE_CONNECTED;
 		    continue;

@@ -494,21 +494,23 @@ static mixed *call_trace(varargs mixed index)
 	trace = ::call_trace();
 	if (previous_program() != RSRCOBJ) {
 	    trace[1][TRACE_FIRSTARG] = nil;
-	}
-	if (creator != "System") {
-	    int i;
+	    if (creator != "System") {
+		int i;
 
-	    for (i = sizeof(trace) - 1; --i >= 0; ) {
-		trace[i] = process_trace(trace[i]);
+		for (i = sizeof(trace) - 1; --i >= 0; ) {
+		    trace[i] = process_trace(trace[i]);
+		}
 	    }
 	}
     } else {
 	trace = ::call_trace()[(int) index];
-	if (index == 1 && previous_program() != RSRCOBJ) {
-	    trace[TRACE_FIRSTARG] = nil;
-	}
-	if (creator != "System") {
-	    trace = process_trace(trace);
+	if (previous_program() != RSRCOBJ) {
+	    if (index == 1) {
+		trace[TRACE_FIRSTARG] = nil;
+	    }
+	    if (creator != "System") {
+		trace = process_trace(trace);
+	    }
 	}
     }
 
