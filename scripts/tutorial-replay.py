@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-2-Clause-Patent
-"""Replay docs/first-hour.md, docs/first-application.md, and
-docs/first-http-endpoint.md against a live boot, driven by
+"""Replay docs/first-hour.md, docs/first-application.md,
+docs/first-http-endpoint.md and docs/first-vault-entity.md against a
+live boot, driven by
 scripts/tutorial-smoke.sh.
 
-Parses the three tutorials' fenced blocks AT RUN TIME -- no generated
+Parses each tutorial's fenced blocks AT RUN TIME -- no generated
 mirror of the transcripts is kept, because a mirror would drift out of
 sync with the docs, which is exactly the failure mode this guard exists
-to catch. All three tutorials use exactly three fence languages (verified
-by inspection of every ``` marker in all three files); ALLOWED_KINDS
-below is that whitelist. Every fence in every document is classified --
+to catch. Every replayed tutorial uses exactly three fence languages
+(verified by inspection of every ``` marker in every file DOCS names);
+ALLOWED_KINDS below is that whitelist. Every fence in every document is classified --
 a fence whose language is not in ALLOWED_KINDS is a named FAIL (file,
 line, language), before any boot, not a quietly-ignored block: a renamed
 fence marker must not be able to drop a whole class of assertions while
@@ -145,12 +146,13 @@ DOCS = [
     ("first-hour", "docs/first-hour.md", False),
     ("first-application", "docs/first-application.md", True),
     ("first-http-endpoint", "docs/first-http-endpoint.md", False),
+    ("first-vault-entity", "docs/first-vault-entity.md", False),
 ]
 
-# The complete set of fence languages the three tutorials use, derived by
-# inspecting every ``` marker in all three files (`grep -n '^```' docs/
-# first-hour.md docs/first-application.md docs/first-http-endpoint.md`):
-# text (console transcripts), sh (shell/curl/boot lines), c (LPC source).
+# The complete set of fence languages the replayed tutorials use, derived
+# by inspecting every ``` marker in every file DOCS names (`grep -n '^```'`
+# over each path above): text (console transcripts), sh (shell/curl/boot
+# lines), c (LPC source).
 # A fence in any document tagged with anything else is unrecognized and
 # a hard FAIL -- see classify_fence_kind below.
 ALLOWED_KINDS = {"text", "sh", "c"}
@@ -234,6 +236,9 @@ def classify_console(content):
 INLINE_COMMENT_RE = re.compile(r"\s+#.*$")
 
 
+_initial_boot_seen = False
+
+
 def classify_shell(content):
     """```sh fence -> list of {'op': 'shell'|'restart'|'http_assert'|
     'skip', ...}. A trailing "    # ..." inline comment (first-hour.md's
@@ -265,11 +270,25 @@ def classify_shell(content):
         if "example.dgd" in stripped:
             rest = stripped.split("example.dgd", 1)[1].strip()
             if not rest:
-                actions.append({"op": "skip", "reason":
-                                 "initial cold boot invocation; the "
-                                 "harness performs this boot itself, "
-                                 "once, before any tutorial's actions "
-                                 "run"})
+                # A boot line with no snapshot argument is the initial
+                # cold boot the FIRST time it appears in a run -- the
+                # harness has already performed that boot itself, so it
+                # is a named SKIP. A later one is a deliberate mid-run
+                # cold boot (first-vault-entity.md section 7 deletes the
+                # snapshot and boots with no image, to show what the
+                # Vault carries that the image does not), and that one
+                # has to actually happen or every assertion after it
+                # runs against the wrong process.
+                global _initial_boot_seen
+                if not _initial_boot_seen:
+                    _initial_boot_seen = True
+                    actions.append({"op": "skip", "reason":
+                                     "initial cold boot invocation; the "
+                                     "harness performs this boot itself, "
+                                     "once, before any tutorial's actions "
+                                     "run"})
+                else:
+                    actions.append({"op": "restart", "snapshot_args": []})
                 i += 1
                 continue
             snapshot_args = rest.split()
@@ -348,7 +367,7 @@ def build_actions(name, relpath):
             raise TutorialParseError(
                 f"{relpath}:{item['line']}: unrecognized fence language "
                 f"'{item['kind']}' -- this parser only recognizes "
-                f"{sorted(ALLOWED_KINDS)} in these three tutorials "
+                f"{sorted(ALLOWED_KINDS)} in the replayed tutorials "
                 f"(ALLOWED_KINDS in tutorial-replay.py)")
         if item["kind"] == "text":
             if item["content"].strip().startswith("login:"):
@@ -448,13 +467,14 @@ def execute_code_action(action):
 
 SLOT_RE = re.compile(r"^\$(\d+)\s*=\s*(.*)$", re.DOTALL)
 
-# The second run-varying expectation class, first-hour.md only: a clone
-# object's numeric index ("</usr/Pet/obj/pet#212>") is platform-global
-# and run-dependent, exactly as the doc itself says ("Your clone number
-# will differ from `#212`. Clone indices are platform-global."). Neither
-# of the other two tutorials embeds a clone index in expected output
-# (verified by inspection: `#\d+` appears nowhere in their fenced
-# blocks), so normalizing it here cannot mask a real mismatch there.
+# The second run-varying expectation class: a clone object's numeric
+# index ("</usr/Pet/obj/pet#212>") is platform-global and run-dependent,
+# and every doc that shows one says so in its own prose -- first-hour.md's
+# "Your clone number will differ from `#212`. Clone indices are
+# platform-global.", first-vault-entity.md's "Your clone number will
+# differ from `#237`". Normalizing here is what lets those blocks be
+# asserted at all; every other character of the line still has to match,
+# so this cannot mask a real mismatch.
 CLONE_INDEX_RE = re.compile(r"#\d+")
 
 

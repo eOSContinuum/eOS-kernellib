@@ -1,9 +1,10 @@
 #!/bin/sh
 #
-# Doc-drift regression for the three-tutorial getting-started path:
-# docs/first-hour.md, docs/first-application.md, and
-# docs/first-http-endpoint.md. Parses the command/expected-output pairs
-# out of all three docs' fenced transcripts AT RUN TIME
+# Doc-drift regression for the four-tutorial getting-started path:
+# docs/first-hour.md, docs/first-application.md,
+# docs/first-http-endpoint.md and docs/first-vault-entity.md. Parses the
+# command/expected-output pairs out of every one of those docs' fenced
+# transcripts AT RUN TIME
 # (scripts/tutorial-replay.py does the parsing and driving -- no
 # generated mirror of the transcripts exists anywhere, because a mirror
 # would drift out of sync with the docs, which is exactly the failure

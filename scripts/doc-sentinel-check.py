@@ -10,7 +10,7 @@ prose stale silently. docs/getting-started.md's merry-app count sat at
 28 through the profile's move to 30 for exactly that reason.
 
 This is the static half of the doc-drift guard. The replay half
-(scripts/tutorial-smoke.sh) boots DGD and replays the three tutorials'
+(scripts/tutorial-smoke.sh) boots DGD and replays the guarded tutorials'
 command/expected-output pairs; it does not read getting-started.md, and
 it cannot run without a DGD binary. This check needs neither, so it
 stays a cheap pre-boot assertion that a contributor can run alone.
