@@ -153,7 +153,7 @@ static string expectParams(Asn1 params)
 	 * trailer field, default is okay
 	 */
 	({ node }) = list[offset++]->contents();
-	if (expect(node, ASN1_INTEGER) != "1") {
+	if (expect(node, ASN1_INTEGER) != "\1") {
 	    error("UNSUPPORTED_CERTIFICATE");
 	}
     }
