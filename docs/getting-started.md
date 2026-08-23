@@ -4,7 +4,7 @@ This guide installs the [DGD] driver, fetches this repository, and runs an eOS-k
 
 **Audience**: a new user setting up DGD and eOS-kernellib for the first time; comfortable with the shell; has not yet booted the platform.
 
-**Tested against**: DGD `master` at `975e927f` (the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires; 2026-07-12) on macOS 26.5 (arm64), validated by hand, most recently 2026-07-18 -- CI does not cover macOS, so this one is a date rather than a standing claim. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
+**Tested against**: DGD `master` at `b4da6a96` (2026-08-21; the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires, and a working `make DEFINES=`) on macOS 26.5 (arm64), validated by hand, most recently 2026-08-22 -- CI does not cover macOS, so this one is a date rather than a standing claim. Other POSIX-compatible systems should work; the macOS-specific bison workaround is captured in `building.md`.
 
 **Tested against (Linux)**: the same DGD commit, continuously. The [regression workflow](../.github/workflows/regression.yml) builds that pinned commit and runs the module-less Full regression sweep on every pull request and every push to `main`, on `ubuntu-latest`; the module-gated steps report their documented SKIPs. The first Debian 12 (bookworm, aarch64) validation was 2026-07-30, run by hand through the committed container recipe (the Run it in a container section below), and CI has carried the claim since. Linux build notes: [`docs/building.md`](building.md#linux).
 
@@ -18,7 +18,7 @@ The fastest signal, from nothing, in one block -- clone and build the driver, cl
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
-(cd dgd && git checkout 975e927f && cd src && make install)
+(cd dgd && git checkout b4da6a96 && cd src && make install)
 git clone https://github.com/eOSContinuum/eOS-kernellib.git
 cd eOS-kernellib
 DGD_BIN=$PWD/../dgd/bin/dgd scripts/run-example.sh merry-app
@@ -65,7 +65,7 @@ Clone the DGD source, build the driver, and install the binary:
 ```sh
 git clone https://github.com/dworkin/dgd.git
 cd dgd
-git checkout 975e927f    # 1.7.9 + preprocess_file(); the kernel layer requires this kfun
+git checkout b4da6a96    # 1.7.9 + preprocess_file() and a working `make DEFINES=`
 cd src
 make install
 ```

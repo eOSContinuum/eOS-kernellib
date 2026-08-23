@@ -12,8 +12,8 @@
 FROM debian:bookworm-slim
 
 # The kernel layer requires preprocess_file(): DGD master at or after
-# 975e927f (docs/building.md). Full hash so the shallow fetch can pin it.
-ARG DGD_COMMIT=975e927f7f2a65e1d26cdce616cdb2eb1e087bbd
+# b4da6a96 (docs/building.md). Full hash so the shallow fetch can pin it.
+ARG DGD_COMMIT=b4da6a965dca0ff40c0912c5ab4a04e56d47fa4b
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates git make gcc g++ bison procps \

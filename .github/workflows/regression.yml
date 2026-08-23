@@ -17,7 +17,7 @@ jobs:
     env:
       # The kernel layer requires preprocess_file(): DGD master at or
       # after this commit (docs/building.md; same pin as the Dockerfile).
-      DGD_COMMIT: 975e927f7f2a65e1d26cdce616cdb2eb1e087bbd
+      DGD_COMMIT: b4da6a965dca0ff40c0912c5ab4a04e56d47fa4b
     steps:
       - uses: actions/checkout@v4
         with:
