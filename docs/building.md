@@ -6,14 +6,14 @@ Building eOS-kernellib means building DGD. The kernel layer is LPC source that D
 
 ## DGD
 
-DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib targets DGD 1.7.x, from upstream `master` at or after `975e927f` (`preprocess_file()`, 2026-07-12) -- the 1.7.9 release predates that kfun and fails to boot the kernel layer.
+DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib targets DGD 1.7.x. The floor is upstream `master` at or after `975e927f` (`preprocess_file()`, 2026-07-12) -- the 1.7.9 release predates that kfun and fails to boot the kernel layer. The pin below is `b4da6a96` (2026-08-21), which is what CI, the container recipe and the quickstart build: the floor plus a `make DEFINES=` that behaves, which the wide-index recipe further down relies on.
 
 ### Standard build
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
 cd dgd
-git checkout 975e927f    # 1.7.9 + preprocess_file(); the kernel layer requires this kfun
+git checkout b4da6a96    # 1.7.9 + preprocess_file() and a working `make DEFINES=`
 cd src
 make install
 ```
@@ -57,7 +57,7 @@ Two rebuilds are known to work, and they carry different amounts of evidence her
 make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX' install
 ```
 
-On Linux and Solaris, restate the large-file flag the Makefile would otherwise contribute (The `DEFINES` override, below):
+On Linux and Solaris, restate the large-file flag -- required on drivers before `b4da6a96`, redundant but harmless on the pin (The `DEFINES` override, below):
 
 ```sh
 make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX -D_FILE_OFFSET_BITS=64' install
@@ -65,7 +65,7 @@ make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX -D_FILE_OFFSET_
 
 Validated 2026-08-10 against driver `25dad1dd` and kernel layer `b5bcde1`, on macOS arm64 and on Debian 12 aarch64: every example profile passes on both platforms at the module-less bar (the crypto-gated steps skip, as they do for any build without the extension module), and `swap_size` accepts values past 65535 where a stock build refuses with `Config error: int value out of range`.
 
-That validation driver is one commit past the `975e927f` pinned in the Standard build above, and the commit between them ("Properly clear the goto list after a function") changes a single line of `src/comp/codegen.cpp`. Nothing the recipe touches differs across the two trees, so it applies to the pinned commit as written. Build the pin unless you have a reason not to: it is what the container recipe and the regression workflow build.
+That validation driver sits two commits behind the `b4da6a96` pinned in the Standard build above, and both of them are the `make DEFINES=` fix described under The `DEFINES` override below. Neither compiles differently: the delta between the two trees is `src/Makefile` and nothing else. What changed is that on the pin the large-file flag arrives on its own, so restating it is redundant rather than required, and the recipes above are written to work either way. Build the pin unless you have a reason not to: it is what the container recipe and the regression workflow build.
 
 **Upstream's fuller form** additionally widens the maximum string length to 1 MB:
 
