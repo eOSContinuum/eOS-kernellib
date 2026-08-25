@@ -139,7 +139,11 @@ private void startStream(int code, string status)
     headers->add(new HttpField("Transfer-Encoding", ({ "chunked" })));
     response->setHeaders(headers);
     streaming = TRUE;
-    sendMessage(new StringBuffer(response->transport()));
+    /* the platform's streaming entry point: it sends the head and, for
+     * the stream's life, re-arms input so a departed peer is noticed
+     * and suspends the inactivity backstop that would otherwise
+     * disconnect this stream 60 seconds after the request */
+    this_object()->sendStreamResponse(response);
 }
 
 /*

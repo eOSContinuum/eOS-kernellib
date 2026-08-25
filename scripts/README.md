@@ -211,6 +211,10 @@ Last, the programmatic persistence surface, module-less:
 
 33. `DGD_BIN=<dgd> scripts/persist-dump-smoke.sh` -- `PERSIST-DUMP PASS` after the dump-only surface's full posture cycle (default-deny, operator grant, a successful `trigger_dump`, revoke, deny again) with the snapshot-file landing asserted mid-run, while the driver is still up and answering -- the property that distinguishes this surface from the dump-and-exit path. See `persist-dump-smoke.sh` above for why the check cannot run after teardown.
 
+Last, the streaming-connection contract, module-less:
+
+34. `DGD_BIN=<dgd> scripts/stream-smoke.sh` -- `STREAM-SMOKE PASS` after the three streaming properties are asserted against a live driver: a stream whose peer departs (FIN, and separately RST) is released within 20 seconds, a healthy silent stream is still alive at 90 seconds, and a client that sends a request on an open stream is disconnected. Each case is paired with a non-streaming presence control that must rise and then be released, so an absence result cannot pass for an observation. The bounds are not tuning knobs: the HTTP layer's inactivity backstop is 60 seconds, so a departure bound above it would pass on the backstop firing rather than on the close being seen, and a survival window below it would never reach the thing it tests. Runs about three minutes -- the survival case alone outwaits the backstop. The composite example's own SSE phases (steps 10 and 11) hold streams open for 8 seconds and so cannot reach any of this; they stayed green throughout the defect this step asserts against.
+
 ## When a run fails
 
 The harness leaves a failed run's evidence in place. The artifact map:

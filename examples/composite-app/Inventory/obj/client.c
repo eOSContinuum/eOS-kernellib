@@ -190,8 +190,19 @@ static void receiveEntity(StringBuffer chunk)
 /*
  * Binary-manager glue modeled on /usr/HTTP/api/obj/tls_client1.c: the
  * driver-level connection stays in raw mode for the whole exchange
- * (BufferedConnection1 does the framing), input feeds the buffered
- * layer, and no driver-level MODE_BLOCK is ever set.
+ * (BufferedConnection1 does the framing) and input feeds the buffered
+ * layer.
+ *
+ * A driver-level MODE_BLOCK IS set, on every inbound message: the
+ * flow_receive_message below returns TRUE, and the kernel connection
+ * library maps that straight to MODE_BLOCK. What makes this shape safe
+ * is not that the block is never set but that BufferedConnection1
+ * lifts it immediately -- its startInput() sends MODE_UNBLOCK once the
+ * buffered layer has taken the bytes. Crediting the safety to the
+ * wrong mechanism is not pedantry: believing that returning TRUE does
+ * not block is exactly the misreading that leaves a streaming server
+ * input-blocked for its whole life, which is the defect
+ * Http1Server::sendStreamResponse now closes.
  */
 int login(string str)
 {

@@ -109,6 +109,14 @@ static void receiveHeaders(string str)
 static void _doneRequest(object prev)
 {
     if (prev == server) {
+	/*
+	 * a streaming response that ends by releasing the request
+	 * rather than by destructing the connection returns to
+	 * ordinary handling here; without this the output-only rule
+	 * would outlive the stream and meet the next request on a
+	 * persistent connection with a protocol error
+	 */
+	endStream();
 	setMode((persistent()) ? MODE_LINE : MODE_DISCONNECT);
     }
 }
@@ -203,4 +211,41 @@ static void _sendResponse(HttpResponse response, object prev)
 void sendResponse(HttpResponse response)
 {
     call_out("_sendResponse", 0, response, previous_object());
+}
+
+/*
+ * send the head of a streaming response
+ */
+static void _sendStreamResponse(HttpResponse response, object prev)
+{
+    if (prev == server) {
+	::sendResponse(response);
+	sendMessage(new StringBuffer(response->transport()));
+	beginStream();
+    }
+}
+
+/*
+ * flow: send the head of a streaming response and hold the connection
+ * open for pushed frames.
+ *
+ * The counterpart of sendResponse() for a response that does not end
+ * with its head: the server pushes frames with sendChunk() and closes
+ * the stream with endChunk(), and the connection is not released by
+ * doneRequest() in between. Sending such a head by hand leaves the
+ * connection input-blocked for the stream's whole life -- the peer's
+ * departure is never seen, and the inactivity backstop disconnects the
+ * stream 60 seconds after the request that opened it whatever the
+ * stream is doing. Going through here instead re-arms input and
+ * suspends that backstop, so the behaviour comes with the platform
+ * rather than with each author remembering it.
+ *
+ * For the stream's life the connection is output-only: a client that
+ * sends bytes on it gets a protocol error and a disconnect, because a
+ * request queued behind an endless response could never be answered.
+ * See Connection1's beginStream().
+ */
+void sendStreamResponse(HttpResponse response)
+{
+    call_out("_sendStreamResponse", 0, response, previous_object());
 }
