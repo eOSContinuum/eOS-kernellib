@@ -35,6 +35,7 @@ private int persistent;		/* is connection persistent? */
 private int webSocket;		/* WebSocket enabled? */
 private int finalPending;	/* terminal chunk handed to sendMessage,
 				 * awaiting the drain that empties it */
+private int streaming;		/* holding a streaming response open? */
 
 /*
  * initialize HTTP/1.x connection
@@ -222,6 +223,42 @@ static void idle()
 {
     idle = TRUE;
     setMode(MODE_RAW, 1);
+}
+
+/*
+ * begin a streaming response: hold the connection open for pushed
+ * frames with input re-armed, so the peer's departure is seen on a read
+ * instead of going unnoticed for the stream's life.
+ *
+ * The connection is OUTPUT-ONLY until the stream ends. That is what
+ * idle() already means -- input unblocked, any inbound byte a protocol
+ * error -- and reusing it keeps one idiom rather than inventing a
+ * second one for the same situation. A client with something to say on
+ * a connection carrying an endless response has no way to be answered:
+ * HTTP/1.1 responses are strictly request-ordered, so a request behind
+ * this one could never be served, and failing it loudly beats accepting
+ * it and never replying. Bidirectional traffic belongs on the WebSocket
+ * path in this same file, not over a chunked response.
+ */
+static void beginStream()
+{
+    streaming = TRUE;
+    idle();
+}
+
+/*
+ * end a streaming response, returning the connection to ordinary
+ * request handling: the output-only rule is lifted and the inactivity
+ * backstop resumes from now rather than from the request that opened
+ * the stream
+ */
+static void endStream()
+{
+    if (streaming) {
+	streaming = FALSE;
+	idle = FALSE;
+	active = time();
+    }
 }
 
 /*
@@ -739,8 +776,26 @@ static void inactive()
 {
     int inactive, timeout;
 
-    inactive = time() - active;
     timeout = inactivityTimeout();
+    if (streaming) {
+	/*
+	 * suspended for the stream's life. active is refreshed only by
+	 * inbound bytes (create() and receiveBytes()), and a stream
+	 * receives none after its request, so leaving the backstop
+	 * running would disconnect a healthy stream a fixed 60 seconds
+	 * after the request that opened it -- measured, not theorised.
+	 * The backstop exists to reclaim a connection the application
+	 * never released; beginStream() re-armed input, so a departed
+	 * peer is now caught by the read rather than waited out here.
+	 * A peer that vanishes WITHOUT closing is not covered by either
+	 * mechanism and is the application's to probe for.
+	 */
+	if (timeout != 0) {
+	    call_out("inactive", timeout);
+	}
+	return;
+    }
+    inactive = time() - active;
     if (inactive >= timeout) {
 	disconnect();
     } else {

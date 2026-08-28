@@ -225,6 +225,41 @@ invokes, so in a single-object composition every chunked receive
 errored. Fixed by renaming the internal function
 (`src/usr/HTTP/lib/Connection1.c`).
 
+### What an open stream is, and is not
+
+A stream is output-only for its whole life, and that is a platform
+contract rather than this example's convention. The head goes out
+through `Http1Server::sendStreamResponse()`, which re-arms input and
+suspends the inactivity backstop in the same call
+([http-applications.md](http-applications.md) Release each completed
+request with `doneRequest()`). Input is re-armed for exactly one
+purpose: so the peer's departure is seen on a read. A byte the client
+actually sends on an open stream is an HTTP protocol error -- the
+connection library surfaces it to the relay through `receiveError` and
+disconnects. It is not ignored, and it does not open a conversation.
+
+The reason is HTTP/1.1's own ordering rather than a shortcut. Responses
+are strictly request-ordered, so a request arriving behind a response
+that never ends could never be answered, and accepting those bytes
+while never replying would be indistinguishable at the client from
+having served them. Bidirectional traffic over one connection has its
+own door: the WebSocket path in the same connection library
+(`expectWsFrame`, `receiveWsFrame`, `sendWsChunk`), not a second
+framing invented over an endless chunked response.
+
+**A keepalive is a liveness probe, not a way to hold a stream open.**
+The `?heartbeat=1` topic above exists to show the async machinery
+ticking between mutations, and it never kept anything alive: the
+inactivity clock is refreshed by inbound bytes only, so server-pushed
+frames could not feed it. Before the streaming entry point existed,
+a healthy heartbeated stream was dropped at 60 seconds regardless. With the
+backstop suspended for the stream's life there is nothing to hold
+open. What a periodic write still earns is the other job -- it fails
+when the peer has gone, and that failure now surfaces on the
+re-armed read. An application that needs to notice a peer which
+vanished without ever closing writes one for that reason, and should
+expect nothing else from it.
+
 ### Bounding a lagging subscriber
 
 The exposure a stream author owns is stated in
@@ -263,11 +298,18 @@ it. The countermeasure is application code, in three pieces:
   pushes reached it.
 - **Know the graceful path's limit.** For a client that has genuinely
   stopped reading, the graceful teardown cannot deliver: TCP
-  backpressure holds the terminal chunk off the wire, and the kernel
-  connection object reaps the socket lazily -- observed as a
-  `CLOSE_WAIT` that clears on the client's next socket event.
-  Application resources are freed either way; only the socket
-  lingers. A deployment that must sever the connection eagerly uses
+  backpressure holds the terminal chunk off the wire, and the
+  connection goes away only when something tells the platform its peer
+  is gone. On a stream that something is a read: the streaming entry point
+  keeps input re-armed for the stream's life
+  (`docs/http-applications.md` Release each completed request with
+  `doneRequest()`), so a client that closes is seen and
+  the connection object is released with it, rather than sitting in
+  `CLOSE_WAIT` behind blocked input with no read to discover the FIN.
+  Application resources are freed either way. What no read discovers is
+  the client that stops reading and never closes: no event arrives at
+  all, and the connection lives until the application acts. A
+  deployment that must sever the connection eagerly uses
   the flow layer's active close instead: `terminate()`
   (`docs/http-applications.md` Outbound connections documents the
   call; the flow layer verifies the caller is the relay, so the

@@ -272,6 +272,6 @@ The loop, named: the docs as the source of open edges (a starter change is a doc
 ## Where to next
 
 - **[../CONTRIBUTING.md](../CONTRIBUTING.md)** -- the full contribution reference this walkthrough executed one pass of: How to propose a change (open the issue first), Code style at line level, Pull request flow, and the other two starter changes.
-- **[../scripts/README.md](../scripts/README.md)** -- the Full regression sweep, annotated step by step: what each of the 30 steps proves and its pass signal. Section 8 ran the subset; the full bar is the pre-PR run.
+- **[../scripts/README.md](../scripts/README.md)** -- the Full regression sweep, annotated step by step: what each of the 34 steps proves and its pass signal. Section 8 ran the subset; the full bar is the pre-PR run.
 - **[dispatcher.md](dispatcher.md)** -- the subsystem this walkthrough touched, at reference depth: registration, timings, batching, bounds, and the verification table that maps each contract to the evidence that exercises it.
 - **[where-code-belongs.md](where-code-belongs.md)** and **[source-map.md](source-map.md)** -- placement doctrine and the subsystem-to-doc map, for finding where your own change belongs and which doc it will owe.
