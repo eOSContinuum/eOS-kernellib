@@ -46,11 +46,19 @@ RUN_EXAMPLE = os.path.join(REPO, "scripts", "run-example.sh")
 FULL_SWEEP = os.path.join(REPO, "scripts", "full-sweep.sh")
 SCRIPTS_README = os.path.join(REPO, "scripts", "README.md")
 
-# Markdown scanned for captured transcripts: the doc set plus the root
-# README. Adding a doc needs no edit here -- it is covered the moment it
-# carries a sentinel-count line.
+# Markdown scanned for captured transcripts and for stated counts: the
+# doc set plus every markdown file at the repository root. Adding a doc
+# needs no edit here -- it is covered the moment it carries a
+# sentinel-count line or states a roster's size.
+#
+# The root is taken wholesale rather than as a list because a list is
+# the failure this check exists to prevent, one level up. CONTRIBUTING.md
+# carried two stale claims about the sweep roster while sitting outside
+# an earlier README-only scan, so the file that motivated the step-count
+# assertion was the one file it could not see.
 SEARCH_DIRS = [os.path.join(REPO, "docs")]
-SEARCH_FILES = [os.path.join(REPO, "README.md")]
+SEARCH_FILES = [os.path.join(REPO, n) for n in sorted(os.listdir(REPO))
+                if n.endswith(".md")]
 
 # scripts/run-example.sh example_profile(): `example-name) echo "Domain
 # boots mode count" ;;`. The count is the fourth field and is the value
