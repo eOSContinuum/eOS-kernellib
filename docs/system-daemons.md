@@ -152,7 +152,7 @@ The operator path binding a platform capability to an identity's principal (`ide
 
 ## webauthnd -- `src/usr/System/sys/webauthnd.c`
 
-The WebAuthn ceremony daemon: composes the pure verification library (`/lib/util/webauthn`, `docs/kernel-libraries.md`) with identityd. TOFU registration verifies a foreign attestation payload and mints an identity bound to the new credential (identityd's global credential-id uniqueness makes a re-registration of a bound credential fail -- never bare TOFU re-bind); assertion verification checks the signature against the stored credential and enforces the signature-counter policy (when either counter is nonzero, the asserted counter must be strictly greater than the stored one) before advancing it. The daemon holds no challenge state: `issue_challenge()` returns fresh secure randomness and the verifying entry points take the expected challenge from the caller -- the session layer that issued it owns it. rpId and origin are operator-configured via the `webauthn` console verb (`docs/admin-console.md`); the surface is System/kernel-tier.
+The WebAuthn ceremony daemon: composes the pure verification library (`/lib/util/webauthn`, `docs/kernel-libraries.md`) with identityd. TOFU registration verifies a foreign attestation payload and mints an identity bound to the new credential (identityd's global credential-id uniqueness makes a re-registration of a bound credential fail -- never bare TOFU re-bind); assertion verification checks the signature against the stored credential and enforces the signature-counter policy (when either counter is nonzero, the asserted counter must be strictly greater than the stored one) before advancing it -- except for backup-eligible credentials (stored flags carry BE, `0x08`): a synced passkey's copies do not share a counter, so strict enforcement would turn the first nonzero assertion into a permanent lockout of every copy still reporting zero. The daemon holds no challenge state: `issue_challenge()` returns fresh secure randomness and the verifying entry points take the expected challenge from the caller -- the session layer that issued it owns it. rpId and origin are operator-configured via the `webauthn` console verb (`docs/admin-console.md`); the surface is System/kernel-tier.
 
 ### `string issue_challenge()`
 
@@ -160,15 +160,19 @@ A fresh single-use challenge, base64url (32 bytes of `secure_random`); errors wi
 
 ### `mapping verify_registration_payload(string challenge, string clientDataJSON, string attestationObject)`
 
-Registration-ceremony verification without a mint: returns the verified credential row, keyed under `"credentialId"` (base64url, the form the store binds). What happens to the row is the System-tier caller's composition -- `register_credential` mints a fresh identity, authd's recovery ceremony pairs it with a code redemption onto an existing record, and the operator `identity bind` verb attaches it directly. Never-bare-re-bind holds because no caller composes a bare re-bind out of the registration route.
+Registration-ceremony verification without a mint: returns the verified credential row, keyed under `"credentialId"` (base64url, the form the store binds); when the authenticator sent a non-zero AAGUID the row carries it as `"aaguid"` (canonical UUID string), persisted with the rest of the row. What happens to the row is the System-tier caller's composition -- `register_credential` mints a fresh identity, authd's recovery ceremony pairs it with a code redemption onto an existing record, and the operator `identity bind` verb attaches it directly. Never-bare-re-bind holds because no caller composes a bare re-bind out of the registration route.
 
 ### `string register_credential(string challenge, string clientDataJSON, string attestationObject)`
 
 The TOFU registration ceremony; returns the new principal string (`identity:<uuid>`).
 
+### `mapping verify_assertion_result(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature)`
+
+The assertion ceremony against the stored credential (`credentialId` in base64url, as bound at registration); enforces and advances the signature counter (backup-eligible credentials are exempt from enforcement -- the daemon intro above). Returns the principal plus what the authenticator reported this login: `([ "principal", "flags", "signCount" ])`, where `"flags"` is the assertion's authenticator-data flags byte -- UV (`0x04`) for per-login verification records, and the Level 3 backup pair BE (`0x08`) / BS (`0x10`) for backup-state transitions -- facts the registration row cannot carry.
+
 ### `string verify_assertion(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature)`
 
-The assertion ceremony against the stored credential (`credentialId` in base64url, as bound at registration); enforces and advances the signature counter; returns the principal.
+The same ceremony reduced to its principal, for callers that need no per-login facts.
 
 ### `void configure(string rpId, string origin)` / `string query_rp_id()` / `string query_origin()`
 
@@ -268,7 +272,7 @@ Add-passkey enrollment: a live session binds an ADDITIONAL passkey to its own re
 
 ### `mixed *query_passkeys(string sessionToken)` / `void revoke_passkey(string sessionToken, string credentialId)`
 
-Passkey self-service on the session's own record. The read returns one row per passkey credential, `({ credentialId, created, lastUsed })` -- bookkeeping, never key material. The revocation removes one of the record's own passkeys, refusing non-passkey rows (recovery codes rotate as a set above) and the record's last passkey, so a principal never revokes itself out of login; the substrate's never-zero guard backs it at the record level. Sessions are separate state and are untouched. The intended sequence for a lost device is recovery first (the replacement passkey binds via `recover_identity`), then revocation of the lost credential here.
+Passkey self-service on the session's own record. The read returns one row per passkey credential, `({ credentialId, created, lastUsed, aaguid })` -- bookkeeping, never key material; the aaguid element (a UUID string, nil when the authenticator sent zeros) is the credential-manager hint an application can render beside the credential. The revocation removes one of the record's own passkeys, refusing non-passkey rows (recovery codes rotate as a set above) and the record's last passkey, so a principal never revokes itself out of login; the substrate's never-zero guard backs it at the record level. Sessions are separate state and are untouched. The intended sequence for a lost device is recovery first (the replacement passkey binds via `recover_identity`), then revocation of the lost credential here.
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 

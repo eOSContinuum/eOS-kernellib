@@ -30,6 +30,18 @@
 # define CRED_SIGNCOUNT		"signCount"	/* authenticator counter */
 # define CRED_TRANSPORTS	"transports"	/* string array, optional */
 # define CRED_FLAGS		"flags"		/* authData flags (int) */
+# define CRED_AAGUID		"aaguid"	/* authenticator AAGUID (UUID
+						   string); absent when the
+						   authenticator sent zeros */
+
+/* the authenticator-data flags byte, as stored in CRED_FLAGS at
+   registration and surfaced per-assertion by webauthnd */
+# define WA_FLAG_UP	0x01	/* user present */
+# define WA_FLAG_UV	0x04	/* user verified */
+# define WA_FLAG_BE	0x08	/* backup eligible (synced passkey) */
+# define WA_FLAG_BS	0x10	/* backed up */
+# define WA_FLAG_AT	0x40	/* attested credential data present */
+# define WA_FLAG_ED	0x80	/* extension data present */
 # define CRED_HASH		"hash"		/* recovery-code / agent-token
 						   hash (hex) */
 # define CRED_CREATED		"created"	/* row creation time() */

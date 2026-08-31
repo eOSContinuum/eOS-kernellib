@@ -316,7 +316,7 @@ mixed *query_passkeys(string sessionToken)
 	row = identity->query_credential(ids[i]);
 	if (row[CRED_TYPE] == CRED_TYPE_PASSKEY) {
 	    rows += ({ ({ ids[i], row[CRED_CREATED],
-			  row[CRED_LASTUSED] }) });
+			  row[CRED_LASTUSED], row[CRED_AAGUID] }) });
 	}
     }
     return rows;

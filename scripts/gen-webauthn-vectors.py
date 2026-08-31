@@ -98,12 +98,13 @@ def attestation_object(ad: bytes) -> bytes:
     return cbor({"fmt": "none", "attStmt": {}, "authData": ad})
 
 
-def attested_credential(cred_id: bytes, cose_key: dict) -> bytes:
-    return (b"\x00" * 16 + struct.pack(">H", len(cred_id)) + cred_id +
+def attested_credential(cred_id: bytes, cose_key: dict,
+                        aaguid: bytes = b"\x00" * 16) -> bytes:
+    return (aaguid + struct.pack(">H", len(cred_id)) + cred_id +
             cbor(cose_key))
 
 
-UP, UV, AT = 0x01, 0x04, 0x40
+UP, UV, BE, BS, AT = 0x01, 0x04, 0x08, 0x10, 0x40
 
 # --- ES256 credential ---
 
@@ -112,6 +113,8 @@ es_nums = es_key.public_key().public_numbers()
 es_x = es_nums.x.to_bytes(32, "big")
 es_y = es_nums.y.to_bytes(32, "big")
 es_cred_id = bytes(range(0x10, 0x20))
+es_aaguid = bytes(range(0xa0, 0xb0))
+ES_AAGUID_STR = "a0a1a2a3-a4a5-a6a7-a8a9-aaabacadaeaf"
 es_cose = {1: 2, 3: -7, -1: 1, -2: es_x, -3: es_y}
 
 attacker_key = ec.generate_private_key(ec.SECP256R1())
@@ -121,7 +124,7 @@ CH_A1 = b64u(bytes(range(32, 64)))
 CH_A2 = b64u(bytes(range(64, 96)))
 
 reg_ad = auth_data(RP_ID, UP | AT, 5,
-                   attested_credential(es_cred_id, es_cose))
+                   attested_credential(es_cred_id, es_cose, es_aaguid))
 reg_ao = attestation_object(reg_ad)
 reg_cdj = client_data("webauthn.create", CH_REG, ORIGIN)
 
@@ -129,7 +132,7 @@ reg_cdj_bad_origin = client_data("webauthn.create", CH_REG, BAD_ORIGIN)
 reg_cdj_bad_type = client_data("webauthn.get", CH_REG, ORIGIN)
 reg_ao_bad_rp = attestation_object(
     auth_data(BAD_RP_ID, UP | AT, 5,
-              attested_credential(es_cred_id, es_cose)))
+              attested_credential(es_cred_id, es_cose, es_aaguid)))
 reg_ao_bad_fmt = cbor({"fmt": "packed", "attStmt": {}, "authData": reg_ad})
 
 
@@ -172,7 +175,7 @@ ed_reg_ad = auth_data(RP_ID, UP | AT, 2,
 ed_reg_ao = attestation_object(ed_reg_ad)
 ed_reg_cdj = client_data("webauthn.create", CH_REG2, ORIGIN)
 
-ed_a_ad = auth_data(RP_ID, UP, 3)
+ed_a_ad = auth_data(RP_ID, UP | UV, 3)
 ed_a_cdj = client_data("webauthn.get", CH_A3, ORIGIN)
 ed_a_sig = ed_key.sign(ed_a_ad + hashlib.sha256(ed_a_cdj).digest())
 
@@ -215,6 +218,39 @@ reg4_ao = attestation_object(reg4_ad)
 reg4_cdj = client_data("webauthn.create", CH_REG4, ORIGIN)
 
 
+# --- ES256 credential #4: the synced passkey (backup-eligible) ---
+
+es4_key = ec.generate_private_key(ec.SECP256R1())
+es4_nums = es4_key.public_key().public_numbers()
+es4_cose = {1: 2, 3: -7, -1: 1,
+            -2: es4_nums.x.to_bytes(32, "big"),
+            -3: es4_nums.y.to_bytes(32, "big")}
+es4_cred_id = bytes(range(0x70, 0x80))
+
+CH_REG5 = b64u(bytes([5]) * 32)
+CH_A5 = b64u(bytes([6]) * 32)
+CH_A6 = b64u(bytes([7]) * 32)
+
+reg5_ad = auth_data(RP_ID, UP | AT | BE | BS, 0,
+                    attested_credential(es4_cred_id, es4_cose))
+reg5_ao = attestation_object(reg5_ad)
+reg5_cdj = client_data("webauthn.create", CH_REG5, ORIGIN)
+
+
+def es4_sign(ad: bytes, cdj: bytes) -> bytes:
+    return es4_key.sign(ad + hashlib.sha256(cdj).digest(),
+                        ec.ECDSA(hashes.SHA256()))
+
+
+a5_ad = auth_data(RP_ID, UP | BE | BS, 7)
+a5_cdj = client_data("webauthn.get", CH_A5, ORIGIN)
+a5_sig = es4_sign(a5_ad, a5_cdj)
+
+a6_ad = auth_data(RP_ID, UP | BE | BS, 0)
+a6_cdj = client_data("webauthn.get", CH_A6, ORIGIN)
+a6_sig = es4_sign(a6_ad, a6_cdj)
+
+
 # --- emit the LPC fixture ---
 
 defines = [
@@ -229,6 +265,7 @@ defines = [
     ("WA_REG_AO_BAD_RP", reg_ao_bad_rp, "x"),
     ("WA_REG_AO_BAD_FMT", reg_ao_bad_fmt, "x"),
     ("WA_ES_CRED_ID", es_cred_id, "x"),
+    ("WA_ES_AAGUID", ES_AAGUID_STR, "s"),
     ("WA_A1_AD", a1_ad, "x"), ("WA_A1_CDJ", a1_cdj, "x"),
     ("WA_A1_SIG", a1_sig, "x"),
     ("WA_A_BAD_ORIGIN_CDJ", a_bad_origin_cdj, "x"),
@@ -274,10 +311,11 @@ vs = f"""# webauthn operator verb -- the ceremony daemon driven end-to-end on a
 #   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \\
 #       scripts/verbsets/webauthn-ceremony.verbset
 # Covers: rp configuration, TOFU registration minting an identity,
-# assertion verification updating signCount, the signCount replay
-# refusal, re-registration of a bound credential refused, an unknown
-# credential refused, and the System-tier gate refusing a console
-# caller.
+# assertion verification updating signCount and surfacing the flags
+# byte, the signCount replay refusal, the backup-eligible (synced
+# passkey) counter exemption, re-registration of a bound credential
+# refused, an unknown credential refused, and the System-tier gate
+# refusing a console caller.
 
 # point the ceremony daemon at the vectors' rp
 cmd: webauthn rpid {RP_ID}
@@ -300,9 +338,10 @@ capture: uuid registered identity:([0-9a-f-]+)
 cmd: webauthn register {CH_REG} {b64u(reg_cdj)} {b64u(reg_ao)}
 expect: identity: credential already bound
 
-# assertion verifies and advances signCount (5 at registration -> 6)
+# assertion verifies, advances signCount (5 at registration -> 6), and
+# surfaces the assertion's flags byte (this vector is UP-only, 0x01)
 cmd: webauthn authenticate {CH_A1} {b64u(es_cred_id)} {b64u(a1_cdj)} {b64u(a1_ad)} {b64u(a1_sig)}
-expect: webauthn: authenticated identity:%{{uuid}} signCount 6
+expect: webauthn: authenticated identity:%{{uuid}} signCount 6 flags 0x01
 
 # replaying the same assertion is refused (6 is not greater than 6)
 cmd: webauthn authenticate {CH_A1} {b64u(es_cred_id)} {b64u(a1_cdj)} {b64u(a1_ad)} {b64u(a1_sig)}
@@ -311,6 +350,21 @@ expect: webauthn: signCount replay
 # an unknown credential is refused
 cmd: webauthn authenticate {CH_A1} {b64u(bytes(16))} {b64u(a1_cdj)} {b64u(a1_ad)} {b64u(a1_sig)}
 expect: webauthn: unknown credential
+
+# a synced passkey (BE|BS) registers with counter 0
+cmd: webauthn register {CH_REG5} {b64u(reg5_cdj)} {b64u(reg5_ao)}
+expect: webauthn: registered identity:[0-9a-f-]+
+capture: uuid2 registered identity:([0-9a-f-]+)
+
+# one copy asserts counter 7 (flags UP|BE|BS = 0x19)
+cmd: webauthn authenticate {CH_A5} {b64u(es4_cred_id)} {b64u(a5_cdj)} {b64u(a5_ad)} {b64u(a5_sig)}
+expect: webauthn: authenticated identity:%{{uuid2}} signCount 7 flags 0x19
+
+# another copy still reports 0: backup-eligible is exempt from the
+# strictly-increasing counter policy, so this is accepted, not a
+# permanent lockout
+cmd: webauthn authenticate {CH_A6} {b64u(es4_cred_id)} {b64u(a6_cdj)} {b64u(a6_ad)} {b64u(a6_sig)}
+expect: webauthn: authenticated identity:%{{uuid2}} signCount 0 flags 0x19
 
 # the System-tier API refuses a console caller
 cmd: code "/usr/System/sys/webauthnd"->issue_challenge()

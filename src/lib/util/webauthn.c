@@ -19,12 +19,8 @@
 
 private inherit cbor "/lib/util/cbor";
 private inherit cose "/lib/util/cose";
+private inherit hex "/lib/util/hex";
 private inherit json "/lib/util/json";
-
-# define WA_FLAG_UP	0x01	/* user present */
-# define WA_FLAG_UV	0x04	/* user verified */
-# define WA_FLAG_AT	0x40	/* attested credential data present */
-# define WA_FLAG_ED	0x80	/* extension data present */
 
 /*
  * collectedClientData checks shared by both ceremonies (section 5.8.1):
@@ -76,6 +72,28 @@ private int signCount(string authData)
 }
 
 /*
+ * the AAGUID region (authenticator data bytes 37-52) as the canonical
+ * UUID string, or nil when all-zero: Level 3 permits a real AAGUID
+ * with attestation "none", and an all-zero AAGUID means the
+ * authenticator did not identify its model
+ */
+private string aaguidString(string authData)
+{
+    string aaguid, str;
+    int i;
+
+    aaguid = authData[37 .. 52];
+    for (i = 0; i < 16; i++) {
+	if (aaguid[i] != 0) {
+	    str = hex::format(aaguid);
+	    return str[.. 7] + "-" + str[8 .. 11] + "-" + str[12 .. 15] +
+		   "-" + str[16 .. 19] + "-" + str[20 ..];
+	}
+    }
+    return nil;
+}
+
+/*
  * registration (section 7.1, the TOFU subset): verify the client data
  * and the attestation object, and return the attested credential as a
  * mapping over the identityd row keys plus "credentialId" -- the raw
@@ -88,7 +106,8 @@ static mapping verifyRegistration(string rpId, string origin,
 				  string attestationObject)
 {
     mixed attestation, attStmt, coseKey;
-    string authData, credentialId, *verifier;
+    string authData, credentialId, aaguid, *verifier;
+    mapping row;
     int flags, idLength, offset;
     mixed *sub;
 
@@ -135,24 +154,33 @@ static mapping verifyRegistration(string rpId, string origin,
     }
     verifier = cose::verifyKey(coseKey);
 
-    return ([ "credentialId" : credentialId,
-	      CRED_TYPE : CRED_TYPE_PASSKEY,
-	      CRED_SCHEME : verifier[0],
-	      CRED_KEY : verifier[1],
-	      CRED_SIGNCOUNT : signCount(authData),
-	      CRED_FLAGS : flags ]);
+    row = ([ "credentialId" : credentialId,
+	     CRED_TYPE : CRED_TYPE_PASSKEY,
+	     CRED_SCHEME : verifier[0],
+	     CRED_KEY : verifier[1],
+	     CRED_SIGNCOUNT : signCount(authData),
+	     CRED_FLAGS : flags ]);
+    aaguid = aaguidString(authData);
+    if (aaguid) {
+	row[CRED_AAGUID] = aaguid;
+    }
+    return row;
 }
 
 /*
  * assertion (section 7.2): verify the client data, the authenticator
  * data, and the signature over authenticatorData || SHA-256(clientData)
  * with the stored credential's verify scheme and raw public key.
- * Returns the assertion's signature counter; counter policy (replay
- * comparison against the stored value) is the caller's.
+ * Returns what the authenticator reported, under the identityd row
+ * keys: the signature counter and the flags byte (UV, and the Level 3
+ * backup pair BE/BS, are the caller-relevant bits beyond the enforced
+ * UP). Counter policy (replay comparison against the stored value) is
+ * the caller's.
  */
-static int verifyAssertion(string rpId, string origin, string challenge,
-			   string scheme, string key, string clientDataJSON,
-			   string authenticatorData, string signature)
+static mapping verifyAssertion(string rpId, string origin, string challenge,
+			       string scheme, string key,
+			       string clientDataJSON,
+			       string authenticatorData, string signature)
 {
     string message;
     int valid;
@@ -169,5 +197,6 @@ static int verifyAssertion(string rpId, string origin, string challenge,
     if (!valid) {
 	error("webauthn: signature invalid");
     }
-    return signCount(authenticatorData);
+    return ([ CRED_SIGNCOUNT : signCount(authenticatorData),
+	      CRED_FLAGS : authenticatorData[32] ]);
 }

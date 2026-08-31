@@ -16,7 +16,11 @@
  * Counter policy (spec section 6.1.1): when either the stored or the
  * asserted counter is nonzero, the asserted counter must be strictly
  * greater than the stored one; a pair of zeros means the authenticator
- * does not implement the counter and is accepted.
+ * does not implement the counter and is accepted. Backup-eligible
+ * credentials (stored flags carry BE) are exempt: a synced passkey's
+ * copies do not share a counter, so strict enforcement turns the
+ * first nonzero assertion into a permanent lockout of every other
+ * copy still reporting zero.
  *
  * rpId and origin are operator-configured (the "webauthn" console
  * verb); defaults match the platform's native-TLS shape. The surface
@@ -31,6 +35,7 @@
 inherit "/usr/System/lib/auto";
 private inherit "/lib/util/lpc";	/* sysLog */
 private inherit base64 "/lib/util/base64";
+private inherit hex "/lib/util/hex";
 private inherit webauthn "/lib/util/webauthn";
 
 private string rpId;	/* relying-party id the ceremonies verify against */
@@ -140,16 +145,19 @@ string register_credential(string challenge, string clientDataJSON,
 
 /*
  * assertion: look the credential up, verify the signature, enforce the
- * counter policy, advance the stored counter. Returns the principal.
+ * counter policy, advance the stored counter. Returns the principal
+ * plus what the authenticator reported this login -- the flags byte
+ * (UV, and the BE/BS backup pair) and the signature counter -- so the
+ * caller can read per-login facts the registration row cannot carry.
  */
-string verify_assertion(string challenge, string credentialId,
-			string clientDataJSON, string authenticatorData,
-			string signature)
+mapping verify_assertion_result(string challenge, string credentialId,
+				string clientDataJSON,
+				string authenticatorData, string signature)
 {
     object identity;
-    mapping row;
+    mapping row, asserted;
     string uuid;
-    int stored, asserted;
+    int stored, count;
 
     check_system(previous_program());
     uuid = IDENTITYD->find_by_credential(credentialId);
@@ -166,11 +174,29 @@ string verify_assertion(string challenge, string credentialId,
 					 clientDataJSON, authenticatorData,
 					 signature);
     stored = row[CRED_SIGNCOUNT];
-    if ((stored != 0 || asserted != 0) && asserted <= stored) {
+    count = asserted[CRED_SIGNCOUNT];
+    if (!(row[CRED_FLAGS] & WA_FLAG_BE) &&
+	(stored != 0 || count != 0) && count <= stored) {
 	error("webauthn: signCount replay");
     }
-    IDENTITYD->update_sign_count(uuid, credentialId, asserted);
-    return "identity:" + uuid;
+    IDENTITYD->update_sign_count(uuid, credentialId, count);
+    return ([ "principal" : "identity:" + uuid,
+	      CRED_FLAGS : asserted[CRED_FLAGS],
+	      CRED_SIGNCOUNT : count ]);
+}
+
+/*
+ * the assertion ceremony reduced to its principal, for callers that
+ * need no per-login facts
+ */
+string verify_assertion(string challenge, string credentialId,
+			string clientDataJSON, string authenticatorData,
+			string signature)
+{
+    check_system(previous_program());
+    return verify_assertion_result(challenge, credentialId, clientDataJSON,
+				   authenticatorData, signature)
+	   ["principal"];
 }
 
 
@@ -200,8 +226,8 @@ private void _emit(object user, string msg)
  */
 void cmd_webauthn(object user, string cmd, string str)
 {
-    string *parts, err, principal, uuid;
-    int count;
+    string *parts, err, principal;
+    mapping result;
 
     if (!KERNEL()) {
 	error("Access denied");
@@ -260,16 +286,15 @@ void cmd_webauthn(object user, string cmd, string str)
 			"<authenticatorData-b64u> <signature-b64u>\n");
 	    return;
 	}
-	err = catch(principal = verify_assertion(parts[1], parts[2],
+	err = catch(result = verify_assertion_result(parts[1], parts[2],
 			base64::urlDecode(parts[3]),
 			base64::urlDecode(parts[4]),
-			base64::urlDecode(parts[5])),
-		    uuid = IDENTITYD->find_by_credential(parts[2]),
-		    count = IDENTITYD->find_identity(uuid)->
-			    query_credential(parts[2])[CRED_SIGNCOUNT]);
+			base64::urlDecode(parts[5])));
 	_emit(user, err ? err + "\n"
-			: "webauthn: authenticated " + principal +
-			  " signCount " + (string) count + "\n");
+			: "webauthn: authenticated " + result["principal"] +
+			  " signCount " + (string) result[CRED_SIGNCOUNT] +
+			  " flags 0x" + hex::encode(result[CRED_FLAGS], 2) +
+			  "\n");
 	return;
 
     default:
