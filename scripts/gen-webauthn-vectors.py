@@ -98,8 +98,9 @@ def attestation_object(ad: bytes) -> bytes:
     return cbor({"fmt": "none", "attStmt": {}, "authData": ad})
 
 
-def attested_credential(cred_id: bytes, cose_key: dict) -> bytes:
-    return (b"\x00" * 16 + struct.pack(">H", len(cred_id)) + cred_id +
+def attested_credential(cred_id: bytes, cose_key: dict,
+                        aaguid: bytes = b"\x00" * 16) -> bytes:
+    return (aaguid + struct.pack(">H", len(cred_id)) + cred_id +
             cbor(cose_key))
 
 
@@ -112,6 +113,8 @@ es_nums = es_key.public_key().public_numbers()
 es_x = es_nums.x.to_bytes(32, "big")
 es_y = es_nums.y.to_bytes(32, "big")
 es_cred_id = bytes(range(0x10, 0x20))
+es_aaguid = bytes(range(0xa0, 0xb0))
+ES_AAGUID_STR = "a0a1a2a3-a4a5-a6a7-a8a9-aaabacadaeaf"
 es_cose = {1: 2, 3: -7, -1: 1, -2: es_x, -3: es_y}
 
 attacker_key = ec.generate_private_key(ec.SECP256R1())
@@ -121,7 +124,7 @@ CH_A1 = b64u(bytes(range(32, 64)))
 CH_A2 = b64u(bytes(range(64, 96)))
 
 reg_ad = auth_data(RP_ID, UP | AT, 5,
-                   attested_credential(es_cred_id, es_cose))
+                   attested_credential(es_cred_id, es_cose, es_aaguid))
 reg_ao = attestation_object(reg_ad)
 reg_cdj = client_data("webauthn.create", CH_REG, ORIGIN)
 
@@ -129,7 +132,7 @@ reg_cdj_bad_origin = client_data("webauthn.create", CH_REG, BAD_ORIGIN)
 reg_cdj_bad_type = client_data("webauthn.get", CH_REG, ORIGIN)
 reg_ao_bad_rp = attestation_object(
     auth_data(BAD_RP_ID, UP | AT, 5,
-              attested_credential(es_cred_id, es_cose)))
+              attested_credential(es_cred_id, es_cose, es_aaguid)))
 reg_ao_bad_fmt = cbor({"fmt": "packed", "attStmt": {}, "authData": reg_ad})
 
 
@@ -229,6 +232,7 @@ defines = [
     ("WA_REG_AO_BAD_RP", reg_ao_bad_rp, "x"),
     ("WA_REG_AO_BAD_FMT", reg_ao_bad_fmt, "x"),
     ("WA_ES_CRED_ID", es_cred_id, "x"),
+    ("WA_ES_AAGUID", ES_AAGUID_STR, "s"),
     ("WA_A1_AD", a1_ad, "x"), ("WA_A1_CDJ", a1_cdj, "x"),
     ("WA_A1_SIG", a1_sig, "x"),
     ("WA_A_BAD_ORIGIN_CDJ", a_bad_origin_cdj, "x"),

@@ -160,7 +160,7 @@ A fresh single-use challenge, base64url (32 bytes of `secure_random`); errors wi
 
 ### `mapping verify_registration_payload(string challenge, string clientDataJSON, string attestationObject)`
 
-Registration-ceremony verification without a mint: returns the verified credential row, keyed under `"credentialId"` (base64url, the form the store binds). What happens to the row is the System-tier caller's composition -- `register_credential` mints a fresh identity, authd's recovery ceremony pairs it with a code redemption onto an existing record, and the operator `identity bind` verb attaches it directly. Never-bare-re-bind holds because no caller composes a bare re-bind out of the registration route.
+Registration-ceremony verification without a mint: returns the verified credential row, keyed under `"credentialId"` (base64url, the form the store binds); when the authenticator sent a non-zero AAGUID the row carries it as `"aaguid"` (canonical UUID string), persisted with the rest of the row. What happens to the row is the System-tier caller's composition -- `register_credential` mints a fresh identity, authd's recovery ceremony pairs it with a code redemption onto an existing record, and the operator `identity bind` verb attaches it directly. Never-bare-re-bind holds because no caller composes a bare re-bind out of the registration route.
 
 ### `string register_credential(string challenge, string clientDataJSON, string attestationObject)`
 
@@ -268,7 +268,7 @@ Add-passkey enrollment: a live session binds an ADDITIONAL passkey to its own re
 
 ### `mixed *query_passkeys(string sessionToken)` / `void revoke_passkey(string sessionToken, string credentialId)`
 
-Passkey self-service on the session's own record. The read returns one row per passkey credential, `({ credentialId, created, lastUsed })` -- bookkeeping, never key material. The revocation removes one of the record's own passkeys, refusing non-passkey rows (recovery codes rotate as a set above) and the record's last passkey, so a principal never revokes itself out of login; the substrate's never-zero guard backs it at the record level. Sessions are separate state and are untouched. The intended sequence for a lost device is recovery first (the replacement passkey binds via `recover_identity`), then revocation of the lost credential here.
+Passkey self-service on the session's own record. The read returns one row per passkey credential, `({ credentialId, created, lastUsed, aaguid })` -- bookkeeping, never key material; the aaguid element (a UUID string, nil when the authenticator sent zeros) is the credential-manager hint an application can render beside the credential. The revocation removes one of the record's own passkeys, refusing non-passkey rows (recovery codes rotate as a set above) and the record's last passkey, so a principal never revokes itself out of login; the substrate's never-zero guard backs it at the record level. Sessions are separate state and are untouched. The intended sequence for a lost device is recovery first (the replacement passkey binds via `recover_identity`), then revocation of the lost credential here.
 
 ## Index daemon -- `src/usr/Index/sys/index_daemon.c`
 

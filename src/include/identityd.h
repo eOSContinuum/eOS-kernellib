@@ -30,6 +30,9 @@
 # define CRED_SIGNCOUNT		"signCount"	/* authenticator counter */
 # define CRED_TRANSPORTS	"transports"	/* string array, optional */
 # define CRED_FLAGS		"flags"		/* authData flags (int) */
+# define CRED_AAGUID		"aaguid"	/* authenticator AAGUID (UUID
+						   string); absent when the
+						   authenticator sent zeros */
 # define CRED_HASH		"hash"		/* recovery-code / agent-token
 						   hash (hex) */
 # define CRED_CREATED		"created"	/* row creation time() */

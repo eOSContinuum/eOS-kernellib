@@ -370,7 +370,8 @@ private void test_reg_verify()
     if (cred["credentialId"] != hex::decodeString(WA_ES_CRED_ID_HEX) ||
 	cred["scheme"] != "ECDSA-SECP256R1-SHA256" ||
 	strlen(cred["key"]) != 65 || cred["key"][0] != 0x04 ||
-	cred["signCount"] != 5 || cred["type"] != "passkey") {
+	cred["signCount"] != 5 || cred["type"] != "passkey" ||
+	cred["aaguid"] != WA_ES_AAGUID) {
 	log_line("WebAuthn:test: FAIL: registration parsed wrong");
 	return;
     }
@@ -477,7 +478,7 @@ private void test_ceremonies()
 					hex::decodeString(WA_ED_REG_CDJ_HEX),
 					hex::decodeString(WA_ED_REG_AO_HEX));
 	if (edCred["scheme"] == "Ed25519" && strlen(edCred["key"]) == 32 &&
-	    edCred["signCount"] == 2) {
+	    edCred["signCount"] == 2 && edCred["aaguid"] == nil) {
 	    log_line("WebAuthn:test: ED25519-REG OK");
 	} else {
 	    log_line("WebAuthn:test: FAIL: Ed25519 registration parsed wrong");
