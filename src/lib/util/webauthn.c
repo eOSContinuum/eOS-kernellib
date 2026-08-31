@@ -176,12 +176,16 @@ static mapping verifyRegistration(string rpId, string origin,
  * assertion (section 7.2): verify the client data, the authenticator
  * data, and the signature over authenticatorData || SHA-256(clientData)
  * with the stored credential's verify scheme and raw public key.
- * Returns the assertion's signature counter; counter policy (replay
- * comparison against the stored value) is the caller's.
+ * Returns what the authenticator reported, under the identityd row
+ * keys: the signature counter and the flags byte (UV, and the Level 3
+ * backup pair BE/BS, are the caller-relevant bits beyond the enforced
+ * UP). Counter policy (replay comparison against the stored value) is
+ * the caller's.
  */
-static int verifyAssertion(string rpId, string origin, string challenge,
-			   string scheme, string key, string clientDataJSON,
-			   string authenticatorData, string signature)
+static mapping verifyAssertion(string rpId, string origin, string challenge,
+			       string scheme, string key,
+			       string clientDataJSON,
+			       string authenticatorData, string signature)
 {
     string message;
     int valid;
@@ -198,5 +202,6 @@ static int verifyAssertion(string rpId, string origin, string challenge,
     if (!valid) {
 	error("webauthn: signature invalid");
     }
-    return signCount(authenticatorData);
+    return ([ CRED_SIGNCOUNT : signCount(authenticatorData),
+	      CRED_FLAGS : authenticatorData[32] ]);
 }

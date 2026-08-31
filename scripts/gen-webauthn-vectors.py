@@ -175,7 +175,7 @@ ed_reg_ad = auth_data(RP_ID, UP | AT, 2,
 ed_reg_ao = attestation_object(ed_reg_ad)
 ed_reg_cdj = client_data("webauthn.create", CH_REG2, ORIGIN)
 
-ed_a_ad = auth_data(RP_ID, UP, 3)
+ed_a_ad = auth_data(RP_ID, UP | UV, 3)
 ed_a_cdj = client_data("webauthn.get", CH_A3, ORIGIN)
 ed_a_sig = ed_key.sign(ed_a_ad + hashlib.sha256(ed_a_cdj).digest())
 
@@ -304,9 +304,10 @@ capture: uuid registered identity:([0-9a-f-]+)
 cmd: webauthn register {CH_REG} {b64u(reg_cdj)} {b64u(reg_ao)}
 expect: identity: credential already bound
 
-# assertion verifies and advances signCount (5 at registration -> 6)
+# assertion verifies, advances signCount (5 at registration -> 6), and
+# surfaces the assertion's flags byte (this vector is UP-only, 0x01)
 cmd: webauthn authenticate {CH_A1} {b64u(es_cred_id)} {b64u(a1_cdj)} {b64u(a1_ad)} {b64u(a1_sig)}
-expect: webauthn: authenticated identity:%{{uuid}} signCount 6
+expect: webauthn: authenticated identity:%{{uuid}} signCount 6 flags 0x01
 
 # replaying the same assertion is refused (6 is not greater than 6)
 cmd: webauthn authenticate {CH_A1} {b64u(es_cred_id)} {b64u(a1_cdj)} {b64u(a1_ad)} {b64u(a1_sig)}

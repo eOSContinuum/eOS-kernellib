@@ -421,8 +421,7 @@ private void assert_negative(string sentinel, string want, string challenge,
 
 private void test_ceremonies()
 {
-    mapping cred, edCred;
-    int count;
+    mapping cred, edCred, asserted;
 
     /* ES256 registration, then its negatives */
     catch { test_reg_verify(); } : { log_line("WebAuthn:test: FAIL: reg verify threw"); }
@@ -442,17 +441,19 @@ private void test_ceremonies()
 					    hex::decodeString(WA_REG_CDJ_HEX),
 					    hex::decodeString(WA_REG_AO_HEX));
 
-	/* the positive assertion: counter 5 at registration, 6 asserted */
-	count = webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, WA_CH_A1,
+	/* the positive assertion: counter 5 at registration, 6 asserted;
+	 * the mapping surfaces the flags byte (this vector is UP-only) */
+	asserted = webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, WA_CH_A1,
 					  cred["scheme"], cred["key"],
 					  hex::decodeString(WA_A1_CDJ_HEX),
 					  hex::decodeString(WA_A1_AD_HEX),
 					  hex::decodeString(WA_A1_SIG_HEX));
-	if (count == 6) {
+	if (asserted["signCount"] == 6 && asserted["flags"] == 0x01) {
 	    log_line("WebAuthn:test: ASSERT-VERIFY OK");
 	} else {
-	    log_line("WebAuthn:test: FAIL: assertion signCount " +
-		     (string) count);
+	    log_line("WebAuthn:test: FAIL: assertion result signCount " +
+		     (string) asserted["signCount"] + " flags " +
+		     (string) asserted["flags"]);
 	}
 
 	/* assertion negatives against the same stored credential */
@@ -483,16 +484,17 @@ private void test_ceremonies()
 	} else {
 	    log_line("WebAuthn:test: FAIL: Ed25519 registration parsed wrong");
 	}
-	count = webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, WA_CH_A3,
+	asserted = webauthn::verifyAssertion(WA_RP_ID, WA_ORIGIN, WA_CH_A3,
 					  edCred["scheme"], edCred["key"],
 					  hex::decodeString(WA_ED_A_CDJ_HEX),
 					  hex::decodeString(WA_ED_A_AD_HEX),
 					  hex::decodeString(WA_ED_A_SIG_HEX));
-	if (count == 3) {
+	if (asserted["signCount"] == 3 && asserted["flags"] == 0x05) {
 	    log_line("WebAuthn:test: ED25519-ASSERT OK");
 	} else {
 	    log_line("WebAuthn:test: FAIL: Ed25519 assertion signCount " +
-		     (string) count);
+		     (string) asserted["signCount"] + " flags " +
+		     (string) asserted["flags"]);
 	}
     } : {
 	log_line("WebAuthn:test: FAIL: Ed25519 phases threw");

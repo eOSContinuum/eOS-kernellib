@@ -166,9 +166,13 @@ Registration-ceremony verification without a mint: returns the verified credenti
 
 The TOFU registration ceremony; returns the new principal string (`identity:<uuid>`).
 
+### `mapping verify_assertion_result(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature)`
+
+The assertion ceremony against the stored credential (`credentialId` in base64url, as bound at registration); enforces and advances the signature counter. Returns the principal plus what the authenticator reported this login: `([ "principal", "flags", "signCount" ])`, where `"flags"` is the assertion's authenticator-data flags byte -- UV (`0x04`) for per-login verification records, and the Level 3 backup pair BE (`0x08`) / BS (`0x10`) for backup-state transitions -- facts the registration row cannot carry.
+
 ### `string verify_assertion(string challenge, string credentialId, string clientDataJSON, string authenticatorData, string signature)`
 
-The assertion ceremony against the stored credential (`credentialId` in base64url, as bound at registration); enforces and advances the signature counter; returns the principal.
+The same ceremony reduced to its principal, for callers that need no per-login facts.
 
 ### `void configure(string rpId, string origin)` / `string query_rp_id()` / `string query_origin()`
 
