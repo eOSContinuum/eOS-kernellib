@@ -311,10 +311,11 @@ vs = f"""# webauthn operator verb -- the ceremony daemon driven end-to-end on a
 #   LPC_EXT_CRYPTO=<crypto> DGD_BIN=<dgd> scripts/drive-verbs-smoke.sh \\
 #       scripts/verbsets/webauthn-ceremony.verbset
 # Covers: rp configuration, TOFU registration minting an identity,
-# assertion verification updating signCount, the signCount replay
-# refusal, re-registration of a bound credential refused, an unknown
-# credential refused, and the System-tier gate refusing a console
-# caller.
+# assertion verification updating signCount and surfacing the flags
+# byte, the signCount replay refusal, the backup-eligible (synced
+# passkey) counter exemption, re-registration of a bound credential
+# refused, an unknown credential refused, and the System-tier gate
+# refusing a console caller.
 
 # point the ceremony daemon at the vectors' rp
 cmd: webauthn rpid {RP_ID}
