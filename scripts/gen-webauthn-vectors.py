@@ -104,7 +104,7 @@ def attested_credential(cred_id: bytes, cose_key: dict,
             cbor(cose_key))
 
 
-UP, UV, AT = 0x01, 0x04, 0x40
+UP, UV, BE, BS, AT = 0x01, 0x04, 0x08, 0x10, 0x40
 
 # --- ES256 credential ---
 
@@ -218,6 +218,39 @@ reg4_ao = attestation_object(reg4_ad)
 reg4_cdj = client_data("webauthn.create", CH_REG4, ORIGIN)
 
 
+# --- ES256 credential #4: the synced passkey (backup-eligible) ---
+
+es4_key = ec.generate_private_key(ec.SECP256R1())
+es4_nums = es4_key.public_key().public_numbers()
+es4_cose = {1: 2, 3: -7, -1: 1,
+            -2: es4_nums.x.to_bytes(32, "big"),
+            -3: es4_nums.y.to_bytes(32, "big")}
+es4_cred_id = bytes(range(0x70, 0x80))
+
+CH_REG5 = b64u(bytes([5]) * 32)
+CH_A5 = b64u(bytes([6]) * 32)
+CH_A6 = b64u(bytes([7]) * 32)
+
+reg5_ad = auth_data(RP_ID, UP | AT | BE | BS, 0,
+                    attested_credential(es4_cred_id, es4_cose))
+reg5_ao = attestation_object(reg5_ad)
+reg5_cdj = client_data("webauthn.create", CH_REG5, ORIGIN)
+
+
+def es4_sign(ad: bytes, cdj: bytes) -> bytes:
+    return es4_key.sign(ad + hashlib.sha256(cdj).digest(),
+                        ec.ECDSA(hashes.SHA256()))
+
+
+a5_ad = auth_data(RP_ID, UP | BE | BS, 7)
+a5_cdj = client_data("webauthn.get", CH_A5, ORIGIN)
+a5_sig = es4_sign(a5_ad, a5_cdj)
+
+a6_ad = auth_data(RP_ID, UP | BE | BS, 0)
+a6_cdj = client_data("webauthn.get", CH_A6, ORIGIN)
+a6_sig = es4_sign(a6_ad, a6_cdj)
+
+
 # --- emit the LPC fixture ---
 
 defines = [
@@ -316,6 +349,21 @@ expect: webauthn: signCount replay
 # an unknown credential is refused
 cmd: webauthn authenticate {CH_A1} {b64u(bytes(16))} {b64u(a1_cdj)} {b64u(a1_ad)} {b64u(a1_sig)}
 expect: webauthn: unknown credential
+
+# a synced passkey (BE|BS) registers with counter 0
+cmd: webauthn register {CH_REG5} {b64u(reg5_cdj)} {b64u(reg5_ao)}
+expect: webauthn: registered identity:[0-9a-f-]+
+capture: uuid2 registered identity:([0-9a-f-]+)
+
+# one copy asserts counter 7 (flags UP|BE|BS = 0x19)
+cmd: webauthn authenticate {CH_A5} {b64u(es4_cred_id)} {b64u(a5_cdj)} {b64u(a5_ad)} {b64u(a5_sig)}
+expect: webauthn: authenticated identity:%{{uuid2}} signCount 7 flags 0x19
+
+# another copy still reports 0: backup-eligible is exempt from the
+# strictly-increasing counter policy, so this is accepted, not a
+# permanent lockout
+cmd: webauthn authenticate {CH_A6} {b64u(es4_cred_id)} {b64u(a6_cdj)} {b64u(a6_ad)} {b64u(a6_sig)}
+expect: webauthn: authenticated identity:%{{uuid2}} signCount 0 flags 0x19
 
 # the System-tier API refuses a console caller
 cmd: code "/usr/System/sys/webauthnd"->issue_challenge()

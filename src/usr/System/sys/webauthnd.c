@@ -16,7 +16,11 @@
  * Counter policy (spec section 6.1.1): when either the stored or the
  * asserted counter is nonzero, the asserted counter must be strictly
  * greater than the stored one; a pair of zeros means the authenticator
- * does not implement the counter and is accepted.
+ * does not implement the counter and is accepted. Backup-eligible
+ * credentials (stored flags carry BE) are exempt: a synced passkey's
+ * copies do not share a counter, so strict enforcement turns the
+ * first nonzero assertion into a permanent lockout of every other
+ * copy still reporting zero.
  *
  * rpId and origin are operator-configured (the "webauthn" console
  * verb); defaults match the platform's native-TLS shape. The surface
@@ -171,7 +175,8 @@ mapping verify_assertion_result(string challenge, string credentialId,
 					 signature);
     stored = row[CRED_SIGNCOUNT];
     count = asserted[CRED_SIGNCOUNT];
-    if ((stored != 0 || count != 0) && count <= stored) {
+    if (!(row[CRED_FLAGS] & WA_FLAG_BE) &&
+	(stored != 0 || count != 0) && count <= stored) {
 	error("webauthn: signCount replay");
     }
     IDENTITYD->update_sign_count(uuid, credentialId, count);

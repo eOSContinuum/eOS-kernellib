@@ -22,11 +22,6 @@ private inherit cose "/lib/util/cose";
 private inherit hex "/lib/util/hex";
 private inherit json "/lib/util/json";
 
-# define WA_FLAG_UP	0x01	/* user present */
-# define WA_FLAG_UV	0x04	/* user verified */
-# define WA_FLAG_AT	0x40	/* attested credential data present */
-# define WA_FLAG_ED	0x80	/* extension data present */
-
 /*
  * collectedClientData checks shared by both ceremonies (section 5.8.1):
  * JSON with the expected type, the issued challenge (base64url string
