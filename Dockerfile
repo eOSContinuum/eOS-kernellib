@@ -11,9 +11,10 @@
 
 FROM debian:bookworm-slim
 
-# The kernel layer requires preprocess_file(): DGD master at or after
-# b4da6a96 (docs/building.md). Full hash so the shallow fetch can pin it.
-ARG DGD_COMMIT=b4da6a965dca0ff40c0912c5ab4a04e56d47fa4b
+# The kernel layer's floor is preprocess_file() (975e927f); the commit
+# below is the validated pin, further along the same master line
+# (docs/building.md). Full hash so the shallow fetch can pin it.
+ARG DGD_COMMIT=733ea01eeeb571721c35511cb7f51a7f9d32fb6c
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates git make gcc g++ bison procps \

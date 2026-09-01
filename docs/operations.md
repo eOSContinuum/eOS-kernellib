@@ -152,7 +152,7 @@ Which stop path leaves which case:
 
 | Stop path | Call | Restore needs |
 |---|---|---|
-| Kill signal (SIGTERM) | `prepare_reboot()` then `dump_state(1)` (`src/kernel/sys/driver.c:757-766`) | `dump_file` + `dump_file.old` (in practice, see below) |
+| Kill signal (SIGTERM) | `prepare_reboot()` then `dump_state(1)` (`src/kernel/sys/driver.c:762-771`) | `dump_file` + `dump_file.old` (in practice, see below) |
 | `reboot` verb | `dump_state(TRUE)` then `shutdown()` (`cmd_reboot`, `src/kernel/lib/admin_console.c`) | `dump_file` + `dump_file.old` (in practice, see below) |
 | `snapshot` verb | `dump_state(FALSE)` (`cmd_snapshot`) | `dump_file` alone |
 | Console dump-and-exit path | `dump_state(FALSE)` then `shutdown()` (`src/usr/System/sys/persist_helper.c:83`) | `dump_file` alone |
@@ -273,7 +273,7 @@ Optional verbose-trace lines are general diagnostics rather than audit, so they 
 
 The platform is one process. A process supervisor (systemd, a container runtime, runit) owns its lifecycle: start it, restart it on exit, stop it on demand. Two facts shape that configuration.
 
-**A graceful stop takes a final snapshot.** The driver catches `SIGTERM`, the default stop signal for `systemctl stop`, `docker stop`, and a bare `kill`. On receipt it runs `prepare_reboot()`, writes an incremental snapshot with `dump_state(1)`, and shuts down cold (`src/kernel/sys/driver.c:757-766`, reached through the `SIGTERM` handler in `dworkin/dgd` `src/host/unix/local.cpp`). A supervisor's ordinary stop therefore leaves a current restore point with no operator action. This is the same incremental form the `reboot` verb writes (Backing up and restoring state above), so recovery needs both `dump_file` and `<dump_file>.old`.
+**A graceful stop takes a final snapshot.** The driver catches `SIGTERM`, the default stop signal for `systemctl stop`, `docker stop`, and a bare `kill`. On receipt it runs `prepare_reboot()`, writes an incremental snapshot with `dump_state(1)`, and shuts down cold (`src/kernel/sys/driver.c:762-771`, reached through the `SIGTERM` handler in `dworkin/dgd` `src/host/unix/local.cpp`). A supervisor's ordinary stop therefore leaves a current restore point with no operator action. This is the same incremental form the `reboot` verb writes (Backing up and restoring state above), so recovery needs both `dump_file` and `<dump_file>.old`.
 
 Give the stop timeout room for the dump. Dump time scales with the in-memory image size (`docs/configuration.md` Limits and capacity), so a large image needs a stop timeout longer than a supervisor's default. A supervisor that escalates to `SIGKILL` before the dump finishes loses that snapshot.
 

@@ -79,9 +79,9 @@ There is no `VAL_SAM` tag (the `$"..."` SAM-token surface is a game-content exte
 
 The sandbox lives in `src/usr/Merry/lib/merrynode.c`. The compiled Merry object inherits `merrynode`, which provides:
 
-- **`call_other` filter**: the local `call_other` shadow (lines 384-396) accepts non-object arguments (calls into pseudo-objects: `nil`, ints, floats, arrays, mappings) and refuses object arguments with `"function 'call_other' not allowed in merry code"`. Cross-object calls must go through `Call(obj, "name", args...)` instead.
-- **`new_object` deny**: the local `new_object` shadow (lines 398-401) refuses unconditionally. Cloning new objects is a `Spawn`-merryfun privilege, not a general Merry capability.
-- **51-entry kfun deny list**: the `SANDBOX(f)` macro (line 403) defines a function `f` that errors with `"function '<name>' not allowed in merry code"`. Every named kfun is locally shadowed by its sandbox stub. Compiled Merry source that calls one of these names dispatches to the local shadow and raises at runtime.
+- **`call_other` filter**: the local `call_other` shadow (lines 520-533) accepts non-object arguments (calls into pseudo-objects: `nil`, ints, floats, arrays, mappings) and refuses object arguments with `"function 'call_other' not allowed in merry code"`. Cross-object calls must go through `Call(obj, "name", args...)` instead.
+- **`new_object` deny**: the local `new_object` shadow (lines 535-538) refuses unconditionally. Cloning new objects is a `Spawn`-merryfun privilege, not a general Merry capability.
+- **51-entry kfun deny list**: the `SANDBOX(f)` macro (line 540) defines a function `f` that errors with `"function '<name>' not allowed in merry code"`. Every named kfun is locally shadowed by its sandbox stub. Compiled Merry source that calls one of these names dispatches to the local shadow and raises at runtime.
 
 The full sandbox list, grouped:
 

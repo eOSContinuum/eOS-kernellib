@@ -6,14 +6,14 @@ Building eOS-kernellib means building DGD. The kernel layer is LPC source that D
 
 ## DGD
 
-DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib targets DGD 1.7.x. The floor is upstream `master` at or after `975e927f` (`preprocess_file()`, 2026-07-12) -- the 1.7.9 release predates that kfun and fails to boot the kernel layer. The pin below is `b4da6a96` (2026-08-21), which is what CI, the container recipe and the quickstart build: the floor plus a `make DEFINES=` that behaves, which the wide-index recipe further down relies on.
+DGD is the LPC runtime that loads and executes the kernel layer. eOS-kernellib targets DGD 1.7.x. The floor is upstream `master` at or after `975e927f` (`preprocess_file()`, 2026-07-12) -- the 1.7.9 release predates that kfun and fails to boot the kernel layer. The pin below is `733ea01e` (2026-08-30), which is what CI, the container recipe and the quickstart build: the floor plus a `make DEFINES=` that behaves, which the wide-index recipe further down relies on.
 
 ### Standard build
 
 ```sh
 git clone https://github.com/dworkin/dgd.git
 cd dgd
-git checkout b4da6a96    # 1.7.9 + preprocess_file() and a working `make DEFINES=`
+git checkout 733ea01e    # 1.7.9 + preprocess_file() and a working `make DEFINES=`
 cd src
 make install
 ```
@@ -65,7 +65,7 @@ make DEFINES='-DUINDEX_TYPE="unsigned int" -DUINDEX_MAX=UINT_MAX -D_FILE_OFFSET_
 
 Validated 2026-08-10 against driver `25dad1dd` and kernel layer `b5bcde1`, on macOS arm64 and on Debian 12 aarch64: every example profile passes on both platforms at the module-less bar (the crypto-gated steps skip, as they do for any build without the extension module), and `swap_size` accepts values past 65535 where a stock build refuses with `Config error: int value out of range`.
 
-That validation driver sits two commits behind the `b4da6a96` pinned in the Standard build above, and both of them are the `make DEFINES=` fix described under The `DEFINES` override below. Neither compiles differently: the delta between the two trees is `src/Makefile` and nothing else. What changed is that on the pin the large-file flag arrives on its own, so restating it is redundant rather than required, and the recipes above are written to work either way. Build the pin unless you have a reason not to: it is what the container recipe and the regression workflow build.
+That validation driver sits three commits behind the `733ea01e` pinned in the Standard build above: one adjusts the repository's own container script, one is the `make DEFINES=` fix described under The `DEFINES` override below (its `src/Makefile` change, plus the same container script), and the third closes a connection immediately on a write error (`src/comm.cpp`). None of them changes what these recipes compile. What changed is that on the pin the large-file flag arrives on its own, so restating it is redundant rather than required, and the recipes above are written to work either way. Build the pin unless you have a reason not to: it is what the container recipe and the regression workflow build.
 
 **Upstream's fuller form** additionally widens the maximum string length to 1 MB:
 
@@ -77,7 +77,7 @@ This is the form DGD's author recommends when strings need to grow as well as in
 
 **Why a naive widening fails.** Setting all three types to `unsigned int` compiles cleanly and segfaults at cold boot before the first banner line. The cause is a cast, not the width: `config.h` defines `MAX_STRLEN` as `SSIZET_MAX`, and string creation guards on `len > (LPCint) MAX_STRLEN`, so an `SSIZET_MAX` of `UINT_MAX` becomes -1 in the driver's signed 32-bit `LPCint`, every string allocation takes the error path, and the error path builds its own message through the same allocator until the stack guard fires. Bounding `SSIZET_MAX` to a value that survives the cast is what makes the fuller form work. (`-DLARGENUM` also produces a working build, by widening `LPCint` so the cast no longer overflows, but it enables an unrelated feature and is not the intended route.)
 
-**The `DEFINES` override.** Passing `DEFINES` on the `make` command line replaces the Makefile's variable outright and suppresses the Makefile's own appends to it -- including the `-D_FILE_OFFSET_BITS=64` that `src/Makefile` adds for Linux and Solaris hosts. Writing `+=` on the command line does not change this: a command-line assignment overrides a plain makefile append whichever operator either side uses. That describes the pinned driver and every DGD before `b4da6a96` (2026-08-21), which fixed it by routing the platform appends through a second variable that a command line does not set. On a driver at or past that commit the flag arrives on the compile line as usual and restating it is merely redundant. Restating it is harmless either way, so the second recipe above is the form that works on both.
+**The `DEFINES` override.** Passing `DEFINES` on the `make` command line replaces the Makefile's variable outright and suppresses the Makefile's own appends to it -- including the `-D_FILE_OFFSET_BITS=64` that `src/Makefile` adds for Linux and Solaris hosts. Writing `+=` on the command line does not change this: a command-line assignment overrides a plain makefile append whichever operator either side uses. That describes every DGD before `b4da6a96` (2026-08-21), which fixed it by routing the platform appends through a second variable that a command line does not set. On a driver at or past that commit -- the pin included -- the flag arrives on the compile line as usual and restating it is merely redundant. Restating it is harmless either way, so the second recipe above is the form that works on both.
 
 What restating it buys is confined to 32-bit hosts. On a 64-bit host -- which is every platform validated here -- `off_t` is already 64 bits and the flag changes no type at all: measured on Debian 12 aarch64, its entire effect on the resulting binary is to redirect a couple of glibc entry points to their large-file variants, which are equivalent under LP64. The flag earns its keep on 32-bit hosts, where it is what lifts the 2 GB file-offset ceiling.
 

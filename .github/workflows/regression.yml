@@ -15,9 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # The kernel layer requires preprocess_file(): DGD master at or
-      # after this commit (docs/building.md; same pin as the Dockerfile).
-      DGD_COMMIT: b4da6a965dca0ff40c0912c5ab4a04e56d47fa4b
+      # The kernel layer's floor is preprocess_file() (975e927f); this
+      # is the validated pin, further along the same master line
+      # (docs/building.md; same pin as the Dockerfile).
+      DGD_COMMIT: 733ea01eeeb571721c35511cb7f51a7f9d32fb6c
     steps:
       - uses: actions/checkout@v4
         with:

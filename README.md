@@ -1,6 +1,6 @@
 [![License: BSD-2-Clause-Patent](https://img.shields.io/badge/License-BSD--2--Clause--Patent-blue.svg)](LICENSE.md)
 [![Built on: DGD](https://img.shields.io/badge/Built_on-DGD-green.svg)](https://github.com/dworkin/dgd)
-[![Tested against: DGD 1.7.9+](https://img.shields.io/badge/Tested_against-DGD_1.7.9%2B-brightgreen.svg)](#quickstart)
+[![Tested against: pinned DGD master](https://img.shields.io/badge/Tested_against-pinned_DGD_master-brightgreen.svg)](#quickstart)
 
 # eOS-kernellib
 
@@ -85,7 +85,7 @@ DGD_BIN=/path/to/dgd/bin/dgd scripts/run-example.sh merry-app
 
 A passing run ends with the expected `OK` sentinel count — [`docs/getting-started.md`](docs/getting-started.md#zero-to-a-passing-proof) shows the captured transcript, and [`docs/getting-started.md`](docs/getting-started.md#run-it-in-a-container) has the same proof running in a container with no C toolchain on the host, if DGD is not yet built. [`scripts/README.md`](scripts/README.md) documents the harness; each example under [`examples/`](examples/) names its own profile, and the Full regression sweep there is the complete bar — every example and smoke in about fifteen minutes end to end on the measured-baseline hardware.
 
-**Tested against**: DGD `master` at `b4da6a96` (2026-08-21) — the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires, and a `make DEFINES=` that behaves. On Linux, continuously: the [regression workflow](.github/workflows/regression.yml) builds that commit and runs the module-less sweep on every pull request and every push to `main`. On macOS 26.5 (arm64), by hand, most recently 2026-08-22; CI does not cover macOS. The floor is lower than the pin: any driver at or after `975e927f` (2026-07-12) carries `preprocess_file()` and will boot the kernel layer. Other POSIX-compatible systems should work; [`docs/building.md`](docs/building.md) covers the floor and the platform-specific build notes.
+**Tested against**: DGD `master` at `733ea01e` (2026-08-30) — the 1.7.9 driver plus `preprocess_file()`, which the kernel layer requires, and a `make DEFINES=` that behaves. On Linux, continuously: the [regression workflow](.github/workflows/regression.yml) builds that commit and runs the module-less sweep on every pull request and every push to `main`. On macOS 26.5 (arm64), by hand, most recently 2026-09-01; CI does not cover macOS. The floor is lower than the pin: any driver at or after `975e927f` (2026-07-12) carries `preprocess_file()` and will boot the kernel layer. Other POSIX-compatible systems should work; [`docs/building.md`](docs/building.md) covers the floor and the platform-specific build notes.
 
 ## Documentation
 
