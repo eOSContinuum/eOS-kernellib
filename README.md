@@ -1,6 +1,6 @@
 [![License: BSD-2-Clause-Patent](https://img.shields.io/badge/License-BSD--2--Clause--Patent-blue.svg)](LICENSE.md)
 [![Built on: DGD](https://img.shields.io/badge/Built_on-DGD-green.svg)](https://github.com/dworkin/dgd)
-[![Tested against: DGD 1.7.9+](https://img.shields.io/badge/Tested_against-DGD_1.7.9%2B-brightgreen.svg)](#quickstart)
+[![Tested against: pinned DGD master](https://img.shields.io/badge/Tested_against-pinned_DGD_master-brightgreen.svg)](#quickstart)
 
 # eOS-kernellib
 
