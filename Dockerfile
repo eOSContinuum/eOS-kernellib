@@ -11,8 +11,9 @@
 
 FROM debian:bookworm-slim
 
-# The kernel layer requires preprocess_file(): DGD master at or after
-# 733ea01e (docs/building.md). Full hash so the shallow fetch can pin it.
+# The kernel layer's floor is preprocess_file() (975e927f); the commit
+# below is the validated pin, further along the same master line
+# (docs/building.md). Full hash so the shallow fetch can pin it.
 ARG DGD_COMMIT=733ea01eeeb571721c35511cb7f51a7f9d32fb6c
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
